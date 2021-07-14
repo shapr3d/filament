@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.19)
-project(sdl2 C)
+project(sdl2 C CXX)
 
 # This is necessary on Windows, so the sdl2.dll lives next to the sample apps that use it
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${FILAMENT_SAMPLES_BINARY_DIR})
@@ -102,6 +102,19 @@ endif()
 ###################################################################################################
 # Windows specific files
 if (WIN32)
+    if (WINDOWS_STORE)
+        file(GLOB SRCS_WINRT 
+            ${SRC_DIR}/core/winrt/*.c
+            ${SRC_DIR}/core/winrt/*.cpp
+            ${SRC_DIR}/misc/winrt/*.cpp
+            ${SRC_DIR}/video/winrt/*.c
+            ${SRC_DIR}/video/winrt/*.cpp
+            ${SRC_DIR}/power/winrt/*.cpp
+            ${SRC_DIR}/render/direct3d11/*.cpp
+            ${SRC_DIR}/audio/wasapi/*.cpp
+        )
+    endif()
+
     file(GLOB SRCS_WIN32
             ${SRC_DIR}/core/windows/*.c
             ${SRC_DIR}/video/windows/*.c
@@ -116,20 +129,28 @@ if (WIN32)
             ${SRC_DIR}/audio/winmm/*.c
             ${SRC_DIR}/audio/wasapi/*.c
     )
-    set(SRCS ${SRCS} ${SRCS_WIN32})
+    set(SRCS ${SRCS} ${SRCS_WIN32} ${SRCS_WINRT})
 
-    list(APPEND EXTRA_LIBS dinput8)
-    list(APPEND EXTRA_LIBS dxguid)
-    list(APPEND EXTRA_LIBS gdi32)
-    list(APPEND EXTRA_LIBS imagehlp)
-    list(APPEND EXTRA_LIBS imm32)
-    list(APPEND EXTRA_LIBS ole32)
-    list(APPEND EXTRA_LIBS oleaut32)
-    list(APPEND EXTRA_LIBS shell32)
-    list(APPEND EXTRA_LIBS user32)
-    list(APPEND EXTRA_LIBS uuid)
-    list(APPEND EXTRA_LIBS version)
-    list(APPEND EXTRA_LIBS winmm)
+    if (WINDOWS_STORE)
+        list(APPEND EXTRA_LIBS
+            -nodefaultlib:vccorlib$<$<CONFIG:Debug>:d>
+            -nodefaultlib:msvcrt$<$<CONFIG:Debug>:d>
+            vccorlib$<$<CONFIG:Debug>:d>.lib
+            msvcrt$<$<CONFIG:Debug>:d>.lib)
+    else()
+        list(APPEND EXTRA_LIBS dinput8)
+        list(APPEND EXTRA_LIBS dxguid)
+        list(APPEND EXTRA_LIBS gdi32)
+        list(APPEND EXTRA_LIBS imagehlp)
+        list(APPEND EXTRA_LIBS imm32)
+        list(APPEND EXTRA_LIBS ole32)
+        list(APPEND EXTRA_LIBS oleaut32)
+        list(APPEND EXTRA_LIBS shell32)
+        list(APPEND EXTRA_LIBS user32)
+        list(APPEND EXTRA_LIBS uuid)
+        list(APPEND EXTRA_LIBS version)
+        list(APPEND EXTRA_LIBS winmm)
+    endif()
 
 endif()
 ###################################################################################################
@@ -145,7 +166,13 @@ add_definitions(-D_THREAD_SAFE)
 add_library(${TARGET} SHARED ${SRCS})
 
 # libraries we're linking against
-target_link_libraries(${TARGET} ${EXTRA_LIBS})
+target_link_libraries(${TARGET} PRIVATE ${EXTRA_LIBS})
+
+set_property(TARGET ${TARGET} PROPERTY CXX_STANDARD 14)
+
+if(WINDOWS_STORE)
+  add_definitions(-DSDL_BUILDING_WINRT=1 -ZW)
+endif()
 
 if(NOT MSVC)
     target_compile_options(${TARGET}
@@ -162,7 +189,13 @@ target_include_directories(${TARGET} PUBLIC ${PUBLIC_HDR_DIR})
 
 if (WIN32)
     # Windows needs a WinMain static library.
-    add_library(${TARGET}main ${SRC_DIR}/main/windows/SDL_windows_main.c)
+    if (WINDOWS_STORE)
+        add_library(${TARGET}main INTERFACE)
+        target_sources(${TARGET}main INTERFACE ${SRC_DIR}/main/winrt/SDL_winrt_main_NonXAML.cpp)
+        set_property(TARGET ${TARGET}main PROPERTY CXX_STANDARD 14)
+    else()
+        add_library(${TARGET}main STATIC ${SRC_DIR}/main/windows/SDL_windows_main.c)
+    endif()
     if(NOT MSVC)
         # Making this option public because the warning occurs in public headers
         target_compile_options(${TARGET} PUBLIC -Wno-pragma-pack)
