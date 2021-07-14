@@ -25,6 +25,7 @@
 /* Windows includes */
 #include <roapi.h>
 #include <windows.foundation.h>
+#include <windows.system.h>
 #include <EventToken.h>
 
 
@@ -48,6 +49,7 @@ static Platform::WeakReference WINRT_MainThreadDispatcher;
    Declare its WinRT/COM interface here, to allow compilation with earlier
    Windows SDKs.
 */
+
 MIDL_INTERFACE("1DB9A292-CC78-4173-BE45-B61E67283EA7")
 IGameBarStatics_ : public IInspectable
 {
