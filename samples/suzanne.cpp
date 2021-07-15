@@ -136,6 +136,7 @@ int main(int argc, char** argv) {
     Config config;
     config.title = "suzanne";
     config.iblDirectory = FilamentApp::getRootAssetsPath() + IBL_FOLDER;
+    config.backend = Engine::Backend::OPENGL;
 
     handleCommandLineArguments(argc, argv, &config);
 

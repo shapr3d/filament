@@ -44,7 +44,7 @@ add_library(${TARGET} STATIC ${PUBLIC_HDRS} ${SRCS})
 target_include_directories(${TARGET} PUBLIC ${PUBLIC_HDR_DIR})
 
 if (WIN32)
-    target_link_libraries(${TARGET} PRIVATE opengl32 gdi32)
+    target_link_libraries(${TARGET} PRIVATE gdi32)
 endif()
 
 install(TARGETS ${TARGET} ARCHIVE DESTINATION lib/${DIST_DIR})

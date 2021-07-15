@@ -55,7 +55,7 @@ set(PRIVATE_HDRS
 # OpenGL / OpenGL ES Sources
 # ==================================================================================================
 
-if (FILAMENT_SUPPORTS_OPENGL AND NOT FILAMENT_USE_EXTERNAL_GLES3 AND NOT FILAMENT_USE_SWIFTSHADER)
+if (FILAMENT_SUPPORTS_OPENGL AND NOT FILAMENT_USE_SWIFTSHADER)
     list(APPEND SRCS
             src/opengl/gl_headers.cpp
             src/opengl/gl_headers.h
@@ -93,7 +93,7 @@ if (FILAMENT_SUPPORTS_OPENGL AND NOT FILAMENT_USE_EXTERNAL_GLES3 AND NOT FILAMEN
     elseif (LINUX)
         list(APPEND SRCS src/opengl/PlatformGLX.cpp)
     elseif (WIN32)
-        list(APPEND SRCS src/opengl/PlatformWGL.cpp)
+        list(APPEND SRCS src/opengl/PlatformEGL.cpp)
     else()
         list(APPEND SRCS src/opengl/PlatformDummyGL.cpp)
     endif()
@@ -206,6 +206,7 @@ add_library(${TARGET} STATIC ${PRIVATE_HDRS} ${PUBLIC_HDRS} ${SRCS})
 
 # specify where the public headers of this library are
 target_include_directories(${TARGET} PUBLIC ${PUBLIC_HDR_DIR})
+target_include_directories(${TARGET} PUBLIC "D:/Work/angle/include")
 
 # ==================================================================================================
 # Expose a header-only target to minimize dependencies.
@@ -290,6 +291,10 @@ endif()
 
 if (LINUX)
     target_link_libraries(${TARGET} PRIVATE dl)
+endif()
+
+if (WIN32)
+    target_link_libraries(${TARGET} PUBLIC "D:/Work/angle/out/Debug/libEGL.dll.lib" "D:/Work/angle/out/Debug/libGLESv2.dll.lib")
 endif()
 
 # ==================================================================================================
