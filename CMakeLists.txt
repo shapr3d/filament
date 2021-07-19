@@ -519,8 +519,8 @@ endfunction()
 # ==================================================================================================
 # Configuration for CMAKE_CROSSCOMPILING.
 # ==================================================================================================
-if (WEBGL)
-    set(IMPORT_EXECUTABLES ${FILAMENT}/${IMPORT_EXECUTABLES_DIR}/ImportExecutables-Release.cmake)
+if (WEBGL OR WIN32)
+    set(IMPORT_EXECUTABLES ${FILAMENT}/${IMPORT_EXECUTABLES_DIR}/ImportExecutables-All.cmake)
 else()
     set(IMPORT_EXECUTABLES ${FILAMENT}/${IMPORT_EXECUTABLES_DIR}/ImportExecutables-${CMAKE_BUILD_TYPE}.cmake)
 endif()
@@ -686,7 +686,7 @@ if (IS_HOST_PLATFORM)
     add_subdirectory(${TOOLS}/specular-color)
 endif()
 
-# Generate exported executables for cross-compiled builds (Android, WebGL, and iOS)
+# Generate exported executables for cross-compiled builds (Android, WebGL, iOS and WinRT)
 if (NOT CMAKE_CROSSCOMPILING)
     export(TARGETS matc cmgen filamesh mipgen resgen glslminifier FILE ${IMPORT_EXECUTABLES})
 endif()
