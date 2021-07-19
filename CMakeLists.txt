@@ -519,7 +519,7 @@ endfunction()
 # ==================================================================================================
 # Configuration for CMAKE_CROSSCOMPILING.
 # ==================================================================================================
-if (WEBGL)
+if (WEBGL OR WINDOWS_STORE)
     set(IMPORT_EXECUTABLES ${FILAMENT}/${IMPORT_EXECUTABLES_DIR}/ImportExecutables-Release.cmake)
 else()
     set(IMPORT_EXECUTABLES ${FILAMENT}/${IMPORT_EXECUTABLES_DIR}/ImportExecutables-${CMAKE_BUILD_TYPE}.cmake)
