@@ -440,7 +440,7 @@ void FilamentApp::run(const Config& config, SetupCallback setupCallback,
 #endif
 
 const utils::Path& FilamentApp::getRootAssetsPath() {
-    static const utils::Path root = utils::Path::getCurrentExecutable().getParent() + RELATIVE_ASSET_PATH;
+    static const utils::Path root = utils::Path::getCurrentExecutable().getParent();
     return root;
 }
 
