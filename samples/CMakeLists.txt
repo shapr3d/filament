@@ -214,7 +214,7 @@ endif()
 
 function(add_demo NAME)
     include_directories(${GENERATION_ROOT})
-    add_executable(${NAME} ${NAME}.cpp)
+    add_executable(${NAME} WIN32 ${NAME}.cpp)
     target_link_libraries(${NAME} PRIVATE sample-resources filamentapp)
     target_compile_options(${NAME} PRIVATE ${COMPILER_FLAGS})
 endfunction()
