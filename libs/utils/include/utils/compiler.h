@@ -117,7 +117,7 @@
 #if defined(__EMSCRIPTEN__) || defined(FILAMENT_SINGLE_THREADED)
 #   define UTILS_HAS_THREADING 0
 #else
-#   define UTILS_HAS_THREADING 1
+#   define UTILS_HAS_THREADING 0
 #endif
 
 #if __has_attribute(noinline)
