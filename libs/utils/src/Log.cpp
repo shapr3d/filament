@@ -19,6 +19,8 @@
 #include <string>
 #include <utils/compiler.h>
 
+#include <Windows.h>
+
 #ifdef ANDROID
 #   include <android/log.h>
 #   ifndef UTILS_LOG_TAG
@@ -67,10 +69,10 @@ ostream& LogStream::flush() noexcept {
         case LOG_DEBUG:
         case LOG_WARNING:
         case LOG_INFO:
-            fprintf(stdout, "%s", buf.get());
+            OutputDebugStringA(buf.get());
             break;
         case LOG_ERROR:
-            fprintf(stderr, "%s", buf.get());
+            OutputDebugStringA(buf.get());
             break;
     }
 #endif
