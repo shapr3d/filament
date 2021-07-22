@@ -123,7 +123,11 @@ protected:
     bool mIsValid = true;
     bool mPrintShaders = false;
     bool mRawShaderMode = false;
+#ifdef FILAMENT_NO_SPIRV_OPTIMIZATION
+    Optimization mOptimizationLevel = Optimization::NONE;
+#else
     Optimization mOptimizationLevel = Optimization::PERFORMANCE;
+#endif
     Metadata mReflectionTarget = Metadata::NONE;
     Platform mPlatform = Platform::ALL;
     OutputFormat mOutputFormat = OutputFormat::BLOB;

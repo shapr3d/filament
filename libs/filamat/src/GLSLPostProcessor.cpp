@@ -152,7 +152,9 @@ void GLSLPostProcessor::spirvToToMsl(const SpirvBlob *spirv, std::string *outMsl
     }
 
     *outMsl = mslCompiler.compile();
+#ifndef FILAMENT_NO_SHADER_MINIFIER
     *outMsl = minifier.removeWhitespace(*outMsl);
+#endif
 }
 
 bool GLSLPostProcessor::process(const std::string& inputShader, Config const& config,
@@ -224,8 +226,10 @@ bool GLSLPostProcessor::process(const std::string& inputShader, Config const& co
                             internalConfig.minifier);
                 }
             } else {
+#ifndef FILAMENT_NO_SPIRV_OPTIMIZATION
                 utils::slog.e << "GLSL post-processor invoked with optimization level NONE"
                         << utils::io::endl;
+#endif
             }
             break;
         case MaterialBuilder::Optimization::PREPROCESSOR:
@@ -238,6 +242,7 @@ bool GLSLPostProcessor::process(const std::string& inputShader, Config const& co
     }
 
     if (internalConfig.glslOutput) {
+#ifndef FILAMENT_NO_SHADER_MINIFIER
         *internalConfig.glslOutput =
                 internalConfig.minifier.removeWhitespace(*internalConfig.glslOutput);
 
@@ -246,6 +251,7 @@ bool GLSLPostProcessor::process(const std::string& inputShader, Config const& co
            *internalConfig.glslOutput =
                    internalConfig.minifier.renameStructFields(*internalConfig.glslOutput);
         }
+#endif
 
         if (mPrintShaders) {
             utils::slog.i << *internalConfig.glslOutput << utils::io::endl;
@@ -256,6 +262,10 @@ bool GLSLPostProcessor::process(const std::string& inputShader, Config const& co
 
 void GLSLPostProcessor::preprocessOptimization(glslang::TShader& tShader,
         GLSLPostProcessor::Config const& config, InternalConfig& internalConfig) const {
+
+#ifdef FILAMENT_NO_SPIRV_OPTIMIZATION
+        utils::slog.e << "GLSL post-processor with preprocessOptimization invoked when FILAMENT_NO_SPIRV_OPTIMIZATION was defined" << utils::io::endl;
+#endif
 
     using TargetApi = MaterialBuilder::TargetApi;
 
@@ -312,6 +322,10 @@ void GLSLPostProcessor::preprocessOptimization(glslang::TShader& tShader,
 void GLSLPostProcessor::fullOptimization(const TShader& tShader,
         GLSLPostProcessor::Config const& config, InternalConfig& internalConfig) const {
     SpirvBlob spirv;
+
+#ifdef FILAMENT_NO_SPIRV_OPTIMIZATION
+        utils::slog.e << "GLSL post-processor with fullOptimization invoked when FILAMENT_NO_SPIRV_OPTIMIZATION was defined" << utils::io::endl;
+#endif
 
     // Compile GLSL to to SPIR-V
     SpvOptions options;

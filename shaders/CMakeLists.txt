@@ -73,6 +73,9 @@ foreach(SHADER_FILE ${SHADERS})
     # -lshader_name adds a #line directive at the beginning to help identify sources of errors.
     set(OPT_FLAG "$<$<CONFIG:DEBUG>:-Onone>")
     set(LINE_FLAG "$<$<CONFIG:DEBUG>:-l${SHADER_NAME}>")
+    if (FILAMENT_NO_SHADER_MINIFIER)
+        set(OPT_FLAG "-Onone")
+    endif()
     add_custom_command(
         OUTPUT ${SHADER_MIN}
         COMMAND glslminifier ${OPT_FLAG} ${LINE_FLAG} -o ${SHADER_MIN} ${SHADER_RAW}

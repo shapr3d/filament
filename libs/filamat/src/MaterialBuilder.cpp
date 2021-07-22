@@ -84,7 +84,11 @@ void MaterialBuilderBase::prepare(bool vulkanSemantics) {
     if (vulkanSemantics) {
         // Currently GLSLPostProcessor.cpp is incapable of compiling SPIRV to GLSL without
         // running the optimizer. For now we just activate the optimizer in that case.
+#ifdef FILAMENT_NO_SPIRV_OPTIMIZATION
+        mOptimization = MaterialBuilder::Optimization::NONE;
+#else
         mOptimization = MaterialBuilder::Optimization::PERFORMANCE;
+#endif
         glTargetLanguage = TargetLanguage::SPIRV;
     }
 

@@ -23,6 +23,10 @@ option(FILAMENT_SUPPORTS_XCB "Include XCB support in Linux builds" ON)
 
 option(FILAMENT_SUPPORTS_XLIB "Include XLIB support in Linux builds" ON)
 
+option(FILAMENT_NO_SPIRV_OPTIMIZATION "Experimental: Do not optimize cross-compiled shaders" ON)
+
+option(FILAMENT_NO_SHADER_MINIFIER "Experimental: Do not use shader minifier" ON)
+
 set(FILAMENT_NDK_VERSION "" CACHE STRING
     "Android NDK version or version prefix to be used when building for Android."
 )
@@ -245,6 +249,14 @@ endif()
 
 if (FILAMENT_USE_SWIFTSHADER)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DFILAMENT_USE_SWIFTSHADER")
+endif()
+
+if (FILAMENT_NO_SPIRV_OPTIMIZATION)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DFILAMENT_NO_SPIRV_OPTIMIZATION")
+endif()
+
+if (FILAMENT_NO_SHADER_MINIFIER)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DFILAMENT_NO_SHADER_MINIFIER")
 endif()
 
 if (WIN32)

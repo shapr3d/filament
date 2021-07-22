@@ -138,6 +138,10 @@ namespace {
  * - Remove empty lines
  */
 std::string ShaderMinifier::removeWhitespace(const std::string& s) const {
+#ifdef FILAMENT_NO_SHADER_MINIFIER
+    utils::slog.e << "ShaderMinifier called when FILAMENT_NO_SHADER_MINIFIER was defined" << utils::io::endl;
+#endif
+
     size_t cur = 0;
 
     std::string r;
