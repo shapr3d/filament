@@ -292,6 +292,10 @@ if (LINUX)
     target_link_libraries(${TARGET} PRIVATE dl)
 endif()
 
+if (WIN32 AND FILAMENT_USE_EXTERNAL_GLES3)
+    target_link_libraries(${TARGET} PUBLIC angle)
+endif()
+
 # ==================================================================================================
 # Compiler flags
 # ==================================================================================================

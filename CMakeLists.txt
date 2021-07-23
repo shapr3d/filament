@@ -641,6 +641,10 @@ if (APPLE)
     add_subdirectory(${EXTERNAL}/moltenvk/tnt)
 endif()
 
+if (FILAMENT_USE_EXTERNAL_GLES3)
+    add_subdirectory(${EXTERNAL}/angle/tnt)
+endif()
+
 set(FILAMENT_SAMPLES_BINARY_DIR ${PROJECT_BINARY_DIR}/samples)
 
 if (WEBGL)
