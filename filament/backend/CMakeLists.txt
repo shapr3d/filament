@@ -55,7 +55,7 @@ set(PRIVATE_HDRS
 # OpenGL / OpenGL ES Sources
 # ==================================================================================================
 
-if (FILAMENT_SUPPORTS_OPENGL AND NOT FILAMENT_USE_EXTERNAL_GLES3 AND NOT FILAMENT_USE_SWIFTSHADER)
+if (FILAMENT_SUPPORTS_OPENGL AND NOT FILAMENT_USE_SWIFTSHADER)
     list(APPEND SRCS
             src/opengl/gl_headers.cpp
             src/opengl/gl_headers.h
@@ -93,7 +93,11 @@ if (FILAMENT_SUPPORTS_OPENGL AND NOT FILAMENT_USE_EXTERNAL_GLES3 AND NOT FILAMEN
     elseif (LINUX)
         list(APPEND SRCS src/opengl/PlatformGLX.cpp)
     elseif (WIN32)
-        list(APPEND SRCS src/opengl/PlatformWGL.cpp)
+        if (FILAMENT_USE_EXTERNAL_GLES3)
+            list(APPEND SRCS src/opengl/PlatformEGL.cpp)
+        else()
+            list(APPEND SRCS src/opengl/PlatformWGL.cpp)
+        endif()
     else()
         list(APPEND SRCS src/opengl/PlatformDummyGL.cpp)
     endif()

@@ -52,6 +52,9 @@
     #if defined(FILAMENT_SUPPORTS_OPENGL) && !defined(FILAMENT_USE_EXTERNAL_GLES3) && !defined(FILAMENT_USE_SWIFTSHADER)
         #include "opengl/PlatformWGL.h"
     #endif
+    #if defined(FILAMENT_SUPPORTS_OPENGL) && defined(FILAMENT_USE_EXTERNAL_GLES3)
+        #include "opengl/PlatformEGL.h"
+    #endif
     #if defined(FILAMENT_DRIVER_SUPPORTS_VULKAN)
         #include "vulkan/PlatformVkWindows.h"
     #endif
@@ -93,7 +96,7 @@ DefaultPlatform* DefaultPlatform::create(Backend* backend) noexcept {
 #endif
 
     if (*backend == Backend::DEFAULT) {
-#if defined(__EMSCRIPTEN__)
+#if defined(__EMSCRIPTEN__) || defined(FILAMENT_USE_EXTERNAL_GLES3)
         *backend = Backend::OPENGL;
 #elif defined(ANDROID)
         *backend = Backend::OPENGL;
@@ -135,7 +138,7 @@ DefaultPlatform* DefaultPlatform::create(Backend* backend) noexcept {
     assert_invariant(*backend == Backend::OPENGL);
     #if defined(FILAMENT_SUPPORTS_OPENGL)
         #if defined(FILAMENT_USE_EXTERNAL_GLES3) || defined(FILAMENT_USE_SWIFTSHADER)
-            return nullptr;
+            return new PlatformEGL();
         #elif defined(ANDROID)
             return new PlatformEGLAndroid();
         #elif defined(IOS)
