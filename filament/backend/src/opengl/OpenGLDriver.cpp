@@ -2484,11 +2484,11 @@ GLsizei OpenGLDriver::getAttachments(AttachmentArray& attachments,
         assert_invariant(!defaultFramebuffer);
         attachments[attachmentCount++] = GL_COLOR_ATTACHMENT7;
     }
-    if (any(buffers & TargetBufferFlags::DEPTH)) {
-        attachments[attachmentCount++] = defaultFramebuffer ? GL_DEPTH : GL_DEPTH_ATTACHMENT;
+    if (any(buffers & TargetBufferFlags::DEPTH) && !defaultFramebuffer) {
+        attachments[attachmentCount++] = GL_DEPTH_ATTACHMENT;
     }
-    if (any(buffers & TargetBufferFlags::STENCIL)) {
-        attachments[attachmentCount++] = defaultFramebuffer ? GL_STENCIL : GL_STENCIL_ATTACHMENT;
+    if (any(buffers & TargetBufferFlags::STENCIL) && !defaultFramebuffer) {
+        attachments[attachmentCount++] = GL_STENCIL_ATTACHMENT;
     }
     return attachmentCount;
 }
