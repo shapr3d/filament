@@ -350,13 +350,15 @@ static LinearColor inverseTonemapSRGB(sRGBColor x) {
 static float sGlobalScale = 1.0f;
 static float sGlobalScaleAnamorphism = 0.0f;
 
-int main(int argc, char** argv) {
+int main(int argc0, char** argv0) {
     App app;
 
     app.config.title = "Filament";
     app.config.iblDirectory = FilamentApp::getRootAssetsPath() + DEFAULT_IBL;
 
-    int optionIndex = handleCommandLineArguments(argc, argv, &app);
+    int argc = 3;
+    const char* argv[] = { "gltf_viewer.exe", "--api", "opengl" };
+    int optionIndex = handleCommandLineArguments(argc, (char**)argv, &app);
 
     utils::Path filename;
     int num_args = argc - optionIndex;
