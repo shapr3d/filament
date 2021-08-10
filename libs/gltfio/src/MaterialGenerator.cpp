@@ -478,6 +478,8 @@ static Material* createMaterial(Engine* engine, const MaterialKey& config, const
         builder.shading(Shading::LIT);
     }
 
+    builder.platform(MaterialBuilderBase::Platform::ALL);
+
     Package pkg = builder.build(engine->getJobSystem());
     return Material::Builder().package(pkg.getData(), pkg.getSize()).build(*engine);
 }
