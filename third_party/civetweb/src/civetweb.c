@@ -46,6 +46,8 @@
 #endif
 
 #if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
 #if !defined(_CRT_SECURE_NO_WARNINGS)
 #define _CRT_SECURE_NO_WARNINGS /* Disable deprecation warning in VS2005 */
 #endif
@@ -5543,7 +5545,7 @@ set_close_on_exec(SOCKET sock,
 #if defined(_WIN32_WCE)
 	(void)sock;
 #else
-	(void)SetHandleInformation((HANDLE)(intptr_t)sock, HANDLE_FLAG_INHERIT, 0);
+	(void)SetHandleInformation((HANDLE)(intptr_t)sock, 0, 0);
 #endif
 }
 
@@ -5730,7 +5732,7 @@ spawn_process(struct mg_connection *conn,
 	memset(&si, 0, sizeof(si));
 	si.cb = sizeof(si);
 
-	si.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
+	si.dwFlags = 0;
 	si.wShowWindow = SW_HIDE;
 
 	me = GetCurrentProcess();
@@ -5760,13 +5762,13 @@ spawn_process(struct mg_connection *conn,
 	 * https://msdn.microsoft.com/en-us/library/windows/desktop/ms682499%28v=vs.85%29.aspx
 	 */
 	SetHandleInformation((HANDLE)_get_osfhandle(fdin[1]),
-	                     HANDLE_FLAG_INHERIT,
+	                     0,
 	                     0);
 	SetHandleInformation((HANDLE)_get_osfhandle(fdout[0]),
-	                     HANDLE_FLAG_INHERIT,
+	                     0,
 	                     0);
 	SetHandleInformation((HANDLE)_get_osfhandle(fderr[0]),
-	                     HANDLE_FLAG_INHERIT,
+	                     0,
 	                     0);
 
 	/* If CGI file is a script, try to read the interpreter line */
