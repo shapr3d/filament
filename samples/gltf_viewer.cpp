@@ -356,8 +356,8 @@ int main(int argc0, char** argv0) {
     app.config.title = "Filament";
     app.config.iblDirectory = FilamentApp::getRootAssetsPath() + DEFAULT_IBL;
 
-    int argc = 3;
-    const char* argv[] = { "gltf_viewer.exe", "--api", "opengl" };
+    int argc = 4;
+    const char* argv[] = { "gltf_viewer.exe", "--api", "opengl", "test/scene.gltf"};
     int optionIndex = handleCommandLineArguments(argc, (char**)argv, &app);
 
     utils::Path filename;
