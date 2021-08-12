@@ -275,7 +275,7 @@ static bool isMobileTarget(filament::backend::ShaderModel model) {
         case ShaderModel::UNKNOWN:
             return false;
         case ShaderModel::GL_ES_30:
-            return true;
+            return false;
         case ShaderModel::GL_CORE_41:
             return false;
     }

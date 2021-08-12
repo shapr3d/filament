@@ -475,7 +475,7 @@ io::sstream& CodeGenerator::generateQualityDefine(io::sstream& out, ShaderQualit
             switch (mShaderModel) {
                 default:                        goto quality_normal;
                 case ShaderModel::GL_CORE_41:   goto quality_high;
-                case ShaderModel::GL_ES_30:     goto quality_low;
+                case ShaderModel::GL_ES_30:     goto quality_high;
             }
         case ShaderQuality::LOW:
         quality_low:
