@@ -177,7 +177,8 @@ DECL_DRIVER_API_R_N(backend::IndexBufferHandle, createIndexBuffer,
 
 DECL_DRIVER_API_R_N(backend::BufferObjectHandle, createBufferObject,
         uint32_t, byteCount,
-        backend::BufferObjectBinding, bindingType)
+        backend::BufferObjectBinding, bindingType,
+        bool, wrapsNativeBuffer)
 
 DECL_DRIVER_API_R_N(backend::TextureHandle, createTexture,
         backend::SamplerType, target,
@@ -309,6 +310,11 @@ DECL_DRIVER_API_SYNCHRONOUS_N(backend::SyncStatus, getSyncStatus, backend::SyncH
  * Updating driver objects
  * -----------------------
  */
+
+DECL_DRIVER_API_N(setNativeBuffer,
+        backend::BufferObjectHandle, boh,
+        void*, nativeBuffer,
+        bool, hasManagedStorageMode)
 
 DECL_DRIVER_API_N(setVertexBufferObject,
         backend::VertexBufferHandle, vbh,

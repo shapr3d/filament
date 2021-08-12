@@ -510,7 +510,8 @@ void OpenGLDriver::createIndexBufferR(
 void OpenGLDriver::createBufferObjectR(
         Handle<HwBufferObject> boh,
         uint32_t byteCount,
-        BufferObjectBinding bindingType) {
+        BufferObjectBinding bindingType,
+        bool wrapsNativeBuffer) {
     DEBUG_MARKER()
 
     auto& gl = mContext;
@@ -1707,6 +1708,11 @@ void OpenGLDriver::makeCurrent(Handle<HwSwapChain> schDraw, Handle<HwSwapChain> 
 // ------------------------------------------------------------------------------------------------
 // Updating driver objects
 // ------------------------------------------------------------------------------------------------
+
+void OpenGLDriver::setNativeBuffer(Handle<HwBufferObject> boh, void* nativeBuffer,
+        bool hasManagedStorageMode) {
+    ASSERT_PRECONDITION(false, "setNativeBuffer() is not implemented for backend!");
+}
 
 void OpenGLDriver::setVertexBufferObject(Handle<HwVertexBuffer> vbh,
         uint32_t index, Handle<HwBufferObject> boh) {

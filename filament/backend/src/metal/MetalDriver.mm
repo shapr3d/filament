@@ -200,8 +200,8 @@ void MetalDriver::createIndexBufferR(Handle<HwIndexBuffer> ibh, ElementType elem
 }
 
 void MetalDriver::createBufferObjectR(Handle<HwBufferObject> boh, uint32_t byteCount,
-        BufferObjectBinding bindingType) {
-    construct_handle<MetalBufferObject>(mHandleMap, boh, *mContext, byteCount);
+        BufferObjectBinding bindingType, bool wrapsNativeBuffer) {
+    construct_handle<MetalBufferObject>(mHandleMap, boh, *mContext, byteCount, wrapsNativeBuffer);
 }
 
 void MetalDriver::createTextureR(Handle<HwTexture> th, SamplerType target, uint8_t levels,
@@ -696,6 +696,13 @@ void MetalDriver::updateBufferObject(Handle<HwBufferObject> boh, BufferDescripto
     auto* bo = handle_cast<MetalBufferObject>(mHandleMap, boh);
     bo->updateBuffer(data.buffer, data.size, byteOffset);
     scheduleDestroy(std::move(data));
+}
+
+void MetalDriver::setNativeBuffer(Handle<HwBufferObject> boh, void* nativeBuffer,
+        bool hasManagedStorageMode) {
+    auto* bo = handle_cast<MetalBufferObject>(mHandleMap, boh);
+    bo->getBuffer()->releaseNativeBuffer();
+    bo->getBuffer()->wrapNativeBuffer((__bridge id<MTLBuffer>)nativeBuffer, hasManagedStorageMode);
 }
 
 void MetalDriver::setVertexBufferObject(Handle<HwVertexBuffer> vbh, uint32_t index,

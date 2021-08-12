@@ -21,6 +21,7 @@
 #include "MetalBufferPool.h"
 
 #include <Metal/Metal.h>
+#include <optional>
 
 namespace filament {
 namespace backend {
@@ -36,6 +37,16 @@ public:
     MetalBuffer& operator=(const MetalBuffer& rhs) = delete;
 
     size_t getSize() const noexcept { return mBufferSize; }
+
+    /**
+     * Wrap an existing native Metal buffer. Stores a strong reference to it.
+     */
+    void wrapNativeBuffer(id<MTLBuffer> buffer, bool hasManagedStorageMode);
+
+    /**
+     * Release an existing native Metal buffer, if wrapping any.
+     */
+    bool releaseNativeBuffer();
 
     /**
      * Update the buffer with data inside src. Potentially allocates a new buffer allocation to hold
@@ -71,7 +82,13 @@ public:
 
 private:
 
+    struct NativeBufferWraper {
+        id<MTLBuffer> mBuffer = nil;
+        bool hasManagedStorageMode = false;
+    };
+
     size_t mBufferSize = 0;
+    std::optional<NativeBufferWraper> mNativeBufferWrapper;
     const MetalBufferPoolEntry* mBufferPoolEntry = nullptr;
     void* mCpuBuffer = nullptr;
     MetalContext& mContext;

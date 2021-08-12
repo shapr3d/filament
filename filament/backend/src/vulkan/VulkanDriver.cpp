@@ -466,8 +466,8 @@ void VulkanDriver::destroyIndexBuffer(Handle<HwIndexBuffer> ibh) {
     }
 }
 
-void VulkanDriver::createBufferObjectR(Handle<HwBufferObject> boh,
-        uint32_t byteCount, BufferObjectBinding bindingType) {
+void VulkanDriver::createBufferObjectR(Handle<HwBufferObject> boh, uint32_t byteCount,
+        BufferObjectBinding bindingType, bool wrapsNativeBuffer) {
     auto bufferObject = construct_handle<VulkanBufferObject>(mHandleMap, boh, mContext, mStagePool,
             byteCount);
     mDisposer.createDisposable(bufferObject, [this, boh] () {
@@ -837,6 +837,11 @@ math::float2 VulkanDriver::getClipSpaceParams() {
 
 uint8_t VulkanDriver::getMaxDrawBuffers() {
     return backend::MRT::MIN_SUPPORTED_RENDER_TARGET_COUNT; // TODO: query real value
+}
+
+void VulkanDriver::setNativeBuffer(Handle<HwBufferObject> boh, void* nativeBuffer,
+        bool hasManagedStorageMode) {
+    ASSERT_PRECONDITION(false, "setNativeBuffer() is not implemented for backend!");
 }
 
 void VulkanDriver::setVertexBufferObject(Handle<HwVertexBuffer> vbh, uint32_t index,

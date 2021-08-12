@@ -16,6 +16,9 @@
 
 #include "MetalBuffer.h"
 
+#if defined(__APPLE__)
+#include <TargetConditionals.h> // TARGET_OS_SIMULATOR, etc.
+#endif
 #include <utils/Panic.h>
 
 namespace filament {
@@ -34,6 +37,8 @@ MetalBuffer::MetalBuffer(MetalContext& context, size_t size, bool forceGpuBuffer
 }
 
 MetalBuffer::~MetalBuffer() {
+    releaseNativeBuffer();
+
     if (mCpuBuffer) {
         free(mCpuBuffer);
     }
@@ -42,6 +47,28 @@ MetalBuffer::~MetalBuffer() {
     if (mBufferPoolEntry) {
         mContext.bufferPool->releaseBuffer(mBufferPoolEntry);
     }
+}
+
+void MetalBuffer::wrapNativeBuffer(id <MTLBuffer> buffer, bool hasManagedStorageMode) {
+    ASSERT_PRECONDITION(!mNativeBufferWrapper, "A native buffer is already wrapped. Call releaseNativeBuffer()");
+    ASSERT_PRECONDITION(buffer, "Native buffer cannot be nil");
+#if TARGET_OS_IOS
+    ASSERT_PRECONDITION(!hasManagedStorageMode, "Managed storage mode is not supported on iOS");
+#endif
+    ASSERT_PRECONDITION(!mCpuBuffer, "This buffer is backed by CPU memory");
+    mNativeBufferWrapper = { buffer, hasManagedStorageMode };
+}
+
+bool MetalBuffer::releaseNativeBuffer() {
+    if (!mNativeBufferWrapper) {
+        return false;
+    }
+
+#if !__has_feature(objc_arc)
+    [mNativeBufferWrapper.mBuffer release];
+#endif
+    mNativeBufferWrapper.reset();
+    return true;
 }
 
 void MetalBuffer::copyIntoBuffer(void* src, size_t size) {
@@ -57,6 +84,16 @@ void MetalBuffer::copyIntoBuffer(void* src, size_t size) {
         return;
     }
 
+    if (mNativeBufferWrapper) {
+        memcpy(static_cast<uint8_t*>(mNativeBufferWrapper->mBuffer.contents), src, size);
+#if !TARGET_OS_IOS
+        if (mNativeBufferWrapper->hasManagedStorageMode) {
+            [mNativeBufferWrapper->mBuffer didModifyRange:NSMakeRange(0, size)];
+        }
+#endif
+        return;
+    }
+
     // We're about to acquire a new buffer to hold the new contents. If we previously had obtained a
     // buffer we release it, decrementing its reference count, as we no longer needs it.
     if (mBufferPoolEntry) {
@@ -68,6 +105,10 @@ void MetalBuffer::copyIntoBuffer(void* src, size_t size) {
 }
 
 id<MTLBuffer> MetalBuffer::getGpuBufferForDraw(id<MTLCommandBuffer> cmdBuffer) noexcept {
+    if (mNativeBufferWrapper) {
+        return mNativeBufferWrapper->mBuffer;
+    }
+
     if (!mBufferPoolEntry) {
         // If there's a CPU buffer, then we return nil here, as the CPU-side buffer will be bound
         // separately.

@@ -36,6 +36,7 @@ struct VertexBuffer::BuilderDetails {
     uint32_t mVertexCount = 0;
     uint8_t mBufferCount = 0;
     bool mBufferObjectsEnabled = false;
+    bool mNativeBuffersEnabled = false;
 };
 
 using BuilderType = VertexBuffer;
@@ -53,6 +54,11 @@ VertexBuffer::Builder& VertexBuffer::Builder::vertexCount(uint32_t vertexCount) 
 
 VertexBuffer::Builder& VertexBuffer::Builder::enableBufferObjects(bool enabled) noexcept {
     mImpl->mBufferObjectsEnabled = enabled;
+    return *this;
+}
+
+VertexBuffer::Builder& VertexBuffer::Builder::enableNativeBuffer(bool enabled) noexcept {
+    mImpl->mNativeBuffersEnabled = enabled;
     return *this;
 }
 
@@ -146,7 +152,8 @@ VertexBuffer* VertexBuffer::Builder::build(Engine& engine) {
 
 FVertexBuffer::FVertexBuffer(FEngine& engine, const VertexBuffer::Builder& builder)
         : mVertexCount(builder->mVertexCount), mBufferCount(builder->mBufferCount),
-          mBufferObjectsEnabled(builder->mBufferObjectsEnabled) {
+          mBufferObjectsEnabled(builder->mBufferObjectsEnabled),
+          mNativeBuffersEnabled(builder->mNativeBuffersEnabled) {
     std::copy(std::begin(builder->mAttributes), std::end(builder->mAttributes), mAttributes.begin());
 
     mDeclaredAttributes = builder->mDeclaredAttributes;
@@ -199,7 +206,7 @@ FVertexBuffer::FVertexBuffer(FEngine& engine, const VertexBuffer::Builder& build
         for (size_t i = 0; i < MAX_VERTEX_BUFFER_COUNT; ++i) {
             if (bufferSizes[i] > 0) {
                 BufferObjectHandle bo = driver.createBufferObject(bufferSizes[i],
-                        backend::BufferObjectBinding::VERTEX);
+                        backend::BufferObjectBinding::VERTEX, mNativeBuffersEnabled);
                 driver.setVertexBufferObject(mHandle, i, bo);
                 mBufferObjects[i] = bo;
             }
@@ -224,6 +231,7 @@ size_t FVertexBuffer::getVertexCount() const noexcept {
 void FVertexBuffer::setBufferAt(FEngine& engine, uint8_t bufferIndex,
         backend::BufferDescriptor&& buffer, uint32_t byteOffset) {
     ASSERT_PRECONDITION(!mBufferObjectsEnabled, "Please use setBufferObjectAt()");
+    ASSERT_PRECONDITION(!mNativeBuffersEnabled, "Please use setNativeBufferAt()");
     if (bufferIndex < mBufferCount) {
         assert_invariant(mBufferObjects[bufferIndex]);
         engine.getDriverApi().updateBufferObject(mBufferObjects[bufferIndex],
@@ -235,6 +243,7 @@ void FVertexBuffer::setBufferAt(FEngine& engine, uint8_t bufferIndex,
 
 void FVertexBuffer::setBufferObjectAt(FEngine& engine, uint8_t bufferIndex,
         FBufferObject const * bufferObject) {
+    ASSERT_PRECONDITION(!mNativeBuffersEnabled, "Please use setNativeBufferAt()");
     ASSERT_PRECONDITION(mBufferObjectsEnabled, "Please use setBufferAt()");
     ASSERT_PRECONDITION(bufferObject->getBindingType() == BufferObject::BindingType::VERTEX,
             "Binding type must be VERTEX.");
@@ -245,6 +254,19 @@ void FVertexBuffer::setBufferObjectAt(FEngine& engine, uint8_t bufferIndex,
         ASSERT_PRECONDITION(bufferIndex < mBufferCount, "bufferIndex must be < bufferCount");
     }
 }
+
+void FVertexBuffer::setNativeBufferAt(FEngine& engine, uint8_t bufferIndex,
+         void* nativeBuffer, bool hasManagedStorageMode) {
+    ASSERT_PRECONDITION(!mBufferObjectsEnabled, "Please use setBufferObjectAt()");
+    ASSERT_PRECONDITION(mNativeBuffersEnabled, "Please use setBufferAt()");
+    if (bufferIndex < mBufferCount) {
+        assert_invariant(mBufferObjects[bufferIndex]);
+        engine.getDriverApi().setNativeBuffer(mBufferObjects[bufferIndex], nativeBuffer, hasManagedStorageMode);
+    } else {
+        ASSERT_PRECONDITION(bufferIndex < mBufferCount, "bufferIndex must be < bufferCount");
+    }
+}
+
 
 // ------------------------------------------------------------------------------------------------
 // Trampoline calling into private implementation
@@ -262,6 +284,11 @@ void VertexBuffer::setBufferAt(Engine& engine, uint8_t bufferIndex,
 void VertexBuffer::setBufferObjectAt(Engine& engine, uint8_t bufferIndex,
         BufferObject const* bufferObject) {
     upcast(this)->setBufferObjectAt(upcast(engine), bufferIndex, upcast(bufferObject));
+}
+
+void VertexBuffer::setNativeBufferAt(Engine& engine, uint8_t bufferIndex,
+        void* nativeBuffer, bool hasManagedStorageMode) {
+    upcast(this)->setNativeBufferAt(upcast(engine), bufferIndex, nativeBuffer, hasManagedStorageMode);
 }
 
 } // namespace filament

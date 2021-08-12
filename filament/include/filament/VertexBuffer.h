@@ -99,6 +99,16 @@ public:
         Builder& enableBufferObjects(bool enabled = true) noexcept;
 
         /**
+         * Allows buffers to wrap native (backend-specific) buffers.
+         *
+         * If native buffer mode is enabled, clients must call setNativeBufferAt rather than
+         * setBufferAt.
+         *
+         * @param enabled If true, enables native buffer mode.  False by default.
+         */
+        Builder& enableNativeBuffer(bool enabled = true) noexcept;
+
+        /**
          * Sets up an attribute for this vertex buffer set.
          *
          * Using \p byteOffset and \p byteStride, attributes can be interleaved in the same buffer.
@@ -194,6 +204,20 @@ public:
      * @param bufferObject The handle to the GPU data that will be used in this buffer slot.
      */
     void setBufferObjectAt(Engine& engine, uint8_t bufferIndex, BufferObject const* bufferObject);
+
+    /**
+     * Wraps the given native buffer (stores a strong reference to it).
+     *
+     * To use this, you must first call enableNativeBuffer() on the Builder.
+     *
+     * @param engine Reference to the filament::Engine to associate this VertexBuffer with.
+     * @param bufferIndex Index of the buffer to initialize. Must be between 0
+     *                    and Builder::bufferCount() - 1.
+     * @param nativeBuffer Pointer to the native buffer that will be used in this buffer slot.
+     * @param hasManagedStorageMode Backend-specific property (for Metal backend only).
+     */
+    void setNativeBufferAt(Engine& engine, uint8_t bufferIndex,
+            void* nativeBuffer, bool hasManagedStorageMode);
 };
 
 } // namespace filament
