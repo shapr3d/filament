@@ -336,10 +336,8 @@ void GLSLPostProcessor::fullOptimization(const TShader& tShader,
         glslOptions.es = config.shaderModel == filament::backend::ShaderModel::GL_ES_30;
         glslOptions.version = shaderVersionFromModel(config.shaderModel);
         glslOptions.enable_420pack_extension = glslOptions.version >= 420;
-        glslOptions.fragment.default_float_precision = glslOptions.es ?
-                CompilerGLSL::Options::Precision::Mediump : CompilerGLSL::Options::Precision::Highp;
-        glslOptions.fragment.default_int_precision = glslOptions.es ?
-                CompilerGLSL::Options::Precision::Mediump : CompilerGLSL::Options::Precision::Highp;
+        glslOptions.fragment.default_float_precision = CompilerGLSL::Options::Precision::Highp;
+        glslOptions.fragment.default_int_precision = CompilerGLSL::Options::Precision::Highp;
 
         CompilerGLSL glslCompiler(move(spirv));
         glslCompiler.set_common_options(glslOptions);
