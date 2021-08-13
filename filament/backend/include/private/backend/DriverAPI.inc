@@ -311,6 +311,11 @@ DECL_DRIVER_API_SYNCHRONOUS_N(backend::SyncStatus, getSyncStatus, backend::SyncH
  * -----------------------
  */
 
+DECL_DRIVER_API_N(setNativeIndexBuffer,
+        backend::IndexBufferHandle, ibh,
+        void*, nativeBuffer,
+        bool, hasManagedStorageMode)
+
 DECL_DRIVER_API_N(setNativeBuffer,
         backend::BufferObjectHandle, boh,
         void*, nativeBuffer,

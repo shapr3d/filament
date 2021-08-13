@@ -698,6 +698,13 @@ void MetalDriver::updateBufferObject(Handle<HwBufferObject> boh, BufferDescripto
     scheduleDestroy(std::move(data));
 }
 
+void MetalDriver::setNativeIndexBuffer(Handle<HwIndexBuffer> ibh, void* nativeBuffer,
+        bool hasManagedStorageMode) {
+    auto* ib = handle_cast<MetalIndexBuffer>(mHandleMap, ibh);
+    ib->buffer.releaseNativeBuffer();
+    ib->buffer.wrapNativeBuffer((__bridge id<MTLBuffer>)nativeBuffer, hasManagedStorageMode);
+}
+
 void MetalDriver::setNativeBuffer(Handle<HwBufferObject> boh, void* nativeBuffer,
         bool hasManagedStorageMode) {
     auto* bo = handle_cast<MetalBufferObject>(mHandleMap, boh);

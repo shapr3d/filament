@@ -1709,6 +1709,11 @@ void OpenGLDriver::makeCurrent(Handle<HwSwapChain> schDraw, Handle<HwSwapChain> 
 // Updating driver objects
 // ------------------------------------------------------------------------------------------------
 
+void OpenGLDriver::setNativeIndexBuffer(Handle<HwIndexBuffer> ibh, void* nativeBuffer,
+        bool hasManagedStorageMode) {
+    ASSERT_PRECONDITION(false, "setNativeIndexBuffer() is not implemented for backend!");
+}
+
 void OpenGLDriver::setNativeBuffer(Handle<HwBufferObject> boh, void* nativeBuffer,
         bool hasManagedStorageMode) {
     ASSERT_PRECONDITION(false, "setNativeBuffer() is not implemented for backend!");

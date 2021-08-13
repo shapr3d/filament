@@ -83,6 +83,16 @@ public:
         Builder& bufferType(IndexType indexType) noexcept;
 
         /**
+        * Allows buffers to wrap native (backend-specific) buffers.
+        *
+        * If native buffer mode is enabled, clients must call setNativeBuffer rather than
+        * setBuffer.
+        *
+        * @param enabled If true, enables native buffer mode.  False by default.
+        */
+        Builder& enableNativeBuffer(bool enabled = true) noexcept;
+
+        /**
          * Creates the IndexBuffer object and returns a pointer to it. After creation, the index
          * buffer is uninitialized. Use IndexBuffer::setBuffer() to initialize the IndexBuffer.
          *
@@ -112,6 +122,18 @@ public:
      * @param byteOffset Offset in *bytes* into the IndexBuffer
      */
     void setBuffer(Engine& engine, BufferDescriptor&& buffer, uint32_t byteOffset = 0);
+
+
+    /**
+     * Wraps the given native buffer (stores a strong reference to it).
+     *
+     * To use this, you must first call enableNativeBuffer() on the Builder.
+     *
+     * @param engine Reference to the filament::Engine to associate this VertexBuffer with.
+     * @param nativeBuffer Pointer to the native buffer that will be used in this buffer slot.
+     * @param hasManagedStorageMode Backend-specific property (for Metal backend only).
+     */
+    void setNativeBuffer(Engine& engine, void* nativeBuffer, bool hasManagedStorageMode);
 
     /**
      * Returns the size of this IndexBuffer in elements.

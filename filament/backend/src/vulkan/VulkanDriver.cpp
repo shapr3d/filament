@@ -839,6 +839,11 @@ uint8_t VulkanDriver::getMaxDrawBuffers() {
     return backend::MRT::MIN_SUPPORTED_RENDER_TARGET_COUNT; // TODO: query real value
 }
 
+void VulkanDriver::setNativeIndexBuffer(Handle<HwIndexBuffer> ibh, void* nativeBuffer,
+        bool hasManagedStorageMode) {
+    ASSERT_PRECONDITION(false, "setNativeIndexBuffer() is not implemented for backend!");
+}
+
 void VulkanDriver::setNativeBuffer(Handle<HwBufferObject> boh, void* nativeBuffer,
         bool hasManagedStorageMode) {
     ASSERT_PRECONDITION(false, "setNativeBuffer() is not implemented for backend!");
