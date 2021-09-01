@@ -90,16 +90,6 @@ struct FeaturesVk : FeatureSetBase
         "supportsIncrementalPresent", FeatureCategory::VulkanFeatures,
         "VkDevice supports the VK_KHR_incremental_present extension", &members};
 
-    // Whether the Vulkan presentation engine rotates the present region rectangles of the
-    // VK_KHR_incremental_present extension in pre-rotation situations.  The Android presentation
-    // engine assumes that these rectangles need to be rotated, and thus ANGLE should not also
-    // pre-rotate them.
-    Feature disablePreRotateIncrementalPresentRectangles = {
-        "disablePreRotateIncrementalPresentRectangles", FeatureCategory::VulkanFeatures,
-        "Presentation engine performs necessary rotation for present region rectangles of the "
-        "VK_KHR_incremental_present extension",
-        &members};
-
     // Whether texture copies on cube map targets should be done on GPU.  This is a workaround for
     // Intel drivers on windows that have an issue with creating single-layer views on cube map
     // textures.
@@ -171,10 +161,16 @@ struct FeaturesVk : FeatureSetBase
         "VkDevice supports the EGL_ANDROID_native_fence_sync extension", &members,
         "http://anglebug.com/2517"};
 
-    // Whether the VkDevice can support imageCubeArray feature properly.
+    // Whether the VkDevice can support the imageCubeArray feature properly.
     Feature supportsImageCubeArray = {"supportsImageCubeArray", FeatureCategory::VulkanFeatures,
                                       "VkDevice supports the imageCubeArray feature properly",
                                       &members, "http://anglebug.com/3584"};
+
+    // Whether the VkDevice supports the pipelineStatisticsQuery feature.
+    Feature supportsPipelineStatisticsQuery = {
+        "supportsPipelineStatisticsQuery", FeatureCategory::VulkanFeatures,
+        "VkDevice supports the pipelineStatisticsQuery feature", &members,
+        "http://anglebug.com/5430"};
 
     // Whether the VkDevice supports the VK_EXT_shader_stencil_export extension, which is used to
     // perform multisampled resolve of stencil buffer.  A multi-step workaround is used instead if
@@ -209,6 +205,13 @@ struct FeaturesVk : FeatureSetBase
                                       "VkDevice supports the VK_EXT_index_type_uint8 extension",
                                       &members, "http://anglebug.com/4405"};
 
+    // Whether the VkDevice supports the VK_EXT_custom_border_color extension
+    // http://anglebug.com/3577
+    Feature supportsCustomBorderColorEXT = {
+        "supports_custom_border_color", FeatureCategory::VulkanFeatures,
+        "VkDevice supports the VK_EXT_custom_border_color extension", &members,
+        "http://anglebug.com/3577"};
+
     // Whether the VkDevice supports the VK_KHR_depth_stencil_resolve extension with the
     // independentResolveNone feature.
     // http://anglebug.com/4836
@@ -224,6 +227,11 @@ struct FeaturesVk : FeatureSetBase
         "supportsMultisampledRenderToSingleSampled", FeatureCategory::VulkanFeatures,
         "VkDevice supports the VK_EXT_multisampled_render_to_single_sampled extension", &members,
         "http://anglebug.com/4836"};
+
+    // Whether the VkDevice supports the VK_KHR_multiview extension.  http://anglebug.com/6048
+    Feature supportsMultiview = {"supportsMultiview", FeatureCategory::VulkanFeatures,
+                                 "VkDevice supports the VK_KHR_multiview extension", &members,
+                                 "http://anglebug.com/6048"};
 
     // VK_PRESENT_MODE_FIFO_KHR causes random timeouts on Linux Intel. http://anglebug.com/3153
     Feature disableFifoPresentMode = {"disableFifoPresentMode", FeatureCategory::VulkanWorkarounds,
@@ -433,11 +441,41 @@ struct FeaturesVk : FeatureSetBase
         "Works around a bug on platforms which destroy oldSwapchain in vkCreateSwapchainKHR.",
         &members, "http://anglebug.com/5061"};
 
+    // Allow forcing an LOD offset on all sampling operations for performance comparisons. ANGLE is
+    // non-conformant if this feature is enabled.
+    std::array<angle::Feature, 4> forceTextureLODOffset = {
+        angle::Feature{"force_texture_lod_offset_1", angle::FeatureCategory::VulkanWorkarounds,
+                       "Increase the minimum texture level-of-detail by 1 when sampling.",
+                       &members},
+        angle::Feature{"force_texture_lod_offset_2", angle::FeatureCategory::VulkanWorkarounds,
+                       "Increase the minimum texture level-of-detail by 2 when sampling.",
+                       &members},
+        angle::Feature{"force_texture_lod_offset_3", angle::FeatureCategory::VulkanWorkarounds,
+                       "Increase the minimum texture level-of-detail by 3 when sampling.",
+                       &members},
+        angle::Feature{"force_texture_lod_offset_4", angle::FeatureCategory::VulkanWorkarounds,
+                       "Increase the minimum texture level-of-detail by 4 when sampling.",
+                       &members},
+    };
+
+    // Translate non-nearest filtering modes to nearest for all samplers for performance
+    // comparisons. ANGLE is non-conformant if this feature is enabled.
+    Feature forceNearestFiltering = {"force_nearest_filtering", FeatureCategory::VulkanWorkarounds,
+                                     "Force nearest filtering when sampling.", &members};
+
     // Translate  non-nearest mip filtering modes to nearest mip for all samplers for performance
     // comparisons. ANGLE is non-conformant if this feature is enabled.
     Feature forceNearestMipFiltering = {"forceNearestMipFiltering",
                                         FeatureCategory::VulkanWorkarounds,
                                         "Force nearest mip filtering when sampling.", &members};
+
+    // Compress float32 vertices in static buffers to float16 at draw time. ANGLE is non-conformant
+    // if this feature is enabled.
+    angle::Feature compressVertexData = {"compress_vertex_data",
+                                         angle::FeatureCategory::VulkanWorkarounds,
+                                         "Compress vertex data to smaller data types when "
+                                         "possible. Using this feature makes ANGLE non-conformant.",
+                                         &members};
 
     // Qualcomm missynchronizes vkCmdClearAttachments in the middle of render pass.
     // https://issuetracker.google.com/166809097
@@ -461,6 +499,12 @@ struct FeaturesVk : FeatureSetBase
     Feature emulatedPrerotation270 = {"emulatedPrerotation270", FeatureCategory::VulkanFeatures,
                                       "Emulate 270-degree prerotation.", &members,
                                       "http://anglebug.com/4901"};
+
+    // Whether SPIR-V should be generated directly instead of through glslang.  Transitory feature
+    // until the work is complete.
+    Feature directSPIRVGeneration = {"directSPIRVGeneration", FeatureCategory::VulkanFeatures,
+                                     "Direct translation to SPIR-V.", &members,
+                                     "http://anglebug.com/4889"};
 
     // Whether we should use driver uniforms over specialization constants for some shader
     // modifications like yflip and rotation.
@@ -489,13 +533,46 @@ struct FeaturesVk : FeatureSetBase
         "supportsNegativeViewport", FeatureCategory::VulkanFeatures,
         "The driver supports inverting the viewport with a negative height.", &members};
 
-    // The EGL_EXT_buffer_age implementation causes
-    // android.graphics.cts.BitmapTest#testDrawingHardwareBitmapNotLeaking to fail on Cuttlefish
-    // with SwANGLE. Needs investigation whether this is a race condition which could affect other
-    // Vulkan drivers, or if it's a SwiftShader bug.
-    // http://anglebug.com/3529
-    Feature enableBufferAge = {"enableBufferAge", FeatureCategory::VulkanWorkarounds,
-                               "Expose EGL_EXT_buffer_age", &members, "http://anglebug.com/3529"};
+    // Whether we should force any highp precision in the fragment shader to mediump.
+    // ANGLE is non-conformant if this feature is enabled.
+    Feature forceFragmentShaderPrecisionHighpToMediump = {
+        "forceFragmentShaderPrecisionHighpToMediump", FeatureCategory::VulkanWorkarounds,
+        "Forces highp precision in fragment shader to mediump.", &members,
+        "https://issuetracker.google.com/184850002"};
+
+    // Whether we should submit at each FBO boundary.
+    Feature preferSubmitAtFBOBoundary = {
+        "preferSubmitAtFBOBoundary", FeatureCategory::VulkanWorkarounds,
+        "Submit commands to driver at each FBO boundary for performance improvements.", &members,
+        "https://issuetracker.google.com/187425444"};
+
+    // Workaround for gap in Vulkan spec related to querying descriptor count for immutable samplers
+    // tied to an external format.
+    Feature useMultipleDescriptorsForExternalFormats = {
+        "useMultipleDescriptorsForExternalFormats", FeatureCategory::VulkanWorkarounds,
+        "Return a default descriptor count for external formats.", &members,
+        "http://anglebug.com/6141"};
+
+    // Whether the VkDevice can support Protected Memory.
+    Feature supportsProtectedMemory = {"supports_protected_memory", FeatureCategory::VulkanFeatures,
+                                       "VkDevice supports protected memory", &members,
+                                       "http://anglebug.com/3965"};
+
+    // Whether the VkInstance supports the VK_KHR_get_surface_capabilities2 extension.
+    Feature supportsSurfaceCapabilities2Extension = {
+        "supportsSurfaceCapabilities2Extension", FeatureCategory::VulkanFeatures,
+        "VkInstance supports the VK_KHR_get_surface_capabilities2 extension", &members};
+
+    // Whether the VkInstance supports the VK_KHR_surface_protected_capabilities extension.
+    Feature supportsSurfaceProtectedCapabilitiesExtension = {
+        "supportsSurfaceProtectedCapabilitiesExtension", FeatureCategory::VulkanFeatures,
+        "VkInstance supports the VK_KHR_surface_protected_capabilities extension", &members};
+
+    // Whether the VkSurface supports protected swapchains from
+    // supportsSurfaceProtectedCapabilitiesExtension.
+    Feature supportsSurfaceProtectedSwapchains = {
+        "supportsSurfaceProtectedSwapchains", FeatureCategory::VulkanFeatures,
+        "VkSurface supportsProtected for protected swapchains", &members};
 };
 
 inline FeaturesVk::FeaturesVk()  = default;

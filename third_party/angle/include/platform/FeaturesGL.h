@@ -205,15 +205,6 @@ struct FeaturesGL : FeatureSetBase
         "The point size range reported from the API is inconsistent with the actual behavior",
         &members};
 
-    // On some NVIDIA drivers certain types of GLSL arithmetic ops mixing vectors and scalars may be
-    // executed incorrectly. Change them in the shader translator. Tracking bug:
-    // http://crbug.com/772651
-    Feature rewriteVectorScalarArithmetic = {"rewrite_vector_scalar_arithmetic",
-                                             FeatureCategory::OpenGLWorkarounds,
-                                             "Certain types of GLSL arithmetic ops mixing vectors "
-                                             "and scalars may be executed incorrectly",
-                                             &members, "http://crbug.com/772651"};
-
     // On some Android devices for loops used to initialize variables hit native GLSL compiler bugs.
     Feature dontUseLoopsToInitializeVariables = {
         "dont_use_loops_to_initialize_variables", FeatureCategory::OpenGLWorkarounds,
@@ -342,12 +333,6 @@ struct FeaturesGL : FeatureSetBase
         "clip_src_region_for_blitframebuffer", FeatureCategory::OpenGLWorkarounds,
         "Issues with blitFramebuffer when the parameters don't match the framebuffer size.",
         &members, "http://crbug.com/830046"};
-
-    // Calling glTexImage2D with zero size generates GL errors
-    Feature resettingTexturesGeneratesErrors = {
-        "reset_texture_generates_errors", FeatureCategory::OpenGLWorkarounds,
-        "Calling glTexImage2D with zero size generates errors.", &members,
-        "http://anglebug.com/3859"};
 
     // Mac Intel samples transparent black from GL_COMPRESSED_RGB_S3TC_DXT1_EXT
     Feature rgbDXT1TexturesSampleZeroAlpha = {
@@ -529,6 +514,52 @@ struct FeaturesGL : FeatureSetBase
         "shift_instanced_array_data_with_offset", FeatureCategory::OpenGLWorkarounds,
         "glDrawArraysInstanced is buggy on certain new Mac Intel GPUs", &members,
         "http://crbug.com/1144207"};
+
+    // ANGLE needs to support devices that have no native VAOs. Sync everything to the default VAO.
+    Feature syncVertexArraysToDefault = {
+        "sync_vertex_arrays_to_default", FeatureCategory::OpenGLWorkarounds,
+        "Only use the default VAO because of missing support or driver bugs", &members,
+        "http://anglebug.com/5577"};
+
+    // On desktop Linux/AMD when using the amdgpu drivers, the precise kernel and DRM version are
+    // leaked via GL_RENDERER. We workaround this to improve user privacy.
+    Feature sanitizeAmdGpuRendererString = {
+        "sanitize_amdgpu_renderer_string", FeatureCategory::OpenGLWorkarounds,
+        "Strip precise kernel and DRM version information from amdgpu renderer strings.", &members,
+        "http://crbug.com/1181193"};
+
+    // Imagination GL drivers are buggy with context switching. We need to ubind fbo to workaround a
+    // crash in the driver.
+    Feature unbindFBOOnContextSwitch = {"unbind_fbo_before_switching_context",
+                                        FeatureCategory::OpenGLWorkarounds,
+                                        "Imagination GL drivers are buggy with context switching.",
+                                        &members, "http://crbug.com/1181193"};
+
+    Feature flushOnFramebufferChange = {"flush_on_framebuffer_change",
+                                        FeatureCategory::OpenGLWorkarounds,
+                                        "Switching framebuffers without a flush can lead to "
+                                        "crashes on Intel 9th Generation GPU Macs.",
+                                        &members, "http://crbug.com/1181068"};
+
+    Feature disableMultisampledRenderToTexture = {
+        "disable_mutlisampled_render_to_texture", FeatureCategory::OpenGLWorkarounds,
+        "Many drivers have bugs when using GL_EXT_multisampled_render_to_texture", &members,
+        "http://anglebug.com/2894"};
+
+    // Mac OpenGL drivers often hang when calling glTexSubImage with >120kb of data. Instead, upload
+    // the data in <120kb chunks.
+    static constexpr const size_t kUploadTextureDataInChunksUploadSize = (120 * 1024) - 1;
+    Feature uploadTextureDataInChunks                                  = {
+        "chunked_texture_upload", FeatureCategory::OpenGLWorkarounds,
+        "Upload texture data in <120kb chunks to work around Mac driver hangs and crashes.",
+        &members, "http://crbug.com/1181068"};
+
+    // Qualcomm drivers may sometimes reject immutable ASTC sliced 3D texture
+    // allocation. Instead, use non-immutable allocation internally.
+    Feature emulateImmutableCompressedTexture3D = {
+        "emulate_immutable_compressed_texture_3d", FeatureCategory::OpenGLWorkarounds,
+        "Use non-immutable texture allocation to work around a driver bug.", &members,
+        "https://crbug.com/1060012"};
 };
 
 inline FeaturesGL::FeaturesGL()  = default;
