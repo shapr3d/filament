@@ -377,7 +377,7 @@ void FilamentApp::run(const Config& config, SetupCallback setupCallback,
         cameraCube->mapFrustum(*mEngine, window->mMainCamera);
 
         // TODO: we need better timing or use SDL_GL_SetSwapInterval
-        SDL_Delay(16);
+        //SDL_Delay(16);
 
         Renderer* renderer = window->getRenderer();
 
