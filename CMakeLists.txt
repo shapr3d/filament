@@ -151,6 +151,8 @@ if (WIN32)
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${CRT_FLAGS_DEBUG} /Z7")
     set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} ${CRT_FLAGS_DEBUG} /Z7")
 
+    add_link_options("/DEBUG")
+
     # Special settings when building on CI.
     if (${FILAMENT_WINDOWS_CI_BUILD})
         set(LinkerFlags
