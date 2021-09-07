@@ -360,6 +360,12 @@ void PlatformEGL::destroyExternalImage(void* texture) noexcept {
     glDeleteTextures(1, &t->gl.id);
 }
 
+void PlatformEGL::setSwapInterval(int32_t interval) noexcept {
+    if (eglSwapInterval(mEGLDisplay, interval) == EGL_FALSE) {
+        logEglError("eglSwapInterval");
+    }
+}
+
 void PlatformEGL::initializeGlExtensions() noexcept {
     GLUtils::unordered_string_set glExtensions;
     GLint n;
