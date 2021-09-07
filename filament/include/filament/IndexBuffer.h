@@ -131,9 +131,8 @@ public:
      *
      * @param engine Reference to the filament::Engine to associate this VertexBuffer with.
      * @param nativeBuffer Pointer to the native buffer that will be used in this buffer slot.
-     * @param hasManagedStorageMode Backend-specific property (for Metal backend only).
      */
-    void setNativeBuffer(Engine& engine, void* nativeBuffer, bool hasManagedStorageMode);
+    void setNativeBuffer(Engine& engine, void* nativeBuffer);
 
     /**
      * Returns the size of this IndexBuffer in elements.

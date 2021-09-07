@@ -214,10 +214,9 @@ public:
      * @param bufferIndex Index of the buffer to initialize. Must be between 0
      *                    and Builder::bufferCount() - 1.
      * @param nativeBuffer Pointer to the native buffer that will be used in this buffer slot.
-     * @param hasManagedStorageMode Backend-specific property (for Metal backend only).
      */
     void setNativeBufferAt(Engine& engine, uint8_t bufferIndex,
-            void* nativeBuffer, bool hasManagedStorageMode);
+            void* nativeBuffer);
 };
 
 } // namespace filament

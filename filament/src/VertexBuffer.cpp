@@ -256,12 +256,12 @@ void FVertexBuffer::setBufferObjectAt(FEngine& engine, uint8_t bufferIndex,
 }
 
 void FVertexBuffer::setNativeBufferAt(FEngine& engine, uint8_t bufferIndex,
-         void* nativeBuffer, bool hasManagedStorageMode) {
+         void* nativeBuffer) {
     ASSERT_PRECONDITION(!mBufferObjectsEnabled, "Please use setBufferObjectAt()");
     ASSERT_PRECONDITION(mNativeBuffersEnabled, "Please use setBufferAt()");
     if (bufferIndex < mBufferCount) {
         assert_invariant(mBufferObjects[bufferIndex]);
-        engine.getDriverApi().setNativeBuffer(mBufferObjects[bufferIndex], nativeBuffer, hasManagedStorageMode);
+        engine.getDriverApi().setNativeBuffer(mBufferObjects[bufferIndex], nativeBuffer);
     } else {
         ASSERT_PRECONDITION(bufferIndex < mBufferCount, "bufferIndex must be < bufferCount");
     }
@@ -287,8 +287,8 @@ void VertexBuffer::setBufferObjectAt(Engine& engine, uint8_t bufferIndex,
 }
 
 void VertexBuffer::setNativeBufferAt(Engine& engine, uint8_t bufferIndex,
-        void* nativeBuffer, bool hasManagedStorageMode) {
-    upcast(this)->setNativeBufferAt(upcast(engine), bufferIndex, nativeBuffer, hasManagedStorageMode);
+        void* nativeBuffer) {
+    upcast(this)->setNativeBufferAt(upcast(engine), bufferIndex, nativeBuffer);
 }
 
 } // namespace filament

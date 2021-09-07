@@ -64,7 +64,8 @@ FIndexBuffer::FIndexBuffer(FEngine& engine, const IndexBuffer::Builder& builder)
     mHandle = driver.createIndexBuffer(
             (backend::ElementType)builder->mIndexType,
             uint32_t(builder->mIndexCount),
-            backend::BufferUsage::STATIC);
+            backend::BufferUsage::STATIC, 
+            mNativeBuffersEnabled);
 }
 
 void FIndexBuffer::terminate(FEngine& engine) {
@@ -77,9 +78,9 @@ void FIndexBuffer::setBuffer(FEngine& engine, BufferDescriptor&& buffer, uint32_
     engine.getDriverApi().updateIndexBuffer(mHandle, std::move(buffer), byteOffset);
 }
 
-void FIndexBuffer::setNativeBuffer(FEngine& engine, void* nativeBuffer, bool hasManagedStorageMode) {
+void FIndexBuffer::setNativeBuffer(FEngine& engine, void* nativeBuffer) {
     ASSERT_PRECONDITION(mNativeBuffersEnabled, "Please use setBuffer()");
-    engine.getDriverApi().setNativeIndexBuffer(mHandle, nativeBuffer, hasManagedStorageMode);
+    engine.getDriverApi().setNativeIndexBuffer(mHandle, nativeBuffer);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -95,8 +96,8 @@ size_t IndexBuffer::getIndexCount() const noexcept {
     return upcast(this)->getIndexCount();
 }
 
-void IndexBuffer::setNativeBuffer(Engine& engine, void* nativeBuffer, bool hasManagedStorageMode) {
-    upcast(this)->setNativeBuffer(upcast(engine), nativeBuffer, hasManagedStorageMode);
+void IndexBuffer::setNativeBuffer(Engine& engine, void* nativeBuffer) {
+    upcast(this)->setNativeBuffer(upcast(engine), nativeBuffer);
 }
 
 } // namespace filament

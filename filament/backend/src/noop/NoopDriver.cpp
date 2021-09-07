@@ -185,12 +185,10 @@ void NoopDriver::updateBufferObject(Handle<HwBufferObject> ibh, BufferDescriptor
     scheduleDestroy(std::move(p));
 }
 
-void NoopDriver::setNativeIndexBuffer(Handle<HwIndexBuffer> ibh, void* nativeBuffer,
-        bool hasManagedStorageMode) {
+void NoopDriver::setNativeIndexBuffer(Handle<HwIndexBuffer> ibh, void* nativeBuffer) {
 }
 
-void NoopDriver::setNativeBuffer(Handle<HwBufferObject> boh, void* nativeBuffer,
-        bool hasManagedStorageMode) {
+void NoopDriver::setNativeBuffer(Handle<HwBufferObject> boh, void* nativeBuffer) {
 }
 
 void NoopDriver::setVertexBufferObject(Handle<HwVertexBuffer> vbh, uint32_t index,

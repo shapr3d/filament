@@ -42,7 +42,7 @@ public:
 
     void setBuffer(FEngine& engine, BufferDescriptor&& buffer, uint32_t byteOffset = 0);
 
-    void setNativeBuffer(FEngine& engine, void* nativeBuffer, bool hasManagedStorageMode);
+    void setNativeBuffer(FEngine& engine, void* nativeBuffer);
 
 private:
     friend class IndexBuffer;

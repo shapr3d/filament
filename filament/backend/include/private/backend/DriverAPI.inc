@@ -173,7 +173,8 @@ DECL_DRIVER_API_R_N(backend::VertexBufferHandle, createVertexBuffer,
 DECL_DRIVER_API_R_N(backend::IndexBufferHandle, createIndexBuffer,
         backend::ElementType, elementType,
         uint32_t, indexCount,
-        backend::BufferUsage, usage)
+        backend::BufferUsage, usage,
+        bool, wrapsNativeBuffer)
 
 DECL_DRIVER_API_R_N(backend::BufferObjectHandle, createBufferObject,
         uint32_t, byteCount,
@@ -313,13 +314,11 @@ DECL_DRIVER_API_SYNCHRONOUS_N(backend::SyncStatus, getSyncStatus, backend::SyncH
 
 DECL_DRIVER_API_N(setNativeIndexBuffer,
         backend::IndexBufferHandle, ibh,
-        void*, nativeBuffer,
-        bool, hasManagedStorageMode)
+        void*, nativeBuffer)
 
 DECL_DRIVER_API_N(setNativeBuffer,
         backend::BufferObjectHandle, boh,
-        void*, nativeBuffer,
-        bool, hasManagedStorageMode)
+        void*, nativeBuffer)
 
 DECL_DRIVER_API_N(setVertexBufferObject,
         backend::VertexBufferHandle, vbh,

@@ -61,7 +61,7 @@ public:
             FBufferObject const * bufferObject);
 
     void setNativeBufferAt(FEngine& engine, uint8_t bufferIndex,
-            void* nativeBuffer, bool hasManagedStorageMode);
+            void* nativeBuffer);
 
 private:
     friend class VertexBuffer;

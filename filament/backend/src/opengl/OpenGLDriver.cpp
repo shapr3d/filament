@@ -493,38 +493,45 @@ void OpenGLDriver::createIndexBufferR(
         Handle<HwIndexBuffer> ibh,
         ElementType elementType,
         uint32_t indexCount,
-        BufferUsage usage) {
+        BufferUsage usage, 
+        bool wrapsNativeBuffer) {
     DEBUG_MARKER()
 
     auto& gl = mContext;
     uint8_t elementSize = static_cast<uint8_t>(getElementTypeSize(elementType));
     GLIndexBuffer* ib = construct<GLIndexBuffer>(ibh, elementSize, indexCount);
-    glGenBuffers(1, &ib->gl.buffer);
-    GLsizeiptr size = elementSize * indexCount;
-    gl.bindVertexArray(nullptr);
-    gl.bindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib->gl.buffer);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, size, nullptr, getBufferUsage(usage));
-    CHECK_GL_ERROR(utils::slog.e)
+    ib->gl.isExternal = wrapsNativeBuffer;
+    if (!wrapsNativeBuffer) {
+        glGenBuffers(1, &ib->gl.id);
+        GLsizeiptr size = elementSize * indexCount;
+        gl.bindVertexArray(nullptr);
+        gl.bindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib->gl.id);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, size, nullptr, getBufferUsage(usage));
+        CHECK_GL_ERROR(utils::slog.e)
+    }
 }
 
 void OpenGLDriver::createBufferObjectR(
         Handle<HwBufferObject> boh,
         uint32_t byteCount,
         BufferObjectBinding bindingType,
-        bool wrapsNativeBuffer) {
+        bool wrapsNativeBuffer) {   
     DEBUG_MARKER()
 
     auto& gl = mContext;
     GLBufferObject* bo = construct<GLBufferObject>(boh, byteCount);
-    glGenBuffers(1, &bo->gl.id);
-    gl.bindVertexArray(nullptr);
+    bo->gl.isExternal = wrapsNativeBuffer;
+    if (!wrapsNativeBuffer) {
+        glGenBuffers(1, &bo->gl.id);
+        gl.bindVertexArray(nullptr);
 
-    assert_invariant(byteCount > 0);
-    assert_invariant(bindingType == BufferObjectBinding::VERTEX);
+        assert_invariant(byteCount > 0);
+        assert_invariant(bindingType == BufferObjectBinding::VERTEX);
 
-    gl.bindBuffer(GL_ARRAY_BUFFER, bo->gl.id);
-    glBufferData(GL_ARRAY_BUFFER, byteCount, nullptr, GL_STATIC_DRAW);
-    CHECK_GL_ERROR(utils::slog.e)
+        gl.bindBuffer(GL_ARRAY_BUFFER, bo->gl.id);
+        glBufferData(GL_ARRAY_BUFFER, byteCount, nullptr, GL_STATIC_DRAW);
+        CHECK_GL_ERROR(utils::slog.e)
+    }
 }
 
 void OpenGLDriver::createRenderPrimitiveR(Handle<HwRenderPrimitive> rph, int) {
@@ -1290,7 +1297,9 @@ void OpenGLDriver::destroyIndexBuffer(Handle<HwIndexBuffer> ibh) {
     if (ibh) {
         auto& gl = mContext;
         GLIndexBuffer const* ib = handle_cast<const GLIndexBuffer*>(ibh);
-        gl.deleteBuffers(1, &ib->gl.buffer, GL_ELEMENT_ARRAY_BUFFER);
+        if (!ib->gl.isExternal) {
+            gl.deleteBuffers(1, &ib->gl.id, GL_ELEMENT_ARRAY_BUFFER);
+        }
         destruct(ibh, ib);
     }
 }
@@ -1301,7 +1310,9 @@ void OpenGLDriver::destroyBufferObject(Handle<HwBufferObject> boh) {
     if (boh) {
         auto& gl = mContext;
         GLBufferObject const* bo = handle_cast<const GLBufferObject*>(boh);
-        gl.deleteBuffers(1, &bo->gl.id, GL_ARRAY_BUFFER);
+        if (!bo->gl.isExternal) {
+            gl.deleteBuffers(1, &bo->gl.id, GL_ARRAY_BUFFER);
+        }
         destruct(boh, bo);
     }
 }
@@ -1709,14 +1720,16 @@ void OpenGLDriver::makeCurrent(Handle<HwSwapChain> schDraw, Handle<HwSwapChain> 
 // Updating driver objects
 // ------------------------------------------------------------------------------------------------
 
-void OpenGLDriver::setNativeIndexBuffer(Handle<HwIndexBuffer> ibh, void* nativeBuffer,
-        bool hasManagedStorageMode) {
-    ASSERT_PRECONDITION(false, "setNativeIndexBuffer() is not implemented for backend!");
+void OpenGLDriver::setNativeIndexBuffer(Handle<HwIndexBuffer> ibh, void* nativeBuffer) {
+    GLIndexBuffer* ib = handle_cast<GLIndexBuffer*>(ibh);
+    assert_invariant(ib->gl.isExternal);
+    glNamedBufferStorageExternalEXT(ib->gl.id, 0, ib->count * ib->elementSize, nativeBuffer, 0);
 }
 
-void OpenGLDriver::setNativeBuffer(Handle<HwBufferObject> boh, void* nativeBuffer,
-        bool hasManagedStorageMode) {
-    ASSERT_PRECONDITION(false, "setNativeBuffer() is not implemented for backend!");
+void OpenGLDriver::setNativeBuffer(Handle<HwBufferObject> boh, void* nativeBuffer) {
+    GLBufferObject* bo = handle_cast<GLBufferObject*>(boh);
+    assert_invariant(bo->gl.isExternal);
+    glNamedBufferStorageExternalEXT(bo->gl.id, 0, bo->byteCount, nativeBuffer, 0);
 }
 
 void OpenGLDriver::setVertexBufferObject(Handle<HwVertexBuffer> vbh,
@@ -1749,7 +1762,9 @@ void OpenGLDriver::updateIndexBuffer(
     assert_invariant(ib->elementSize == 2 || ib->elementSize == 4);
 
     gl.bindVertexArray(nullptr);
-    gl.bindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib->gl.buffer);
+    gl.bindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib->gl.id);
+    assert_invariant(!ib->gl.isExternal);
+
     glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, byteOffset, p.size, p.buffer);
 
     scheduleDestroy(std::move(p));
@@ -2526,7 +2541,7 @@ void OpenGLDriver::setRenderPrimitiveBuffer(Handle<HwRenderPrimitive> rph,
         updateVertexArrayObject(rp, eb);
 
         // this records the index buffer into the currently bound VAO
-        gl.bindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib->gl.buffer);
+        gl.bindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib->gl.id);
 
         CHECK_GL_ERROR(utils::slog.e)
     }
