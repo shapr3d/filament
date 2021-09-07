@@ -111,6 +111,12 @@ backend::Driver* PlatformEGL_ANGLE_D3D11::createDriver(void* sharedContext) noex
         goto errorANGLE;
     }
 
+    if (!eglMakeCurrent(mEGLDisplay, EGL_NO_CONTEXT, EGL_NO_CONTEXT, mEGLContext)) {
+        // eglMakeCurrent failed
+        logEglError("eglMakeCurrent");
+        goto errorANGLE;
+    }
+
     initializeGlExtensions();
 
     // success!!
