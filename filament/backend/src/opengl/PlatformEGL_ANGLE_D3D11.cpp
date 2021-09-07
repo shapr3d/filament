@@ -148,6 +148,29 @@ void PlatformEGL_ANGLE_D3D11::terminate() noexcept {
     }
 }
 
+Platform::SwapChain* PlatformEGL_ANGLE_D3D11::createSwapChain(void* nativewindow, uint64_t& flags) noexcept {
+    EGLSurface sur = eglCreateWindowSurface(mEGLDisplay,
+            (flags & backend::SWAP_CHAIN_CONFIG_TRANSPARENT) ?
+            mEGLTransparentConfig : mEGLConfig,
+            static_cast<EGLNativeWindowType>(nativewindow), nullptr);
+
+    if (UTILS_UNLIKELY(sur == EGL_NO_SURFACE)) {
+        logEglError("eglCreateWindowSurface");
+        return nullptr;
+    }
+    if (!eglSurfaceAttrib(mEGLDisplay, sur, EGL_SWAP_BEHAVIOR, EGL_BUFFER_DESTROYED)) {
+        logEglError("eglSurfaceAttrib(..., EGL_SWAP_BEHAVIOR, EGL_BUFFER_DESTROYED)");
+        // this is not fatal
+    }
+
+    return (SwapChain*)sur;
+}
+
+Platform::SwapChain* PlatformEGL_ANGLE_D3D11::createSwapChain(uint32_t width, uint32_t height, uint64_t& flags) noexcept {
+    slog.e << "PlatformEGL_ANGLE_D3D11::createSwapChain() can only be called with native swap chain!" << io::endl;
+    return nullptr;
+}
+
 EGLConfig PlatformEGL_ANGLE_D3D11::chooseConfig(const EGLint* configAttribs) const noexcept {
     // Configs are sorted in ascending order by most attributes, except for color depth, which is in descending order
     // (https://www.khronos.org/registry/EGL/sdk/docs/man/html/eglChooseConfig.xhtml)
