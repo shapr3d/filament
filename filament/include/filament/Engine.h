@@ -187,7 +187,7 @@ public:
      * This method is thread-safe.
      */
     static Engine* create(Backend backend = Backend::DEFAULT,
-            Platform* platform = nullptr, void* sharedGLContext = nullptr);
+            Platform* platform = nullptr, void* sharedGLContext = nullptr, void* nativeDevice = nullptr);
 
 #if UTILS_HAS_THREADING
     /**

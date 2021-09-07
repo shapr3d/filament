@@ -130,7 +130,7 @@ public:
 
 public:
     static FEngine* create(Backend backend = Backend::DEFAULT,
-            Platform* platform = nullptr, void* sharedGLContext = nullptr);
+            Platform* platform = nullptr, void* sharedGLContext = nullptr, void* nativeDevice = nullptr);
 
 #if UTILS_HAS_THREADING
     static void createAsync(CreateCallback callback, void* user,
@@ -327,7 +327,7 @@ public:
     }
 
 private:
-    FEngine(Backend backend, Platform* platform, void* sharedGLContext);
+    FEngine(Backend backend, Platform* platform, void* sharedGLContext, void* nativeDevice);
     void init();
     void shutdown();
 
@@ -346,6 +346,7 @@ private:
     Platform* mPlatform = nullptr;
     bool mOwnPlatform = false;
     void* mSharedGLContext = nullptr;
+    void* mNativeDevice = nullptr;
     bool mTerminated = false;
     backend::Handle<backend::HwRenderPrimitive> mFullScreenTriangleRph;
     FVertexBuffer* mFullScreenTriangleVb = nullptr;

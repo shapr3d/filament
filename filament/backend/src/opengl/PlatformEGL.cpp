@@ -20,9 +20,6 @@
 #include "OpenGLContext.h"
 #include "OpenGLDriverFactory.h"
 
-#include <EGL/egl.h>
-#include <EGL/eglext.h>
-
 #include <utils/compiler.h>
 #include <utils/Log.h>
 
@@ -91,16 +88,7 @@ Driver* PlatformEGL::createDriver(void* sharedContext) noexcept {
         return nullptr;
     }
 
-    importGLESExtensionsEntryPoints();
-
-    auto extensions = GLUtils::split(eglQueryString(mEGLDisplay, EGL_EXTENSIONS));
-
-    eglCreateSyncKHR = (PFNEGLCREATESYNCKHRPROC) eglGetProcAddress("eglCreateSyncKHR");
-    eglDestroySyncKHR = (PFNEGLDESTROYSYNCKHRPROC) eglGetProcAddress("eglDestroySyncKHR");
-    eglClientWaitSyncKHR = (PFNEGLCLIENTWAITSYNCKHRPROC) eglGetProcAddress("eglClientWaitSyncKHR");
-
-    eglCreateImageKHR = (PFNEGLCREATEIMAGEKHRPROC) eglGetProcAddress("eglCreateImageKHR");
-    eglDestroyImageKHR = (PFNEGLDESTROYIMAGEKHRPROC) eglGetProcAddress("eglDestroyImageKHR");
+    auto extensions = initializeExtensions();
 
     EGLint configsCount;
     EGLint configAttribs[] = {
@@ -381,6 +369,21 @@ void PlatformEGL::initializeGlExtensions() noexcept {
         glExtensions.insert(extension);
     }
     ext.OES_EGL_image_external_essl3 = glExtensions.has("GL_OES_EGL_image_external_essl3");
+}
+
+GLUtils::unordered_string_set PlatformEGL::initializeExtensions() noexcept
+{
+    importGLESExtensionsEntryPoints();
+
+    auto extensions = GLUtils::split(eglQueryString(mEGLDisplay, EGL_EXTENSIONS));
+    eglCreateSyncKHR = (PFNEGLCREATESYNCKHRPROC) eglGetProcAddress("eglCreateSyncKHR");
+    eglDestroySyncKHR = (PFNEGLDESTROYSYNCKHRPROC) eglGetProcAddress("eglDestroySyncKHR");
+    eglClientWaitSyncKHR = (PFNEGLCLIENTWAITSYNCKHRPROC) eglGetProcAddress("eglClientWaitSyncKHR");
+
+    eglCreateImageKHR = (PFNEGLCREATEIMAGEKHRPROC) eglGetProcAddress("eglCreateImageKHR");
+    eglDestroyImageKHR = (PFNEGLDESTROYIMAGEKHRPROC) eglGetProcAddress("eglDestroyImageKHR");
+
+    return extensions;
 }
 
 } // namespace filament
