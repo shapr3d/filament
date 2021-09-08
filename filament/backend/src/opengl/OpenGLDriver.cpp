@@ -500,9 +500,9 @@ void OpenGLDriver::createIndexBufferR(
     auto& gl = mContext;
     uint8_t elementSize = static_cast<uint8_t>(getElementTypeSize(elementType));
     GLIndexBuffer* ib = construct<GLIndexBuffer>(ibh, elementSize, indexCount);
+    glGenBuffers(1, &ib->gl.id);
     ib->gl.isExternal = wrapsNativeBuffer;
     if (!wrapsNativeBuffer) {
-        glGenBuffers(1, &ib->gl.id);
         GLsizeiptr size = elementSize * indexCount;
         gl.bindVertexArray(nullptr);
         gl.bindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib->gl.id);
@@ -520,9 +520,9 @@ void OpenGLDriver::createBufferObjectR(
 
     auto& gl = mContext;
     GLBufferObject* bo = construct<GLBufferObject>(boh, byteCount);
+    glGenBuffers(1, &bo->gl.id);
     bo->gl.isExternal = wrapsNativeBuffer;
     if (!wrapsNativeBuffer) {
-        glGenBuffers(1, &bo->gl.id);
         gl.bindVertexArray(nullptr);
 
         assert_invariant(byteCount > 0);
@@ -1721,15 +1721,33 @@ void OpenGLDriver::makeCurrent(Handle<HwSwapChain> schDraw, Handle<HwSwapChain> 
 // ------------------------------------------------------------------------------------------------
 
 void OpenGLDriver::setNativeIndexBuffer(Handle<HwIndexBuffer> ibh, void* nativeBuffer) {
+    DEBUG_MARKER()
+
+    auto& gl = mContext;
     GLIndexBuffer* ib = handle_cast<GLIndexBuffer*>(ibh);
+
     assert_invariant(ib->gl.isExternal);
-    glNamedBufferStorageExternalEXT(ib->gl.id, 0, ib->count * ib->elementSize, nativeBuffer, 0);
+
+    gl.bindVertexArray(nullptr);
+    gl.bindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib->gl.id);
+    glBufferStorageExternalEXT(GL_ELEMENT_ARRAY_BUFFER, 0, ib->count * ib->elementSize, nativeBuffer, 0);
+
+    CHECK_GL_ERROR(utils::slog.e)
 }
 
 void OpenGLDriver::setNativeBuffer(Handle<HwBufferObject> boh, void* nativeBuffer) {
+    DEBUG_MARKER()
+
+    auto& gl = mContext;
     GLBufferObject* bo = handle_cast<GLBufferObject*>(boh);
+
     assert_invariant(bo->gl.isExternal);
-    glNamedBufferStorageExternalEXT(bo->gl.id, 0, bo->byteCount, nativeBuffer, 0);
+
+    gl.bindVertexArray(nullptr);
+    gl.bindBuffer(GL_ARRAY_BUFFER, bo->gl.id);
+    glBufferStorageExternalEXT(GL_ARRAY_BUFFER, 0, bo->byteCount, nativeBuffer, 0);
+
+    CHECK_GL_ERROR(utils::slog.e)
 }
 
 void OpenGLDriver::setVertexBufferObject(Handle<HwVertexBuffer> vbh,
