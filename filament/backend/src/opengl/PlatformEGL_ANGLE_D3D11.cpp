@@ -146,6 +146,8 @@ void PlatformEGL_ANGLE_D3D11::terminate() noexcept {
             assert(false);
         }
     }
+
+    PlatformEGL::terminate();
 }
 
 Platform::SwapChain* PlatformEGL_ANGLE_D3D11::createSwapChain(void* nativewindow, uint64_t& flags) noexcept {
