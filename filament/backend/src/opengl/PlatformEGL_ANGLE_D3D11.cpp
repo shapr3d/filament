@@ -61,6 +61,13 @@ backend::Driver* PlatformEGL_ANGLE_D3D11::createDriver(void* sharedContext) noex
         EGL_NONE, EGL_NONE, // reserved for EGL_CONTEXT_OPENGL_NO_ERROR_KHR below
         EGL_NONE
     };
+
+    EGLint pbufferAttribs[] = {
+            EGL_WIDTH,  1,
+            EGL_HEIGHT, 1,
+            EGL_NONE
+    };
+
 #ifdef NDEBUG
     // When we don't have a shared context and we're in release mode, we always activate the
     // EGL_KHR_create_context_no_error extension.
@@ -92,9 +99,14 @@ backend::Driver* PlatformEGL_ANGLE_D3D11::createDriver(void* sharedContext) noex
         eglConfig = mEGLConfig = mEGLTransparentConfig;
     }
 
-    // Ignore initial hardcoded 1,1 window size and wait for the first Resize(),
-    // as trying to call eglCreateWindowSurface() would fail yet.
-    mEGLDummySurface = EGL_NO_SURFACE;
+    // the pbuffer dummy surface is always created with a transparent surface because
+    // either we have EGL_KHR_no_config_context and it doesn't matter, or we don't and
+    // we must use a transparent surface
+    mEGLDummySurface = eglCreatePbufferSurface(mEGLDisplay, mEGLTransparentConfig, pbufferAttribs);
+    if (mEGLDummySurface == EGL_NO_SURFACE) {
+        logEglError("eglCreatePbufferSurface");
+        goto errorANGLE;
+    }
 
     mEGLContext = eglCreateContext(mEGLDisplay, eglConfig, (EGLContext)sharedContext, contextAttribs);
     if (mEGLContext == EGL_NO_CONTEXT && sharedContext &&
@@ -111,7 +123,7 @@ backend::Driver* PlatformEGL_ANGLE_D3D11::createDriver(void* sharedContext) noex
         goto errorANGLE;
     }
 
-    if (!eglMakeCurrent(mEGLDisplay, EGL_NO_CONTEXT, EGL_NO_CONTEXT, mEGLContext)) {
+    if (!makeCurrent(mEGLDummySurface, mEGLDummySurface)) {
         // eglMakeCurrent failed
         logEglError("eglMakeCurrent");
         goto errorANGLE;
