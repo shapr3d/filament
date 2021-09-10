@@ -1721,6 +1721,7 @@ void OpenGLDriver::makeCurrent(Handle<HwSwapChain> schDraw, Handle<HwSwapChain> 
 // ------------------------------------------------------------------------------------------------
 
 void OpenGLDriver::setNativeIndexBuffer(Handle<HwIndexBuffer> ibh, void* nativeBuffer) {
+#ifdef GL_EXT_external_buffer
     DEBUG_MARKER()
 
     auto& gl = mContext;
@@ -1733,9 +1734,13 @@ void OpenGLDriver::setNativeIndexBuffer(Handle<HwIndexBuffer> ibh, void* nativeB
     glBufferStorageExternalEXT(GL_ELEMENT_ARRAY_BUFFER, 0, ib->count * ib->elementSize, nativeBuffer, 0);
 
     CHECK_GL_ERROR(utils::slog.e)
+#else
+    assert(false && "You need GL_EXT_external_buffer for setting native index buffers!");
+#endif
 }
 
 void OpenGLDriver::setNativeBuffer(Handle<HwBufferObject> boh, void* nativeBuffer) {
+#ifdef GL_EXT_external_buffer
     DEBUG_MARKER()
 
     auto& gl = mContext;
@@ -1748,6 +1753,9 @@ void OpenGLDriver::setNativeBuffer(Handle<HwBufferObject> boh, void* nativeBuffe
     glBufferStorageExternalEXT(GL_ARRAY_BUFFER, 0, bo->byteCount, nativeBuffer, 0);
 
     CHECK_GL_ERROR(utils::slog.e)
+#else
+    assert(false && "You need GL_EXT_external_buffer for setting native buffers!");
+#endif
 }
 
 void OpenGLDriver::setVertexBufferObject(Handle<HwVertexBuffer> vbh,

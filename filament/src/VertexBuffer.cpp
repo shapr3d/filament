@@ -286,8 +286,7 @@ void VertexBuffer::setBufferObjectAt(Engine& engine, uint8_t bufferIndex,
     upcast(this)->setBufferObjectAt(upcast(engine), bufferIndex, upcast(bufferObject));
 }
 
-void VertexBuffer::setNativeBufferAt(Engine& engine, uint8_t bufferIndex,
-        void* nativeBuffer) {
+void VertexBuffer::setNativeBufferAt(Engine& engine, uint8_t bufferIndex, void* nativeBuffer) {
     upcast(this)->setNativeBufferAt(upcast(engine), bufferIndex, nativeBuffer);
 }
 

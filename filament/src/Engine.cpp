@@ -107,11 +107,11 @@ FEngine* FEngine::create(Backend backend, Platform* platform, void* sharedGLCont
 
 #if UTILS_HAS_THREADING
 
-void FEngine::createAsync(CreateCallback callback, void* user,
-        Backend backend, Platform* platform, void* sharedGLContext) {
+void FEngine::createAsync(CreateCallback callback, void* user, Backend backend, 
+        Platform* platform, void* sharedGLContext, void* nativeDevice) {
     SYSTRACE_ENABLE();
     SYSTRACE_CALL();
-    FEngine* instance = new FEngine(backend, platform, sharedGLContext);
+    FEngine* instance = new FEngine(backend, platform, sharedGLContext, nativeDevice);
 
     // start the driver thread
     instance->mDriverThread = std::thread(&FEngine::loop, instance);
@@ -876,8 +876,8 @@ void Engine::destroy(Engine* engine) {
 
 #if UTILS_HAS_THREADING
 void Engine::createAsync(Engine::CreateCallback callback, void* user, Backend backend,
-        Platform* platform, void* sharedGLContext) {
-    FEngine::createAsync(callback, user, backend, platform, sharedGLContext);
+        Platform* platform, void* sharedGLContext, void* nativeDevice) {
+    FEngine::createAsync(callback, user, backend, platform, sharedGLContext, nativeDevice);
 }
 
 Engine* Engine::getEngine(void* token) {

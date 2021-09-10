@@ -116,7 +116,7 @@
 
 #if defined(__EMSCRIPTEN__) || defined(FILAMENT_SINGLE_THREADED)
 #   define UTILS_HAS_THREADING 0
-#elif (WIN32)
+#elif defined(WIN32) || defined(_WIN32)
 #   define UTILS_HAS_THREADING 0
 #else
 #   define UTILS_HAS_THREADING 1

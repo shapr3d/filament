@@ -129,13 +129,12 @@ public:
     static constexpr size_t CONFIG_COMMAND_BUFFERS_SIZE         = filament::CONFIG_COMMAND_BUFFERS_SIZE;
 
 public:
-    static FEngine* create(Backend backend = Backend::DEFAULT,
-            Platform* platform = nullptr, void* sharedGLContext = nullptr, void* nativeDevice = nullptr);
+    static FEngine* create(Backend backend = Backend::DEFAULT, Platform* platform = nullptr,
+            void* sharedGLContext = nullptr, void* nativeDevice = nullptr);
 
 #if UTILS_HAS_THREADING
-    static void createAsync(CreateCallback callback, void* user,
-            Backend backend = Backend::DEFAULT,
-            Platform* platform = nullptr, void* sharedGLContext = nullptr);
+    static void createAsync(CreateCallback callback, void* user, Backend backend = Backend::DEFAULT,
+            Platform* platform = nullptr, void* sharedGLContext = nullptr, void* nativeDevice = nullptr);
 
     static FEngine* getEngine(void* token);
 #endif

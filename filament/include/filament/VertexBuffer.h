@@ -215,8 +215,7 @@ public:
      *                    and Builder::bufferCount() - 1.
      * @param nativeBuffer Pointer to the native buffer that will be used in this buffer slot.
      */
-    void setNativeBufferAt(Engine& engine, uint8_t bufferIndex,
-            void* nativeBuffer);
+    void setNativeBufferAt(Engine& engine, uint8_t bufferIndex, void* nativeBuffer);
 };
 
 } // namespace filament

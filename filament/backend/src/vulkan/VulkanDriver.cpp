@@ -452,8 +452,8 @@ void VulkanDriver::destroyVertexBuffer(Handle<HwVertexBuffer> vbh) {
     }
 }
 
-void VulkanDriver::createIndexBufferR(Handle<HwIndexBuffer> ibh,
-        ElementType elementType, uint32_t indexCount, BufferUsage usage) {
+void VulkanDriver::createIndexBufferR(Handle<HwIndexBuffer> ibh, ElementType elementType,
+        uint32_t indexCount, BufferUsage usage, bool wrapsNativeBuffer) {
     auto elementSize = (uint8_t) getElementTypeSize(elementType);
     auto indexBuffer = construct_handle<VulkanIndexBuffer>(mHandleMap, ibh, mContext, mStagePool,
             elementSize, indexCount);
@@ -842,13 +842,11 @@ uint8_t VulkanDriver::getMaxDrawBuffers() {
     return backend::MRT::MIN_SUPPORTED_RENDER_TARGET_COUNT; // TODO: query real value
 }
 
-void VulkanDriver::setNativeIndexBuffer(Handle<HwIndexBuffer> ibh, void* nativeBuffer,
-        bool hasManagedStorageMode) {
+void VulkanDriver::setNativeIndexBuffer(Handle<HwIndexBuffer> ibh, void* nativeBuffer) {
     ASSERT_PRECONDITION(false, "setNativeIndexBuffer() is not implemented for backend!");
 }
 
-void VulkanDriver::setNativeBuffer(Handle<HwBufferObject> boh, void* nativeBuffer,
-        bool hasManagedStorageMode) {
+void VulkanDriver::setNativeBuffer(Handle<HwBufferObject> boh, void* nativeBuffer) {
     ASSERT_PRECONDITION(false, "setNativeBuffer() is not implemented for backend!");
 }
 

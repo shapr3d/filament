@@ -197,7 +197,7 @@ void MetalDriver::createVertexBufferR(Handle<HwVertexBuffer> vbh, uint8_t buffer
 }
 
 void MetalDriver::createIndexBufferR(Handle<HwIndexBuffer> ibh, ElementType elementType,
-        uint32_t indexCount, BufferUsage usage) {
+        uint32_t indexCount, BufferUsage usage, bool wrapsNativeBuffer) {
     auto elementSize = (uint8_t) getElementTypeSize(elementType);
     construct_handle<MetalIndexBuffer>(mHandleMap, ibh, *mContext, elementSize, indexCount);
 }
@@ -701,18 +701,16 @@ void MetalDriver::updateBufferObject(Handle<HwBufferObject> boh, BufferDescripto
     scheduleDestroy(std::move(data));
 }
 
-void MetalDriver::setNativeIndexBuffer(Handle<HwIndexBuffer> ibh, void* nativeBuffer,
-        bool hasManagedStorageMode) {
+void MetalDriver::setNativeIndexBuffer(Handle<HwIndexBuffer> ibh, void* nativeBuffer) {
     auto* ib = handle_cast<MetalIndexBuffer>(mHandleMap, ibh);
     ib->buffer.releaseNativeBuffer();
-    ib->buffer.wrapNativeBuffer((__bridge id<MTLBuffer>)nativeBuffer, hasManagedStorageMode);
+    ib->buffer.wrapNativeBuffer((__bridge id<MTLBuffer>)nativeBuffer);
 }
 
-void MetalDriver::setNativeBuffer(Handle<HwBufferObject> boh, void* nativeBuffer,
-        bool hasManagedStorageMode) {
+void MetalDriver::setNativeBuffer(Handle<HwBufferObject> boh, void* nativeBuffer) {
     auto* bo = handle_cast<MetalBufferObject>(mHandleMap, boh);
     bo->getBuffer()->releaseNativeBuffer();
-    bo->getBuffer()->wrapNativeBuffer((__bridge id<MTLBuffer>)nativeBuffer, hasManagedStorageMode);
+    bo->getBuffer()->wrapNativeBuffer((__bridge id<MTLBuffer>)nativeBuffer);
 }
 
 void MetalDriver::setVertexBufferObject(Handle<HwVertexBuffer> vbh, uint32_t index,

@@ -19,7 +19,9 @@
 #include <string>
 #include <utils/compiler.h>
 
+#ifdef WIN32
 #include <Windows.h>
+#endif
 
 #ifdef ANDROID
 #   include <android/log.h>
@@ -69,14 +71,14 @@ ostream& LogStream::flush() noexcept {
         case LOG_DEBUG:
         case LOG_WARNING:
         case LOG_INFO:
-#if (WIN32)
+#ifdef WIN32
             OutputDebugStringA(buf.get());
 #else
             fprintf(stdout, "%s", buf.get());
 #endif
             break;
         case LOG_ERROR:
-#if (WIN32)
+#ifdef WIN32
             OutputDebugStringA(buf.get());
 #else
             fprintf(stderr, "%s", buf.get());
