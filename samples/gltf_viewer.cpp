@@ -86,7 +86,7 @@ struct App {
     gltfio::ResourceLoader* resourceLoader = nullptr;
     bool recomputeAabb = false;
 
-    bool actualSize = false;
+    bool actualSize = true;
 
     struct Scene {
         Entity groundPlane;
@@ -355,6 +355,7 @@ int main(int argc, char** argv) {
 
     app.config.title = "Filament";
     app.config.iblDirectory = FilamentApp::getRootAssetsPath() + DEFAULT_IBL;
+    app.config.cameraMode = camutils::Mode::FREE_FLIGHT;
 
     int optionIndex = handleCommandLineArguments(argc, argv, &app);
 
@@ -492,6 +493,7 @@ int main(int argc, char** argv) {
                 createMaterialGenerator(engine) : createUbershaderLoader(engine);
         app.assetLoader = AssetLoader::create({engine, app.materials, app.names });
         app.mainCamera = &view->getCamera();
+
         if (filename.isEmpty()) {
             app.asset = app.assetLoader->createAssetFromBinary(
                     GLTF_VIEWER_DAMAGEDHELMET_DATA,
@@ -736,6 +738,7 @@ int main(int argc, char** argv) {
     });
 
     filamentApp.run(app.config, setup, cleanup, gui, preRender, postRender);
+
 
     return 0;
 }
