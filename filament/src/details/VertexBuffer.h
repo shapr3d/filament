@@ -60,8 +60,8 @@ public:
     void setBufferObjectAt(FEngine& engine, uint8_t bufferIndex,
             FBufferObject const * bufferObject);
 
-    void setNativeBufferAt(FEngine& engine, uint8_t bufferIndex,
-            void* nativeBuffer);
+    void setExternalBufferAt(FEngine& engine, uint8_t bufferIndex,
+            void* externalBuffer);
 
 private:
     friend class VertexBuffer;
@@ -77,7 +77,7 @@ private:
     uint32_t mVertexCount = 0;
     uint8_t mBufferCount = 0;
     bool mBufferObjectsEnabled = false;
-    bool mNativeBuffersEnabled = false;
+    bool mExternalBuffersEnabled = false;
 };
 
 FILAMENT_UPCAST(VertexBuffer)

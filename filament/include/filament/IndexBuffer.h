@@ -83,14 +83,14 @@ public:
         Builder& bufferType(IndexType indexType) noexcept;
 
         /**
-        * Allows buffers to wrap native (backend-specific) buffers.
+        * Allows buffers to wrap external (backend-specific) buffers.
         *
-        * If native buffer mode is enabled, clients must call setNativeBuffer rather than
+        * If external buffer mode is enabled, clients must call setExternalBuffer rather than
         * setBuffer.
         *
-        * @param enabled If true, enables native buffer mode.  False by default.
+        * @param enabled If true, enables external buffer mode.  False by default.
         */
-        Builder& enableNativeBuffer(bool enabled = true) noexcept;
+        Builder& enableExternalBuffer(bool enabled = true) noexcept;
 
         /**
          * Creates the IndexBuffer object and returns a pointer to it. After creation, the index
@@ -125,14 +125,14 @@ public:
 
 
     /**
-     * Wraps the given native buffer (stores a strong reference to it).
+     * Wraps the given external buffer (stores a strong reference to it).
      *
-     * To use this, you must first call enableNativeBuffer() on the Builder.
+     * To use this, you must first call enableExternalBuffer() on the Builder.
      *
      * @param engine Reference to the filament::Engine to associate this VertexBuffer with.
-     * @param nativeBuffer Pointer to the native buffer that will be used in this buffer slot.
+     * @param externalBuffer Pointer to the external buffer that will be used in this buffer slot.
      */
-    void setNativeBuffer(Engine& engine, void* nativeBuffer);
+    void setExternalBuffer(Engine& engine, void* externalBuffer);
 
     /**
      * Returns the size of this IndexBuffer in elements.

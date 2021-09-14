@@ -197,14 +197,14 @@ void MetalDriver::createVertexBufferR(Handle<HwVertexBuffer> vbh, uint8_t buffer
 }
 
 void MetalDriver::createIndexBufferR(Handle<HwIndexBuffer> ibh, ElementType elementType,
-        uint32_t indexCount, BufferUsage usage, bool wrapsNativeBuffer) {
+        uint32_t indexCount, BufferUsage usage, bool wrapsExternalBuffer) {
     auto elementSize = (uint8_t) getElementTypeSize(elementType);
     construct_handle<MetalIndexBuffer>(mHandleMap, ibh, *mContext, elementSize, indexCount);
 }
 
 void MetalDriver::createBufferObjectR(Handle<HwBufferObject> boh, uint32_t byteCount,
-        BufferObjectBinding bindingType, bool wrapsNativeBuffer) {
-    construct_handle<MetalBufferObject>(mHandleMap, boh, *mContext, byteCount, wrapsNativeBuffer);
+        BufferObjectBinding bindingType, bool wrapsExternalBuffer) {
+    construct_handle<MetalBufferObject>(mHandleMap, boh, *mContext, byteCount, wrapsExternalBuffer);
 }
 
 void MetalDriver::createTextureR(Handle<HwTexture> th, SamplerType target, uint8_t levels,
@@ -701,16 +701,16 @@ void MetalDriver::updateBufferObject(Handle<HwBufferObject> boh, BufferDescripto
     scheduleDestroy(std::move(data));
 }
 
-void MetalDriver::setNativeIndexBuffer(Handle<HwIndexBuffer> ibh, void* nativeBuffer) {
+void MetalDriver::setExternalIndexBuffer(Handle<HwIndexBuffer> ibh, void* externalBuffer) {
     auto* ib = handle_cast<MetalIndexBuffer>(mHandleMap, ibh);
-    ib->buffer.releaseNativeBuffer();
-    ib->buffer.wrapNativeBuffer((__bridge id<MTLBuffer>)nativeBuffer);
+    ib->buffer.releaseExternalBuffer();
+    ib->buffer.wrapExternalBuffer((__bridge id<MTLBuffer>)externalBuffer);
 }
 
-void MetalDriver::setNativeBuffer(Handle<HwBufferObject> boh, void* nativeBuffer) {
+void MetalDriver::setExternalBuffer(Handle<HwBufferObject> boh, void* externalBuffer) {
     auto* bo = handle_cast<MetalBufferObject>(mHandleMap, boh);
-    bo->getBuffer()->releaseNativeBuffer();
-    bo->getBuffer()->wrapNativeBuffer((__bridge id<MTLBuffer>)nativeBuffer);
+    bo->getBuffer()->releaseExternalBuffer();
+    bo->getBuffer()->wrapExternalBuffer((__bridge id<MTLBuffer>)externalBuffer);
 }
 
 void MetalDriver::setVertexBufferObject(Handle<HwVertexBuffer> vbh, uint32_t index,

@@ -25,7 +25,7 @@ namespace filament {
 struct IndexBuffer::BuilderDetails {
     uint32_t mIndexCount = 0;
     IndexType mIndexType = IndexType::UINT;
-    bool mNativeBuffersEnabled = false;
+    bool mExternalBuffersEnabled = false;
 };
 
 using BuilderType = IndexBuffer;
@@ -46,8 +46,8 @@ IndexBuffer::Builder& IndexBuffer::Builder::bufferType(IndexType indexType) noex
     return *this;
 }
 
-IndexBuffer::Builder& IndexBuffer::Builder::enableNativeBuffer(bool enabled) noexcept {
-    mImpl->mNativeBuffersEnabled = enabled;
+IndexBuffer::Builder& IndexBuffer::Builder::enableExternalBuffer(bool enabled) noexcept {
+    mImpl->mExternalBuffersEnabled = enabled;
     return *this;
 }
 
@@ -59,13 +59,13 @@ IndexBuffer* IndexBuffer::Builder::build(Engine& engine) {
 
 FIndexBuffer::FIndexBuffer(FEngine& engine, const IndexBuffer::Builder& builder)
         : mIndexCount(builder->mIndexCount),
-          mNativeBuffersEnabled(builder->mNativeBuffersEnabled) {
+          mExternalBuffersEnabled(builder->mExternalBuffersEnabled) {
     FEngine::DriverApi& driver = engine.getDriverApi();
     mHandle = driver.createIndexBuffer(
             (backend::ElementType)builder->mIndexType,
             uint32_t(builder->mIndexCount),
             backend::BufferUsage::STATIC, 
-            mNativeBuffersEnabled);
+            mExternalBuffersEnabled);
 }
 
 void FIndexBuffer::terminate(FEngine& engine) {
@@ -74,13 +74,13 @@ void FIndexBuffer::terminate(FEngine& engine) {
 }
 
 void FIndexBuffer::setBuffer(FEngine& engine, BufferDescriptor&& buffer, uint32_t byteOffset) {
-    ASSERT_PRECONDITION(!mNativeBuffersEnabled, "Please use setNativeBuffer()");
+    ASSERT_PRECONDITION(!mExternalBuffersEnabled, "Please use setExternalBuffer()");
     engine.getDriverApi().updateIndexBuffer(mHandle, std::move(buffer), byteOffset);
 }
 
-void FIndexBuffer::setNativeBuffer(FEngine& engine, void* nativeBuffer) {
-    ASSERT_PRECONDITION(mNativeBuffersEnabled, "Please use setBuffer()");
-    engine.getDriverApi().setNativeIndexBuffer(mHandle, nativeBuffer);
+void FIndexBuffer::setExternalBuffer(FEngine& engine, void* externalBuffer) {
+    ASSERT_PRECONDITION(mExternalBuffersEnabled, "Please use setBuffer()");
+    engine.getDriverApi().setExternalIndexBuffer(mHandle, externalBuffer);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -96,8 +96,8 @@ size_t IndexBuffer::getIndexCount() const noexcept {
     return upcast(this)->getIndexCount();
 }
 
-void IndexBuffer::setNativeBuffer(Engine& engine, void* nativeBuffer) {
-    upcast(this)->setNativeBuffer(upcast(engine), nativeBuffer);
+void IndexBuffer::setExternalBuffer(Engine& engine, void* externalBuffer) {
+    upcast(this)->setExternalBuffer(upcast(engine), externalBuffer);
 }
 
 } // namespace filament

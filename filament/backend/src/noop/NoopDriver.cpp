@@ -188,10 +188,10 @@ void NoopDriver::updateBufferObject(Handle<HwBufferObject> ibh, BufferDescriptor
     scheduleDestroy(std::move(p));
 }
 
-void NoopDriver::setNativeIndexBuffer(Handle<HwIndexBuffer> ibh, void* nativeBuffer) {
+void NoopDriver::setExternalIndexBuffer(Handle<HwIndexBuffer> ibh, void* externalBuffer) {
 }
 
-void NoopDriver::setNativeBuffer(Handle<HwBufferObject> boh, void* nativeBuffer) {
+void NoopDriver::setExternalBuffer(Handle<HwBufferObject> boh, void* externalBuffer) {
 }
 
 void NoopDriver::setVertexBufferObject(Handle<HwVertexBuffer> vbh, uint32_t index,

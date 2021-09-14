@@ -99,14 +99,14 @@ public:
         Builder& enableBufferObjects(bool enabled = true) noexcept;
 
         /**
-         * Allows buffers to wrap native (backend-specific) buffers.
+         * Allows buffers to wrap external (backend-specific) buffers.
          *
-         * If native buffer mode is enabled, clients must call setNativeBufferAt rather than
+         * If external buffer mode is enabled, clients must call setExternalBufferAt rather than
          * setBufferAt.
          *
-         * @param enabled If true, enables native buffer mode.  False by default.
+         * @param enabled If true, enables external buffer mode.  False by default.
          */
-        Builder& enableNativeBuffer(bool enabled = true) noexcept;
+        Builder& enableExternalBuffer(bool enabled = true) noexcept;
 
         /**
          * Sets up an attribute for this vertex buffer set.
@@ -206,16 +206,16 @@ public:
     void setBufferObjectAt(Engine& engine, uint8_t bufferIndex, BufferObject const* bufferObject);
 
     /**
-     * Wraps the given native buffer (stores a strong reference to it).
+     * Wraps the given external buffer (stores a strong reference to it).
      *
-     * To use this, you must first call enableNativeBuffer() on the Builder.
+     * To use this, you must first call enableExternalBuffer() on the Builder.
      *
      * @param engine Reference to the filament::Engine to associate this VertexBuffer with.
      * @param bufferIndex Index of the buffer to initialize. Must be between 0
      *                    and Builder::bufferCount() - 1.
-     * @param nativeBuffer Pointer to the native buffer that will be used in this buffer slot.
+     * @param externalBuffer Pointer to the external buffer that will be used in this buffer slot.
      */
-    void setNativeBufferAt(Engine& engine, uint8_t bufferIndex, void* nativeBuffer);
+    void setExternalBufferAt(Engine& engine, uint8_t bufferIndex, void* externalBuffer);
 };
 
 } // namespace filament

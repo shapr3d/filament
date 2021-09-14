@@ -36,7 +36,7 @@ MetalBuffer::MetalBuffer(MetalContext& context, size_t size, bool forceGpuBuffer
 }
 
 MetalBuffer::~MetalBuffer() {
-    releaseNativeBuffer();
+    releaseExternalBuffer();
 
     if (mCpuBuffer) {
         free(mCpuBuffer);
@@ -48,22 +48,22 @@ MetalBuffer::~MetalBuffer() {
     }
 }
 
-void MetalBuffer::wrapNativeBuffer(id <MTLBuffer> buffer) {
-    ASSERT_PRECONDITION(!mNativeBuffer, "A native buffer is already wrapped. Call releaseNativeBuffer()");
-    ASSERT_PRECONDITION(buffer, "Native buffer cannot be nil");
+void MetalBuffer::wrapExternalBuffer(id <MTLBuffer> buffer) {
+    ASSERT_PRECONDITION(!mExternalBuffer, "A external buffer is already wrapped. Call releaseExternalBuffer()");
+    ASSERT_PRECONDITION(buffer, "External buffer cannot be nil");
     ASSERT_PRECONDITION(!mCpuBuffer, "This buffer is backed by CPU memory");
-    mNativeBuffer = buffer;
+    mExternalBuffer = buffer;
 }
 
-bool MetalBuffer::releaseNativeBuffer() {
-    if (!mNativeBuffer) {
+bool MetalBuffer::releaseExternalBuffer() {
+    if (!mExternalBuffer) {
         return false;
     }
 
 #if !__has_feature(objc_arc)
-    [mNativeBuffer release];
+    [mExternalBuffer release];
 #endif
-    mNativeBuffer = nil;
+    mExternalBuffer = nil;
     return true;
 }
 
@@ -80,11 +80,11 @@ void MetalBuffer::copyIntoBuffer(void* src, size_t size) {
         return;
     }
 
-    if (mNativeBuffer) {
-        memcpy(static_cast<uint8_t*>(mNativeBuffer.contents), src, size);
+    if (mExternalBuffer) {
+        memcpy(static_cast<uint8_t*>(mExternalBuffer.contents), src, size);
 #if !TARGET_OS_IOS
-        if (mNativeBuffer.storageMode == MTLStorageModeManaged) {
-            [mNativeBuffer didModifyRange:NSMakeRange(0, size)];
+        if (mExternalBuffer.storageMode == MTLStorageModeManaged) {
+            [mExternalBuffer didModifyRange:NSMakeRange(0, size)];
         }
 #endif
         return;
@@ -101,8 +101,8 @@ void MetalBuffer::copyIntoBuffer(void* src, size_t size) {
 }
 
 id<MTLBuffer> MetalBuffer::getGpuBufferForDraw(id<MTLCommandBuffer> cmdBuffer) noexcept {
-    if (mNativeBuffer) {
-        return mNativeBuffer;
+    if (mExternalBuffer) {
+        return mExternalBuffer;
     }
 
     if (!mBufferPoolEntry) {

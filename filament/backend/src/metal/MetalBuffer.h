@@ -38,14 +38,14 @@ public:
     size_t getSize() const noexcept { return mBufferSize; }
 
     /**
-     * Wrap an existing native Metal buffer. Stores a strong reference to it.
+     * Wrap an external Metal buffer. Stores a strong reference to it.
      */
-    void wrapNativeBuffer(id<MTLBuffer> buffer);
+    void wrapExternalBuffer(id<MTLBuffer> buffer);
 
     /**
-     * Release an existing native Metal buffer, if wrapping any.
+     * Release the external Metal buffer, if wrapping any.
      */
-    bool releaseNativeBuffer();
+    bool releaseExternalBuffer();
 
     /**
      * Update the buffer with data inside src. Potentially allocates a new buffer allocation to hold
@@ -82,7 +82,7 @@ public:
 private:
 
     size_t mBufferSize = 0;
-    id<MTLBuffer> mNativeBuffer = nil;
+    id<MTLBuffer> mExternalBuffer = nil;
     const MetalBufferPoolEntry* mBufferPoolEntry = nullptr;
     void* mCpuBuffer = nullptr;
     MetalContext& mContext;
