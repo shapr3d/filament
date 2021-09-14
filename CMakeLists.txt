@@ -41,7 +41,7 @@ set(FILAMENT_MIN_COMMAND_BUFFERS_SIZE_IN_MB "49" CACHE STRING
     "Size of the command-stream buffer. As a rule of thumb use the same value as FILAMENT_PER_FRRAME_COMMANDS_SIZE_IN_MB, default 1."
 )
 
-set(FILAMENT_OPENGL_HANDLE_ARENA_SIZE_IN_MB "4" CACHE STRING
+set(FILAMENT_OPENGL_HANDLE_ARENA_SIZE_IN_MB "10" CACHE STRING
     "Size of the OpenGL handle arena, default 4."
 )
 
