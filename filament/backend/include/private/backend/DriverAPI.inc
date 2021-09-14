@@ -145,6 +145,10 @@ DECL_DRIVER_API_N(setFrameCompletedCallback,
         backend::FrameCompletedCallback, callback,
         void*, user)
 
+DECL_DRIVER_API_N(setSwapInterval,
+        backend::SwapChainHandle, sch,
+        int32_t, interval)
+
 DECL_DRIVER_API_N(setPresentationTime,
         int64_t, monotonic_clock_ns)
 
