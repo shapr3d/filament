@@ -36,7 +36,13 @@ namespace details {
 class SafeString {
 public:
     SafeString() noexcept = default;
-    explicit SafeString(const char* str) noexcept : mCStr(strdup(str)) { }
+    explicit SafeString(const char* str) noexcept :
+#if defined(WIN32) || defined(_WIN32)
+        mCStr(_strdup(str)) {
+#else
+        mCStr(strdup(str)) {
+#endif
+    }
     SafeString(SafeString&& rhs) noexcept : mCStr(rhs.mCStr) { rhs.mCStr = nullptr; }
     SafeString& operator=(SafeString&& rhs) noexcept {
         std::swap(mCStr, rhs.mCStr);
