@@ -696,7 +696,7 @@ function validate_build_command {
     fi
     # Make sure we have Java
     local javac_binary=$(command -v javac)
-    if [[ "${JAVA_HOME}" == "" ]] || [[ ! "${javac_binary}" ]]; then
+    if [[ "${ISSUE_DESKTOP_BUILD}" == "true" ]] && ([[ "${JAVA_HOME}" == "" ]] || [[ ! "${javac_binary}" ]]); then
         echo "Warning: JAVA_HOME is not set, skipping Java projects"
         FILAMENT_ENABLE_JAVA=OFF
     fi
