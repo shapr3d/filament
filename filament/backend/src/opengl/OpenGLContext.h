@@ -149,6 +149,7 @@ public:
         bool EXT_texture_compression_s3tc_srgb = false;
         bool WEBGL_texture_compression_s3tc = false;
         bool WEBGL_texture_compression_s3tc_srgb = false;
+        bool EXT_external_buffer = false;
     } ext;
 
     struct {

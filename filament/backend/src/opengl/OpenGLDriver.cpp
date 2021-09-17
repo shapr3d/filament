@@ -1725,6 +1725,10 @@ void OpenGLDriver::setExternalIndexBuffer(Handle<HwIndexBuffer> ibh, void* exter
     DEBUG_MARKER()
 
     auto& gl = mContext;
+    if (!gl.ext.EXT_external_buffer) {
+        assert(false && "You need GL_EXT_external_buffer for setting external index buffers!");
+        return;
+    }
     GLIndexBuffer* ib = handle_cast<GLIndexBuffer*>(ibh);
 
     assert_invariant(ib->gl.isExternal);
@@ -1744,6 +1748,10 @@ void OpenGLDriver::setExternalBuffer(Handle<HwBufferObject> boh, void* externalB
     DEBUG_MARKER()
 
     auto& gl = mContext;
+    if (!gl.ext.EXT_external_buffer) {
+        assert(false && "You need GL_EXT_external_buffer for setting external index buffers!");
+        return;
+    }
     GLBufferObject* bo = handle_cast<GLBufferObject*>(boh);
 
     assert_invariant(bo->gl.isExternal);
