@@ -86,7 +86,7 @@ struct App {
     gltfio::ResourceLoader* resourceLoader = nullptr;
     bool recomputeAabb = false;
 
-    bool actualSize = false;
+    bool actualSize = true;
 
     struct Scene {
         Entity groundPlane;
@@ -354,11 +354,12 @@ int main(int argc, char** argv) {
     App app;
 
     app.config.title = "Filament";
-    app.config.iblDirectory = FilamentApp::getRootAssetsPath() + DEFAULT_IBL;
+    app.config.iblDirectory = FilamentApp::getRootAssetsPath() + DEFAULT_IBL;    
+    app.config.cameraMode = camutils::Mode::FREE_FLIGHT;
 
     int optionIndex = handleCommandLineArguments(argc, argv, &app);
 
-    utils::Path filename;
+    utils::Path filename = "C:\\Depot\\filament_viewer\\third_party\\models\\TestEnv01\\testEnv_01.glb";
     int num_args = argc - optionIndex;
     if (num_args >= 1) {
         filename = argv[optionIndex];
@@ -440,6 +441,7 @@ int main(int argc, char** argv) {
         app.names = new NameComponentManager(EntityManager::get());
         app.viewer = new SimpleViewer(engine, scene, view, 410);
         app.viewer->getSettings().viewer.autoScaleEnabled = !app.actualSize;
+        app.viewer->getSettings().lighting.enableSunlight = false;
 
         const bool batchMode = !app.batchFile.empty();
 

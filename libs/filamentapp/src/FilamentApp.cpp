@@ -589,6 +589,8 @@ FilamentApp::Window::Window(FilamentApp* filamentApp,
     // set-up the camera manipulators
     mMainCameraMan = CameraManipulator::Builder()
             .targetPosition(0, 0, -4)
+            .flightStartPosition(3, 1, 2)
+            .flightStartOrientation(-0.1, 1)
             .flightMoveDamping(15.0)
             .build(config.cameraMode);
     mDebugCameraMan = CameraManipulator::Builder()

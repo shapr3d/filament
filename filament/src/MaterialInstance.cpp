@@ -173,6 +173,45 @@ template UTILS_PUBLIC void MaterialInstance::setParameter<float3>  (const char* 
 template UTILS_PUBLIC void MaterialInstance::setParameter<float4>  (const char* name, const float4   *v, size_t c) noexcept;
 template UTILS_PUBLIC void MaterialInstance::setParameter<mat4f>   (const char* name, const mat4f    *v, size_t c) noexcept;
 
+float& MaterialInstance::getClearCoatScale() noexcept {
+    return upcast(this)->clearCoatScale;
+}
+float& MaterialInstance::getClearCoatNormalScale() noexcept {
+    return upcast(this)->clearCoatNormalScale;
+}
+float& MaterialInstance::getNormalScale() noexcept {
+    return upcast(this)->normalScale;
+}
+float& MaterialInstance::getRoughnessScale() noexcept {
+    return upcast(this)->roughnessScale;
+}
+float& MaterialInstance::getSpecularScale() noexcept {
+    return upcast(this)->specularScale;
+}
+float& MaterialInstance::getDiffuseScale() noexcept {
+    return upcast(this)->diffuseScale;
+}
+
+void MaterialInstance::setClearCoatScale( float clearCoatScale ) noexcept {
+    upcast(this)->clearCoatScale = clearCoatScale;
+}
+void MaterialInstance::setClearCoatNormalScale(float clearCoatNormalScale) noexcept {
+    upcast(this)->clearCoatNormalScale = clearCoatNormalScale;
+}
+void MaterialInstance::setNormalScale( float normalScale ) noexcept {
+    upcast(this)->normalScale = normalScale;
+}
+void MaterialInstance::setRoughnessScale( float roughnessScale ) noexcept {
+    upcast(this)->roughnessScale = roughnessScale;
+}
+void MaterialInstance::setSpecularScale( float specularScale ) noexcept {
+    upcast(this)->specularScale = specularScale;
+}
+void MaterialInstance::setDiffuseScale(float diffuseScale) noexcept {
+    upcast(this)->diffuseScale = diffuseScale;
+}
+
+
 // ------------------------------------------------------------------------------------------------
 
 FMaterialInstance::FMaterialInstance() noexcept = default;
@@ -186,7 +225,13 @@ FMaterialInstance::FMaterialInstance(FEngine& engine,
           mDepthWrite(other->mDepthWrite),
           mDepthFunc(other->mDepthFunc),
           mScissorRect(other->mScissorRect),
-          mName(name ? CString(name) : other->mName) {
+          mName(name ? CString(name) : other->mName),
+          clearCoatScale{1.0f},
+          clearCoatNormalScale{ 1.0f },
+          normalScale{ 1.0f },
+          roughnessScale{ 1.0f },
+          specularScale{ 1.0f },
+          diffuseScale{ 1.0f } {
 
     FEngine::DriverApi& driver = engine.getDriverApi();
     FMaterial const* const material = other->getMaterial();

@@ -508,6 +508,8 @@ void SimpleViewer::updateUserInterface() {
 
     // Show a common set of UI widgets for all renderables.
     auto renderableTreeItem = [this, &rm](utils::Entity entity) {
+        static std::vector<Material::ParameterInfo> params(256);
+
         bool rvis = mScene->hasEntity(entity);
         ImGui::Checkbox("visible", &rvis);
         if (rvis) {
@@ -521,7 +523,30 @@ void SimpleViewer::updateUserInterface() {
         rm.setCastShadows(instance, scaster);
         size_t numPrims = rm.getPrimitiveCount(instance);
         for (size_t prim = 0; prim < numPrims; ++prim) {
-            const char* mname = rm.getMaterialInstanceAt(instance, prim)->getName();
+            const auto& matInstance = rm.getMaterialInstanceAt(instance, prim);
+            const char* mname = matInstance->getName();
+            const auto* mat = matInstance->getMaterial();
+            
+            size_t paramCount = mat->getParameterCount();
+            mat->getParameters(params.data(), paramCount);
+
+            bool hasClearCoat = mat->hasParameter("clearCoatNormalScale");
+            
+            ImGui::SliderFloat("IBL Diffuse intensity multiplier", &matInstance->getDiffuseScale(), 0.0f, 8.0f);
+            ImGui::SliderFloat("IBL Specular intensity multiplier", &matInstance->getSpecularScale(), 0.0f, 8.0f);
+            ImGui::SliderFloat("Roughness multiplier", &matInstance->getRoughnessScale(), 0.0f, 8.0f);
+            ImGui::SliderFloat("Normal multiplier", &matInstance->getNormalScale(), 0.0f, 8.0f);
+            ImGui::SliderFloat("Clear coat intensity multiplier", &matInstance->getClearCoatScale(), 0.0f, 8.0f);
+            if (hasClearCoat) {
+                ImGui::SliderFloat("Clear coat normal multiplier", &matInstance->getClearCoatNormalScale(), 0.0f, 8.0f);
+            }
+
+            matInstance->setParameter("scalingControl", math::float4(matInstance->getSpecularScale() - 1.0f, matInstance->getRoughnessScale() - 1.0f, matInstance->getDiffuseScale() - 1.0f, matInstance->getClearCoatScale() - 1.0f));
+            matInstance->setParameter("normalScale", matInstance->getNormalScale());
+            if (hasClearCoat) {
+                matInstance->setParameter("clearCoatNormalScale", matInstance->getClearCoatNormalScale());
+            }
+            
             if (mname) {
                 ImGui::Text("prim %zu: material %s", prim, mname);
             } else {

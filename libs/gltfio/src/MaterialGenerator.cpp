@@ -150,6 +150,14 @@ std::string shaderFromKey(const MaterialKey& config) {
     }
 
     if (!config.unlit) {
+        // for controlling the roughness and specular scales
+        shader += R"SHADER(
+                material.specularScale  = 1.0 + materialParams.scalingControl.x;
+                material.roughnessScale = 1.0 + materialParams.scalingControl.y;
+                material.diffuseScale   = 1.0 + materialParams.scalingControl.z;
+                material.clearCoatScale = 1.0 + materialParams.scalingControl.w;
+            )SHADER";
+
         if (config.useSpecularGlossiness) {
             shader += R"SHADER(
                 material.glossiness = materialParams.glossinessFactor;
@@ -158,7 +166,7 @@ std::string shaderFromKey(const MaterialKey& config) {
             )SHADER";
         } else {
             shader += R"SHADER(
-                material.roughness = materialParams.roughnessFactor;
+                material.roughness = materialParams.roughnessFactor * material.roughnessScale;
                 material.metallic = materialParams.metallicFactor;
                 material.emissive = vec4(materialParams.emissiveFactor.rgb, 0.0);
             )SHADER";
@@ -182,7 +190,8 @@ std::string shaderFromKey(const MaterialKey& config) {
                     material.metallic *= mr.b;
                 )SHADER";
             }
-        }
+        }        
+
         if (config.hasOcclusionTexture) {
             shader += "highp float2 aoUV = ${ao};\n";
             if (config.hasTextureTransforms) {
@@ -340,6 +349,9 @@ static Material* createMaterial(Engine* engine, const MaterialKey& config, const
     // METALLIC-ROUGHNESS
     builder.parameter(MaterialBuilder::UniformType::FLOAT, "metallicFactor");
     builder.parameter(MaterialBuilder::UniformType::FLOAT, "roughnessFactor");
+
+    builder.parameter(MaterialBuilder::UniformType::FLOAT4, "scalingControl");
+    
     if (config.hasMetallicRoughnessTexture) {
         builder.parameter(MaterialBuilder::SamplerType::SAMPLER_2D, "metallicRoughnessMap");
         if (config.hasTextureTransforms) {

@@ -98,7 +98,7 @@ vec3 diffuseLobe(const PixelParams pixel, float NoV, float NoL, float LoH) {
  * on the Cook-Torrance microfacet model, it uses cheaper terms than the surface
  * BRDF's specular lobe (see brdf.fs).
  */
-vec3 surfaceShading(const PixelParams pixel, const Light light, float occlusion) {
+vec3 surfaceShading(const MaterialInputs material, const PixelParams pixel, const Light light, float occlusion) {
     vec3 h = normalize(shading_view + light.l);
 
     float NoV = shading_NoV;
@@ -125,7 +125,7 @@ vec3 surfaceShading(const PixelParams pixel, const Light light, float occlusion)
 
 #if defined(MATERIAL_HAS_CLEAR_COAT)
     float Fcc;
-    float clearCoat = clearCoatLobe(pixel, h, NoH, LoH, Fcc);
+    float clearCoat = material.clearCoatScale * clearCoatLobe(pixel, h, NoH, LoH, Fcc);
     float attenuation = 1.0 - Fcc;
 
 #if defined(MATERIAL_HAS_NORMAL) || defined(MATERIAL_HAS_CLEAR_COAT_NORMAL)

@@ -343,7 +343,7 @@ vec3 isEvaluateDiffuseIBL(const PixelParams pixel, vec3 n, vec3 v) {
     return indirectDiffuse * invNumSamples; // we bake 1/PI here, which cancels out
 }
 
-void isEvaluateClearCoatIBL(const PixelParams pixel, float specularAO, inout vec3 Fd, inout vec3 Fr) {
+void isEvaluateClearCoatIBL(const MaterialInputs material, const PixelParams pixel, float specularAO, inout vec3 Fd, inout vec3 Fr) {
 #if defined(MATERIAL_HAS_CLEAR_COAT)
 #if defined(MATERIAL_HAS_NORMAL) || defined(MATERIAL_HAS_CLEAR_COAT_NORMAL)
     // We want to use the geometric normal for the clear coat layer
@@ -367,7 +367,7 @@ void isEvaluateClearCoatIBL(const PixelParams pixel, float specularAO, inout vec
     p.anisotropy = 0.0;
 #endif
 
-    vec3 clearCoatLobe = isEvaluateSpecularIBL(p, clearCoatNormal, shading_view, clearCoatNoV);
+    vec3 clearCoatLobe = material.clearCoatScale * isEvaluateSpecularIBL(p, clearCoatNormal, shading_view, clearCoatNoV);
     Fr += clearCoatLobe * (specularAO * pixel.clearCoat);
 #endif
 }
@@ -399,9 +399,9 @@ void evaluateSheenIBL(const PixelParams pixel, float specularAO, inout vec3 Fd, 
 #endif
 }
 
-void evaluateClearCoatIBL(const PixelParams pixel, float specularAO, inout vec3 Fd, inout vec3 Fr) {
+void evaluateClearCoatIBL(const MaterialInputs material, const PixelParams pixel, float specularAO, inout vec3 Fd, inout vec3 Fr) {
 #if IBL_INTEGRATION == IBL_INTEGRATION_IMPORTANCE_SAMPLING
-    isEvaluateClearCoatIBL(pixel, specularAO, Fd, Fr);
+    isEvaluateClearCoatIBL(material, pixel, specularAO, Fd, Fr);
     return;
 #endif
 
@@ -419,7 +419,7 @@ void evaluateClearCoatIBL(const PixelParams pixel, float specularAO, inout vec3 
     float attenuation = 1.0 - Fc;
     Fd *= attenuation;
     Fr *= attenuation;
-    Fr += prefilteredRadiance(clearCoatR, pixel.clearCoatPerceptualRoughness) * (specularAO * Fc);
+    Fr += material.clearCoatScale * prefilteredRadiance(clearCoatR, pixel.clearCoatPerceptualRoughness) * (specularAO * Fc);
 #endif
 }
 
@@ -486,7 +486,9 @@ void refractionThinSphere(const PixelParams pixel,
     ray.d = d;
 }
 
-void applyRefraction(const PixelParams pixel,
+void applyRefraction(
+    const MaterialInputs material,
+    const PixelParams pixel,
     const vec3 n0, vec3 E, vec3 Fd, vec3 Fr,
     inout vec3 color) {
 
@@ -551,19 +553,21 @@ void applyRefraction(const PixelParams pixel,
     Ft *= T;
 #endif
 
-    Fr *= frameUniforms.iblLuminance;
-    Fd *= frameUniforms.iblLuminance;
+    Fr *= material.diffuseScale * frameUniforms.iblLuminance;
+    Fd *= material.specularScale * frameUniforms.iblLuminance;
     color.rgb += Fr + mix(Fd, Ft, pixel.transmission);
 }
 #endif
 
-void combineDiffuseAndSpecular(const PixelParams pixel,
+void combineDiffuseAndSpecular(
+        const MaterialInputs material, 
+        const PixelParams pixel,
         const vec3 n, const vec3 E, const vec3 Fd, const vec3 Fr,
         inout vec3 color) {
 #if defined(HAS_REFRACTION)
-    applyRefraction(pixel, n, E, Fd, Fr, color);
+    applyRefraction(material, pixel, n, E, Fd, Fr, color);
 #else
-    color.rgb += (Fd + Fr) * frameUniforms.iblLuminance;
+    color.rgb += (material.diffuseScale * Fd + material.specularScale * Fr) * frameUniforms.iblLuminance;
 #endif
 }
 
@@ -605,7 +609,7 @@ void evaluateIBL(const MaterialInputs material, const PixelParams pixel, inout v
     evaluateSheenIBL(pixel, specularAO, Fd, Fr);
 
     // clear coat layer
-    evaluateClearCoatIBL(pixel, specularAO, Fd, Fr);
+    evaluateClearCoatIBL(material, pixel, specularAO, Fd, Fr);
 
     // subsurface layer
     evaluateSubsurfaceIBL(pixel, diffuseIrradiance, Fd, Fr);
@@ -615,5 +619,5 @@ void evaluateIBL(const MaterialInputs material, const PixelParams pixel, inout v
     multiBounceSpecularAO(specularAO, pixel.f0, Fr);
 
     // Note: iblLuminance is already premultiplied by the exposure
-    combineDiffuseAndSpecular(pixel, shading_normal, E, Fd, Fr, color);
+    combineDiffuseAndSpecular(material, pixel, shading_normal, E, Fd, Fr, color);
 }
