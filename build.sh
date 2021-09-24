@@ -582,8 +582,10 @@ function build_ios_target {
 
     if [[ "${platform}" == "macosx" ]]; then
         local install_dir="catalyst-${lc_target}"
+        local CATALYST_OPTION="ON"
     else
         local install_dir="ios-${lc_target}"
+        local CATALYST_OPTION="OFF"
     fi
 
     echo "Building iOS ${lc_target} (${arch}) for ${platform}..."
@@ -600,7 +602,7 @@ function build_ios_target {
             -DIOS_ARCH="${arch}" \
             -DPLATFORM_NAME="${platform}" \
             -DIOS=1 \
-            -DCATALYST="${platform}" == "macosx" \
+            -DCATALYST=${CATALYST_OPTION} \
             -DCMAKE_TOOLCHAIN_FILE=../../third_party/clang/iOS.cmake \
             ${MATDBG_OPTION} \
             ${OPENGL_IOS_OPTION} \
