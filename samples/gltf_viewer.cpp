@@ -356,6 +356,7 @@ int main(int argc, char** argv) {
     app.config.title = "Filament";
     app.config.iblDirectory = FilamentApp::getRootAssetsPath() + DEFAULT_IBL;    
     app.config.cameraMode = camutils::Mode::FREE_FLIGHT;
+    app.config.backend = Engine::Backend::OPENGL;
 
     int optionIndex = handleCommandLineArguments(argc, argv, &app);
 

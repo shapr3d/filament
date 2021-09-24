@@ -403,7 +403,10 @@ void SimpleViewer::updateIndirectLight() {
     using namespace filament::math;
     if (mIndirectLight) {
         mIndirectLight->setIntensity(mSettings.lighting.iblIntensity);
-        mIndirectLight->setRotation(mat3f::rotation(mSettings.lighting.iblRotation, float3{ 0, 1, 0 }));
+        mIndirectLight->setRotation(
+            mat3f::rotation(mSettings.lighting.iblRotation, float3{ 0, 0, 1 }) *
+            mat3f::rotation((float)M_PI_2, float3{ 1, 0, 0 })
+        );
     }
 }
 
