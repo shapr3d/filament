@@ -664,10 +664,12 @@ bool MetalDriver::isRenderTargetFormatSupported(TextureFormat format) {
 }
 
 bool MetalDriver::isFrameBufferFetchSupported() {
-    // Newer Intel cards support it too, but it's not documented
+#if !defined(FILAMENT_IOS_SIMULATOR)
+    // Newer Intel cards (Mac2 GPU family and above) support it too, but it's not documented
     if (@available(macOS 10.15, iOS 13, *)) {
         return [mContext->device supportsFamily:MTLGPUFamilyApple1];
     }
+#endif
     return false;
 }
 
