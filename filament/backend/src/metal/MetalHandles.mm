@@ -856,14 +856,17 @@ id<MTLTexture> MetalRenderTarget::createMultisampledTexture(id<MTLDevice> device
     descriptor.textureType = MTLTextureType2DMultisample;
     descriptor.sampleCount = samples;
     descriptor.usage = MTLTextureUsageRenderTarget;
-#if defined(IOS)
-    if (@available(macCatalyst 14.0, *)) {
-        descriptor.resourceOptions = MTLResourceStorageModeMemoryless;
-    } else {
-        descriptor.resourceOptions = MTLResourceStorageModePrivate;        
-    }
-#else
     descriptor.resourceOptions = MTLResourceStorageModePrivate;
+#if !defined(FILAMENT_IOS_SIMULATOR)
+#if defined(IOS) && !TARGET_OS_MACCATALYST
+    descriptor.resourceOptions = MTLResourceStorageModeMemoryless;
+#else
+    if (@available(macOS 11.0, macCatalyst 14.0, *)) {
+        if ([device supportsFamily:MTLGPUFamilyApple1]) {
+            descriptor.resourceOptions = MTLResourceStorageModeMemoryless;
+        }
+    }
+#endif
 #endif
 
     return [device newTextureWithDescriptor:descriptor];
