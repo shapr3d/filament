@@ -264,7 +264,7 @@ function build_desktop_tools_for_ios {
     INSTALL_COMMAND=
     FILAMENT_ENABLE_JAVA=OFF
 
-    build_desktop $1
+    build_desktop "$1"
 
     INSTALL_COMMAND=${old_install_command}
     FILAMENT_ENABLE_JAVA=${old_java_flag}
