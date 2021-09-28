@@ -216,7 +216,6 @@ inline MTLPixelFormat getMetalFormat(id<MTLDevice> device, TextureFormat format)
 
         if (IsSupported(device, TextureCompressionFamily::EAC_ETC)) {
             switch (format) {
-                // EAC / ETC2 formats are only available on iPhone.
                 case TextureFormat::EAC_R11: return MTLPixelFormatEAC_R11Unorm;
                 case TextureFormat::EAC_R11_SIGNED: return MTLPixelFormatEAC_R11Snorm;
                 case TextureFormat::EAC_RG11: return MTLPixelFormatEAC_RG11Unorm;
