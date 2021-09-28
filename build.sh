@@ -172,6 +172,7 @@ BUILD_UNIVERSAL_LIBRARIES=false
 BUILD_GENERATOR=Ninja
 BUILD_COMMAND=ninja
 BUILD_CUSTOM_TARGETS=
+IOS_INSTALLED_LIBS_DIR=
 
 UNAME=$(uname)
 LC_UNAME=$(echo "${UNAME}" | tr '[:upper:]' '[:lower:]')
@@ -579,13 +580,14 @@ function build_ios_target {
     local lc_target=$(echo "$1" | tr '[:upper:]' '[:lower:]')
     local arch=$2
     local platform=$3
+    IOS_INSTALLED_LIBS_DIR=
 
     if [[ "${platform}" == "macosx" ]]; then
         local install_dir="catalyst-${lc_target}"
-        local CATALYST_OPTION="ON"
+        local catalyst_option="ON"
     else
         local install_dir="ios-${lc_target}"
-        local CATALYST_OPTION="OFF"
+        local catalyst_option="OFF"
     fi
 
     echo "Building iOS ${lc_target} (${arch}) for ${platform}..."
@@ -602,7 +604,7 @@ function build_ios_target {
             -DIOS_ARCH="${arch}" \
             -DPLATFORM_NAME="${platform}" \
             -DIOS=1 \
-            -DCATALYST=${CATALYST_OPTION} \
+            -DCATALYST=${catalyst_option} \
             -DCMAKE_TOOLCHAIN_FILE=../../third_party/clang/iOS.cmake \
             ${MATDBG_OPTION} \
             ${OPENGL_IOS_OPTION} \
@@ -614,6 +616,7 @@ function build_ios_target {
     if [[ "${INSTALL_COMMAND}" ]]; then
         echo "Installing ${lc_target} in out/${install_dir}/filament..."
         ${BUILD_COMMAND} ${INSTALL_COMMAND}
+        IOS_INSTALLED_LIBS_DIR="out/${install_dir}/filament/lib"
     fi
 
     cd ../..
@@ -648,11 +651,11 @@ function build_ios {
 
         if [[ "${BUILD_UNIVERSAL_LIBRARIES}" == "true" ]]; then
             build/ios/create-universal-libs.sh \
-                -o out/ios-debug/filament/lib/universal \
-                out/ios-debug/filament/lib/arm64 \
-                out/ios-debug/filament/lib/x86_64
-            rm -rf out/ios-debug/filament/lib/arm64
-            rm -rf out/ios-debug/filament/lib/x86_64
+                -o "${IOS_INSTALLED_LIBS_DIR}/universal" \
+                "${IOS_INSTALLED_LIBS_DIR}/arm64" \
+                "${IOS_INSTALLED_LIBS_DIR}/x86_64"
+            rm -rf "${IOS_INSTALLED_LIBS_DIR}/arm64"
+            rm -rf "${IOS_INSTALLED_LIBS_DIR}/x86_64"
         fi
 
         archive_ios "Debug" "ios"
@@ -666,11 +669,11 @@ function build_ios {
 
         if [[ "${BUILD_UNIVERSAL_LIBRARIES}" == "true" ]]; then
             build/ios/create-universal-libs.sh \
-                -o out/ios-release/filament/lib/universal \
-                out/ios-release/filament/lib/arm64 \
-                out/ios-release/filament/lib/x86_64
-            rm -rf out/ios-release/filament/lib/arm64
-            rm -rf out/ios-release/filament/lib/x86_64
+                -o "${IOS_INSTALLED_LIBS_DIR}/universal" \
+                "${IOS_INSTALLED_LIBS_DIR}/arm64" \
+                "${IOS_INSTALLED_LIBS_DIR}/x86_64"
+            rm -rf "${IOS_INSTALLED_LIBS_DIR}/arm64"
+            rm -rf "${IOS_INSTALLED_LIBS_DIR}/x86_64"
         fi
 
         archive_ios "Release" "ios"
@@ -681,12 +684,34 @@ function build_mac_catalyst {
     build_desktop_tools_for_ios "${MOBILE_HOST_TOOLS}"
 
     if [[ "${ISSUE_DEBUG_BUILD}" == "true" ]]; then
+        build_ios_target "Debug" "arm64" "macosx"
         build_ios_target "Debug" "x86_64" "macosx"
+
+        if [[ "${BUILD_UNIVERSAL_LIBRARIES}" == "true" ]]; then
+            build/ios/create-universal-libs.sh \
+                -o "${IOS_INSTALLED_LIBS_DIR}/universal" \
+                "${IOS_INSTALLED_LIBS_DIR}/arm64" \
+                "${IOS_INSTALLED_LIBS_DIR}/x86_64"
+            rm -rf "${IOS_INSTALLED_LIBS_DIR}/arm64"
+            rm -rf "${IOS_INSTALLED_LIBS_DIR}/x86_64"
+        fi
+
         archive_ios "Debug" "catalyst"
     fi
 
     if [[ "${ISSUE_RELEASE_BUILD}" == "true" ]]; then
+        build_ios_target "Release" "arm64" "macosx"
         build_ios_target "Release" "x86_64" "macosx"
+
+        if [[ "${BUILD_UNIVERSAL_LIBRARIES}" == "true" ]]; then
+            build/ios/create-universal-libs.sh \
+                -o "${IOS_INSTALLED_LIBS_DIR}/universal" \
+                "${IOS_INSTALLED_LIBS_DIR}/arm64" \
+                "${IOS_INSTALLED_LIBS_DIR}/x86_64"
+            rm -rf "${IOS_INSTALLED_LIBS_DIR}/arm64"
+            rm -rf "${IOS_INSTALLED_LIBS_DIR}/x86_64"
+        fi
+
         archive_ios "Release" "catalyst"
     fi
 }
@@ -904,7 +929,6 @@ while getopts ":hacCfijmp:q:uvgslwtdk:" opt; do
             echo "SwiftShader support enabled."
             ;;
         l)
-            IOS_BUILD_SIMULATOR=true
             BUILD_UNIVERSAL_LIBRARIES=true
             echo "Building universal libraries."
             ;;
@@ -966,6 +990,9 @@ if [[ "${ISSUE_ANDROID_BUILD}" == "true" ]]; then
 fi
 
 if [[ "${ISSUE_IOS_BUILD}" == "true" ]]; then
+    if [[ "${BUILD_UNIVERSAL_LIBRARIES}" == "true" ]]; then
+        IOS_BUILD_SIMULATOR=true
+    fi
     build_ios
 fi
 
