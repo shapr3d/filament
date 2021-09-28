@@ -126,7 +126,7 @@ constexpr inline MTLVertexFormat getMetalFormat(ElementType type, bool normalize
     return MTLVertexFormatInvalid;
 }
 
-inline MTLPixelFormat getMetalFormat(TextureFormat format) noexcept {
+inline MTLPixelFormat getMetalFormat(id<MTLDevice> device, TextureFormat format) noexcept {
 #if defined(IOS)
     if (@available(iOS 8, macCatalyst 14, *)) {
         switch (format) {

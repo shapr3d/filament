@@ -375,7 +375,7 @@ MetalProgram::MetalProgram(id<MTLDevice> device, const Program& program) noexcep
 }
 
 static MTLPixelFormat decidePixelFormat(id<MTLDevice> device, TextureFormat format) {
-    const MTLPixelFormat metalFormat = getMetalFormat(format);
+    const MTLPixelFormat metalFormat = getMetalFormat(device, format);
 #if !defined(IOS)
     // Some devices do not support the Depth24_Stencil8 format, so we'll fallback to Depth32.
     if (metalFormat == MTLPixelFormatDepth24Unorm_Stencil8 &&

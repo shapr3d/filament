@@ -247,7 +247,7 @@ void MetalDriver::importTextureR(Handle<HwTexture> th, intptr_t i,
     ASSERT_PRECONDITION(metalTexture.mipmapLevelCount == levels,
             "Imported id<MTLTexture> levels (%d) != Filament texture levels (%d)",
             metalTexture.mipmapLevelCount, levels);
-    MTLPixelFormat filamentMetalFormat = getMetalFormat(format);
+    MTLPixelFormat filamentMetalFormat = getMetalFormat(mContext->device, format);
     ASSERT_PRECONDITION(metalTexture.pixelFormat == filamentMetalFormat,
             "Imported id<MTLTexture> format (%d) != Filament texture format (%d)",
             metalTexture.pixelFormat, filamentMetalFormat);
@@ -604,7 +604,7 @@ FenceStatus MetalDriver::wait(Handle<HwFence> fh, uint64_t timeout) {
 }
 
 bool MetalDriver::isTextureFormatSupported(TextureFormat format) {
-    return getMetalFormat(format) != MTLPixelFormatInvalid ||
+    return getMetalFormat(mContext->device, format) != MTLPixelFormatInvalid ||
            TextureReshaper::canReshapeTextureFormat(format);
 }
 
@@ -658,7 +658,7 @@ bool MetalDriver::isTextureFormatMipmappable(TextureFormat format) {
 }
 
 bool MetalDriver::isRenderTargetFormatSupported(TextureFormat format) {
-    MTLPixelFormat mtlFormat = getMetalFormat(format);
+    MTLPixelFormat mtlFormat = getMetalFormat(mContext->device, format);
     // RGB9E5 isn't supported on Mac as a color render target.
     return mtlFormat != MTLPixelFormatInvalid && mtlFormat != MTLPixelFormatRGB9E5Float;
 }
