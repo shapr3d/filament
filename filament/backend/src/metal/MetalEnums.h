@@ -27,9 +27,9 @@
 
 namespace {
 #if defined(FILAMENT_IOS_SIMULATOR)
-    constexpr bool SupportsEAC_ETC() { return false; }
-    constexpr bool SupportsASTC_LDR() { return false; }
-    constexpr bool SupportsASTC_HDR() { return false; }
+    constexpr bool SupportsEAC_ETC(id<MTLDevice>) { return false; }
+    constexpr bool SupportsASTC_LDR_SRGB(id<MTLDevice>) { return false; }
+    constexpr bool SupportsASTC_HDR(id<MTLDevice>) { return false; }
 #else
     bool SupportsEAC_ETC(id<MTLDevice> device) {
         assert(device);
