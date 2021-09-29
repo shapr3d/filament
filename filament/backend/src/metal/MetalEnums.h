@@ -26,29 +26,43 @@
 #include <Availability.h>
 
 namespace {
-    enum class TextureCompressionFamily {
-        EAC_ETC,
-        ASTC
-    };
-
-    bool IsSupported(id<MTLDevice> device, TextureCompressionFamily family) {
-        assert(device);
 #if defined(FILAMENT_IOS_SIMULATOR)
-        return false;
-#elif defined(IOS) && !TARGET_OS_MACCATALYST
-        return true;
+    constexpr bool SupportsEAC_ETC() { return false; }
+    constexpr bool SupportsASTC_LDR() { return false; }
+    constexpr bool SupportsASTC_HDR() { return false; }
 #else
-        if (@available(macOS 10.15, macCatalyst 13.0, iOS 13.0, *)) {
-            switch (family) {
-                case TextureCompressionFamily::EAC_ETC:
-                    return [device supportsFamily:MTLGPUFamilyApple1];
-                case TextureCompressionFamily::ASTC:
-                    return [device supportsFamily:MTLGPUFamilyApple2];
-            }
+    bool SupportsEAC_ETC(id<MTLDevice> device) {
+        assert(device);
+        if (@available(iOS 13.0, macOS 10.15, *)) {
+            return [device supportsFamily:MTLGPUFamilyApple1];
+#if defined(IOS) && !TARGET_OS_MACCATALYST
+        } else {
+            return [device supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily1_v1];
+#endif
         }
         return false;
-#endif
     }
+
+    bool SupportsASTC_LDR_SRGB(id<MTLDevice> device) {
+        assert(device);
+        if (@available(iOS 13.0, macOS 10.15, *)) {
+            return [device supportsFamily:MTLGPUFamilyApple2];
+#if defined(IOS) && !TARGET_OS_MACCATALYST
+        } else {
+            return [device supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily2_v1];
+#endif
+        }
+        return false;
+    }
+
+    bool SupportsASTC_HDR(id<MTLDevice> device) {
+        assert(device);
+        if (@available(iOS 13.0, macOS 10.15, *)) {
+            return [device supportsFamily:MTLGPUFamilyApple6];
+        }
+        return false;
+    }
+#endif
 }
 
 namespace filament {
@@ -154,7 +168,7 @@ constexpr inline MTLVertexFormat getMetalFormat(ElementType type, bool normalize
 
 inline MTLPixelFormat getMetalFormat(id<MTLDevice> device, TextureFormat format) noexcept {
     if (@available(macOS 11.0, macCatalyst 14.0, *)) {
-        if (IsSupported(device, TextureCompressionFamily::ASTC)) {
+        if (SupportsASTC_LDR_SRGB(device)) {
             switch (format) {
                 case TextureFormat::SRGB8_ALPHA8_ASTC_4x4: return MTLPixelFormatASTC_4x4_sRGB;
                 case TextureFormat::SRGB8_ALPHA8_ASTC_5x4: return MTLPixelFormatASTC_5x4_sRGB;
@@ -173,9 +187,9 @@ inline MTLPixelFormat getMetalFormat(id<MTLDevice> device, TextureFormat format)
                 default: break;
             }
 
-            // Only iOS 13.0 and above supports the ASTC HDR profile. Older versions of iOS fallback to LDR.
-            // The HDR profile is a superset of the LDR profile.
-            if (@available(iOS 13, *)) {
+            // Only iOS 13.0 and Apple GPU family 6 and above supports the ASTC HDR profile.
+            // Older versions of iOS fallback to LDR. The HDR profile is a superset of the LDR profile.
+            if (SupportsASTC_HDR(device)) {
                 switch (format) {
                     case TextureFormat::RGBA_ASTC_4x4: return MTLPixelFormatASTC_4x4_HDR;
                     case TextureFormat::RGBA_ASTC_5x4: return MTLPixelFormatASTC_5x4_HDR;
@@ -214,7 +228,7 @@ inline MTLPixelFormat getMetalFormat(id<MTLDevice> device, TextureFormat format)
             }
         }
 
-        if (IsSupported(device, TextureCompressionFamily::EAC_ETC)) {
+        if (SupportsEAC_ETC(device)) {
             switch (format) {
                 case TextureFormat::EAC_R11: return MTLPixelFormatEAC_R11Unorm;
                 case TextureFormat::EAC_R11_SIGNED: return MTLPixelFormatEAC_R11Snorm;
