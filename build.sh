@@ -623,14 +623,13 @@ function build_ios_target {
 }
 
 function archive_ios {
-    local lc_target=$(echo "$1" | tr '[:upper:]' '[:lower:]')
-    local archive_suffix=$2
+    local archive_suffix=$1
     local archive_filename="filament-${archive_suffix}.tgz"
 
-    if [[ -d "out/ios-${lc_target}/filament" ]]; then
+    if [[ -d "${IOS_INSTALLED_LIBS_DIR}" ]]; then
         if [[ "${ISSUE_ARCHIVES}" == "true" ]]; then
             echo "Generating out/${archive_filename}..."
-            cd "out/ios-${lc_target}"
+            cd "${IOS_INSTALLED_LIBS_DIR}../../"
             tar -czvf "../${archive_filename}" filament
             cd ../..
         fi
@@ -658,7 +657,7 @@ function build_ios {
             rm -rf "${IOS_INSTALLED_LIBS_DIR}/x86_64"
         fi
 
-        archive_ios "Debug" "ios"
+        archive_ios "ios"
     fi
 
     if [[ "${ISSUE_RELEASE_BUILD}" == "true" ]]; then
@@ -676,7 +675,7 @@ function build_ios {
             rm -rf "${IOS_INSTALLED_LIBS_DIR}/x86_64"
         fi
 
-        archive_ios "Release" "ios"
+        archive_ios "ios"
     fi
 }
 
@@ -696,7 +695,7 @@ function build_mac_catalyst {
             rm -rf "${IOS_INSTALLED_LIBS_DIR}/x86_64"
         fi
 
-        archive_ios "Debug" "catalyst"
+        archive_ios "catalyst"
     fi
 
     if [[ "${ISSUE_RELEASE_BUILD}" == "true" ]]; then
@@ -712,7 +711,7 @@ function build_mac_catalyst {
             rm -rf "${IOS_INSTALLED_LIBS_DIR}/x86_64"
         fi
 
-        archive_ios "Release" "catalyst"
+        archive_ios "catalyst"
     fi
 }
 
