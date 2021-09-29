@@ -28,8 +28,7 @@
 namespace {
 #if defined(FILAMENT_IOS_SIMULATOR)
     constexpr bool SupportsEAC_ETC(id<MTLDevice>) { return false; }
-    constexpr bool SupportsASTC_LDR_SRGB(id<MTLDevice>) { return false; }
-    constexpr bool SupportsASTC_HDR(id<MTLDevice>) { return false; }
+    constexpr bool SupportsASTC(id<MTLDevice>) { return false; }
 #else
     bool SupportsEAC_ETC(id<MTLDevice> device) {
         assert(device);
@@ -43,7 +42,7 @@ namespace {
         return false;
     }
 
-    bool SupportsASTC_LDR_SRGB(id<MTLDevice> device) {
+    bool SupportsASTC(id<MTLDevice> device) {
         assert(device);
         if (@available(iOS 13.0, macOS 10.15, *)) {
             return [device supportsFamily:MTLGPUFamilyApple2];
@@ -51,14 +50,6 @@ namespace {
         } else {
             return [device supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily2_v1];
 #endif
-        }
-        return false;
-    }
-
-    bool SupportsASTC_HDR(id<MTLDevice> device) {
-        assert(device);
-        if (@available(iOS 13.0, macOS 10.15, *)) {
-            return [device supportsFamily:MTLGPUFamilyApple6];
         }
         return false;
     }
@@ -168,7 +159,31 @@ constexpr inline MTLVertexFormat getMetalFormat(ElementType type, bool normalize
 
 inline MTLPixelFormat getMetalFormat(id<MTLDevice> device, TextureFormat format) noexcept {
     if (@available(macOS 11.0, macCatalyst 14.0, *)) {
-        if (SupportsASTC_LDR_SRGB(device)) {
+        if (SupportsASTC(device)) {
+            // Only iOS 13.0 + Apple GPU family 6 and above supports the ASTC HDR profile.
+            // Older versions of iOS fallback to LDR. The HDR profile is a superset of the LDR profile.
+            if (@available(iOS 13.0, *)) {
+                if ([device supportsFamily:MTLGPUFamilyApple6]) {
+                    switch (format) {
+                        case TextureFormat::RGBA_ASTC_4x4: return MTLPixelFormatASTC_4x4_HDR;
+                        case TextureFormat::RGBA_ASTC_5x4: return MTLPixelFormatASTC_5x4_HDR;
+                        case TextureFormat::RGBA_ASTC_5x5: return MTLPixelFormatASTC_5x5_HDR;
+                        case TextureFormat::RGBA_ASTC_6x5: return MTLPixelFormatASTC_6x5_HDR;
+                        case TextureFormat::RGBA_ASTC_6x6: return MTLPixelFormatASTC_6x6_HDR;
+                        case TextureFormat::RGBA_ASTC_8x5: return MTLPixelFormatASTC_8x5_HDR;
+                        case TextureFormat::RGBA_ASTC_8x6: return MTLPixelFormatASTC_8x6_HDR;
+                        case TextureFormat::RGBA_ASTC_8x8: return MTLPixelFormatASTC_8x8_HDR;
+                        case TextureFormat::RGBA_ASTC_10x5: return MTLPixelFormatASTC_10x5_HDR;
+                        case TextureFormat::RGBA_ASTC_10x6: return MTLPixelFormatASTC_10x6_HDR;
+                        case TextureFormat::RGBA_ASTC_10x8: return MTLPixelFormatASTC_10x8_HDR;
+                        case TextureFormat::RGBA_ASTC_10x10: return MTLPixelFormatASTC_10x10_HDR;
+                        case TextureFormat::RGBA_ASTC_12x10: return MTLPixelFormatASTC_12x10_HDR;
+                        case TextureFormat::RGBA_ASTC_12x12: return MTLPixelFormatASTC_12x12_HDR;
+                        default: break;
+                    }
+                }
+            }
+
             switch (format) {
                 case TextureFormat::SRGB8_ALPHA8_ASTC_4x4: return MTLPixelFormatASTC_4x4_sRGB;
                 case TextureFormat::SRGB8_ALPHA8_ASTC_5x4: return MTLPixelFormatASTC_5x4_sRGB;
@@ -184,47 +199,22 @@ inline MTLPixelFormat getMetalFormat(id<MTLDevice> device, TextureFormat format)
                 case TextureFormat::SRGB8_ALPHA8_ASTC_10x10: return MTLPixelFormatASTC_10x10_sRGB;
                 case TextureFormat::SRGB8_ALPHA8_ASTC_12x10: return MTLPixelFormatASTC_12x10_sRGB;
                 case TextureFormat::SRGB8_ALPHA8_ASTC_12x12: return MTLPixelFormatASTC_12x12_sRGB;
-                default: break;
-            }
 
-            // Only iOS 13.0 and Apple GPU family 6 and above supports the ASTC HDR profile.
-            // Older versions of iOS fallback to LDR. The HDR profile is a superset of the LDR profile.
-            if (SupportsASTC_HDR(device)) {
-                switch (format) {
-                    case TextureFormat::RGBA_ASTC_4x4: return MTLPixelFormatASTC_4x4_HDR;
-                    case TextureFormat::RGBA_ASTC_5x4: return MTLPixelFormatASTC_5x4_HDR;
-                    case TextureFormat::RGBA_ASTC_5x5: return MTLPixelFormatASTC_5x5_HDR;
-                    case TextureFormat::RGBA_ASTC_6x5: return MTLPixelFormatASTC_6x5_HDR;
-                    case TextureFormat::RGBA_ASTC_6x6: return MTLPixelFormatASTC_6x6_HDR;
-                    case TextureFormat::RGBA_ASTC_8x5: return MTLPixelFormatASTC_8x5_HDR;
-                    case TextureFormat::RGBA_ASTC_8x6: return MTLPixelFormatASTC_8x6_HDR;
-                    case TextureFormat::RGBA_ASTC_8x8: return MTLPixelFormatASTC_8x8_HDR;
-                    case TextureFormat::RGBA_ASTC_10x5: return MTLPixelFormatASTC_10x5_HDR;
-                    case TextureFormat::RGBA_ASTC_10x6: return MTLPixelFormatASTC_10x6_HDR;
-                    case TextureFormat::RGBA_ASTC_10x8: return MTLPixelFormatASTC_10x8_HDR;
-                    case TextureFormat::RGBA_ASTC_10x10: return MTLPixelFormatASTC_10x10_HDR;
-                    case TextureFormat::RGBA_ASTC_12x10: return MTLPixelFormatASTC_12x10_HDR;
-                    case TextureFormat::RGBA_ASTC_12x12: return MTLPixelFormatASTC_12x12_HDR;
-                    default: break;
-                }
-            } else {
-                switch (format) {
-                    case TextureFormat::RGBA_ASTC_4x4: return MTLPixelFormatASTC_4x4_LDR;
-                    case TextureFormat::RGBA_ASTC_5x4: return MTLPixelFormatASTC_5x4_LDR;
-                    case TextureFormat::RGBA_ASTC_5x5: return MTLPixelFormatASTC_5x5_LDR;
-                    case TextureFormat::RGBA_ASTC_6x5: return MTLPixelFormatASTC_6x5_LDR;
-                    case TextureFormat::RGBA_ASTC_6x6: return MTLPixelFormatASTC_6x6_LDR;
-                    case TextureFormat::RGBA_ASTC_8x5: return MTLPixelFormatASTC_8x5_LDR;
-                    case TextureFormat::RGBA_ASTC_8x6: return MTLPixelFormatASTC_8x6_LDR;
-                    case TextureFormat::RGBA_ASTC_8x8: return MTLPixelFormatASTC_8x8_LDR;
-                    case TextureFormat::RGBA_ASTC_10x5: return MTLPixelFormatASTC_10x5_LDR;
-                    case TextureFormat::RGBA_ASTC_10x6: return MTLPixelFormatASTC_10x6_LDR;
-                    case TextureFormat::RGBA_ASTC_10x8: return MTLPixelFormatASTC_10x8_LDR;
-                    case TextureFormat::RGBA_ASTC_10x10: return MTLPixelFormatASTC_10x10_LDR;
-                    case TextureFormat::RGBA_ASTC_12x10: return MTLPixelFormatASTC_12x10_LDR;
-                    case TextureFormat::RGBA_ASTC_12x12: return MTLPixelFormatASTC_12x12_LDR;
-                    default: break;
-                }
+                case TextureFormat::RGBA_ASTC_4x4: return MTLPixelFormatASTC_4x4_LDR;
+                case TextureFormat::RGBA_ASTC_5x4: return MTLPixelFormatASTC_5x4_LDR;
+                case TextureFormat::RGBA_ASTC_5x5: return MTLPixelFormatASTC_5x5_LDR;
+                case TextureFormat::RGBA_ASTC_6x5: return MTLPixelFormatASTC_6x5_LDR;
+                case TextureFormat::RGBA_ASTC_6x6: return MTLPixelFormatASTC_6x6_LDR;
+                case TextureFormat::RGBA_ASTC_8x5: return MTLPixelFormatASTC_8x5_LDR;
+                case TextureFormat::RGBA_ASTC_8x6: return MTLPixelFormatASTC_8x6_LDR;
+                case TextureFormat::RGBA_ASTC_8x8: return MTLPixelFormatASTC_8x8_LDR;
+                case TextureFormat::RGBA_ASTC_10x5: return MTLPixelFormatASTC_10x5_LDR;
+                case TextureFormat::RGBA_ASTC_10x6: return MTLPixelFormatASTC_10x6_LDR;
+                case TextureFormat::RGBA_ASTC_10x8: return MTLPixelFormatASTC_10x8_LDR;
+                case TextureFormat::RGBA_ASTC_10x10: return MTLPixelFormatASTC_10x10_LDR;
+                case TextureFormat::RGBA_ASTC_12x10: return MTLPixelFormatASTC_12x10_LDR;
+                case TextureFormat::RGBA_ASTC_12x12: return MTLPixelFormatASTC_12x12_LDR;
+                default: break;
             }
         }
 
