@@ -21,8 +21,7 @@ if(PLATFORM_NAME STREQUAL "iphonesimulator")
     add_definitions(-DFILAMENT_IOS_SIMULATOR)
     # The simulator only supports iOS >= 13.0
     set(IOS_MIN_TARGET "13.0")
-endif()
-if (CATALYST)
+elseif(PLATFORM_NAME STREQUAL "macosx")
     # Mac Catalyst only supports iOS >= 13.0
     set(IOS_MIN_TARGET "13.0")
 endif()
@@ -108,7 +107,7 @@ IF (NOT DEFINED IOS_MIN_TARGET)
 ENDIF()
 
 SET(IOS_COMMON_FLAGS "-m${PLATFORM_FLAG_NAME}-version-min=${IOS_MIN_TARGET}")
-if (CATALYST)
+if(PLATFORM_NAME STREQUAL "macosx")
   SET(IOS_COMMON_FLAGS "${IOS_COMMON_FLAGS} -target ${IOS_ARCH}-apple-ios${IOS_MIN_TARGET}-macabi")
 endif()
 

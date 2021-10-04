@@ -584,10 +584,8 @@ function build_ios_target {
 
     if [[ "${platform}" == "macosx" ]]; then
         local install_dir="catalyst-${lc_target}"
-        local catalyst_option="ON"
     else
         local install_dir="ios-${lc_target}"
-        local catalyst_option="OFF"
     fi
 
     echo "Building iOS ${lc_target} (${arch}) for ${platform}..."
@@ -604,7 +602,6 @@ function build_ios_target {
             -DIOS_ARCH="${arch}" \
             -DPLATFORM_NAME="${platform}" \
             -DIOS=1 \
-            -DCATALYST=${catalyst_option} \
             -DCMAKE_TOOLCHAIN_FILE=../../third_party/clang/iOS.cmake \
             ${MATDBG_OPTION} \
             ${OPENGL_IOS_OPTION} \
@@ -623,13 +620,15 @@ function build_ios_target {
 }
 
 function archive_ios {
-    local archive_suffix=$1
-    local archive_filename="filament-${archive_suffix}.tgz"
+    local lc_target=$(echo "$1" | tr '[:upper:]' '[:lower:]')
+    local platform_name=$2
+    local archive_filename="filament-${lc_target}-${platform_name}.tgz"
+    local install_dir="out/${platform_name}-${lc_target}"
 
-    if [[ -d "${IOS_INSTALLED_LIBS_DIR}" ]]; then
+    if [[ -d "${install_dir}/filament" ]]; then
         if [[ "${ISSUE_ARCHIVES}" == "true" ]]; then
             echo "Generating out/${archive_filename}..."
-            cd "${IOS_INSTALLED_LIBS_DIR}../../"
+            cd "out/${platform_name}-${lc_target}"
             tar -czvf "../${archive_filename}" filament
             cd ../..
         fi
@@ -657,7 +656,7 @@ function build_ios {
             rm -rf "${IOS_INSTALLED_LIBS_DIR}/x86_64"
         fi
 
-        archive_ios "ios"
+        archive_ios "Debug" "ios"
     fi
 
     if [[ "${ISSUE_RELEASE_BUILD}" == "true" ]]; then
@@ -675,7 +674,7 @@ function build_ios {
             rm -rf "${IOS_INSTALLED_LIBS_DIR}/x86_64"
         fi
 
-        archive_ios "ios"
+        archive_ios "Release" "ios"
     fi
 }
 
@@ -695,7 +694,7 @@ function build_mac_catalyst {
             rm -rf "${IOS_INSTALLED_LIBS_DIR}/x86_64"
         fi
 
-        archive_ios "catalyst"
+        archive_ios "Debug" "catalyst"
     fi
 
     if [[ "${ISSUE_RELEASE_BUILD}" == "true" ]]; then
@@ -711,7 +710,7 @@ function build_mac_catalyst {
             rm -rf "${IOS_INSTALLED_LIBS_DIR}/x86_64"
         fi
 
-        archive_ios "catalyst"
+        archive_ios "Release" "catalyst"
     fi
 }
 
