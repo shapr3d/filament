@@ -34,7 +34,8 @@ function print_help {
     echo "    -p platform1,platform2,..."
     echo "        Where platformN is [desktop|android|ios|catalyst|webgl|all]."
     echo "        Platform(s) to build, defaults to desktop."
-    echo "        Building for iOS will automatically perform a partial desktop build."
+    echo "        Building for iOS/Catalyst/WebGL will automatically perform a partial desktop build."
+    echo "        Building for Catalyst will exclude OpenGL support (same as -g)."
     echo "    -q abi1,abi2,..."
     echo "        Where platformN is [armeabi-v7a|arm64-v8a|x86|x86_64|all]."
     echo "        ABIs to build when the platform is Android. Defaults to all."
@@ -43,7 +44,7 @@ function print_help {
     echo "    -v"
     echo "        Exclude Vulkan support from the Android build."
     echo "    -g"
-    echo "        Exclude OpenGL support from the iOS build."
+    echo "        Exclude OpenGL support from the iOS/Catalyst build."
     echo "    -s"
     echo "        Add iOS simulator support to the iOS build."
     echo "    -t"
@@ -51,7 +52,7 @@ function print_help {
     echo "    -l"
     echo "        Build arm64/x86_64 universal libraries."
     echo "        For iOS, this builds universal binaries for devices and the simulator (implies -s)."
-    echo "        For macOS, this builds universal binaries for both Apple silicon and Intel-based Macs."
+    echo "        For macOS/Catalyst, this builds universal binaries for both Apple silicon and Intel-based Macs."
     echo "    -w"
     echo "        Build Web documents (compiles .md.html files to .html)."
     echo "    -k sample1,sample2,..."
@@ -679,6 +680,9 @@ function build_ios {
 }
 
 function build_mac_catalyst {
+    local old_ogl_ios_option=${OPENGL_IOS_OPTION}
+    OPENGL_IOS_OPTION="-DFILAMENT_SUPPORTS_OPENGL=OFF"
+
     build_desktop_tools_for_ios "${MOBILE_HOST_TOOLS}"
 
     if [[ "${ISSUE_DEBUG_BUILD}" == "true" ]]; then
@@ -712,6 +716,8 @@ function build_mac_catalyst {
 
         archive_ios "Release" "catalyst"
     fi
+
+    OPENGL_IOS_OPTION=${old_ogl_ios_option}
 }
 
 function build_web_docs {
