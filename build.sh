@@ -626,7 +626,7 @@ function archive_ios {
     if [[ -d "${install_dir}/filament" ]]; then
         if [[ "${ISSUE_ARCHIVES}" == "true" ]]; then
             echo "Generating out/${archive_filename}..."
-            cd "out/${platform_name}-${lc_target}"
+            cd "${install_dir}"
             tar -czvf "../${archive_filename}" filament
             cd ../..
         fi
