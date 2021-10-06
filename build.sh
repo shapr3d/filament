@@ -173,7 +173,6 @@ BUILD_UNIVERSAL_LIBRARIES=false
 BUILD_GENERATOR=Ninja
 BUILD_COMMAND=ninja
 BUILD_CUSTOM_TARGETS=
-IOS_INSTALLED_LIBS_DIR=
 
 UNAME=$(uname)
 LC_UNAME=$(echo "${UNAME}" | tr '[:upper:]' '[:lower:]')
@@ -581,7 +580,6 @@ function build_ios_target {
     local lc_target=$(echo "$1" | tr '[:upper:]' '[:lower:]')
     local arch=$2
     local platform=$3
-    IOS_INSTALLED_LIBS_DIR=
 
     if [[ "${platform}" == "macosx" ]]; then
         local install_dir="catalyst-${lc_target}"
@@ -614,7 +612,6 @@ function build_ios_target {
     if [[ "${INSTALL_COMMAND}" ]]; then
         echo "Installing ${lc_target} in out/${install_dir}/filament..."
         ${BUILD_COMMAND} ${INSTALL_COMMAND}
-        IOS_INSTALLED_LIBS_DIR="out/${install_dir}/filament/lib"
     fi
 
     cd ../..
@@ -649,12 +646,13 @@ function build_ios {
         fi
 
         if [[ "${BUILD_UNIVERSAL_LIBRARIES}" == "true" ]]; then
+            local installed_libs_dir="out/ios-debug/filament/lib"
             build/ios/create-universal-libs.sh \
-                -o "${IOS_INSTALLED_LIBS_DIR}/universal" \
-                "${IOS_INSTALLED_LIBS_DIR}/arm64" \
-                "${IOS_INSTALLED_LIBS_DIR}/x86_64"
-            rm -rf "${IOS_INSTALLED_LIBS_DIR}/arm64"
-            rm -rf "${IOS_INSTALLED_LIBS_DIR}/x86_64"
+                -o "${installed_libs_dir}/universal" \
+                "${installed_libs_dir}/arm64" \
+                "${installed_libs_dir}/x86_64"
+            rm -rf "${installed_libs_dir}/arm64"
+            rm -rf "${installed_libs_dir}/x86_64"
         fi
 
         archive_ios "Debug" "ios"
@@ -667,12 +665,13 @@ function build_ios {
         fi
 
         if [[ "${BUILD_UNIVERSAL_LIBRARIES}" == "true" ]]; then
+            local installed_libs_dir="out/ios-release/filament/lib"
             build/ios/create-universal-libs.sh \
-                -o "${IOS_INSTALLED_LIBS_DIR}/universal" \
-                "${IOS_INSTALLED_LIBS_DIR}/arm64" \
-                "${IOS_INSTALLED_LIBS_DIR}/x86_64"
-            rm -rf "${IOS_INSTALLED_LIBS_DIR}/arm64"
-            rm -rf "${IOS_INSTALLED_LIBS_DIR}/x86_64"
+                -o "${installed_libs_dir}/universal" \
+                "${installed_libs_dir}/arm64" \
+                "${installed_libs_dir}/x86_64"
+            rm -rf "${installed_libs_dir}/arm64"
+            rm -rf "${installed_libs_dir}/x86_64"
         fi
 
         archive_ios "Release" "ios"
@@ -690,12 +689,13 @@ function build_mac_catalyst {
         build_ios_target "Debug" "x86_64" "macosx"
 
         if [[ "${BUILD_UNIVERSAL_LIBRARIES}" == "true" ]]; then
+            local installed_libs_dir="out/catalyst-debug/filament/lib"
             build/ios/create-universal-libs.sh \
-                -o "${IOS_INSTALLED_LIBS_DIR}/universal" \
-                "${IOS_INSTALLED_LIBS_DIR}/arm64" \
-                "${IOS_INSTALLED_LIBS_DIR}/x86_64"
-            rm -rf "${IOS_INSTALLED_LIBS_DIR}/arm64"
-            rm -rf "${IOS_INSTALLED_LIBS_DIR}/x86_64"
+                -o "${installed_libs_dir}/universal" \
+                "${installed_libs_dir}/arm64" \
+                "${installed_libs_dir}/x86_64"
+            rm -rf "${installed_libs_dir}/arm64"
+            rm -rf "${installed_libs_dir}/x86_64"
         fi
 
         archive_ios "Debug" "catalyst"
@@ -706,12 +706,13 @@ function build_mac_catalyst {
         build_ios_target "Release" "x86_64" "macosx"
 
         if [[ "${BUILD_UNIVERSAL_LIBRARIES}" == "true" ]]; then
+            local installed_libs_dir="out/catalyst-release/filament/lib"
             build/ios/create-universal-libs.sh \
-                -o "${IOS_INSTALLED_LIBS_DIR}/universal" \
-                "${IOS_INSTALLED_LIBS_DIR}/arm64" \
-                "${IOS_INSTALLED_LIBS_DIR}/x86_64"
-            rm -rf "${IOS_INSTALLED_LIBS_DIR}/arm64"
-            rm -rf "${IOS_INSTALLED_LIBS_DIR}/x86_64"
+                -o "${installed_libs_dir}/universal" \
+                "${installed_libs_dir}/arm64" \
+                "${installed_libs_dir}/x86_64"
+            rm -rf "${installed_libs_dir}/arm64"
+            rm -rf "${installed_libs_dir}/x86_64"
         fi
 
         archive_ios "Release" "catalyst"
