@@ -16,14 +16,14 @@
 
 #include "RenderPass.h"
 
+#include "RenderPrimitive.h"
+#include "ShadowMap.h"
+
 #include "details/Material.h"
 #include "details/MaterialInstance.h"
-#include "details/RenderPrimitive.h"
-#include "details/ShadowMap.h"
-#include "details/View.h"
-
 // NOTE: We only need Renderer.h here because the definition of some FRenderer methods are here
 #include "details/Renderer.h"
+#include "details/View.h"
 
 #include <private/filament/UibStructs.h>
 
@@ -67,7 +67,7 @@ void RenderPass::resize(size_t count) noexcept {
 }
 
 void RenderPass::setGeometry(FScene::RenderableSoa const& soa, Range<uint32_t> vr,
-        backend::Handle<backend::HwUniformBuffer> uboHandle) noexcept {
+        backend::Handle<backend::HwBufferObject> uboHandle) noexcept {
     mRenderableSoa = &soa;
     mVisibleRenderables = vr;
     mUboHandle = uboHandle;
@@ -275,10 +275,8 @@ void RenderPass::generateCommandsImpl(uint32_t extraFlags,
     const bool depthFilterAlphaMaskedObjects = bool(extraFlags & CommandTypeFlags::DEPTH_FILTER_ALPHA_MASKED_OBJECTS);
 
     auto const* const UTILS_RESTRICT soaWorldAABBCenter = soa.data<FScene::WORLD_AABB_CENTER>();
-    auto const* const UTILS_RESTRICT soaReversedWinding = soa.data<FScene::REVERSED_WINDING_ORDER>();
     auto const* const UTILS_RESTRICT soaVisibility      = soa.data<FScene::VISIBILITY_STATE>();
     auto const* const UTILS_RESTRICT soaPrimitives      = soa.data<FScene::PRIMITIVES>();
-    auto const* const UTILS_RESTRICT soaBonesUbh        = soa.data<FScene::BONES_UBH>();
     auto const* const UTILS_RESTRICT soaVisibilityMask  = soa.data<FScene::VISIBLE_MASK>();
 
     const bool hasShadowing = renderFlags & HAS_SHADOWING;
@@ -348,11 +346,10 @@ void RenderPass::generateCommandsImpl(uint32_t extraFlags,
         const uint32_t distanceBits = reinterpret_cast<uint32_t&>(distance);
 
         // calculate the per-primitive face winding order inversion
-        const bool inverseFrontFaces = viewInverseFrontFaces ^ soaReversedWinding[i];
+        const bool inverseFrontFaces = viewInverseFrontFaces ^ soaVisibility[i].reversedWindingOrder;
 
         cmdColor.key = makeField(soaVisibility[i].priority, PRIORITY_MASK, PRIORITY_SHIFT);
         cmdColor.primitive.index = (uint16_t)i;
-        cmdColor.primitive.perRenderableBones = soaBonesUbh[i];
         materialVariant.setShadowReceiver(soaVisibility[i].receiveShadows & hasShadowing);
         materialVariant.setSkinning(soaVisibility[i].skinning || soaVisibility[i].morphing);
 
@@ -363,7 +360,6 @@ void RenderPass::generateCommandsImpl(uint32_t extraFlags,
         cmdDepth.key |= makeField(soaVisibility[i].priority, PRIORITY_MASK, PRIORITY_SHIFT);
         cmdDepth.key |= makeField(distanceBits, DISTANCE_BITS_MASK, DISTANCE_BITS_SHIFT);
         cmdDepth.primitive.index = (uint16_t)i;
-        cmdDepth.primitive.perRenderableBones = soaBonesUbh[i];
         cmdDepth.primitive.materialVariant.setSkinning(soaVisibility[i].skinning || soaVisibility[i].morphing);
         cmdDepth.primitive.rasterState.inverseFrontFaces = inverseFrontFaces;
 
@@ -396,7 +392,7 @@ void RenderPass::generateCommandsImpl(uint32_t extraFlags,
                     cmdColor.key |= makeField(primitive.getBlendOrder(),
                             BLEND_ORDER_MASK, BLEND_ORDER_SHIFT);
 
-                    const TransparencyMode mode = mi->getMaterial()->getTransparencyMode();
+                    const TransparencyMode mode = mi->getTransparencyMode();
 
                     // handle transparent objects, two techniques:
                     //
@@ -460,24 +456,24 @@ void RenderPass::generateCommandsImpl(uint32_t extraFlags,
 
             if (isDepthPass) {
                 FMaterial const* const ma = mi->getMaterial();
-                RasterState rs = ma->getRasterState();
+                const RasterState rs = ma->getRasterState();
+                const TransparencyMode mode = mi->getTransparencyMode();
+                const BlendingMode blendingMode = ma->getBlendingMode();
+                const bool translucent = (blendingMode != BlendingMode::OPAQUE
+                                          && blendingMode != BlendingMode::MASKED);
 
                 // unconditionally write the command
                 cmdDepth.primitive.primitiveHandle = primitive.getHwHandle();
                 cmdDepth.primitive.mi = mi;
                 cmdDepth.primitive.rasterState.culling = mi->getCullingMode();
-                *curr = cmdDepth;
 
-                BlendingMode blendingMode = ma->getBlendingMode();
-                bool translucent = (blendingMode != BlendingMode::OPAQUE && blendingMode != BlendingMode::MASKED);
-
-                // FIXME: should writeDepthForShadowCasters take precedence over rs.depthWrite?
-                bool issueDepth = (rs.depthWrite
+                // FIXME: should writeDepthForShadowCasters take precedence over mi->getDepthWrite()?
+                cmdDepth.primitive.rasterState.depthWrite = (1 // only keep bit 0
+                        & (mi->getDepthWrite() | (mode == TransparencyMode::TWO_PASSES_ONE_SIDE))
                         & !(depthFilterTranslucentObjects & translucent)
                         & !(depthFilterAlphaMaskedObjects & rs.alphaToCoverage))
-                                | writeDepthForShadowCasters;
-
-                curr->key |= select(!issueDepth);
+                            | writeDepthForShadowCasters;
+                *curr = cmdDepth;
 
                 // handle the case where this primitive is empty / no-op
                 curr->key |= select(primitive.getPrimitiveType() == PrimitiveType::NONE);
@@ -514,24 +510,27 @@ void RenderPass::Executor::execute(const char* name,
     engine.flush();
 
     driver.beginRenderPass(renderTarget, params);
-    recordDriverCommands(driver, mBegin, mEnd);
+    recordDriverCommands(driver, mBegin, mEnd, mRenderableSoa);
     driver.endRenderPass();
 }
 
 UTILS_NOINLINE // no need to be inlined
 void RenderPass::Executor::recordDriverCommands(backend::DriverApi& driver,
-        const Command* first, const Command* last) const noexcept {
+        const Command* first, const Command* last,
+        FScene::RenderableSoa const& soa) const noexcept {
     SYSTRACE_CALL();
 
     if (first != last) {
         SYSTRACE_VALUE32("commandCount", last - first);
+
+        auto const* const UTILS_RESTRICT soaSkinning = soa.data<FScene::SKINNING_BUFFER>();
 
         PolygonOffset dummyPolyOffset;
         PipelineState pipeline{ .polygonOffset = mPolygonOffset };
         PolygonOffset* const pPipelinePolygonOffset =
                 mPolygonOffsetOverride ? &dummyPolyOffset : &pipeline.polygonOffset;
 
-        Handle<HwUniformBuffer> uboHandle = mUboHandle;
+        Handle<HwBufferObject> uboHandle = mUboHandle;
         FMaterialInstance const* UTILS_RESTRICT mi = nullptr;
         FMaterial const* UTILS_RESTRICT ma = nullptr;
         auto const& customCommands = mCustomCommands;
@@ -564,14 +563,18 @@ void RenderPass::Executor::recordDriverCommands(backend::DriverApi& driver,
             size_t offset = info.index * sizeof(PerRenderableUib);
             driver.bindUniformBufferRange(BindingPoints::PER_RENDERABLE,
                     uboHandle, offset, sizeof(PerRenderableUib));
-            if (UTILS_UNLIKELY(info.perRenderableBones)) {
-                driver.bindUniformBuffer(BindingPoints::PER_RENDERABLE_BONES,
-                        info.perRenderableBones);
+
+            auto skinning = soaSkinning[info.index];
+            if (UTILS_UNLIKELY(skinning.handle)) {
+                // note: we can't bind less than CONFIG_MAX_BONE_COUNT due to glsl limitations
+                driver.bindUniformBufferRange(BindingPoints::PER_RENDERABLE_BONES,
+                        skinning.handle,
+                        skinning.offset * sizeof(PerRenderableUibBone),
+                        CONFIG_MAX_BONE_COUNT * sizeof(PerRenderableUibBone));
             }
             driver.draw(pipeline, info.primitiveHandle);
         }
     }
 }
-
 
 } // namespace filament

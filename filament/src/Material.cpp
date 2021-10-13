@@ -16,14 +16,12 @@
 
 #include "details/Material.h"
 
-#include "details/Engine.h"
-#include "details/DFG.h"
+#include "DFG.h"
+#include "MaterialParser.h"
 
-#include "private/backend/Program.h"
+#include "details/Engine.h"
 
 #include "FilamentAPI-impl.h"
-
-#include <backend/DriverEnums.h>
 
 #include <private/filament/SibGenerator.h>
 #include <private/filament/UibStructs.h>
@@ -32,7 +30,9 @@
 #include <private/filament/SamplerInterfaceBlock.h>
 #include <private/filament/UniformInterfaceBlock.h>
 
-#include <MaterialParser.h>
+#include "private/backend/Program.h"
+
+#include <backend/DriverEnums.h>
 
 #include <utils/CString.h>
 #include <utils/Panic.h>
@@ -357,8 +357,7 @@ Handle<HwProgram> FMaterial::getProgramSlow(uint8_t variantKey) const noexcept {
     }
 }
 
-Handle<HwProgram> FMaterial::getSurfaceProgramSlow(uint8_t variantKey)
-    const noexcept {
+Handle<HwProgram> FMaterial::getSurfaceProgramSlow(uint8_t variantKey) const noexcept {
     // filterVariant() has already been applied in generateCommands(), shouldn't be needed here
     // if we're unlit, we don't have any bits that correspond to lit materials
     assert_invariant( variantKey == Variant::filterVariant(variantKey, isVariantLit()) );
@@ -527,16 +526,12 @@ void FMaterial::onEditCallback(void* userdata, const utils::CString& name, const
     material->mPendingEdits = createParser(engine.getBackend(), packageData, packageSize);
 }
 
-void FMaterial::onQueryCallback(void* userdata, uint64_t* pVariants) {
+void FMaterial::onQueryCallback(void* userdata, VariantList* pVariants) {
+#if FILAMENT_ENABLE_MATDBG
     FMaterial* material = upcast((Material*) userdata);
-    uint64_t variants = 0;
-    auto& cachedPrograms = material->mCachedPrograms;
-    for (size_t i = 0, n = cachedPrograms.size(); i < n; ++i) {
-        if (cachedPrograms[i]) {
-            variants |= (1u << i);
-        }
-    }
-    *pVariants = variants;
+    *pVariants = material->mActivePrograms;
+    material->mActivePrograms.reset();
+#endif
 }
 
  /** @}*/

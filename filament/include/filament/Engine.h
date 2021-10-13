@@ -327,6 +327,15 @@ public:
     TransformManager& getTransformManager() noexcept;
 
     /**
+     * Helper to enable accurate translations.
+     * If you need this Engine to handle a very large world space, one way to achieve this
+     * automatically is to enable accurate translations in the TransformManager. This helper
+     * provides a convenient way of doing that.
+     * This is typically called once just after creating the Engine.
+     */
+    void enableAccurateTranslations() noexcept;
+
+    /**
      * Creates a SwapChain from the given Operating System's native window handle.
      *
      * @param nativeWindow An opaque native window handle. e.g.: on Android this is an
@@ -446,6 +455,8 @@ public:
      * <code>android.view.SurfaceHolder.Callback.surfaceDestroyed</code></p>
      */
     void flushAndWait();
+
+    void flush();
 
     /**
      * Returns the default Material.

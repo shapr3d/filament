@@ -119,13 +119,14 @@ Java_com_google_android_filament_View_nGetDithering(JNIEnv*, jclass,
 extern "C" JNIEXPORT void JNICALL
 Java_com_google_android_filament_View_nSetDynamicResolutionOptions(JNIEnv*, jclass, jlong nativeView,
         jboolean enabled, jboolean homogeneousScaling,
-        jfloat minScale, jfloat maxScale, jint quality) {
+        jfloat minScale, jfloat maxScale, jfloat sharpness, jint quality) {
     View* view = (View*)nativeView;
     View::DynamicResolutionOptions options;
     options.enabled = enabled;
     options.homogeneousScaling = homogeneousScaling;
     options.minScale = filament::math::float2{ minScale };
     options.maxScale = filament::math::float2{ maxScale };
+    options.sharpness = sharpness;
     options.quality = (View::QualityLevel)quality;
     view->setDynamicResolutionOptions(options);
 }
@@ -216,7 +217,9 @@ Java_com_google_android_filament_View_nGetAmbientOcclusion(JNIEnv*, jclass, jlon
 extern "C" JNIEXPORT void JNICALL
 Java_com_google_android_filament_View_nSetAmbientOcclusionOptions(JNIEnv*, jclass,
     jlong nativeView, jfloat radius, jfloat bias, jfloat power, jfloat resolution, jfloat intensity,
-    jint quality, jint lowPassFilter, jint upsampling, jboolean enabled, jfloat minHorizonAngleRad) {
+    jfloat bilateralThreshold,
+    jint quality, jint lowPassFilter, jint upsampling, jboolean enabled, jboolean bentNormals,
+    jfloat minHorizonAngleRad) {
     View* view = (View*) nativeView;
     View::AmbientOcclusionOptions options = view->getAmbientOcclusionOptions();
     options.radius = radius;
@@ -224,10 +227,12 @@ Java_com_google_android_filament_View_nSetAmbientOcclusionOptions(JNIEnv*, jclas
     options.bias = bias;
     options.resolution = resolution;
     options.intensity = intensity;
+    options.bilateralThreshold = bilateralThreshold;
     options.quality = (View::QualityLevel)quality;
     options.lowPassFilter = (View::QualityLevel)lowPassFilter;
     options.upsampling = (View::QualityLevel)upsampling;
     options.enabled = (bool)enabled;
+    options.bentNormals = (bool)bentNormals;
     options.minHorizonAngleRad = minHorizonAngleRad;
     view->setAmbientOcclusionOptions(options);
 }
