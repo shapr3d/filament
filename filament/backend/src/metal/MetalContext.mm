@@ -36,6 +36,7 @@ void initializeSupportedGpuFamilies(MetalContext* context) {
     highestSupportedFamily.common = 0u;
     highestSupportedFamily.apple = 0u;
     highestSupportedFamily.mac = 0u;
+    highestSupportedFamily.macCatalyst = 0u;
 
     if (@available(iOS 13.0, *)) {
         if ([device supportsFamily:MTLGPUFamilyApple7]) {
@@ -67,6 +68,14 @@ void initializeSupportedGpuFamilies(MetalContext* context) {
         } else if ([device supportsFamily:MTLGPUFamilyMac1]) {
             highestSupportedFamily.mac = 1;
         }
+
+#if TARGET_OS_MACCATALYST
+        if ([device supportsFamily:MTLGPUFamilyMacCatalyst2]) {
+            highestSupportedFamily.macCatalyst = 2;
+        } else if ([device supportsFamily:MTLGPUFamilyMacCatalyst1]) {
+            highestSupportedFamily.macCatalyst = 1;
+        }
+#endif
     } else {
 #if TARGET_OS_IOS
         using FeatureSet = std::pair<MTLFeatureSet, uint8_t>;

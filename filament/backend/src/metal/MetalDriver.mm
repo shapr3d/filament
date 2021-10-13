@@ -74,29 +74,26 @@ MetalDriver::MetalDriver(backend::MetalPlatform* platform) noexcept
     if (mContext->highestSupportedGpuFamily.mac > 0) {
         utils::slog.d << "  MTLGPUFamilyMac" << (int) mContext->highestSupportedGpuFamily.mac << utils::io::endl;
     }
+    if (mContext->highestSupportedGpuFamily.macCatalyst > 0) {
+        utils::slog.d << "  MTLGPUFamilyMacCatalyst" << (int) mContext->highestSupportedGpuFamily.macCatalyst << utils::io::endl;
+    }
 
     // In order to support texture swizzling, the GPU needs to support it and the system be running
     // iOS 13+.
     mContext->supportsTextureSwizzling = false;
     if (@available(iOS 13, *)) {
-#if TARGET_OS_MACCATALYST
-        mContext->supportsTextureSwizzling = [mContext->device supportsFamily:MTLGPUFamilyMacCatalyst2];
-#elif defined(IOS)
         mContext->supportsTextureSwizzling =
-            mContext->highestSupportedGpuFamily.apple >= 1 ||   // all Apple GPUs
-            mContext->highestSupportedGpuFamily.mac   >= 2;     // newer macOS GPUs
-#endif
+            mContext->highestSupportedGpuFamily.apple >= 1 ||       // all Apple GPUs
+            mContext->highestSupportedGpuFamily.mac   >= 2 ||       // newer macOS GPUs
+            mContext->highestSupportedGpuFamily.macCatalyst >= 2;   // newer Mac Catalyst GPUs
     }
 
     mContext->maxColorRenderTargets = 4;
-#if TARGET_OS_MACCATALYST
-    mContext->maxColorRenderTargets = 8;
-#else
     if (mContext->highestSupportedGpuFamily.apple >= 2 ||
-        mContext->highestSupportedGpuFamily.mac >= 1) {
+        mContext->highestSupportedGpuFamily.mac >= 1 ||
+        mContext->highestSupportedGpuFamily.macCatalyst >= 1) {
         mContext->maxColorRenderTargets = 8;
     }
-#endif
 
     // Round requested sample counts down to the nearest device-supported sample count.
     auto& sc = mContext->sampleCountLookup;

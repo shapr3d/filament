@@ -209,7 +209,7 @@ MTLPixelFormat getMetalFormat(MetalContext* context, TextureFormat format) noexc
     // DXT (BC) formats are only available on macOS desktop and Mac Catalyst.
     // See https://developer.apple.com/metal/Metal-Feature-Set-Tables.pdf
 #if TARGET_OS_OSX || TARGET_OS_MACCATALYST
-    if (context->highestSupportedGpuFamily.mac >= 1) {
+    if (context->highestSupportedGpuFamily.mac >= 1 || context->highestSupportedGpuFamily.macCatalyst >= 1) {
         switch (format) {
             case TextureFormat::DXT1_RGBA: return MTLPixelFormatBC1_RGBA;
             case TextureFormat::DXT1_SRGBA: return MTLPixelFormatBC1_RGBA_sRGB;
