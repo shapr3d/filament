@@ -328,6 +328,10 @@ public:
         return mRandomEngine;
     }
 
+    void pumpMessageQueues() {
+        getDriver().purge();
+    }
+
 private:
     FEngine(Backend backend, Platform* platform, void* sharedGLContext, void* nativeDevice);
     void init();
