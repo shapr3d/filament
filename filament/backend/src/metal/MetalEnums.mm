@@ -99,7 +99,7 @@ MTLPixelFormat getMetalFormat(MetalContext* context, TextureFormat format) noexc
 
     // Packed 16 bit formats are only available on Apple GPUs.
     if (context->highestSupportedGpuFamily.apple >= 1) {
-        if (@available(macOS 11.0, *)) {
+        if (@available(macOS 11.0, macCatalyst 14.0, *)) {
             switch (format) {
                 case TextureFormat::RGB565: return MTLPixelFormatB5G6R5Unorm;
                 case TextureFormat::RGB5_A1: return MTLPixelFormatA1BGR5Unorm;
@@ -116,7 +116,7 @@ MTLPixelFormat getMetalFormat(MetalContext* context, TextureFormat format) noexc
 #if TARGET_OS_OSX
     if (context->highestSupportedGpuFamily.mac >= 1 &&
             context->device.depth24Stencil8PixelFormatSupported) {
-        if (@available(macOS 11.0, *)) {
+        if (@available(macOS 11.0, macCatalyst 14.0, *)) {
             if (format == TextureFormat::DEPTH24_STENCIL8) {
                 return MTLPixelFormatDepth24Unorm_Stencil8;
             }

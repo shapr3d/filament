@@ -135,7 +135,7 @@ MTLPixelFormat getMetalFormat(MetalContext* context, TextureFormat format) noexc
 inline MTLPixelFormat getMetalFormat(PixelDataFormat format, PixelDataType type) {
     if (type == PixelDataType::UINT_2_10_10_10_REV) return MTLPixelFormatRGB10A2Unorm;
     if (type == PixelDataType::UINT_10F_11F_11F_REV) return MTLPixelFormatRG11B10Float;
-    if (@available(macOS 11, *)) {
+    if (@available(macOS 11, macCatalyst 14.0, *)) {
         if (type == PixelDataType::USHORT_565) return MTLPixelFormatB5G6R5Unorm;
     }
 

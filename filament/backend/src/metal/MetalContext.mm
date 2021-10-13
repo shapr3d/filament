@@ -77,7 +77,7 @@ void initializeSupportedGpuFamilies(MetalContext* context) {
         }
 #endif
     } else {
-#if TARGET_OS_IOS
+#if TARGET_OS_IOS && !TARGET_OS_MACCATALYST
         using FeatureSet = std::pair<MTLFeatureSet, uint8_t>;
         auto testFeatureSets = [device] (const auto& featureSets,
                 uint8_t& outHighestSupported) {
