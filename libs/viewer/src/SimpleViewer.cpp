@@ -372,15 +372,23 @@ void SimpleViewer::removeAsset() {
 void SimpleViewer::setIndirectLight(filament::IndirectLight* ibl,
         filament::math::float3 const* sh3) {
     using namespace filament::math;
+
+    mIbl = ibl;
+    mSh3 = sh3;
+
     mSettings.view.fog.color = sh3[0];
     mIndirectLight = ibl;
-    if (ibl) {
-        float3 d = filament::IndirectLight::getDirectionEstimate(sh3);
-        float4 c = filament::IndirectLight::getColorEstimate(sh3, d);
+}
+
+void SimpleViewer::setSunlightFromIbl() {
+    using namespace filament::math;
+    if (mIbl && mSh3) {
+        float3 d = filament::IndirectLight::getDirectionEstimate(mSh3);
+        float4 c = filament::IndirectLight::getColorEstimate(mSh3, d);
         if (!std::isnan(d.x * d.y * d.z)) {
-            mSettings.lighting.sunlightDirection = d;
+            mSettings.lighting.sunlightDirection = mIbl->getRotation() * d;
             mSettings.lighting.sunlightColor = c.rgb;
-            mSettings.lighting.sunlightIntensity = c[3] * ibl->getIntensity();
+            mSettings.lighting.sunlightIntensity = c[3] * mIbl->getIntensity();
             updateIndirectLight();
         }
     }
@@ -705,6 +713,8 @@ void SimpleViewer::updateUserInterface() {
             ImGui::Checkbox("Enable sunlight", &light.enableSunlight);
             ImGui::SliderFloat("Sun intensity", &light.sunlightIntensity, 50000.0, 150000.0f);
             ImGuiExt::DirectionWidget("Sun direction", light.sunlightDirection.v);
+            ImGui::ColorEdit3("Sun color", light.sunlightColor.v);
+            if (ImGui::Button("Reset Sunlight from IBL")) setSunlightFromIbl();
         }
         if (ImGui::CollapsingHeader("All lights")) {
             ImGui::Checkbox("Enable shadows", &light.enableShadows);

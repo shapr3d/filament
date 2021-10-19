@@ -96,6 +96,11 @@ public:
     void setIndirectLight(filament::IndirectLight* ibl, filament::math::float3 const* sh3);
 
     /**
+     * Computes Sunlight direction, intensity, and color from the IBL
+     */
+    void setSunlightFromIbl();
+
+    /**
      * Applies the currently-selected glTF animation to the transformation hierarchy and updates
      * the bone matrices on all renderables.
      */
@@ -244,6 +249,9 @@ private:
     // Color grading UI state.
     float mRangePlot[1024 * 3];
     float mCurvePlot[1024 * 3];
+
+    filament::IndirectLight * mIbl{};
+    filament::math::float3 const* mSh3{};
 };
 
 filament::math::mat4f fitIntoUnitCube(const filament::Aabb& bounds, float zoffset);
