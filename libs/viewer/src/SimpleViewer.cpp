@@ -709,7 +709,7 @@ void SimpleViewer::updateUserInterface() {
         if (ImGui::CollapsingHeader("All lights")) {
             ImGui::Checkbox("Enable shadows", &light.enableShadows);
             int mapSize = light.shadowOptions.mapSize;
-            ImGui::SliderInt("Shadow map size", &mapSize, 32, 1024);
+            ImGui::SliderInt("Shadow map size", &mapSize, 32, 4096);
             light.shadowOptions.mapSize = mapSize;
 
 
