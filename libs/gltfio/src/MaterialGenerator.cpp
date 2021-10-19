@@ -318,7 +318,7 @@ static Material* createMaterial(Engine* engine, const MaterialKey& config, const
     MaterialBuilder builder = MaterialBuilder()
             .name(name)
             .flipUV(false)
-            .specularAmbientOcclusion(MaterialBuilder::SpecularAmbientOcclusion::SIMPLE)
+            .specularAmbientOcclusion(MaterialBuilder::SpecularAmbientOcclusion::BENT_NORMALS)
             .specularAntiAliasing(true)
             .clearCoatIorChange(false)
             .material(shader.c_str())
