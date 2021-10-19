@@ -191,7 +191,7 @@ std::string shaderFromKey(const MaterialKey& config) {
                 )SHADER";
             }
         }        
-
+        
         // At this point, material roughness is established and now we can compute the reflective attribute. Our experiments show
         // that it has to depend on roughness: if it is set to a constant nonzero value, then full rough (=1) surfaces become
         // unrealistically reflective. However, if reflective is zero, then unrough (=0) parts of the surface that face the camera
