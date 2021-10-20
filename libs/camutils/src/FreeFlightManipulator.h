@@ -196,7 +196,7 @@ private:
     bool mGrabbing = false;
     FLOAT mScrollWheel = 0.0f;
     FLOAT mScrollPositionNormalized = 0.0f;
-    FLOAT mMoveSpeed = 1.0f;
+    FLOAT mMoveSpeed = 64.0f;
     vec3 mEyeVelocity;
 };
 
