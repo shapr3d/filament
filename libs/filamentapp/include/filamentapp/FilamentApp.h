@@ -217,11 +217,13 @@ private:
     void initSDL();
 
     void loadIBL(const Config& config);
+    void loadSkybox(const Config& config);
     void loadDirt(const Config& config);
 
     filament::Engine* mEngine = nullptr;
     filament::Scene* mScene = nullptr;
     std::unique_ptr<IBL> mIBL;
+    std::unique_ptr<IBL> mSkybox;
     filament::Texture* mDirt = nullptr;
     bool mClosed = false;
     uint64_t mTime = 0;

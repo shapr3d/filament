@@ -131,10 +131,14 @@ void FilamentApp::run(const Config& config, SetupCallback setupCallback,
 
     loadDirt(config);
     loadIBL(config);
+    loadSkybox(config);
     if (mIBL != nullptr) {
         mIBL->getSkybox()->setLayerMask(0x7, 0x4);
         mScene->setSkybox(mIBL->getSkybox());
         mScene->setIndirectLight(mIBL->getIndirectLight());
+    }
+    if (mSkybox != nullptr) {
+        mScene->setSkybox(mSkybox->getSkybox());
     }
 
     for (auto& view : window->mViews) {
@@ -465,6 +469,34 @@ void FilamentApp::loadIBL(const Config& config) {
             if (!mIBL->loadFromDirectory(iblPath)) {
                 std::cerr << "Could not load the specified IBL: " << iblPath << std::endl;
                 mIBL.reset(nullptr);
+                return;
+            }
+        }
+    }
+}
+
+void FilamentApp::loadSkybox(const Config& config) {
+    if (!config.skyboxDirectory.empty()) {
+        Path skyboxPath(config.skyboxDirectory);
+
+        if (!skyboxPath.exists()) {
+            std::cerr << "The specified skybox path does not exist: " << skyboxPath << std::endl;
+            return;
+        }
+
+        mSkybox = std::make_unique<IBL>(*mEngine);
+
+        if (!skyboxPath.isDirectory()) {
+            if (!mSkybox->loadFromEquirect(skyboxPath)) {
+                std::cerr << "Could not load the specified skybox: " << skyboxPath << std::endl;
+                mSkybox.reset(nullptr);
+                return;
+            }
+        }
+        else {
+            if (!mSkybox->loadFromDirectory(skyboxPath)) {
+                std::cerr << "Could not load the specified skybox: " << skyboxPath << std::endl;
+                mSkybox.reset(nullptr);
                 return;
             }
         }

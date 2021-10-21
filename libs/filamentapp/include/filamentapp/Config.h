@@ -26,6 +26,7 @@
 struct Config {
     std::string title;
     std::string iblDirectory;
+    std::string skyboxDirectory;
     std::string dirt;
     float scale = 1.0f;
     bool splitView = false;
