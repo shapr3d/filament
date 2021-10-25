@@ -676,6 +676,16 @@ void SimpleViewer::updateUserInterface() {
             int lowpass = (int) ssao.lowPassFilter;
             bool upsampling = ssao.upsampling != View::QualityLevel::LOW;
 
+            ImGui::SliderFloat("SSAO power (contrast)", &ssao.power, 0.0f, 8.0f);
+            ImGui::SliderFloat("SSAO intensity", &ssao.intensity, 0.0f, 2.0f);
+            ImGui::SliderFloat("SSAO radius (meters)", &ssao.radius, 0.0f, 10.0f);
+            ImGui::SliderFloat("SSAO bias (meters)", &ssao.bias, 0.0f, 0.1f, "%.6f");
+
+            static int ssaoRes = 1;
+            ImGui::RadioButton("SSAO half resolution", &ssaoRes, 1);
+            ImGui::RadioButton("SSAO fullresolution", &ssaoRes, 2);
+            ssao.resolution = ssaoRes * 0.5f;
+
             ImGui::SliderInt("Quality", &quality, 0, 3);
             ImGui::SliderInt("Low Pass", &lowpass, 0, 2);
             ImGui::Checkbox("High quality upsampling", &upsampling);
