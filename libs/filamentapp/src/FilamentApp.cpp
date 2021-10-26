@@ -136,9 +136,12 @@ void FilamentApp::run(const Config& config, SetupCallback setupCallback,
         mIBL->getSkybox()->setLayerMask(0x7, 0x4);
         mScene->setSkybox(mIBL->getSkybox());
         mScene->setIndirectLight(mIBL->getIndirectLight());
-    }
-    if (mSkybox != nullptr) {
-        mScene->setSkybox(mSkybox->getSkybox());
+        if (mSkybox != nullptr) {
+            mScene->setSkybox(mSkybox->getSkybox());
+        }
+        else {
+            mScene->setSkybox(mIBL->getSkybox());
+        }
     }
 
     for (auto& view : window->mViews) {
@@ -428,6 +431,7 @@ void FilamentApp::run(const Config& config, SetupCallback setupCallback,
     window.reset();
 
     mIBL.reset();
+    mSkybox.reset();
     mEngine->destroy(mDepthMI);
     mEngine->destroy(mDepthMaterial);
     mEngine->destroy(mDefaultMaterial);
