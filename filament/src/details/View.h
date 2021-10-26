@@ -114,7 +114,7 @@ public:
     void terminate(FEngine& engine);
 
     void prepare(FEngine& engine, backend::DriverApi& driver, ArenaScope& arena,
-            Viewport const& viewport, math::float4 const& userTime) noexcept;
+        filament::Viewport const& viewport, math::float4 const& userTime) noexcept;
 
     void setScene(FScene* scene) { mScene = scene; }
     FScene const* getScene() const noexcept { return mScene; }
@@ -125,8 +125,8 @@ public:
 
     CameraInfo const& getCameraInfo() const noexcept { return mViewingCameraInfo; }
 
-    void setViewport(Viewport const& viewport) noexcept;
-    Viewport const& getViewport() const noexcept {
+    void setViewport(filament::Viewport const& viewport) noexcept;
+    filament::Viewport const& getViewport() const noexcept {
         return mViewport;
     }
 
@@ -158,11 +158,11 @@ public:
     }
 
     void prepareCamera(const CameraInfo& camera) const noexcept;
-    void prepareViewport(const Viewport& viewport) const noexcept;
+    void prepareViewport(const filament::Viewport& viewport) const noexcept;
     void prepareShadowing(FEngine& engine, backend::DriverApi& driver,
             FScene::RenderableSoa& renderableData, FScene::LightSoa& lightData) noexcept;
     void prepareLighting(FEngine& engine, FEngine::DriverApi& driver,
-            ArenaScope& arena, Viewport const& viewport) noexcept;
+            ArenaScope& arena, filament::Viewport const& viewport) noexcept;
 
     void prepareSSAO(backend::Handle<backend::HwTexture> ssao) const noexcept;
     void prepareSSR(backend::Handle<backend::HwTexture> ssr, float refractionLodOffset) const noexcept;
@@ -484,7 +484,7 @@ private:
 
     mutable Froxelizer mFroxelizer;
 
-    Viewport mViewport;
+    filament::Viewport mViewport;
     bool mCulling = true;
     bool mFrontFaceWindingInverted = false;
 

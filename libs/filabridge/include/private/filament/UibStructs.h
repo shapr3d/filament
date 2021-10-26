@@ -79,6 +79,7 @@ struct PerViewUib { // NOLINT(cppcoreguidelines-pro-type-member-init)
 
     float oneOverFroxelDimensionX;
     float iblLuminance;
+    float skyLuminance; 
     float exposure;
     float ev100;
 
@@ -128,7 +129,7 @@ struct PerViewUib { // NOLINT(cppcoreguidelines-pro-type-member-init)
     float vsmReserved0;
 
     // bring PerViewUib to 2 KiB
-    filament::math::float4 padding2[59];
+    filament::math::float4 padding2[58];
 };
 
 // 2 KiB == 128 float4s

@@ -65,6 +65,8 @@ UniformInterfaceBlock const& UibGenerator::getPerViewUib() noexcept  {
             .add("oneOverFroxelDimension",  1, UniformInterfaceBlock::Type::FLOAT)
             // ibl
             .add("iblLuminance",            1, UniformInterfaceBlock::Type::FLOAT)
+            // sky
+            .add("skyLuminance",            1, UniformInterfaceBlock::Type::FLOAT)
             // camera
             .add("exposure",                1, UniformInterfaceBlock::Type::FLOAT)
             .add("ev100",                   1, UniformInterfaceBlock::Type::FLOAT)
@@ -109,7 +111,7 @@ UniformInterfaceBlock const& UibGenerator::getPerViewUib() noexcept  {
             .add("vsmReserved0",            1, UniformInterfaceBlock::Type::FLOAT)
 
             // bring PerViewUib to 2 KiB
-            .add("padding2", 59, UniformInterfaceBlock::Type::FLOAT4)
+            .add("padding2", 58, UniformInterfaceBlock::Type::FLOAT4)
             .build();
     return uib;
 }

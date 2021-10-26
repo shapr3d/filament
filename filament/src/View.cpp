@@ -303,18 +303,20 @@ void FView::prepareLighting(FEngine& engine, FEngine::DriverApi& driver, ArenaSc
     // associated with the skybox.
     FIndirectLight const* ibl = scene->getIndirectLight();
     float intensity;
+    float skyIntensity = scene->getSkybox() ? scene->getSkybox()->getIntensity() : 1.0f;
     if (UTILS_LIKELY(ibl)) {
         intensity = ibl->getIntensity();
     } else {
         ibl = engine.getDefaultIndirectLight();
         FSkybox const* const skybox = scene->getSkybox();
-        intensity = skybox ? skybox->getIntensity() : FIndirectLight::DEFAULT_INTENSITY;
+        intensity = skybox ? skyIntensity : FIndirectLight::DEFAULT_INTENSITY;
     }
 
     // Set up uniforms and sampler for the IBL, guaranteed to be non-null at this point.
     float iblRoughnessOneLevel = ibl->getLevelCount() - 1.0f;
     s.iblRoughnessOneLevel = iblRoughnessOneLevel;
     s.iblLuminance = intensity * exposure;
+    s.skyLuminance = skyIntensity * exposure;
     std::transform(ibl->getSH(), ibl->getSH() + 9, s.iblSH, [](float3 v){
         return float4(v, 0.0f);
     });

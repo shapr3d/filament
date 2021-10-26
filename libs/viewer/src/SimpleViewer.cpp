@@ -17,6 +17,7 @@
 #include <viewer/SimpleViewer.h>
 
 #include <filament/RenderableManager.h>
+#include <filament/Skybox.h>
 #include <filament/TransformManager.h>
 #include <filament/LightManager.h>
 #include <filament/Material.h>
@@ -416,6 +417,7 @@ void SimpleViewer::updateIndirectLight() {
             mat3f::rotation((float)M_PI_2, float3{ 1, 0, 0 })
         );
     }
+    mScene->getSkybox()->setIntensity(mSettings.lighting.skyIntensity);
 }
 
 void SimpleViewer::applyAnimation(double currentTime) {
@@ -715,6 +717,10 @@ void SimpleViewer::updateUserInterface() {
     auto& light = mSettings.lighting;
     if (ImGui::CollapsingHeader("Light")) {
         ImGui::Indent();
+        if (ImGui::CollapsingHeader("Skybox")) {
+            ImGui::SliderFloat("Intensity", &light.skyIntensity, 0.0f, 100000.0f);
+        }
+
         if (ImGui::CollapsingHeader("Indirect light")) {
             ImGui::SliderFloat("IBL intensity", &light.iblIntensity, 0.0f, 100000.0f);
             ImGui::SliderAngle("IBL rotation", &light.iblRotation);

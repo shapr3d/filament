@@ -796,6 +796,8 @@ static int parse(jsmntok_t const* tokens, int i, const char* jsonChunk, LightSet
             i = parse(tokens, i + 1, jsonChunk, &out->sunlightColor);
         } else if (compare(tok, jsonChunk, "iblIntensity") == 0) {
             i = parse(tokens, i + 1, jsonChunk, &out->iblIntensity);
+        } else if (compare(tok, jsonChunk, "skyIntensity") == 0) {
+            i = parse(tokens, i + 1, jsonChunk, &out->skyIntensity);
         } else if (compare(tok, jsonChunk, "iblRotation") == 0) {
             i = parse(tokens, i + 1, jsonChunk, &out->iblRotation);
         } else {
@@ -923,6 +925,10 @@ void applySettings(const LightSettings& settings, IndirectLight* ibl, utils::Ent
     if (ibl) {
         ibl->setIntensity(settings.iblIntensity);
         ibl->setRotation(math::mat3f::rotation(settings.iblRotation, math::float3 { 0, 1, 0 }));
+    }
+    if (scene->getSkybox())
+    {
+        scene->getSkybox()->setIntensity(settings.skyIntensity);
     }
     for (size_t i = 0; i < sceneLightCount; i++) {
         auto light = lm->getInstance(sceneLights[i]);
@@ -1240,6 +1246,7 @@ static std::ostream& operator<<(std::ostream& out, const LightSettings& in) {
         << "\"sunlightDirection\": " << (in.sunlightDirection) << ",\n"
         << "\"sunlightColor\": " << (in.sunlightColor) << ",\n"
         << "\"iblIntensity\": " << (in.iblIntensity) << ",\n"
+        << "\"skyIntensity\": " << (in.skyIntensity) << ",\n"
         << "\"iblRotation\": " << (in.iblRotation) << "\n"
         << "}";
 }

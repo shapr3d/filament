@@ -36,7 +36,7 @@ fragment {
             sky = materialParams.color;
         } else {
             sky = vec4(textureLod(materialParams_skybox, variable_eyeDirection.xyz, 0.0).rgb, 1.0);
-            sky.rgb *= frameUniforms.iblLuminance;
+            sky.rgb *= frameUniforms.skyLuminance;
         }
         if (materialParams.showSun != 0 && frameUniforms.sun.w >= 0.0f) {
             vec3 direction = normalize(variable_eyeDirection.xyz);
