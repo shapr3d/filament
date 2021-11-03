@@ -34,6 +34,8 @@
 #include <math/mat4.h>
 #include <math/vec3.h>
 
+#include <viewer/TweakableMaterial.h>
+
 namespace filagui {
     class ImGuiHelper;
 }
@@ -216,6 +218,8 @@ public:
 
     int getCurrentCamera() const { return mCurrentCamera; }
 
+    void generateDummyMaterial();
+
 private:
     void updateIndirectLight();
 
@@ -252,6 +256,13 @@ private:
 
     filament::IndirectLight * mIbl{};
     filament::math::float3 const* mSh3{};
+
+    filament::VertexBuffer* mDummyVB{};
+    filament::IndexBuffer* mDummyIB{};
+    utils::Entity mDummyEntity{};
+
+    std::unordered_map<std::string, TweakableMaterial> mTweakedMaterials{};
+    std::vector<filament::MaterialInstance*> mMaterialInstances{};
 };
 
 filament::math::mat4f fitIntoUnitCube(const filament::Aabb& bounds, float zoffset);

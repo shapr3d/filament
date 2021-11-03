@@ -105,6 +105,17 @@ FEngine* FEngine::create(Backend backend, Platform* platform, void* sharedGLCont
     return instance;
 }
 
+const FMaterial* FEngine::getShaprMaterial(size_t index) const noexcept
+{
+    switch (index) {
+    default:
+        return mShaprGeneralMaterial;
+    }
+}
+
+
+
+
 #if UTILS_HAS_THREADING
 
 void FEngine::createAsync(CreateCallback callback, void* user, Backend backend, 
@@ -259,6 +270,12 @@ void FEngine::init() {
                     .package(MATERIALS_DEFAULTMATERIAL_DATA, MATERIALS_DEFAULTMATERIAL_SIZE)
                     .build(*const_cast<FEngine*>(this)));
 
+    mShaprGeneralMaterial = upcast(
+        FMaterial::Builder()
+            .package(MATERIALS_SHAPRGENERALMATERIAL_DATA, MATERIALS_SHAPRGENERALMATERIAL_SIZE)
+            .build(*const_cast<FEngine*>(this))
+    );    
+
     mPostProcessManager.init();
     mLightManager.init(*this);
     mDFG = std::make_unique<DFG>(*this);
@@ -312,6 +329,7 @@ void FEngine::shutdown() {
     destroy(mDefaultColorGrading);
 
     destroy(mDefaultMaterial);
+    destroy(mShaprGeneralMaterial);
 
     /*
      * clean-up after the user -- we call terminate on each "leaked" object and clear each list.
@@ -893,12 +911,17 @@ void Engine::destroy(Engine** pEngine) {
     }
 }
 
+
 // -----------------------------------------------------------------------------------------------
 // Resource management
 // -----------------------------------------------------------------------------------------------
 
 const Material* Engine::getDefaultMaterial() const noexcept {
     return upcast(this)->getDefaultMaterial();
+}
+
+const Material* Engine::getShaprMaterial(size_t index) const noexcept {
+    return upcast(this)->getShaprMaterial(index);
 }
 
 Backend Engine::getBackend() const noexcept {

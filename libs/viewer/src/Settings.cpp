@@ -15,6 +15,7 @@
  */
 
 #include <viewer/Settings.h>
+#include <viewer/TweakableMaterial.h>
 
 #include "jsonParseUtils.h"
 
@@ -68,6 +69,15 @@ int parse(jsmntok_t const* tokens, int i) {
 static int parse(jsmntok_t const* tokens, int i, const char* jsonChunk, uint8_t* val) {
     CHECK_TOKTYPE(tokens[i], JSMN_PRIMITIVE);
     *val = strtol(jsonChunk + tokens[i].start, nullptr, 10);
+    return i + 1;
+}
+
+template <size_t N>
+static int parse(jsmntok_t const* tokens, int i, const char* jsonChunk, char val[N]) {
+    CHECK_TOKTYPE(tokens[i], JSMN_PRIMITIVE);
+    for (size_t j = 0; j < N; ++i) {
+        val[j] = jsonChunk + tokens[i].start + j;
+    }
     return i + 1;
 }
 
@@ -850,6 +860,34 @@ static int parse(jsmntok_t const* tokens, int i, const char* jsonChunk, ViewerOp
     return i;
 }
 
+template <typename T, typename = std::enable_if_t< std::is_same_v<T, float> || std::is_same_v<T, filament::math::float2> || std::is_same_v<T, filament::math::float3> || std::is_same_v<T, filament::math::float4> > >
+static int parse(jsmntok_t const* tokens, int i, const char* jsonChunk, TweakableProperty<T>* out) {
+    CHECK_TOKTYPE(tokens[i], JSMN_OBJECT);
+    int size = tokens[i++].size;
+    for (int j = 0; j < size; ++j) {
+        const jsmntok_t tok = tokens[i];
+        CHECK_KEY(tok);
+        if (compare(tok, jsonChunk, "isFile") == 0) {
+            i = parse(tokens, i + 1, jsonChunk, &out->isFile);
+        }
+        //else if (compare(tok, jsonChunk, "filename") == 0) {
+        //    i = parse(tokens, i + 1, jsonChunk, &out->filename);
+        //}
+        else if (compare(tok, jsonChunk, "value") == 0) {
+            i = parse(tokens, i + 1, jsonChunk, &out->value);
+        }
+        else {
+            slog.w << "Invalid viewer options key: '" << STR(tok, jsonChunk) << "'" << io::endl;
+            i = parse(tokens, i + 1);
+        }
+        if (i < 0) {
+            slog.e << "Invalid viewer options value: '" << STR(tok, jsonChunk) << "'" << io::endl;
+            return i;
+        }
+    }
+    return i;
+}
+
 int parse(jsmntok_t const* tokens, int i, const char* jsonChunk, Settings* out) {
     CHECK_TOKTYPE(tokens[i], JSMN_OBJECT);
     int size = tokens[i++].size;
@@ -872,6 +910,36 @@ int parse(jsmntok_t const* tokens, int i, const char* jsonChunk, Settings* out) 
             slog.e << "Invalid group value: '" << STR(tok, jsonChunk) << "'" << io::endl;
             return i;
         }
+    }
+    return i;
+}
+
+int parse(jsmntok_t const* tokens, int i, const char* jsonChunk, TweakableMaterial* out) {
+    CHECK_TOKTYPE(tokens[i], JSMN_OBJECT);
+    int size = tokens[i++].size;
+    for (int j = 0; j < size; ++j) {
+        const jsmntok_t tok = tokens[i];
+        CHECK_KEY(tok);
+        if (compare(tok, jsonChunk, "baseColor") == 0) {
+            i = parse(tokens, i + 1, jsonChunk, &out->mBaseColor);
+        }
+        /*else if (compare(tok, jsonChunk, "material") == 0) {
+            i = parse(tokens, i + 1, jsonChunk, &out->material);
+        }
+        else if (compare(tok, jsonChunk, "lighting") == 0) {
+            i = parse(tokens, i + 1, jsonChunk, &out->lighting);
+        }
+        else if (compare(tok, jsonChunk, "viewer") == 0) {
+            i = parse(tokens, i + 1, jsonChunk, &out->viewer);
+        }
+        else {
+            slog.w << "Invalid group key: '" << STR(tok, jsonChunk) << "'" << io::endl;
+            i = parse(tokens, i + 1);
+        }
+        if (i < 0) {
+            slog.e << "Invalid group value: '" << STR(tok, jsonChunk) << "'" << io::endl;
+            return i;
+        }*/
     }
     return i;
 }

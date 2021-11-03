@@ -13,6 +13,10 @@ set(PUBLIC_HDRS
         include/viewer/RemoteServer.h
         include/viewer/Settings.h
         include/viewer/SimpleViewer.h
+        include/viewer/TweakableProperty.h
+        include/viewer/TweakableMaterial.h
+        include/viewer/CustomFileDialogs.h
+        include/viewer/json.hpp
 )
 
 set(SRCS
@@ -22,6 +26,8 @@ set(SRCS
         src/RemoteServer.cpp
         src/Settings.cpp
         src/SimpleViewer.cpp
+        src/TweakableMaterial.cpp
+        src/CustomFileDialogs.cpp
 )
 
 # ==================================================================================================
