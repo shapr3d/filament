@@ -30,6 +30,12 @@ set(SRCS
         src/CustomFileDialogs.cpp
 )
 
+if (APPLE)
+    list(APPEND SRCS
+        src/MacosCustomFileDialogs.mm
+    )
+endif()
+
 # ==================================================================================================
 # Include and target definitions
 # ==================================================================================================

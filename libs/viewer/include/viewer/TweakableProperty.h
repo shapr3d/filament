@@ -12,6 +12,7 @@
 #include <math/mat4.h>
 #include <math/vec3.h>
 
+#include <vector>
 #include <functional>
 #include <string>
 #include <type_traits>

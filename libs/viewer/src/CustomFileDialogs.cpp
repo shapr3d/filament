@@ -64,12 +64,14 @@ bool SD_SaveFileDialog(char* browsedFile, const char* formats) {
 
 #else // defined( WIN32 )
 
-bool SD_OpenFileDialog(char* browsedFile, const char* formats = kTextureDialogFilter) {
-    return true;
+#include <viewer/MacosCustomFileDialogs.h>
+
+bool SD_OpenFileDialog(char* browsedFile, const char* formats) {
+    return SD_MacOpenFileDialog(browsedFile, formats);
 }
 
-bool SD_SaveFileDialog(char* browsedFile, const char* formats = kTextureDialogFilter) {
-    return true;
+bool SD_SaveFileDialog(char* browsedFile, const char* formats) {
+    return SD_MacSaveFileDialog(browsedFile, formats);
 }
 
 #endif
