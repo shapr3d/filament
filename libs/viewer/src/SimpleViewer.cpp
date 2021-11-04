@@ -623,7 +623,7 @@ void SimpleViewer::updateUserInterface() {
     using namespace filament;
 
     static char fileDialogPath[1024];
-    static const char* materialFileFilter = "JSON\0*.JSON";
+    static const char* materialFileFilter = "JSON\0*.JSON\0";
 
     auto& tm = mEngine->getTransformManager();
     auto& rm = mEngine->getRenderableManager();
