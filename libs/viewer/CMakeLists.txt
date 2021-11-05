@@ -30,11 +30,22 @@ set(SRCS
         src/CustomFileDialogs.cpp
 )
 
+if (APPLE)
+    list(APPEND SRCS
+        src/MacosCustomFileDialogs.mm
+    )
+
+    find_library(UTI_FRAMEWORK UniformTypeIdentifiers)
+    mark_as_advanced(UTI_FRAMEWORK)
+
+    set(PLATFORM_ADDITIONAL_LIBS ${UTI_FRAMEWORK})
+endif()
+
 # ==================================================================================================
 # Include and target definitions
 # ==================================================================================================
 add_library(${TARGET} STATIC ${PUBLIC_HDRS} ${SRCS})
-target_link_libraries(${TARGET} PUBLIC imgui filament gltfio_core filagui jsmn civetweb)
+target_link_libraries(${TARGET} PUBLIC imgui filament gltfio_core filagui jsmn civetweb ${PLATFORM_ADDITIONAL_LIBS})
 target_include_directories(${TARGET} PUBLIC ${PUBLIC_HDR_DIR})
 
 # ==================================================================================================
