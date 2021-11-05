@@ -37,6 +37,7 @@ SOFTWARE.
 #include <algorithm> // all_of, find, for_each
 #include <cstddef> // nullptr_t, ptrdiff_t, size_t
 #include <functional> // hash, less
+#include <iostream>
 #include <initializer_list> // initializer_list
 #ifndef JSON_NO_IO
     #include <iosfwd> // istream, ostream
@@ -21426,7 +21427,12 @@ class basic_json // NOLINT(cppcoreguidelines-special-member-functions,hicpp-spec
         // at only works for objects
         if (JSON_HEDLEY_LIKELY(is_object()))
         {
-            JSON_ASSERT(m_value.object->find(key) != m_value.object->end());
+            if (m_value.object->find(key) == m_value.object->end())
+            {
+                std::cout << "Key does not exist: " << key << "\n";
+                return {};
+            }
+            //JSON_ASSERT(m_value.object->find(key) != m_value.object->end());
             return m_value.object->find(key)->second;
         }
 

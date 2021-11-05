@@ -107,14 +107,8 @@ FEngine* FEngine::create(Backend backend, Platform* platform, void* sharedGLCont
 
 const FMaterial* FEngine::getShaprMaterial(size_t index) const noexcept
 {
-    switch (index) {
-    default:
-        return mShaprGeneralMaterial;
-    }
+    return mShaprGeneralMaterials[index];
 }
-
-
-
 
 #if UTILS_HAS_THREADING
 
@@ -270,11 +264,21 @@ void FEngine::init() {
                     .package(MATERIALS_DEFAULTMATERIAL_DATA, MATERIALS_DEFAULTMATERIAL_SIZE)
                     .build(*const_cast<FEngine*>(this)));
 
-    mShaprGeneralMaterial = upcast(
+    mShaprGeneralMaterials[0] = upcast(
         FMaterial::Builder()
-            .package(MATERIALS_SHAPRGENERALMATERIAL_DATA, MATERIALS_SHAPRGENERALMATERIAL_SIZE)
+            .package(MATERIALS_SHAPRGENERALMATERIALOPAQUE_DATA, MATERIALS_SHAPRGENERALMATERIALOPAQUE_SIZE)
             .build(*const_cast<FEngine*>(this))
-    );    
+    );
+    mShaprGeneralMaterials[1] = upcast(
+        FMaterial::Builder()
+        .package(MATERIALS_SHAPRGENERALMATERIALTRANSPARENTSOLID_DATA, MATERIALS_SHAPRGENERALMATERIALTRANSPARENTSOLID_SIZE)
+        .build(*const_cast<FEngine*>(this))
+    );
+    mShaprGeneralMaterials[2] = upcast(
+        FMaterial::Builder()
+        .package(MATERIALS_SHAPRGENERALMATERIALTRANSPARENTTHIN_DATA, MATERIALS_SHAPRGENERALMATERIALTRANSPARENTTHIN_SIZE)
+        .build(*const_cast<FEngine*>(this))
+    );
 
     mPostProcessManager.init();
     mLightManager.init(*this);
@@ -329,7 +333,9 @@ void FEngine::shutdown() {
     destroy(mDefaultColorGrading);
 
     destroy(mDefaultMaterial);
-    destroy(mShaprGeneralMaterial);
+    for (auto& shaprMat : mShaprGeneralMaterials) {
+        destroy(shaprMat);
+    }
 
     /*
      * clean-up after the user -- we call terminate on each "leaked" object and clear each list.

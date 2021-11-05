@@ -7,6 +7,7 @@
 
 #include <imgui.h>
 #include <filagui/ImGuiExtensions.h>
+#include <viewer/CustomFileDialogs.h>
 //#include <filagui/imfilebrowser.h>
 
 #include <math/mat4.h>
@@ -15,6 +16,11 @@
 #include <functional>
 #include <string>
 #include <type_traits>
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
+// Common constants for tweakable properties
+//////////////////////////////////////////////////////////////////////////////////////////////////
+constexpr int MAX_FILENAME_LENGTH = 1024;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 // Templated alias to have a single validator for the types that we allow to be tweaked (float, filamenth::math floatNs, etc.)
@@ -49,40 +55,65 @@ template <> constexpr float* getPointerTo<float>(float& instance) {
 //////////////////////////////////////////////////////////////////////////////////////////////////
 // A tweakable property with its own ImGui-based UI
 //////////////////////////////////////////////////////////////////////////////////////////////////
-template <typename T, typename = IsValidTweakableType<T> >
+template <typename T, bool MayContainFile = false, bool IsColor = true, typename = IsValidTweakableType<T> >
 struct TweakableProperty {
     TweakableProperty() {}
     TweakableProperty(const T& prop) : value(prop) {}
 
     void addWidget(const char* label, float min = 0.0f, float max = 1.0f, const char* format = "%.3f", float power = 1.0f) {
-        // TODO: get rid of this and use if constexpr all the way
-        static const std::vector< std::function<bool(const char*, float*, float, float, const char*, float)> > widgetFunctions{ ImGui::SliderFloat, ImGui::SliderFloat2, ImGui::SliderFloat3, ImGui::SliderFloat4 };
-
-        //ImGui::RadioButton("Value", &sourceType, 0);
-        //ImGui::RadioButton("File", &sourceType, 1);
         ImGui::LabelText(label, label);
-        if (!isFile) {
-            if constexpr (dimCount<T>() == 3) {
-                ImGui::ColorEdit3(label, getPointerTo(value));
+        std::string customTextureLabel = std::string("Use texture: ") + label;
+        if constexpr (MayContainFile) {
+            ImGui::Checkbox(customTextureLabel.c_str(), &isFile);
+            if (!isFile) {
+                drawValueWidget(label, min, max, format, power);
             }
-            else if constexpr (dimCount<T>() == 4) {
-                ImGui::ColorEdit4(label, getPointerTo(value));
-            } else {
-                widgetFunctions[dimCount<T>() - 1](label, getPointerTo(value), min, max, format, power);
+            else {
+                static char fileDialogResult[MAX_FILENAME_LENGTH];
+                ImGui::InputText("Filename", &filename[0], MAX_FILENAME_LENGTH);
+                std::string loadTextureLabel = std::string("Load##") + label;
+                if (ImGui::Button(loadTextureLabel.c_str()) && SD_OpenFileDialog(fileDialogResult)) {
+                    filename = fileDialogResult;
+                }
             }
         }
         else {
-            ImGui::InputText("Filename", &filename[0], 1024);
+            drawValueWidget(label, min, max, format, power);
         }
-        ImGui::SameLine();
-        ImGui::Checkbox("Use texture", &isFile);
-        //std::cout << "isType = " << isFile << "\n";
+        ImGui::Separator();
+        ImGui::Spacing();
+    }
+
+    void drawValueWidget(const char* label, float min = 0.0f, float max = 1.0f, const char* format = "%.3f", float power = 1.0f) {
+        if constexpr (dimCount<T>() == 4) {
+            if constexpr (IsColor) {
+                ImGui::ColorEdit4(label, getPointerTo(value));
+            } else {
+                ImGui::SliderFloat4(label, getPointerTo(value), min, max, format, power);
+            }
+        }
+        else if constexpr (dimCount<T>() == 3) {
+            if constexpr (IsColor) {
+                ImGui::ColorEdit3(label, getPointerTo(value));
+            }
+            else {
+                ImGui::SliderFloat3(label, getPointerTo(value), min, max, format, power);
+            }
+        }
+        else if constexpr (dimCount<T>() == 2) {
+            ImGui::SliderFloat2(label, getPointerTo(value), min, max, format, power);
+        }
+        else {
+            ImGui::SliderFloat(label, getPointerTo(value), min, max, format, power);
+        }
     }
 
     float* asPointer() { return getPointerTo(value); }
 
     T value{};
-    //int sourceType{};
     bool isFile{};
-    char filename[1024]{};
+    std::string filename{};
 };
+
+template <typename T, bool IsColor = true, typename = IsValidTweakableType<T> >
+using TweakablePropertyTextured = TweakableProperty<T, true, IsColor>;
