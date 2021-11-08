@@ -368,6 +368,7 @@ int main(int argc, char** argv) {
     app.config.skyboxDirectory = FilamentApp::getRootAssetsPath() + DEFAULT_IBL;
     app.config.cameraMode = camutils::Mode::FREE_FLIGHT;
     app.config.backend = Engine::Backend::OPENGL;
+    app.config.escapeKeyExitsApp = false;
 
     int optionIndex = handleCommandLineArguments(argc, argv, &app);
 
