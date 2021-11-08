@@ -162,7 +162,9 @@ set(MATERIAL_SRCS
         src/materials/colorGrading/colorGrading.mat
         src/materials/colorGrading/colorGradingAsSubpass.mat
         src/materials/defaultMaterial.mat
-        src/materials/shaprGeneralMaterial.mat
+        src/materials/shaprGeneralMaterialOpaque.mat
+        src/materials/shaprGeneralMaterialTransparentSolid.mat
+        src/materials/shaprGeneralMaterialTransparentThin.mat
         src/materials/dof/dof.mat
         src/materials/dof/dofCoc.mat
         src/materials/dof/dofDownsample.mat

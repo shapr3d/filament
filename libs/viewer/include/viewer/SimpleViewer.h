@@ -263,6 +263,9 @@ private:
 
     std::unordered_map<std::string, TweakableMaterial> mTweakedMaterials{};
     std::vector<filament::MaterialInstance*> mMaterialInstances{};
+    std::unordered_map<std::string, filament::Texture*> mTextures{};
+
+    TextureSampler trilinSampler = TextureSampler(TextureSampler::MinFilter::LINEAR_MIPMAP_LINEAR, TextureSampler::MagFilter::LINEAR, TextureSampler::WrapMode::REPEAT);
 };
 
 filament::math::mat4f fitIntoUnitCube(const filament::Aabb& bounds, float zoffset);

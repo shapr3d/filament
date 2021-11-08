@@ -134,7 +134,6 @@ void FilamentApp::run(const Config& config, SetupCallback setupCallback,
     loadSkybox(config);
     if (mIBL != nullptr) {
         mIBL->getSkybox()->setLayerMask(0x7, 0x4);
-        mScene->setSkybox(mIBL->getSkybox());
         mScene->setIndirectLight(mIBL->getIndirectLight());
         if (mSkybox != nullptr) {
             mScene->setSkybox(mSkybox->getSkybox());

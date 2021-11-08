@@ -921,7 +921,7 @@ int parse(jsmntok_t const* tokens, int i, const char* jsonChunk, TweakableMateri
         const jsmntok_t tok = tokens[i];
         CHECK_KEY(tok);
         if (compare(tok, jsonChunk, "baseColor") == 0) {
-            i = parse(tokens, i + 1, jsonChunk, &out->mBaseColor);
+            i = parse(tokens, i + 1, jsonChunk, &out->mBaseColor.value);
         }
         /*else if (compare(tok, jsonChunk, "material") == 0) {
             i = parse(tokens, i + 1, jsonChunk, &out->material);

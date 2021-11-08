@@ -94,7 +94,7 @@ private:
 struct ColorGradingSettings {
     bool enabled = true;
     filament::ColorGrading::QualityLevel quality = filament::ColorGrading::QualityLevel::MEDIUM;
-    ToneMapping toneMapping = ToneMapping::ACES_LEGACY;
+    ToneMapping toneMapping = ToneMapping::LINEAR;
     float temperature = 0;
     float tint = 0;
     math::float3 outRed{1.0f, 0.0f, 0.0f};

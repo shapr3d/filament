@@ -47,7 +47,7 @@ static constexpr uint64_t SWAP_CHAIN_CONFIG_ENABLE_XCB = 0x4;
 static constexpr uint64_t SWAP_CHAIN_CONFIG_APPLE_CVPIXELBUFFER = 0x8;
 
 static constexpr size_t MAX_VERTEX_ATTRIBUTE_COUNT = 16; // This is guaranteed by OpenGL ES.
-static constexpr size_t MAX_SAMPLER_COUNT = 16;          // Matches the Adreno Vulkan driver.
+static constexpr size_t MAX_SAMPLER_COUNT = 17;          // Matches the Adreno Vulkan driver. Hack for artists, this only has to hold true for Windows - we won't be using this many samplers on iOS et al.
 static constexpr size_t MAX_VERTEX_BUFFER_COUNT = 16;    // Max number of bound buffer objects.
 
 static_assert(MAX_VERTEX_BUFFER_COUNT <= MAX_VERTEX_ATTRIBUTE_COUNT,
