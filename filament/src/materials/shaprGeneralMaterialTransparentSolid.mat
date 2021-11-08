@@ -270,12 +270,23 @@ fragment {
         material.clearCoatScale = 1.0 + materialParams.scalingControl.w;
 
         highp vec3 pos = getWorldPosition() + getWorldOffset();
+#if 1
         highp vec3 normal = getWorldGeometricNormalVector();
+#else
+        // Since I have to re-add this so many times to debug issues, I'm leaving this commented out for the time being
+        // Still, be careful: OGL did not expose the fine gradients until 4.5 (!!!) core, so you cannot know if these are
+        // coarse (=constant for the 2x2 fragment quad) or fine (forward/backward difference'd) derivatives
+        vec3 DxPos = dFdx( pos );
+        vec3 DyPos = dFdy( pos );
+        vec3 normal = normalize( cross( DxPos, DyPos ) );
+#endif
 
         if ( materialParams.useNormalTexture == 1 ) {
-            normal = triplanarNormalMap( materialParams_normalTexture, materialParams.textureScaler.y, pos, normal );
-            material.normal = normal;
-        }
+            // We combine the normals in world space, hence the transformation in the end from world to tangent, assuming an
+            // orthonormal tangent frame (which may not hold actually but looks fine enough for now).
+            vec3 normalWS = triplanarNormalMap( materialParams_normalTexture, materialParams.textureScaler.y, pos, normal );
+            material.normal = normalWS * getWorldTangentFrame();
+        } 
 
         mat3 tangentFrame = getWorldTangentFrame();
         if ( materialParams.useBumpTexture == 1 ) {
