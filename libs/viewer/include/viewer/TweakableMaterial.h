@@ -57,11 +57,18 @@ struct TweakableMaterial {
 public:
     TweakableMaterial();
 
+    struct RequestedTexture {
+        std::string filename{};
+        bool isSrgb{};
+        bool isAlpha{};
+        bool doRequestReload{};
+    };
+
     json toJson();
     void fromJson(const json& source);
     void drawUI();
 
-    const std::string nextRequestedTexture();
+    const TweakableMaterial::RequestedTexture nextRequestedTexture();
 
     TweakablePropertyTextured<filament::math::float4> mBaseColor{ {0.0f, 0.0f, 0.0f, 1.0f} };
 
@@ -73,7 +80,7 @@ public:
     TweakablePropertyTextured<float> mClearCoatNormal{};
     TweakablePropertyTextured<float> mClearCoatRoughness{};
 
-    std::vector<std::string> mRequestedTextures{};
+    std::vector< RequestedTexture > mRequestedTextures{};
 
     float mBaseTextureScale = 1.0f; // applied to baseColor texture
     float mNormalTextureScale = 1.0f; // applied to normal.xy, roughness, and metallic maps
@@ -98,7 +105,13 @@ public:
     MaterialType mMaterialType{};
 
 private:
-    void enqueueTextureRequest(const std::string& filename);
+    template< typename T, bool MayContainFile = false, bool IsColor = true, typename = IsValidTweakableType<T> >
+    void enqueueTextureRequest(TweakableProperty<T, MayContainFile, IsColor>& item, bool isSrgb = false, bool isAlpa = false) {
+        enqueueTextureRequest(item.filename, item.doRequestReload, isSrgb, isAlpa);
+        item.doRequestReload = false;
+    }
+
+    void enqueueTextureRequest(const std::string& filename, bool doRequestReload, bool isSrgb = false, bool isAlpa = false);
 
     template< typename T, bool MayContainFile = false, bool IsColor = true, typename = IsValidTweakableType<T> >
     void writeTexturedToJson(json& result, const std::string& prefix, const TweakableProperty<T, MayContainFile, IsColor>& item) {
@@ -112,6 +125,7 @@ private:
         item.value = source[prefix];
         item.isFile = source[prefix + "IsFile"];
         item.filename = source[prefix + "Texture"];
-        if (item.isFile) enqueueTextureRequest(item.filename);
+        item.doRequestReload = true;
+        if (item.isFile) enqueueTextureRequest(item.filename, item.doRequestReload);
     }
 };
