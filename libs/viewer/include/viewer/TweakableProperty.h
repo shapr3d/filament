@@ -71,7 +71,7 @@ struct TweakableProperty {
             }
             else {
                 static char fileDialogResult[MAX_FILENAME_LENGTH];
-                ImGui::LabelText("Filename", filename[0]);
+                ImGui::LabelText("Filename", &filename[0]);
                 std::string loadTextureLabel = std::string("Load##") + label;
                 if (ImGui::Button(loadTextureLabel.c_str()) && SD_OpenFileDialog(fileDialogResult)) {
                     filename = fileDialogResult;
