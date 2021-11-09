@@ -778,13 +778,17 @@ void SimpleViewer::updateUserInterface() {
                     tweaks.drawUI();
 
                     // Load the requested textures
-                    std::string currentRequestedTexture = tweaks.nextRequestedTexture();
-                    while (currentRequestedTexture != "") {
-                        auto textureEntry = mTextures.find(currentRequestedTexture);
-                        if (textureEntry == mTextures.end()) {
+                    TweakableMaterial::RequestedTexture currentRequestedTexture = tweaks.nextRequestedTexture();
+                    while (currentRequestedTexture.filename != "") {
+                        auto textureEntry = mTextures.find(currentRequestedTexture.filename);
+                        if (textureEntry == mTextures.end() ) {
                             mTextures[entityName] = nullptr;
-                            loadTexture(mEngine, currentRequestedTexture, &mTextures[currentRequestedTexture], false, false);
+                            loadTexture(mEngine, currentRequestedTexture.filename, &mTextures[currentRequestedTexture.filename], currentRequestedTexture.isSrgb, currentRequestedTexture.isAlpha);
+                        } else if (currentRequestedTexture.doRequestReload) {
+                            if (mTextures[entityName] != nullptr) mEngine->destroy(mTextures[entityName]);
+                            loadTexture(mEngine, currentRequestedTexture.filename, &mTextures[currentRequestedTexture.filename], currentRequestedTexture.isSrgb, currentRequestedTexture.isAlpha);
                         }
+
                         currentRequestedTexture = tweaks.nextRequestedTexture();
                     }
                 }

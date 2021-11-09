@@ -98,23 +98,29 @@ void TweakableMaterial::drawUI() {
         ImGui::Separator();
 
         mBaseColor.addWidget("baseColor");
-        if (mBaseColor.isFile) enqueueTextureRequest(mBaseColor.filename);
+        if (mBaseColor.isFile) {
+            bool isAlpha = (mMaterialType != MaterialType::Opaque);
+            enqueueTextureRequest(mBaseColor, true, isAlpha);
+        }
     }
 
     if (ImGui::CollapsingHeader("Normal, roughness, specular, metallic")) {
         ImGui::SliderFloat("Scaler: normal et al. textures", &mNormalTextureScale, 1.0f / 1024.0f, 16.0f);
         ImGui::Separator();
 
+        //ImGui::SliderFloat("bump scale", &mBumpScale, 0.0f, 64.0f);
+        //mBump.addWidget("bump map");
+
         mNormal.addWidget("normal");
-        if (mNormal.isFile) enqueueTextureRequest(mNormal.filename);
+        if (mNormal.isFile) enqueueTextureRequest(mNormal);
 
         mRoughness.addWidget("roughness");
-        if (mRoughness.isFile) enqueueTextureRequest(mRoughness.filename);
+        if (mRoughness.isFile) enqueueTextureRequest(mRoughness);
 
         mReflectanceScale.addWidget("reflectance scale (specular)");
 
         mMetallic.addWidget("metallic");
-        if (mMetallic.isFile) enqueueTextureRequest(mMetallic.filename);    
+        if (mMetallic.isFile) enqueueTextureRequest(mMetallic);
     }
 
     if (ImGui::CollapsingHeader("Clear coat settings")) {
@@ -124,17 +130,17 @@ void TweakableMaterial::drawUI() {
         mClearCoat.addWidget("clearCoat");
 
         mClearCoatNormal.addWidget("clearCoat normal");
-        if (mClearCoatNormal.isFile) enqueueTextureRequest(mClearCoatNormal.filename);
+        if (mClearCoatNormal.isFile) enqueueTextureRequest(mClearCoatNormal);
 
         mClearCoatRoughness.addWidget("clearCoat roughness");
-        if (mClearCoatRoughness.isFile) enqueueTextureRequest(mClearCoatRoughness.filename);
+        if (mClearCoatRoughness.isFile) enqueueTextureRequest(mClearCoatRoughness);
     }
 
     if (ImGui::CollapsingHeader("Cloth (sheen, etc.) settings")) {
         mSheenColor.addWidget("sheen color");
 
         mSheenRoughness.addWidget("sheen roughness");
-        if (mSheenRoughness.isFile) enqueueTextureRequest(mSheenRoughness.filename);
+        if (mSheenRoughness.isFile) enqueueTextureRequest(mSheenRoughness);
     }
 
     if (mMaterialType == MaterialType::Opaque) {
@@ -157,13 +163,13 @@ void TweakableMaterial::drawUI() {
     }
 }
 
-const std::string TweakableMaterial::nextRequestedTexture() {
+const TweakableMaterial::RequestedTexture TweakableMaterial::nextRequestedTexture() {
     // TODO: this is very wasteful, make a constant size vector allocation and use an index to track where we are ASAP
-    while (mRequestedTextures.size() > 0 && mRequestedTextures.back() == "") {
+    while (mRequestedTextures.size() > 0 && mRequestedTextures.back().filename == "") {
         mRequestedTextures.pop_back();
     }
 
-    std::string lastRequest = "";
+    RequestedTexture lastRequest{};
     if (mRequestedTextures.size() > 0) {
         lastRequest = mRequestedTextures.back();
         mRequestedTextures.pop_back();
@@ -172,6 +178,6 @@ const std::string TweakableMaterial::nextRequestedTexture() {
     return lastRequest;
 }
 
-void TweakableMaterial::enqueueTextureRequest(const std::string& filename) {
-    mRequestedTextures.push_back(filename);
+void TweakableMaterial::enqueueTextureRequest(const std::string& filename, bool doRequestReload, bool isSrgb, bool isAlpha) {
+    mRequestedTextures.push_back({ filename, isSrgb, isAlpha, doRequestReload });
 }

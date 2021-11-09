@@ -1,10 +1,10 @@
 material {
-    name : generalShaprOpaque,
+    name : generalShaprTransparentSolid,
     requires : [tangents],
     shadingModel : lit,
-    blending : transparent,
+    blending : fade,
     transparency : twoPassesTwoSides,
-    refractionMode : cubemap, // screenspace?
+    refractionMode : screenspace,
     refractionType : solid,
     parameters : [
         //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -317,6 +317,8 @@ fragment {
         } else {
             material.baseColor = materialParams.albedo;
         }
+        // Pre-multiply by alpha
+        material.baseColor.rgb *= material.baseColor.a;
 
         // Careful: reflectance affects non-metals, so this can make things overly shiny
         material.reflectance = materialParams.reflectance * clamp( 1.0 - material.roughness, 0.0, 1.0 );

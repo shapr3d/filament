@@ -71,10 +71,17 @@ struct TweakableProperty {
             }
             else {
                 static char fileDialogResult[MAX_FILENAME_LENGTH];
-                ImGui::InputText("Filename", &filename[0], MAX_FILENAME_LENGTH);
+                ImGui::LabelText("Filename", &filename[0]);
                 std::string loadTextureLabel = std::string("Load##") + label;
                 if (ImGui::Button(loadTextureLabel.c_str()) && SD_OpenFileDialog(fileDialogResult)) {
                     filename = fileDialogResult;
+                }
+
+                if (filename != "") {
+                    ImGui::SameLine();
+                    if (ImGui::Button("Reload")) {
+                        doRequestReload = true;
+                    }
                 }
             }
         }
@@ -114,6 +121,7 @@ struct TweakableProperty {
     T value{};
     bool isFile{};
     std::string filename{};
+    bool doRequestReload{};
 };
 
 template <typename T, bool IsColor = true, typename = IsValidTweakableType<T> >
