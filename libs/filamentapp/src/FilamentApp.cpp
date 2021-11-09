@@ -273,7 +273,7 @@ void FilamentApp::run(const Config& config, SetupCallback setupCallback,
                     mClosed = true;
                     break;
                 case SDL_KEYDOWN:
-                    if (event.key.keysym.scancode == SDL_SCANCODE_ESCAPE) {
+                    if (event.key.keysym.scancode == SDL_SCANCODE_ESCAPE && config.escapeKeyExitsApp) {
                         mClosed = true;
                     }
                     window->keyDown(event.key.keysym.scancode);

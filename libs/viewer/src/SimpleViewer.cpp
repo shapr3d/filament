@@ -1022,7 +1022,7 @@ void SimpleViewer::updateUserInterface() {
             ImGui::SliderFloat("SSAO radius (meters)", &ssao.radius, 0.0f, 10.0f);
             ImGui::SliderFloat("SSAO bias (meters)", &ssao.bias, 0.0f, 0.1f, "%.6f");
 
-            static int ssaoRes = 1;
+            static int ssaoRes = 2;
             ImGui::RadioButton("SSAO half resolution", &ssaoRes, 1);
             ImGui::RadioButton("SSAO fullresolution", &ssaoRes, 2);
             ssao.resolution = ssaoRes * 0.5f;

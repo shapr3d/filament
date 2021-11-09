@@ -368,6 +368,7 @@ int main(int argc, char** argv) {
     app.config.skyboxDirectory = FilamentApp::getRootAssetsPath() + DEFAULT_IBL;
     app.config.cameraMode = camutils::Mode::FREE_FLIGHT;
     app.config.backend = Engine::Backend::OPENGL;
+    app.config.escapeKeyExitsApp = false;
 
     int optionIndex = handleCommandLineArguments(argc, argv, &app);
 
@@ -639,7 +640,7 @@ int main(int argc, char** argv) {
     auto resize = [&app](Engine* engine, View* view) {
         Camera& camera = view->getCamera();
         if (&camera == app.mainCamera) {
-            // Don't adjut the aspect ratio of the main camera, this is done inside of
+            // Don't adjust the aspect ratio of the main camera, this is done inside
             // FilamentApp.cpp
             return;
         }
