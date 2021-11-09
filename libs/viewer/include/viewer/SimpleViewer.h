@@ -223,6 +223,11 @@ public:
 private:
     void updateIndirectLight();
 
+    void undoLastModification();
+    //void redoLastModification();
+
+    void saveTweaksToFile(TweakableMaterial* tweaks, const char* filePath);
+
     // Immutable properties set from the constructor.
     filament::Engine* const mEngine;
     filament::Scene* const mScene;
@@ -261,11 +266,53 @@ private:
     filament::IndexBuffer* mDummyIB{};
     utils::Entity mDummyEntity{};
 
+    std::string mLastSavedEntityName;
+    std::string mLastSavedFileName;
     std::unordered_map<std::string, TweakableMaterial> mTweakedMaterials{};
     std::vector<filament::MaterialInstance*> mMaterialInstances{};
     std::unordered_map<std::string, filament::Texture*> mTextures{};
 
     TextureSampler trilinSampler = TextureSampler(TextureSampler::MinFilter::LINEAR_MIPMAP_LINEAR, TextureSampler::MagFilter::LINEAR, TextureSampler::WrapMode::REPEAT);
+
+    class SimpleViewerInputPredicates {
+        // Taken from SDL_keycode.h
+        static constexpr uint16_t KMOD_LCTRL = 0x0040;
+        static constexpr uint16_t KMOD_RCTRL = 0x0080;
+        static constexpr uint16_t KMOD_LGUI = 0x0400;
+        static constexpr uint16_t KMOD_RGUI = 0x0800;
+        // Ctrl+S on Win, Cmd+S on macOS (Cmd is KMOD_[LR]GUI, not KMOD_[LR]CTRL)
+#ifdef TARGET_OS_MAC
+        static constexpr uint16_t MOD_FOR_HOTKEYS = KMOD_LGUI | KMOD_RGUI;
+#else
+        static constexpr uint16_t MOD_FOR_HOTKEYS = KMOD_LCTRL | KMOD_RCTRL;
+#endif
+
+    public:
+        static bool shouldSaveOnKeyDownEvent(int keyCode, uint16_t modState) {
+            return keyCode == 's' && (modState & MOD_FOR_HOTKEYS);
+        }
+
+        static bool shouldUndoOnKeyDownEvent(int keyCode, uint16_t modState) {
+            return keyCode == 'z' && (modState & MOD_FOR_HOTKEYS);
+        }
+    };
+
+public:
+
+    std::function<bool (int, uint16_t)> getKeyDownHook () {
+        return [this] (int keyCode, uint16_t modState) {
+            if (SimpleViewerInputPredicates::shouldSaveOnKeyDownEvent(keyCode, modState)) {
+                if (!this->mLastSavedEntityName.empty() && !this->mLastSavedFileName.empty()) {
+                    saveTweaksToFile(&mTweakedMaterials[mLastSavedEntityName], mLastSavedFileName.c_str());
+                }
+                return true;
+            } else if (SimpleViewerInputPredicates::shouldUndoOnKeyDownEvent(keyCode, modState)) {
+                undoLastModification();
+                return true;
+            }
+            return false;
+        };
+    }
 };
 
 filament::math::mat4f fitIntoUnitCube(const filament::Aabb& bounds, float zoffset);

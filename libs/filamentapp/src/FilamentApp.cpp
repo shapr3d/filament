@@ -272,12 +272,19 @@ void FilamentApp::run(const Config& config, SetupCallback setupCallback,
                 case SDL_QUIT:
                     mClosed = true;
                     break;
-                case SDL_KEYDOWN:
+                case SDL_KEYDOWN: {
                     if (event.key.keysym.scancode == SDL_SCANCODE_ESCAPE && config.escapeKeyExitsApp) {
                         mClosed = true;
                     }
-                    window->keyDown(event.key.keysym.scancode);
+                    bool handled = false;
+                    for (auto hook: mKeyDownHooks) {
+                        handled |= hook(event.key.keysym.sym, event.key.keysym.mod);
+                    }
+                    if (!handled) {
+                        window->keyDown(event.key.keysym.scancode);
+                    }
                     break;
+                }
                 case SDL_KEYUP:
                     window->keyUp(event.key.keysym.scancode);
                     break;
