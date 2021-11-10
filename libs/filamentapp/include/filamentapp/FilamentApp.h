@@ -51,6 +51,9 @@ class MeshAssimp;
 
 class FilamentApp {
 public:
+    using KeyDownEventHook = std::function<bool(int, int16_t)>;
+    std::vector<KeyDownEventHook> mKeyDownHooks;
+
     using SetupCallback = std::function<void(filament::Engine*, filament::View*, filament::Scene*)>;
     using CleanupCallback =
             std::function<void(filament::Engine*, filament::View*, filament::Scene*)>;

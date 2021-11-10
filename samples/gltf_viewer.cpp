@@ -456,6 +456,9 @@ int main(int argc, char** argv) {
         app.viewer->getSettings().viewer.autoScaleEnabled = !app.actualSize;
         app.viewer->getSettings().lighting.enableSunlight = false;
 
+        // This needs to be here, to have an instantiated SimpleViewer
+        FilamentApp::get().mKeyDownHooks.emplace_back(app.viewer->getKeyDownHook());
+
         const bool batchMode = !app.batchFile.empty();
 
         // First check if a custom automation spec has been provided. If it fails to load, the app

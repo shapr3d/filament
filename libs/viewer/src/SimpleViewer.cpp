@@ -624,6 +624,17 @@ void SimpleViewer::keyPressEvent(int charCode) {
     }
 }
 
+void SimpleViewer::saveTweaksToFile(TweakableMaterial *tweaks, const char *filePath) {
+    nlohmann::json js = tweaks->toJson();
+    std::string filePathStr = filePath;
+    if (filePathStr.rfind(".json") != (filePathStr.size() - 5)) {
+        filePathStr += ".json";
+    }
+    mLastSavedFileName = filePathStr;
+    std::fstream outFile(filePathStr, std::ios::binary | std::ios::out);
+    outFile << js << std::endl;
+    outFile.close();
+}
 
 void SimpleViewer::updateUserInterface() {
     using namespace filament;
@@ -694,6 +705,9 @@ void SimpleViewer::updateUserInterface() {
                             inFile.close();
                             tweaks.fromJson(js);
 
+                            mLastSavedEntityName = entityName;
+                            mLastSavedFileName = fileDialogPath;
+
                             if (tweaks.mMaterialType != prevType) {
                                 filament::MaterialInstance* currentInstance = rm.getMaterialInstanceAt(instance, prim);
                                 for (auto& mat : mMaterialInstances) if (mat == currentInstance) mat = nullptr;
@@ -709,10 +723,8 @@ void SimpleViewer::updateUserInterface() {
                         ImGui::SameLine();
                         if (ImGui::Button("Save material")) {
                             if (SD_SaveFileDialog(fileDialogPath, materialFileFilter)) {
-                                nlohmann::json js = tweaks.toJson();
-                                std::fstream outFile(std::string(fileDialogPath) + ".json", std::ios::binary | std::ios::out);
-                                outFile << js << std::endl;
-                                outFile.close();
+                                mLastSavedEntityName = entityName;
+                                saveTweaksToFile(&tweaks, fileDialogPath);
                             }
                         } else {
                             ImGui::SameLine();
@@ -1281,10 +1293,20 @@ void SimpleViewer::updateUserInterface() {
         }
     }
 
+    {
+        // Hotkey-related feedback UI
+        ImGui::Separator();
+        ImGui::Text("Entity material to save: %s", mLastSavedEntityName.empty() ? "<none>" : mLastSavedEntityName.c_str());
+        ImGui::Text("Save filename: %s", mLastSavedFileName.empty() ? "<none>" : mLastSavedFileName.c_str());
+    }
     mSidebarWidth = ImGui::GetWindowWidth();
     ImGui::End();
 
     updateIndirectLight();
+}
+
+void SimpleViewer::undoLastModification() {
+    // TODO
 }
 
 } // namespace viewer
