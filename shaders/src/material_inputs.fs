@@ -25,6 +25,7 @@ struct MaterialInputs {
     float specularScale;
     float diffuseScale;
     float roughnessScale;
+    float specularIntensity;
     //float normalScale;
     float clearCoatScale;
 

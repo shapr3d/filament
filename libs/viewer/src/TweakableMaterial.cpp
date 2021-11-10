@@ -1,7 +1,7 @@
 #include <viewer/TweakableMaterial.h>
 
 TweakableMaterial::TweakableMaterial() {
-    mReflectanceScale.value = 1.0f;    
+    mSpecularIntensity.value = 1.0f;    
     mAnisotropyDirection.value = { 1.0f, 0.0f, 0.0f };
     mMaxThickness.value = 1.0f;
     mIor.value = 1.5f;
@@ -31,7 +31,7 @@ json TweakableMaterial::toJson() {
     result["clearCoatTextureScale"] = mClearCoatTextureScale;
     result["refractiveTextureScale"] = mRefractiveTextureScale;
 
-    result["reflectanceScale"] = mReflectanceScale.value;
+    result["reflectanceScale"] = mSpecularIntensity.value;
 
     result["anisotropy"] = mAnisotropy.value;
     result["anisotropyDirection"] = mAnisotropyDirection.value;
@@ -72,7 +72,7 @@ void TweakableMaterial::fromJson(const json& source) {
         mNormalTextureScale = source["normalTextureScale"];
         mClearCoatTextureScale = source["clearCoatTextureScale"];
         mRefractiveTextureScale = source["refractiveTextureScale"];
-        mReflectanceScale.value = source["reflectanceScale"];
+        mSpecularIntensity.value = source["reflectanceScale"];
 
         mAnisotropy.value = source["anisotropy"];
         mAnisotropyDirection.value = source["anisotropyDirection"];
@@ -117,7 +117,7 @@ void TweakableMaterial::drawUI() {
         mRoughness.addWidget("roughness");
         if (mRoughness.isFile) enqueueTextureRequest(mRoughness);
 
-        mReflectanceScale.addWidget("reflectance scale (specular)");
+        mSpecularIntensity.addWidget("specularIntensity");
 
         mMetallic.addWidget("metallic");
         if (mMetallic.isFile) enqueueTextureRequest(mMetallic);

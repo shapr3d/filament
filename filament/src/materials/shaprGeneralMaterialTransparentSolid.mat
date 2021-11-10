@@ -166,7 +166,7 @@ material {
         },
         {
             type : float,
-            name : reflectance
+            name : specularIntensity
         },
         {
             type : float,
@@ -386,5 +386,10 @@ fragment {
 #if defined(MATERIAL_HAS_MICRO_THICKNESS) && (REFRACTION_TYPE == REFRACTION_TYPE_THIN)
             material.microThickness = thicknessValue; // default 0.0
 #endif
+
+        //--------
+        // simplies
+        //--------
+        material.specularIntensity = materialParams.specularIntensity;
     }
 }

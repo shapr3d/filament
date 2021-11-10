@@ -128,7 +128,7 @@ material {
         //////////////////////////////////////////////////////////////////////////////////////////////////
         {
             type : float,
-            name : reflectance
+            name : specularIntensity
         },
         {
             type : float,
@@ -330,6 +330,7 @@ fragment {
         material.clearCoat = materialParams.clearCoat;
         material.sheenColor = materialParams.sheenColor;
 
+        material.specularIntensity = materialParams.specularIntensity;
         // Debug coloring
         //material.baseColor.rgb *= 1e-6;
         //material.baseColor.rgb += 0.5 * ( material.normal + vec3(1) );

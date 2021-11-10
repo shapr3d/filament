@@ -152,10 +152,11 @@ std::string shaderFromKey(const MaterialKey& config) {
     if (!config.unlit) {
         // for controlling the roughness and specular scales
         shader += R"SHADER(
-                material.specularScale  = 1.0 + materialParams.scalingControl.x;
-                material.roughnessScale = 1.0 + materialParams.scalingControl.y;
-                material.diffuseScale   = 1.0 + materialParams.scalingControl.z;
-                material.clearCoatScale = 1.0 + materialParams.scalingControl.w;
+                material.specularScale     = 1.0 + materialParams.scalingControl.x;
+                material.roughnessScale    = 1.0 + materialParams.scalingControl.y;
+                material.diffuseScale      = 1.0 + materialParams.scalingControl.z;
+                material.clearCoatScale    = 1.0 + materialParams.scalingControl.w;
+                material.specularIntensity = 1.0;
             )SHADER";
 
         if (config.useSpecularGlossiness) {

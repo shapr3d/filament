@@ -913,7 +913,7 @@ void SimpleViewer::updateUserInterface() {
                     matInstance->setParameter("useBumpTexture", 0);
 
                     matInstance->setParameter("textureScaler", math::float4(tweaks.mBaseTextureScale, tweaks.mNormalTextureScale, tweaks.mClearCoatTextureScale, tweaks.mRefractiveTextureScale));
-                    matInstance->setParameter("reflectance", tweaks.mReflectanceScale.value);
+                    matInstance->setParameter("specularIntensity", tweaks.mSpecularIntensity.value);
                     matInstance->setParameter("albedo", tweaks.mBaseColor.value);
                     matInstance->setParameter("roughness", tweaks.mRoughness.value);
                     matInstance->setParameter("clearCoat", tweaks.mClearCoat.value);

@@ -234,7 +234,7 @@ float prefilteredImportanceSampling(float ipdf, float omegaP) {
     return mipLevel;
 }
 
-vec3 isEvaluateSpecularIBL(const PixelParams pixel, vec3 n, vec3 v, float NoV) {
+vec3 isEvaluateSpecularIBL(const MaterialInputs material, const PixelParams pixel, vec3 n, vec3 v, float NoV) {
     const uint numSamples = uint(IBL_INTEGRATION_IMPORTANCE_SAMPLING_COUNT);
     const float invNumSamples = 1.0 / float(numSamples);
     const vec3 up = vec3(0.0, 0.0, 1.0);
@@ -283,7 +283,7 @@ vec3 isEvaluateSpecularIBL(const PixelParams pixel, vec3 n, vec3 v, float NoV) {
 
             float D = distribution(roughness, NoH, h);
             float V = visibility(roughness, NoV, NoL);
-            vec3 F = fresnel(pixel.f0, LoH);
+            vec3 F = material.specularIntensity * fresnel(pixel.f0, LoH);
             vec3 Fr = F * (D * V * NoL * ipdf * invNumSamples);
 
             indirectSpecular += (Fr * L);
@@ -367,7 +367,7 @@ void isEvaluateClearCoatIBL(const MaterialInputs material, const PixelParams pix
     p.anisotropy = 0.0;
 #endif
 
-    vec3 clearCoatLobe = material.clearCoatScale * isEvaluateSpecularIBL(p, clearCoatNormal, shading_view, clearCoatNoV);
+    vec3 clearCoatLobe = material.clearCoatScale * isEvaluateSpecularIBL(material, p, clearCoatNormal, shading_view, clearCoatNoV);
     Fr += clearCoatLobe * (specularAO * pixel.clearCoat);
 #endif
 }
@@ -553,8 +553,8 @@ void applyRefraction(
     Ft *= T;
 #endif
 
-    Fr *= material.diffuseScale * frameUniforms.iblLuminance;
-    Fd *= material.specularScale * frameUniforms.iblLuminance;
+    Fd *= material.diffuseScale * frameUniforms.iblLuminance;
+    Fr *= material.specularIntensity * material.specularScale * frameUniforms.iblLuminance;
     color.rgb += Fr + mix(Fd, Ft, pixel.transmission);
 }
 #endif
@@ -567,7 +567,7 @@ void combineDiffuseAndSpecular(
 #if defined(HAS_REFRACTION)
     applyRefraction(material, pixel, n, E, Fd, Fr, color);
 #else
-    color.rgb += (material.diffuseScale * Fd + material.specularScale * Fr) * frameUniforms.iblLuminance;
+    color.rgb += (material.diffuseScale * Fd + material.specularIntensity * material.specularScale * Fr) * frameUniforms.iblLuminance;
 #endif
 }
 
