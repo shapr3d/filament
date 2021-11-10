@@ -321,7 +321,7 @@ fragment {
         material.baseColor.rgb *= material.baseColor.a;
 
         // Careful: reflectance affects non-metals, so this can make things overly shiny
-        material.reflectance = materialParams.reflectance * clamp( 1.0 - material.roughness, 0.0, 1.0 );
+        material.reflectance = clamp( 1.0 - material.roughness, 0.0, 1.0 );
 
         // TODO @gvalasek: to conform to standards, .r is treated as occlusion, .b is roughness,
         //       and .b as metallness. For now, only roughness is taken into account for M2.
@@ -348,10 +348,6 @@ fragment {
             material.clearCoatNormal = triplanarNormalMap( materialParams_clearCoatNormalTexture, materialParams.textureScaler.z, pos, normal );
         }
 
-        // Careful: reflectance affects non-metals, so this can make things overly shiny
-        material.reflectance = 1.0 - material.roughness;
-
-        material.anisotropy = 0.0;
         material.clearCoat = materialParams.clearCoat;
 
         //////////////////////////////////////////////////////////////////////////////////////////////////
