@@ -458,7 +458,6 @@ int main(int argc, char** argv) {
 
         // This needs to be here, to have an instantiated SimpleViewer
         FilamentApp::get().mKeyDownHooks.emplace_back(app.viewer->getKeyDownHook());
-        app.viewer->setCameraMovementSpeedUpdateCallback(FilamentApp::get().getCameraMovementSpeedUpdateCallback());
 
         const bool batchMode = !app.batchFile.empty();
 
@@ -498,14 +497,19 @@ int main(int argc, char** argv) {
             app.viewer->stopAnimation();
         }
 
+        auto cameraMovementSpeedUpdateCallback = FilamentApp::get().getCameraMovementSpeedUpdateCallback();
+
         if (app.settingsFile.size() > 0) {
             bool success = loadSettings(app.settingsFile.c_str(), &app.viewer->getSettings());
             if (success) {
                 std::cout << "Loaded settings from " << app.settingsFile << std::endl;
+                cameraMovementSpeedUpdateCallback(app.viewer->getSettings().viewer.cameraMovementSpeed);
             } else {
                 std::cerr << "Failed to load settings from " << app.settingsFile << std::endl;
             }
         }
+
+        app.viewer->setCameraMovementSpeedUpdateCallback(std::move(cameraMovementSpeedUpdateCallback));
 
         app.materials = (app.materialSource == GENERATE_SHADERS) ?
                 createMaterialGenerator(engine) : createUbershaderLoader(engine);
