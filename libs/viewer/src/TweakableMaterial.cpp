@@ -6,6 +6,7 @@ TweakableMaterial::TweakableMaterial() {
     mMaxThickness.value = 1.0f;
     mIor.value = 1.5f;
     mIorScale.value = 1.0f;
+    mNormalIntensity.value = 1.0f;
 }
 
 json TweakableMaterial::toJson() {
@@ -14,6 +15,8 @@ json TweakableMaterial::toJson() {
     result["materialType"] = mMaterialType;
 
     writeTexturedToJson(result, "baseColor", mBaseColor);
+
+    result["normalIntensity"] = mNormalIntensity.value;
 
     writeTexturedToJson(result, "normalTexture", mNormal);
 
@@ -55,6 +58,13 @@ void TweakableMaterial::fromJson(const json& source) {
         mMaterialType = source["materialType"];
 
         readTexturedFromJson(source, "baseColor", mBaseColor);
+
+        try {
+            mNormalIntensity.value = source["normalIntensity"];
+        } catch (...) {
+            std::cout << "Material file did not have normal scale attribute. Using default instead.\n";
+            mNormalIntensity.value = 1.0f;
+        }
 
         readTexturedFromJson(source, "normalTexture", mNormal);
 
@@ -111,6 +121,8 @@ void TweakableMaterial::drawUI() {
         //ImGui::SliderFloat("bump scale", &mBumpScale, 0.0f, 64.0f);
         //mBump.addWidget("bump map");
 
+        mNormalIntensity.addWidget("normal intensity", 0.0f, 32.0f);
+        
         mNormal.addWidget("normal");
         if (mNormal.isFile) enqueueTextureRequest(mNormal);
 

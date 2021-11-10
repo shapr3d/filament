@@ -915,6 +915,7 @@ void SimpleViewer::updateUserInterface() {
 
                     setTextureIfPresent(tweaks.mBaseColor.isFile, tweaks.mBaseColor.filename, "albedo");
 
+                    matInstance->setParameter("normalScale", tweaks.mNormalIntensity.value);
                     setTextureIfPresent(tweaks.mNormal.isFile, tweaks.mNormal.filename, "normal");
                     setTextureIfPresent(tweaks.mRoughness.isFile, tweaks.mRoughness.filename, "roughness");
                     setTextureIfPresent(tweaks.mMetallic.isFile, tweaks.mMetallic.filename, "metallic");
@@ -961,7 +962,6 @@ void SimpleViewer::updateUserInterface() {
                 // These attributes apply to all materials as we inject them manually into the shaders generated for GLTF import
                 const auto& matInstance = rm.getMaterialInstanceAt(instance, prim);
                 matInstance->setParameter("scalingControl", math::float4(matInstance->getSpecularScale() - 1.0f, matInstance->getRoughnessScale() - 1.0f, matInstance->getDiffuseScale() - 1.0f, matInstance->getClearCoatScale() - 1.0f));
-                matInstance->setParameter("normalScale", matInstance->getNormalScale());
                 const auto* mat = matInstance->getMaterial();
                 bool hasClearCoat = mat->hasParameter("clearCoatNormalScale");
                 if (hasClearCoat) {
