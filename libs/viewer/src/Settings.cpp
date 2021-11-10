@@ -848,6 +848,8 @@ static int parse(jsmntok_t const* tokens, int i, const char* jsonChunk, ViewerOp
              i = parse(tokens, i + 1, jsonChunk, &out->cameraFocusDistance);
         } else if (compare(tok, jsonChunk, "autoScaleEnabled") == 0) {
              i = parse(tokens, i + 1, jsonChunk, &out->autoScaleEnabled);
+        } else if (compare(tok, jsonChunk, "cameraMovementSpeed") == 0) {
+            i = parse(tokens, i + 1, jsonChunk, &out->cameraMovementSpeed);
         } else {
             slog.w << "Invalid viewer options key: '" << STR(tok, jsonChunk) << "'" << io::endl;
             i = parse(tokens, i + 1);
@@ -1331,6 +1333,7 @@ static std::ostream& operator<<(std::ostream& out, const ViewerOptions& in) {
         << "\"cameraFocalLength\": " << (in.cameraFocalLength) << ",\n"
         << "\"cameraFocusDistance\": " << (in.cameraFocusDistance) << ",\n"
         << "\"autoScaleEnabled\": " << to_string(in.autoScaleEnabled) << "\n"
+        << "\"cameraMovementSpeed\": " << (in.cameraMovementSpeed) << ",\n"
         << "}";
 }
 

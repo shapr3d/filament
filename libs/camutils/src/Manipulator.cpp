@@ -317,6 +317,9 @@ void Manipulator<FLOAT>::keyUp(Manipulator<FLOAT>::Key key) { }
 template <typename FLOAT>
 void Manipulator<FLOAT>::update(FLOAT deltaTime) { }
 
+template <typename FLOAT>
+void Manipulator<FLOAT>::setFlightSpeed(float speed) { }
+
 template class Manipulator<float>;
 
 } // namespace camutils

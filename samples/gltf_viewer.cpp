@@ -458,6 +458,7 @@ int main(int argc, char** argv) {
 
         // This needs to be here, to have an instantiated SimpleViewer
         FilamentApp::get().mKeyDownHooks.emplace_back(app.viewer->getKeyDownHook());
+        app.viewer->setCameraMovementSpeedUpdateCallback(FilamentApp::get().getCameraMovementSpeedUpdateCallback());
 
         const bool batchMode = !app.batchFile.empty();
 

@@ -188,6 +188,10 @@ public:
         updateTarget(bookmark.flight.pitch, bookmark.flight.yaw);
     }
 
+    void setFlightSpeed(float speed) override {
+        mMoveSpeed = speed;
+    }
+
 private:
     vec2 mGrabWin;
     vec2 mTargetEuler;  // (pitch, yaw)

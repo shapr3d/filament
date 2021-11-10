@@ -278,6 +278,8 @@ public:
      */
     virtual void jumpToBookmark(const Bookmark& bookmark) = 0;
 
+    virtual void setFlightSpeed(float speed);
+
 protected:
     Manipulator(Mode mode, const Config& props);
 

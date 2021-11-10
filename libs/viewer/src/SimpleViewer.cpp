@@ -1294,6 +1294,14 @@ void SimpleViewer::updateUserInterface() {
     }
 
     {
+        // Camera movement speed setting UI
+        ImGui::Separator();
+        if (ImGui::SliderFloat("Cam move speed", &mSettings.viewer.cameraMovementSpeed, 1.0f, 100.0f)) {
+            updateCameraMovementSpeed();
+        }
+    }
+
+    {
         // Hotkey-related feedback UI
         ImGui::Separator();
         ImGui::Text("Entity material to save: %s", mLastSavedEntityName.empty() ? "<none>" : mLastSavedEntityName.c_str());
@@ -1308,6 +1316,19 @@ void SimpleViewer::updateUserInterface() {
 void SimpleViewer::undoLastModification() {
     // TODO
 }
+
+void SimpleViewer::updateCameraMovementSpeed() {
+    if (mCameraMovementSpeedUpdateCallback) {
+        mCameraMovementSpeedUpdateCallback(mSettings.viewer.cameraMovementSpeed);
+    } else {
+        std::cout << "Oops! No mCameraMovementSpeedUpdateCallback set!" << std::endl;
+    }
+}
+
+void SimpleViewer::setCameraMovementSpeedUpdateCallback(std::function<void(float)>&& callback) {
+    mCameraMovementSpeedUpdateCallback = std::move(callback);
+}
+
 
 } // namespace viewer
 } // namespace filament

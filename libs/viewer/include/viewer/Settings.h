@@ -176,6 +176,8 @@ struct ViewerOptions {
     float cameraFocalLength = 28.0f;
     float cameraFocusDistance = 10.0f;
     bool autoScaleEnabled = true;
+
+    float cameraMovementSpeed = 5.0f;
 };
 
 struct Settings {

@@ -54,6 +54,9 @@ public:
     using KeyDownEventHook = std::function<bool(int, int16_t)>;
     std::vector<KeyDownEventHook> mKeyDownHooks;
 
+    using CameraMovementSpeedUpdateCallback = std::function<void(float)>;
+    CameraMovementSpeedUpdateCallback getCameraMovementSpeedUpdateCallback();
+
     using SetupCallback = std::function<void(filament::Engine*, filament::View*, filament::Scene*)>;
     using CleanupCallback =
             std::function<void(filament::Engine*, filament::View*, filament::Scene*)>;
@@ -244,6 +247,8 @@ private:
     std::string mWindowTitle;
     std::vector<filament::View*> mOffscreenViews;
     float mCameraFocalLength = 28.0f;
+
+    CameraMovementSpeedUpdateCallback mCameraMovementSpeedUpdateCallback = nullptr;
 };
 
 #endif // TNT_FILAMENT_SAMPLE_FILAMENTAPP_H

@@ -220,11 +220,15 @@ public:
 
     void generateDummyMaterial();
 
+    void setCameraMovementSpeedUpdateCallback(std::function<void(float)>&& callback);
 private:
     void updateIndirectLight();
 
     void undoLastModification();
     //void redoLastModification();
+
+    void updateCameraMovementSpeed();
+    std::function<void(float)> mCameraMovementSpeedUpdateCallback;
 
     void saveTweaksToFile(TweakableMaterial* tweaks, const char* filePath);
 
