@@ -291,7 +291,7 @@ fragment {
         }
 
         // Careful: reflectance affects non-metals, so this can make things overly shiny
-        material.reflectance = materialParams.reflectance * clamp( 1.0 - material.roughness, 0.0, 1.0 );
+        material.reflectance = clamp( 1.0 - material.roughness, 0.0, 1.0 );
 
         // TODO @gvalasek: see as above, technically all this should have been a single fetch
         if ( materialParams.useMetallicTexture == 1 ) {
