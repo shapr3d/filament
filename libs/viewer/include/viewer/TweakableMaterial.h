@@ -87,6 +87,7 @@ public:
     float mClearCoatTextureScale = 1.0f; // applied to clearcloat normal.xy, roughness, and value textures
     float mRefractiveTextureScale = 1.0f; // applied to ior, transmission, {micro}Thickness textures
     TweakableProperty<float> mSpecularIntensity{}; // scales Filament's reflectance attribute - should be equivalent to specular in Blender
+    TweakableProperty<float> mNormalIntensity{}; // scales the normal vectors along the XY axes
 
     TweakableProperty<float> mAnisotropy{}; // for metals
     TweakableProperty<filament::math::float3, false, false> mAnisotropyDirection{}; // for metals; not color
