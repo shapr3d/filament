@@ -104,7 +104,7 @@ void TweakableMaterial::fromJson(const json& source) {
 
 void TweakableMaterial::drawUI() {
     if (ImGui::CollapsingHeader("Base color")) {
-        ImGui::SliderFloat("Scaler: albedo texture", &mBaseTextureScale, 1.0f / 1024.0f, 16.0f);
+        ImGui::SliderFloat("Tile: albedo texture", &mBaseTextureScale, 1.0f / 1024.0f, 32.0f);
         ImGui::Separator();
 
         mBaseColor.addWidget("baseColor");
@@ -115,11 +115,8 @@ void TweakableMaterial::drawUI() {
     }
 
     if (ImGui::CollapsingHeader("Normal, roughness, specular, metallic")) {
-        ImGui::SliderFloat("Scaler: normal et al. textures", &mNormalTextureScale, 1.0f / 1024.0f, 16.0f);
+        ImGui::SliderFloat("Tile: normal et al. textures", &mNormalTextureScale, 1.0f / 1024.0f, 32.0f);
         ImGui::Separator();
-
-        //ImGui::SliderFloat("bump scale", &mBumpScale, 0.0f, 64.0f);
-        //mBump.addWidget("bump map");
 
         mNormalIntensity.addWidget("normal intensity", 0.0f, 32.0f);
         
@@ -129,17 +126,17 @@ void TweakableMaterial::drawUI() {
         mRoughness.addWidget("roughness");
         if (mRoughness.isFile) enqueueTextureRequest(mRoughness);
 
-        mSpecularIntensity.addWidget("specularIntensity");
+        mSpecularIntensity.addWidget("specular intensity");
 
         mMetallic.addWidget("metallic");
         if (mMetallic.isFile) enqueueTextureRequest(mMetallic);
     }
 
     if (ImGui::CollapsingHeader("Clear coat settings")) {
-        ImGui::SliderFloat("Scaler: clearCoat et al. textures", &mClearCoatTextureScale, 1.0f / 1024.0f, 16.0f);
+        ImGui::SliderFloat("Tile: clearCoat et al. textures", &mClearCoatTextureScale, 1.0f / 1024.0f, 32.0f);
         ImGui::Separator();
 
-        mClearCoat.addWidget("clearCoat");
+        mClearCoat.addWidget("clearCoat intensity");
 
         mClearCoatNormal.addWidget("clearCoat normal");
         if (mClearCoatNormal.isFile) enqueueTextureRequest(mClearCoatNormal);
@@ -162,7 +159,7 @@ void TweakableMaterial::drawUI() {
         }
     } else { 
         if (ImGui::CollapsingHeader("Transparent and refractive properties")) {
-            ImGui::SliderFloat("Scaler: refractive textures", &mRefractiveTextureScale, 1.0f / 1024.0f, 16.0f);
+            ImGui::SliderFloat("Tile: refractive textures", &mRefractiveTextureScale, 1.0f / 1024.0f, 32.0f);
             ImGui::Separator();
 
             mIorScale.addWidget("ior scale", 0.0f, 4.0f);
