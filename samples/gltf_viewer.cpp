@@ -577,8 +577,17 @@ int main(int argc, char** argv) {
                     automation.startRunning();
                 }
 
+                ImGui::Separator();
+                static char browsedPath[1024];
+                static std::string settingsFilePath = ".\settings.json";
+                ImGui::LabelText("Path", &settingsFilePath[0]);
+                if (ImGui::Button("Set settings file")) {
+                    if (SD_SaveFileDialog(browsedPath, "JSON\0SETTINGS.JSON\0")) {
+                        settingsFilePath = browsedPath;
+                    }
+                }
                 if (ImGui::Button("Export view settings")) {
-                    automation.exportSettings(app.viewer->getSettings(), "settings.json");
+                    automation.exportSettings(app.viewer->getSettings(), settingsFilePath.c_str());
                     app.messageBoxText = automation.getStatusMessage();
                     ImGui::OpenPopup("MessageBox");
                 }
