@@ -582,8 +582,8 @@ int main(int argc, char** argv) {
 
                 ImGui::Separator();
                 static char browsedPath[1024];
-                static std::string settingsFilePath = ".\settings.json";
-                ImGui::LabelText("Path", &settingsFilePath[0]);
+                static std::string settingsFilePath = "./settings.json";
+                ImGui::LabelText("Path", "%s", &settingsFilePath[0]);
                 if (ImGui::Button("Set settings file")) {
                     if (SD_SaveFileDialog(browsedPath, "JSON\0SETTINGS.JSON\0")) {
                         settingsFilePath = browsedPath;
