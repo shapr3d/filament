@@ -56,6 +56,7 @@ public:
 
     using CameraMovementSpeedUpdateCallback = std::function<void(float)>;
     CameraMovementSpeedUpdateCallback getCameraMovementSpeedUpdateCallback();
+    void setCameraFlightSpeedUpdateOnUICallback(std::function<void(float)>);
 
     using SetupCallback = std::function<void(filament::Engine*, filament::View*, filament::Scene*)>;
     using CleanupCallback =
@@ -249,6 +250,7 @@ private:
     float mCameraFocalLength = 28.0f;
 
     CameraMovementSpeedUpdateCallback mCameraMovementSpeedUpdateCallback = nullptr;
+    filament::camutils::Manipulator<float>::FlightSpeedModifiedCallback mFlightSpeedModifiedCallback = nullptr;
 };
 
 #endif // TNT_FILAMENT_SAMPLE_FILAMENTAPP_H

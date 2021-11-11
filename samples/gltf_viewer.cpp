@@ -510,6 +510,9 @@ int main(int argc, char** argv) {
         }
 
         app.viewer->setCameraMovementSpeedUpdateCallback(std::move(cameraMovementSpeedUpdateCallback));
+        FilamentApp::get().setCameraFlightSpeedUpdateOnUICallback([&app] (float value) {
+            app.viewer->updateCameraSpeedOnUI(value);
+        });
 
         app.materials = (app.materialSource == GENERATE_SHADERS) ?
                 createMaterialGenerator(engine) : createUbershaderLoader(engine);

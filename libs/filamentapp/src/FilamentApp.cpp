@@ -152,7 +152,10 @@ void FilamentApp::run(const Config& config, SetupCallback setupCallback,
     mCameraMovementSpeedUpdateCallback = [&window] (float speed) {
         window->mMainCameraMan->setFlightSpeed(speed);
     };
+
     setupCallback(mEngine, window->mMainView->getView(), mScene);
+
+    window->mMainCameraMan->setFlightSpeedModifiedCallback(mFlightSpeedModifiedCallback);
 
     if (imguiCallback) {
         mImGuiHelper = std::make_unique<ImGuiHelper>(mEngine, window->mUiView->getView(),
@@ -452,6 +455,10 @@ void FilamentApp::run(const Config& config, SetupCallback setupCallback,
 
 FilamentApp::CameraMovementSpeedUpdateCallback FilamentApp::getCameraMovementSpeedUpdateCallback() {
     return mCameraMovementSpeedUpdateCallback;
+}
+
+void FilamentApp::setCameraFlightSpeedUpdateOnUICallback(std::function<void(float)> callback) {
+    mFlightSpeedModifiedCallback = callback;
 }
 
 // RELATIVE_ASSET_PATH is set inside samples/CMakeLists.txt and used to support multi-configuration

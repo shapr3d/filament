@@ -57,7 +57,7 @@ public:
             resolved.flightPanSpeed = vec2(0.01, 0.01);
         }
         if (resolved.flightMaxSpeed == 0.0) {
-            resolved.flightMaxSpeed = 10.0;
+            resolved.flightMaxSpeed = 100.0;
         }
         if (resolved.flightSpeedSteps == 0) {
             resolved.flightSpeedSteps = 80;
@@ -118,6 +118,10 @@ public:
         // units per second.
         mScrollPositionNormalized = (mScrollWheel + halfSpeedSteps) / halfSpeedSteps - 1.0;
         mMoveSpeed = pow(Base::mProps.flightMaxSpeed, mScrollPositionNormalized);
+
+        if (Base::mFlightSpeedModifiedCallback) {
+            Base::mFlightSpeedModifiedCallback(mMoveSpeed);
+        }
     }
 
     void update(FLOAT deltaTime) override {
@@ -190,6 +194,10 @@ public:
 
     void setFlightSpeed(float speed) override {
         mMoveSpeed = speed;
+    }
+
+    FLOAT getFlightSpeed() override {
+        return mMoveSpeed;
     }
 
 private:

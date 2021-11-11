@@ -221,6 +221,8 @@ public:
     void generateDummyMaterial();
 
     void setCameraMovementSpeedUpdateCallback(std::function<void(float)>&& callback);
+
+    void updateCameraSpeedOnUI(float value);
 private:
     void updateIndirectLight();
 

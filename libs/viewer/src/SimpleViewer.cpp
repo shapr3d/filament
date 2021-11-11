@@ -1329,6 +1329,10 @@ void SimpleViewer::setCameraMovementSpeedUpdateCallback(std::function<void(float
     mCameraMovementSpeedUpdateCallback = std::move(callback);
 }
 
+void SimpleViewer::updateCameraSpeedOnUI(float value) {
+    mSettings.viewer.cameraMovementSpeed = value;
+}
+
 
 } // namespace viewer
 } // namespace filament

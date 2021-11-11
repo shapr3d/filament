@@ -320,6 +320,14 @@ void Manipulator<FLOAT>::update(FLOAT deltaTime) { }
 template <typename FLOAT>
 void Manipulator<FLOAT>::setFlightSpeed(float speed) { }
 
+template <typename FLOAT>
+FLOAT Manipulator<FLOAT>::getFlightSpeed() { return -1; }
+
+template <typename FLOAT>
+void Manipulator<FLOAT>::setFlightSpeedModifiedCallback(FlightSpeedModifiedCallback callback) {
+    mFlightSpeedModifiedCallback = callback;
+}
+
 template class Manipulator<float>;
 
 } // namespace camutils
