@@ -51,15 +51,24 @@
 using namespace filagui;
 using namespace filament::math;
 
+std::string g_ArtRootPathStr {};
+
 namespace filament {
 namespace viewer {
 
 // Taken from MeshAssimp.cpp
 static void loadTexture(Engine* engine, const std::string& filePath, Texture** map,
-    bool sRGB, bool hasAlpha) {
+    bool sRGB, bool hasAlpha, const std::string& artRootPathStr) {
+
+    std::cout << "Loading texture \"" << filePath << "\" relative to \"" << artRootPathStr << "\"" << std::endl;
 
     if (!filePath.empty()) {
         utils::Path path(filePath);
+        utils::Path artRootPath(artRootPathStr);
+        path = artRootPath + path;
+
+        std::cout << "\tResolved path: " << path.getPath() << std::endl;
+
         if (path.exists()) {
             int w, h, n;
             int numChannels = hasAlpha ? 4 : 3;
@@ -783,10 +792,10 @@ void SimpleViewer::updateUserInterface() {
                         auto textureEntry = mTextures.find(currentRequestedTexture.filename);
                         if (textureEntry == mTextures.end() ) {
                             mTextures[entityName] = nullptr;
-                            loadTexture(mEngine, currentRequestedTexture.filename, &mTextures[currentRequestedTexture.filename], currentRequestedTexture.isSrgb, currentRequestedTexture.isAlpha);
+                            loadTexture(mEngine, currentRequestedTexture.filename, &mTextures[currentRequestedTexture.filename], currentRequestedTexture.isSrgb, currentRequestedTexture.isAlpha, mSettings.viewer.artRootPath);
                         } else if (currentRequestedTexture.doRequestReload) {
                             if (mTextures[entityName] != nullptr) mEngine->destroy(mTextures[entityName]);
-                            loadTexture(mEngine, currentRequestedTexture.filename, &mTextures[currentRequestedTexture.filename], currentRequestedTexture.isSrgb, currentRequestedTexture.isAlpha);
+                            loadTexture(mEngine, currentRequestedTexture.filename, &mTextures[currentRequestedTexture.filename], currentRequestedTexture.isSrgb, currentRequestedTexture.isAlpha, mSettings.viewer.artRootPath);
                         }
 
                         currentRequestedTexture = tweaks.nextRequestedTexture();

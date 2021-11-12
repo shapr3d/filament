@@ -65,6 +65,8 @@ using namespace filament::viewer;
 using namespace gltfio;
 using namespace utils;
 
+extern std::string g_ArtRootPathStr;
+
 enum MaterialSource {
     GENERATE_SHADERS,
     LOAD_UBERSHADERS,
@@ -162,6 +164,15 @@ static void printUsage(char* name) {
 static std::ifstream::pos_type getFileSize(const char* filename) {
     std::ifstream in(filename, std::ifstream::ate | std::ifstream::binary);
     return in.tellg();
+}
+
+static std::optional<std::string> readEnvironmentVariable(std::string envVarName) {
+    char* var = std::getenv(envVarName.c_str());
+    if (var == nullptr) {
+        return std::nullopt;
+    } else {
+        return std::string(var);
+    }
 }
 
 static int handleCommandLineArguments(int argc, char* argv[], App* app) {
@@ -508,6 +519,26 @@ int main(int argc, char** argv) {
                 std::cerr << "Failed to load settings from " << app.settingsFile << std::endl;
             }
         }
+
+
+        bool didArtRootPathChange = false;
+        auto& artRootPathRef = app.viewer->getSettings().viewer.artRootPath;
+        std::cout << "Current art root path: \"" << artRootPathRef << "\"" << std::endl;
+        if (artRootPathRef.empty()) {
+            artRootPathRef = readEnvironmentVariable("SHAPR_ART_ROOT").value_or("");
+            didArtRootPathChange = !artRootPathRef.empty();
+            std::cout << "Art root path set to: \"" << artRootPathRef << "\"" << std::endl;
+        }
+        auto artRootOverride = readEnvironmentVariable("SHAPR_ART_ROOT_OVERRIDE");
+        if (artRootOverride) {
+            artRootPathRef = artRootOverride.value_or("");
+            didArtRootPathChange = !artRootPathRef.empty();
+            std::cout << "Override art root path to: \"" << artRootPathRef << "\"" << std::endl;
+        }
+        if (didArtRootPathChange && !app.settingsFile.empty()) {
+            app.automationEngine->exportSettings(app.viewer->getSettings(), app.settingsFile.c_str());
+        }
+        g_ArtRootPathStr = artRootPathRef;
 
         app.viewer->setCameraMovementSpeedUpdateCallback(std::move(cameraMovementSpeedUpdateCallback));
         FilamentApp::get().setCameraFlightSpeedUpdateOnUICallback([&app] (float value) {

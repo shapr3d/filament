@@ -10,6 +10,8 @@
 #include <viewer/CustomFileDialogs.h>
 //#include <filagui/imfilebrowser.h>
 
+#include <utils/Path.h>
+
 #include <math/mat4.h>
 #include <math/vec3.h>
 
@@ -17,6 +19,9 @@
 #include <functional>
 #include <string>
 #include <type_traits>
+
+// This is really nasty, instantiated in SimpleViewer.cpp
+extern std::string g_ArtRootPathStr;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 // Common constants for tweakable properties
@@ -74,7 +79,8 @@ struct TweakableProperty {
                 ImGui::LabelText("Filename", &filename[0]);
                 std::string loadTextureLabel = std::string("Load##") + label;
                 if (ImGui::Button(loadTextureLabel.c_str()) && SD_OpenFileDialog(fileDialogResult)) {
-                    filename = fileDialogResult;
+                    utils::Path fileDialogPath(fileDialogResult);
+                    filename = fileDialogPath.makeRelativeTo(g_ArtRootPathStr);
                 }
 
                 if (filename != "") {

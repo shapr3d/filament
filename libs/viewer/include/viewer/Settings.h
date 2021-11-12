@@ -178,6 +178,7 @@ struct ViewerOptions {
     bool autoScaleEnabled = true;
 
     float cameraMovementSpeed = 5.0f;
+    std::string artRootPath;
 };
 
 struct Settings {

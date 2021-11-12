@@ -19,6 +19,7 @@
 #include <sstream>
 #include <ostream>
 #include <iterator>
+#include <deque>
 
 #if defined(WIN32)
 #   include <utils/compiler.h>
@@ -114,6 +115,34 @@ bool Path::isAbsolute() const {
     return !isEmpty() && m_path.front() == '/';
 }
 #endif
+
+Path Path::makeRelativeTo(const Path& path) const {
+    auto thisSplitVec = split();
+    auto baseSplitVec = path.split();
+
+    std::deque<std::string> thisSplit = std::deque<std::string>(thisSplitVec.cbegin(), thisSplitVec.cend());
+    std::deque<std::string> baseSplit = std::deque<std::string>(baseSplitVec.cbegin(), baseSplitVec.cend());
+
+    while (thisSplit.front() == baseSplit.front() && !thisSplit.empty() && !baseSplit.empty()) {
+        thisSplit.pop_front();
+        baseSplit.pop_front();
+    }
+
+    std::vector<std::string> resultElements {"."};
+
+    while (!baseSplit.empty()) {
+        resultElements.push_back("..");
+        baseSplit.pop_front();
+    }
+
+    std::copy(thisSplit.cbegin(), thisSplit.cend(), std::back_inserter(resultElements));
+
+    std::stringstream resultPath;
+    std::copy(resultElements.begin(), resultElements.end() - 1,
+              std::ostream_iterator<std::string>(resultPath, SEPARATOR_STR));
+
+    return resultPath.str() + resultElements.back();
+}
 
 Path Path::getParent() const {
     if (isEmpty()) return "";
