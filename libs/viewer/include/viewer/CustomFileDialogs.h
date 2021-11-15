@@ -4,3 +4,5 @@ static const char* kTextureDialogFilter = "All\0*.*\0Jpg\0*.JPG\0Png\0*.PNG\0Tga
 
 bool SD_OpenFileDialog(char* browsedFile, const char* formats = kTextureDialogFilter);
 bool SD_SaveFileDialog(char* browsedFile, const char* formats = kTextureDialogFilter);
+
+bool SD_OpenFolderDialog(char* browsedFile);

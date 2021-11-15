@@ -545,6 +545,10 @@ int main(int argc, char** argv) {
             app.viewer->updateCameraSpeedOnUI(value);
         });
 
+        app.viewer->mDoSaveSettings = [&app]() {
+            app.automationEngine->exportSettings(app.viewer->getSettings(), app.settingsFile.c_str());
+        };
+
         app.materials = (app.materialSource == GENERATE_SHADERS) ?
                 createMaterialGenerator(engine) : createUbershaderLoader(engine);
         app.assetLoader = AssetLoader::create({engine, app.materials, app.names });

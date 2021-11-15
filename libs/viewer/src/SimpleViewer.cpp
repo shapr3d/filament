@@ -1311,6 +1311,23 @@ void SimpleViewer::updateUserInterface() {
     }
 
     {
+        // Art root directory display
+        ImGui::Separator();
+        ImGui::Text("Art root: %s", mSettings.viewer.artRootPath.empty() ? "<none>" : mSettings.viewer.artRootPath.c_str());
+        char tempArtRootPath[1024];
+        if (ImGui::Button("Set art root") && mDoSaveSettings && SD_OpenFolderDialog(&tempArtRootPath[0])) {
+            utils::Path tempPath = tempArtRootPath;
+            if (tempPath.exists()) {
+                mSettings.viewer.artRootPath = tempPath.c_str();
+                mDoSaveSettings();
+            }
+            else {
+                // error
+            }
+        }
+    }
+
+    {
         // Hotkey-related feedback UI
         ImGui::Separator();
         ImGui::Text("Entity material to save: %s", mLastSavedEntityName.empty() ? "<none>" : mLastSavedEntityName.c_str());

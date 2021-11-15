@@ -319,6 +319,8 @@ public:
             return false;
         };
     }
+
+    std::function<void(void)> mDoSaveSettings{};
 };
 
 filament::math::mat4f fitIntoUnitCube(const filament::Aabb& bounds, float zoffset);

@@ -2,6 +2,7 @@
 
 #if defined( WIN32 )
 #include <Windows.h>
+#include <ShlObj_core.h>
 #include <cstring>
 #else // defined( WIN32 )
 #endif
@@ -62,6 +63,23 @@ bool SD_SaveFileDialog(char* browsedFile, const char* formats) {
     return result;
 }
 
+bool SD_OpenFolderDialog(char* browsedFile) {
+    BROWSEINFO browseInfo;
+    ZeroMemory(&browseInfo, sizeof(BROWSEINFO));
+
+    auto result = SHBrowseForFolder(&browseInfo);
+    if (result) {
+        if (SHGetPathFromIDList(result, browsedFile)) {
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    return false;
+}
+
 #else // defined( WIN32 )
 
 #include <viewer/MacosCustomFileDialogs.h>
@@ -72,6 +90,10 @@ bool SD_OpenFileDialog(char* browsedFile, const char* formats) {
 
 bool SD_SaveFileDialog(char* browsedFile, const char* formats) {
     return SD_MacSaveFileDialog(browsedFile, formats);
+}
+
+bool SD_OpenFolderDialog(char* browsedFile) {
+    return false;
 }
 
 #endif
