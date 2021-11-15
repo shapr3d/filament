@@ -137,10 +137,9 @@ Path Path::makeRelativeTo(const Path& path) const {
 
     std::vector<std::string> resultElements {"."};
 
-    bool skipDriveLetterOnWindows = false;
     while (!baseSplit.empty()) {
         if (std::isalpha(baseSplit.front()[0]) && std::isupper(baseSplit.front()[0]) && (baseSplit.front()[1] == ':')) {
-            skipDriveLetterOnWindows = true;
+            baseSplit.pop_front();
             continue;
         }
         resultElements.push_back("..");
@@ -159,7 +158,8 @@ Path Path::makeRelativeTo(const Path& path) const {
     std::copy(resultElements.begin(), resultElements.end() - 1,
               std::ostream_iterator<std::string>(resultPath, SEPARATOR_STR));
 
-    return resultPath.str() + resultElements.back();
+    auto finalResult = resultPath.str() + resultElements.back();
+    return finalResult;
 }
 
 Path Path::getParent() const {
@@ -289,9 +289,11 @@ std::string Path::getCanonicalPath(const std::string& path) {
             if (segments.back().empty()) { // ignore if .. follows initial /
                 continue;
             }
-            if (segments.back() != "..") {
+            if (segments.back() != ".." && segments.back() != ".") {
                 segments.pop_back();
                 continue;
+            } else if (segments.back() == ".") {
+                segments.pop_back();
             }
         }
 
