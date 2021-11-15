@@ -22,6 +22,7 @@
 #include <deque>
 
 #if defined(WIN32)
+#   include <assert.h>
 #   include <utils/compiler.h>
 #   include <utils/win32/stdtypes.h>
 #   define SEPARATOR '\\'
@@ -123,19 +124,36 @@ Path Path::makeRelativeTo(const Path& path) const {
     std::deque<std::string> thisSplit = std::deque<std::string>(thisSplitVec.cbegin(), thisSplitVec.cend());
     std::deque<std::string> baseSplit = std::deque<std::string>(baseSplitVec.cbegin(), baseSplitVec.cend());
 
-    while (thisSplit.front() == baseSplit.front() && !thisSplit.empty() && !baseSplit.empty()) {
+#ifdef WIN32
+    // Having ':' as second char of first path element implies the first char must match
+    // aka if both paths are absolute, then they must point to the same drive
+    assert(!(thisSplit.front()[1] == ':' && thisSplit.front()[1] == baseSplit.front()[1]) || thisSplit.front()[0] == baseSplit.front()[0]);
+#endif
+
+    while (!thisSplit.empty() && !baseSplit.empty() && thisSplit.front() == baseSplit.front()) {
         thisSplit.pop_front();
         baseSplit.pop_front();
     }
 
     std::vector<std::string> resultElements {"."};
 
+    bool skipDriveLetterOnWindows = false;
     while (!baseSplit.empty()) {
+        if (std::isalpha(baseSplit.front()[0]) && std::isupper(baseSplit.front()[0]) && (baseSplit.front()[1] == ':')) {
+            skipDriveLetterOnWindows = true;
+            continue;
+        }
         resultElements.push_back("..");
         baseSplit.pop_front();
     }
 
-    std::copy(thisSplit.cbegin(), thisSplit.cend(), std::back_inserter(resultElements));
+#ifdef WIN32
+    const uint8_t skipFirstItem = std::isalpha(thisSplit.front()[0]) && std::isupper(thisSplit.front()[0]) && (thisSplit.front()[1] == ':');
+#else
+    const uint8_t skipFirstItem = 0;
+#endif
+
+    std::copy(thisSplit.cbegin() + skipFirstItem, thisSplit.cend(), std::back_inserter(resultElements));
 
     std::stringstream resultPath;
     std::copy(resultElements.begin(), resultElements.end() - 1,
