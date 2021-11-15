@@ -93,7 +93,7 @@ bool SD_SaveFileDialog(char* browsedFile, const char* formats) {
 }
 
 bool SD_OpenFolderDialog(char* browsedFile) {
-    return false;
+    return SD_MacOpenFileDialog(browsedFile, nullptr, true);;
 }
 
 #endif

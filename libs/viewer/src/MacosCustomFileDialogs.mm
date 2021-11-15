@@ -53,12 +53,18 @@ static NSArray<UTType*>* ConvertFormatsToUTI(const char* formats)
     return result;
 }
 
-bool SD_MacOpenFileDialog(char* browsedFile, const char* formats) {
+bool SD_MacOpenFileDialog(char* browsedFile, const char* formats, bool folderOnly) {
     NSOpenPanel* openPanel = [NSOpenPanel openPanel];
-    if (@available(macOS 11.0, *)) {
-        openPanel.allowedContentTypes = ConvertFormatsToUTI(formats);
-    } else {
-        openPanel.allowedFileTypes = GetExtensionsFromFormatString(formats);
+
+    openPanel.canChooseDirectories = folderOnly ? YES : NO;
+    openPanel.canChooseFiles = !folderOnly ? YES : NO;
+
+    if (!folderOnly) {
+        if (@available(macOS 11.0, *)) {
+            openPanel.allowedContentTypes = ConvertFormatsToUTI(formats);
+        } else {
+            openPanel.allowedFileTypes = GetExtensionsFromFormatString(formats);
+        }
     }
     NSModalResponse response = [openPanel runModal];
     
