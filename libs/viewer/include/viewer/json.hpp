@@ -21336,7 +21336,11 @@ class basic_json // NOLINT(cppcoreguidelines-special-member-functions,hicpp-spec
         if (JSON_HEDLEY_LIKELY(is_object()))
         {
             JSON_ASSERT(m_value.object->find(key) != m_value.object->end());
-            return m_value.object->find(key)->second;
+            if (m_value.object->find(key) != m_value.object->end()) {
+                return m_value.object->find(key)->second;
+            } else {
+                JSON_THROW(invalid_iterator::create(999, "key not found: " + std::string(key), *this));
+            }
         }
 
         JSON_THROW(type_error::create(305, "cannot use operator[] with a string argument with " + std::string(type_name()), *this));

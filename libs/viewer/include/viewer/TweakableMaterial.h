@@ -138,4 +138,24 @@ private:
             item.filename.clear();
         }
     }
+
+    template< typename T, bool IsColor = false, typename = IsValidTweakableType<T> >
+    void readValueFromJson(const json& source, const std::string& prefix, TweakableProperty<T, false, IsColor>& item, const T defaultValue = T()) {
+        try {
+            item.value = source[prefix];
+        } catch (...) {
+            std::cout << "Material file did not have attribute '" << prefix << "'. Using default (" << defaultValue << ") instead." << std::endl;
+            item.value = defaultValue;
+        }
+    }
+
+    template< typename T, bool IsColor = false, typename = IsValidTweakableType<T> >
+    void readValueFromJson(const json& source, const std::string& prefix, T& item, const T defaultValue = T()) {
+        try {
+            item = source[prefix];
+        } catch (...) {
+            std::cout << "Material file did not have attribute '" << prefix << "'. Using default (" << defaultValue << ") instead." << std::endl;
+            item = defaultValue;
+        }
+    }
 };
