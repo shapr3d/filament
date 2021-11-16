@@ -126,7 +126,7 @@ void TweakableMaterial::drawUI() {
         mRoughness.addWidget("roughness");
         if (mRoughness.isFile) enqueueTextureRequest(mRoughness);
 
-        mSpecularIntensity.addWidget("specular intensity");
+        mSpecularIntensity.addWidget("specular intensity", 0.0f, 3.0f);
 
         mMetallic.addWidget("metallic");
         if (mMetallic.isFile) enqueueTextureRequest(mMetallic);
