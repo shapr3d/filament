@@ -81,30 +81,92 @@ void TweakableMaterial::fromJson(const json& source) {
 
         readTexturedFromJson(source, "metallic", mMetallic);
 
-        mClearCoat.value = source["clearCoat"];
+        try {
+            mClearCoat.value = source["clearCoat"];
+        }
+        catch (...) {
+            std::cout << "Material file did not have a clear coat attribute. Using default (0.0f) instead.\n";
+            mClearCoat.value = 0.0f;
+        }
 
         readTexturedFromJson(source, "clearCoatNormal", mClearCoatNormal);
 
         readTexturedFromJson(source, "clearCoatRoughness", mClearCoatRoughness);
 
-        mBaseTextureScale = source["baseTextureScale"];
-        mNormalTextureScale = source["normalTextureScale"];
-        mClearCoatTextureScale = source["clearCoatTextureScale"];
-        mRefractiveTextureScale = source["refractiveTextureScale"];
-        mSpecularIntensity.value = source["reflectanceScale"];
+        try {
+            mBaseTextureScale = source["baseTextureScale"];
+        } catch (...) {
+            std::cout << "Material file did not have a baseTextureScale attribute. Using default (1.0f) instead.\n";
+            mBaseTextureScale = 1.0f;
+        }
+        try {
+            mNormalTextureScale = source["normalTextureScale"];
+        } catch (...) {
+            std::cout << "Material file did not have a normalTextureScale attribute. Using default (1.0f) instead.\n";
+            mNormalTextureScale = 1.0f;
+        }
+        try {
+            mClearCoatTextureScale = source["clearCoatTextureScale"];
+        } catch (...) {
+            std::cout << "Material file did not have a clearCoatTextureScale attribute. Using default (1.0f) instead.\n";
+            mClearCoatTextureScale = 1.0f;
+        }
+        try {
+            mRefractiveTextureScale = source["refractiveTextureScale"];
+        } catch (...) {
+            std::cout << "Material file did not have a refractiveTextureScale attribute. Using default (1.0f) instead.\n";
+            mRefractiveTextureScale = 1.0f;
+        }
+        try {
+            mSpecularIntensity.value = source["reflectanceScale"];
+        } catch (...) {
+            std::cout << "Material file did not have a specular intensity attribute. Using default (1.0f) instead.\n";
+            mSpecularIntensity.value = 1.0f;
+        }
 
-        mAnisotropy.value = source["anisotropy"];
-        mAnisotropyDirection.value = source["anisotropyDirection"];
+        try {
+            mAnisotropy.value = source["anisotropy"];
+        } catch (...) {
+            std::cout << "Material file did not have an anisotropy attribute. Using default (0.0f) instead.\n";
+            mAnisotropy.value = 0.0f;
+        }
+        try {
+            mAnisotropyDirection.value = source["anisotropyDirection"];
+        } catch (...) {
+            std::cout << "Material file did not have an anisotropy direction attribute. Using default ({ 1.0f, 0.0f, 0.0f }) instead.\n";
+            mAnisotropyDirection.value = { 1.0f, 0.0f, 0.0f };
+        }
 
         readTexturedFromJson(source, "sheenRoughness", mSheenRoughness);
-        mSheenColor.value = source["sheenColor"];
+        try {
+            mSheenColor.value = source["sheenColor"];
+        }
+        catch (...) {
+            std::cout << "Material file did not have a sheen color attribute. Using default ({ 0.0f, 0.0f, 0.0f }) instead.\n";
+            mSheenColor.value = { 0.0f, 0.0f, 0.0f };
+        }
 
-        mAbsorption.value = source["absorption"];
-        mIorScale.value = source["iorScale"];
+        try {
+            mAbsorption.value = source["absorption"];
+        } catch (...) {
+            std::cout << "Material file did not have an absorption attribute. Using default ({ 0.0f, 0.0f, 0.0f }) instead.\n";
+            mAbsorption.value = { 0.0f, 0.0f, 0.0f };
+        }
+        try {
+            mIorScale.value = source["iorScale"];
+        } catch (...) {
+            std::cout << "Material file did not have an IOR scale attribute. Using default (1.0f) instead.\n";
+            mIorScale.value = 1.0f;
+        }
         readTexturedFromJson(source, "ior", mIor);
         readTexturedFromJson(source, "thickness", mThickness);
         readTexturedFromJson(source, "transmission", mTransmission);
-        mMaxThickness.value = source["maxThickness"];
+        try {
+            mMaxThickness.value = source["maxThickness"];
+        } catch (...) {
+            std::cout << "Material file did not have a max thickness attribute. Using default (1.0f) instead.\n";
+            mMaxThickness.value = 1.0f;
+        }
     }
     catch (...) {
         std::cout << "Could not load material file.\n";

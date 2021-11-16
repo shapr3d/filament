@@ -8,6 +8,7 @@
 #include <viewer/json.hpp>
 #include <vector>
 #include <string>
+#include <iostream>
 
 // The following template specializations have to be defined under the nlohmann namespace
 namespace nlohmann {
@@ -124,10 +125,17 @@ private:
 
     template< typename T, bool MayContainFile = false, bool IsColor = true, typename = IsValidTweakableType<T> >
     void readTexturedFromJson(const json& source, const std::string& prefix, TweakableProperty<T, MayContainFile, IsColor>& item) {
-        item.value = source[prefix];
-        item.isFile = source[prefix + "IsFile"];
-        item.filename = source[prefix + "Texture"];
-        item.doRequestReload = true;
-        if (item.isFile) enqueueTextureRequest(item.filename, item.doRequestReload);
+        try {
+            item.value = source[prefix];
+            item.isFile = source[prefix + "IsFile"];
+            item.filename = source[prefix + "Texture"];
+            item.doRequestReload = true;
+            if (item.isFile) enqueueTextureRequest(item.filename, item.doRequestReload);
+        } catch (...) {
+            std::cout << "Unable to read textured property '" << prefix << "', reverting to default value without texture." << std::endl;
+            item.value = T();
+            item.isFile = false;
+            item.filename.clear();
+        }
     }
 };
