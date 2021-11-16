@@ -926,6 +926,7 @@ void SimpleViewer::updateUserInterface() {
 
                     matInstance->setParameter("normalScale", tweaks.mNormalIntensity.value);
                     setTextureIfPresent(tweaks.mNormal.isFile, tweaks.mNormal.filename, "normal");
+                    matInstance->setParameter("roughnessScale", tweaks.mRoughnessScale.value);
                     setTextureIfPresent(tweaks.mRoughness.isFile, tweaks.mRoughness.filename, "roughness");
                     setTextureIfPresent(tweaks.mMetallic.isFile, tweaks.mMetallic.filename, "metallic");
 
@@ -936,7 +937,12 @@ void SimpleViewer::updateUserInterface() {
 
                     matInstance->setParameter("textureScaler", math::float4(tweaks.mBaseTextureScale, tweaks.mNormalTextureScale, tweaks.mClearCoatTextureScale, tweaks.mRefractiveTextureScale));
                     matInstance->setParameter("specularIntensity", tweaks.mSpecularIntensity.value);
-                    matInstance->setParameter("albedo", tweaks.mBaseColor.value);
+                    math::float4 gammaBaseColor{}; 
+                    gammaBaseColor.r = std::pow(tweaks.mBaseColor.value.r, 2.22f); 
+                    gammaBaseColor.g = std::pow(tweaks.mBaseColor.value.g, 2.22f);
+                    gammaBaseColor.b = std::pow(tweaks.mBaseColor.value.b, 2.22f);
+                    gammaBaseColor.a = tweaks.mBaseColor.value.a;
+                    matInstance->setParameter("albedo", gammaBaseColor);
                     matInstance->setParameter("roughness", tweaks.mRoughness.value);
                     matInstance->setParameter("clearCoat", tweaks.mClearCoat.value);
                     matInstance->setParameter("metallic", tweaks.mMetallic.value);

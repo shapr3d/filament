@@ -145,6 +145,10 @@ material {
         {
             type : float3,
             name : sheenColor
+        },
+        {
+            type : float,
+            name : roughnessScale
         }
     ]
 }
@@ -289,6 +293,7 @@ fragment {
         } else {
             material.roughness = materialParams.roughness;
         }
+        material.roughness *= materialParams.roughnessScale;
 
         // Careful: reflectance affects non-metals, so this can make things overly shiny
         material.reflectance = clamp( 1.0 - material.roughness, 0.0, 1.0 );
