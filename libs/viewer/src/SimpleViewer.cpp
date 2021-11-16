@@ -926,6 +926,7 @@ void SimpleViewer::updateUserInterface() {
 
                     matInstance->setParameter("normalScale", tweaks.mNormalIntensity.value);
                     setTextureIfPresent(tweaks.mNormal.isFile, tweaks.mNormal.filename, "normal");
+                    matInstance->setParameter("roughnessScale", tweaks.mRoughnessScale.value);
                     setTextureIfPresent(tweaks.mRoughness.isFile, tweaks.mRoughness.filename, "roughness");
                     setTextureIfPresent(tweaks.mMetallic.isFile, tweaks.mMetallic.filename, "metallic");
 

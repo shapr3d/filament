@@ -179,6 +179,10 @@ material {
         {
             type : float3,
             name : absorption
+        },
+        {
+            type : float,
+            name : roughnessScale
         }
     ]
 }
@@ -329,6 +333,7 @@ fragment {
         } else {
             material.roughness = materialParams.roughness;
         }
+        material.roughness *= materialParams.roughnessScale;
 
         // TODO @gvalasek: see as above, technically all this should have been a single fetch
         if ( materialParams.useMetallicTexture == 1 ) {

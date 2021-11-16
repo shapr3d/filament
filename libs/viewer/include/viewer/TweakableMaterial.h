@@ -73,7 +73,8 @@ public:
     TweakablePropertyTextured<filament::math::float4> mBaseColor{ {0.0f, 0.0f, 0.0f, 1.0f} };
 
     TweakablePropertyTextured<float, false> mNormal{};
-    TweakablePropertyTextured<float> mRoughness{};
+    TweakableProperty<float> mRoughnessScale{};
+    TweakablePropertyTextured<float> mRoughness;
     TweakablePropertyTextured<float> mMetallic{};
 
     TweakableProperty<float> mClearCoat{};

@@ -7,6 +7,7 @@ TweakableMaterial::TweakableMaterial() {
     mIor.value = 1.5f;
     mIorScale.value = 1.0f;
     mNormalIntensity.value = 1.0f;
+    mRoughnessScale.value = 1.0f;
 }
 
 json TweakableMaterial::toJson() {
@@ -20,6 +21,7 @@ json TweakableMaterial::toJson() {
 
     writeTexturedToJson(result, "normalTexture", mNormal);
 
+    result["roughnessScale"] = mRoughnessScale.value;
     writeTexturedToJson(result, "roughness", mRoughness);
 
     writeTexturedToJson(result, "metallic", mMetallic);
@@ -67,6 +69,13 @@ void TweakableMaterial::fromJson(const json& source) {
         }
 
         readTexturedFromJson(source, "normalTexture", mNormal);
+
+        try {
+            mRoughnessScale.value = source["roughnessScale"];
+        } catch (...) {
+            std::cout << "Material file did not have roughness scale attribute. Using default instead.\n";
+            mRoughnessScale.value = 1.0f;
+        }
 
         readTexturedFromJson(source, "roughness", mRoughness);
 
@@ -122,6 +131,8 @@ void TweakableMaterial::drawUI() {
         
         mNormal.addWidget("normal");
         if (mNormal.isFile) enqueueTextureRequest(mNormal);
+
+        mRoughnessScale.addWidget("roughness scale");
 
         mRoughness.addWidget("roughness");
         if (mRoughness.isFile) enqueueTextureRequest(mRoughness);
