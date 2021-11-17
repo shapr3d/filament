@@ -226,6 +226,7 @@ public:
 private:
     void updateIndirectLight();
 
+    void quickLoad();
     void undoLastModification();
     //void redoLastModification();
 
@@ -299,6 +300,10 @@ private:
             return keyCode == 's' && (modState & MOD_FOR_HOTKEYS);
         }
 
+        static bool shouldQuickLoadOnKeyDownEvent(int keyCode, uint16_t modState) {
+            return keyCode == 'l' && (modState & MOD_FOR_HOTKEYS);
+        }
+
         static bool shouldUndoOnKeyDownEvent(int keyCode, uint16_t modState) {
             return keyCode == 'z' && (modState & MOD_FOR_HOTKEYS);
         }
@@ -313,8 +318,8 @@ public:
                     saveTweaksToFile(&mTweakedMaterials[mLastSavedEntityName], mLastSavedFileName.c_str());
                 }
                 return true;
-            } else if (SimpleViewerInputPredicates::shouldUndoOnKeyDownEvent(keyCode, modState)) {
-                undoLastModification();
+            } else if (SimpleViewerInputPredicates::shouldQuickLoadOnKeyDownEvent(keyCode, modState)) {
+                quickLoad();
                 return true;
             }
             return false;

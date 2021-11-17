@@ -1362,8 +1362,12 @@ void SimpleViewer::updateUserInterface() {
 }
 
 // This loads the last saved (or loaded) material from file, to its entity
-void SimpleViewer::undoLastModification() {
+void SimpleViewer::quickLoad() {
     loadTweaksFromFile(mLastSavedEntityName, mLastSavedFileName);
+}
+
+void SimpleViewer::undoLastModification() {
+    // TODO implement
 }
 
 void SimpleViewer::updateCameraMovementSpeed() {
