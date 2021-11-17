@@ -233,6 +233,7 @@ private:
     std::function<void(float)> mCameraMovementSpeedUpdateCallback;
 
     void saveTweaksToFile(TweakableMaterial* tweaks, const char* filePath);
+    void loadTweaksFromFile(const std::string& entityName, const std::string& filePath);
 
     // Immutable properties set from the constructor.
     filament::Engine* const mEngine;

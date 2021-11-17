@@ -645,6 +645,22 @@ void SimpleViewer::saveTweaksToFile(TweakableMaterial *tweaks, const char *fileP
     outFile.close();
 }
 
+
+void SimpleViewer::loadTweaksFromFile(const std::string& entityName, const std::string& filePath) {
+    auto entityMaterial = mTweakedMaterials.find(entityName);
+    if (entityMaterial == mTweakedMaterials.end()) {
+        std::cout << "Cannot quick load material '" << filePath << "' for entity '" << entityName << "'" << std::endl;
+        return;
+    }
+    TweakableMaterial& tweaks = entityMaterial->second;
+
+    std::fstream inFile(filePath, std::ios::binary | std::ios::in);
+    nlohmann::json js{};
+    inFile >> js;
+    inFile.close();
+    tweaks.fromJson(js);
+}
+
 void SimpleViewer::updateUserInterface() {
     using namespace filament;
 
@@ -1345,8 +1361,9 @@ void SimpleViewer::updateUserInterface() {
     updateIndirectLight();
 }
 
+// This loads the last saved (or loaded) material from file, to its entity
 void SimpleViewer::undoLastModification() {
-    // TODO
+    loadTweaksFromFile(mLastSavedEntityName, mLastSavedFileName);
 }
 
 void SimpleViewer::updateCameraMovementSpeed() {
