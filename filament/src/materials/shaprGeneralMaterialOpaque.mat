@@ -275,6 +275,12 @@ fragment {
         // By this time the normal should be ready, it is safe to apply the normal scale
         material.normal.xy *= materialParams.normalScale;
 
+        // Clear coat normals
+        if ( materialParams.useClearCoatNormalTexture == 1 ) {
+            vec3 clearCoatNormalWS = triplanarNormalMap( materialParams_clearCoatNormalTexture, materialParams.textureScaler.z, pos, normal );
+            material.clearCoatNormal = clearCoatNormalWS * getWorldTangentFrame();
+        }
+
         // Let Filament compute the global shading parameters. Note that material.normal stays in tangent space. Its world space coordinates
         // are stored in the global variable shading_normal.
         prepareMaterial(material);
@@ -312,10 +318,6 @@ fragment {
             material.clearCoatRoughness = triplanarTexture(materialParams_clearCoatRoughnessTexture, materialParams.textureScaler.z, pos, normal).r;
         } else {
             material.clearCoatRoughness = materialParams.clearCoatRoughness;
-        }
-
-        if ( materialParams.useClearCoatNormalTexture == 1 ) {
-            material.clearCoatNormal = triplanarNormalMap( materialParams_clearCoatNormalTexture, materialParams.textureScaler.z, pos, normal );
         }
 
         //--------

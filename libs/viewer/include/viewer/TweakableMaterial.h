@@ -79,7 +79,7 @@ public:
     TweakablePropertyTextured<float> mMetallic{};
 
     TweakableProperty<float> mClearCoat{};
-    TweakablePropertyTextured<float> mClearCoatNormal{};
+    TweakablePropertyTextured<float, false> mClearCoatNormal{};
     TweakablePropertyTextured<float> mClearCoatRoughness{};
 
     std::vector< RequestedTexture > mRequestedTextures{};
