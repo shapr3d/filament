@@ -311,6 +311,9 @@ fragment {
         // By this time the normal should be ready, it is safe to apply the normal scale
         material.normal.xy *= materialParams.normalScale;
 
+        // Clear coat normals
+        // Filament material docs state normals should be set _before_ calling prepareMaterial,
+        //   turns out this is also required for clear coat normals
         if ( materialParams.useClearCoatNormalTexture == 1 ) {
             vec3 clearCoatNormalWS = triplanarNormalMap( materialParams_clearCoatNormalTexture, materialParams.textureScaler.z, pos, normal );
             material.clearCoatNormal = clearCoatNormalWS * getWorldTangentFrame();
