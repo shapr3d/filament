@@ -65,6 +65,10 @@ static void loadTexture(Engine* engine, const std::string& filePath, Texture** m
     if (!filePath.empty()) {
         utils::Path path(filePath);
         utils::Path artRootPath(artRootPathStr);
+        if (path.isAbsolute() && !artRootPath.isEmpty()) {
+            std::cout << "Texture path is absolutte. Making it relative to '" << artRootPathStr << "'" << std::endl;
+            path.makeRelativeTo(artRootPath);
+        }
         path = artRootPath + path;
 
         std::cout << "\tResolved path: " << path.getPath() << std::endl;
