@@ -118,7 +118,7 @@ void TweakableMaterial::drawUI() {
         mNormal.addWidget("normal");
         if (mNormal.isFile) enqueueTextureRequest(mNormal);
 
-        mRoughnessScale.addWidget("roughness scale");
+        mRoughnessScale.addWidget("roughness scale", 0.0f, 3.0f);
 
         mRoughness.addWidget("roughness");
         if (mRoughness.isFile) enqueueTextureRequest(mRoughness);
