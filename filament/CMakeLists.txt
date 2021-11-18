@@ -165,6 +165,8 @@ set(MATERIAL_SRCS
         src/materials/shaprGeneralMaterialOpaque.mat
         src/materials/shaprGeneralMaterialTransparentSolid.mat
         src/materials/shaprGeneralMaterialTransparentThin.mat
+        src/materials/shaprGeneralMaterialSubsurface.mat
+        src/materials/shaprGeneralMaterialCloth.mat
         src/materials/dof/dof.mat
         src/materials/dof/dofCoc.mat
         src/materials/dof/dofDownsample.mat

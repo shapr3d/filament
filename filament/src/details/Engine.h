@@ -400,7 +400,7 @@ private:
     Epoch mEngineEpoch;
 
     mutable FMaterial const* mDefaultMaterial = nullptr;
-    mutable FMaterial const* mShaprGeneralMaterials[3]{};
+    mutable FMaterial const* mShaprGeneralMaterials[5]{};
     mutable FMaterial const* mSkyboxMaterial = nullptr;
 
     mutable FTexture* mDefaultIblTexture = nullptr;

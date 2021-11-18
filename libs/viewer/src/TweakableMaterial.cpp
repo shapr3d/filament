@@ -44,6 +44,8 @@ json TweakableMaterial::toJson() {
     result["anisotropyDirection"] = mAnisotropyDirection.value;
 
     result["sheenColor"] = mSheenColor.value;
+    result["subsurfaceColor"] = mSubsurfaceColor.value;
+    result["subsurfacePower"] = mSubsurfacePower.value;
     writeTexturedToJson(result, "sheenRoughness", mSheenRoughness);
 
     // Transparent and refractive attributes
@@ -88,6 +90,8 @@ void TweakableMaterial::fromJson(const json& source) {
 
         readTexturedFromJson(source, "sheenRoughness", mSheenRoughness);
         readValueFromJson<filament::math::float3, true>(source, "sheenColor", mSheenColor, { 0.0f, 0.0f, 0.0f });
+        readValueFromJson<filament::math::float3, true>(source, "subsurfaceColor", mSubsurfaceColor, { 0.0f, 0.0f, 0.0f });        
+        readValueFromJson(source, "subsurfacePower", mSubsurfacePower.value, 1.0f);
 
         readValueFromJson<filament::math::float3, true>(source, "absorption", mAbsorption, { 0.0f, 0.0f, 0.0f });
         readValueFromJson(source, "iorScale", mIorScale, 1.0f);
@@ -129,8 +133,10 @@ void TweakableMaterial::drawUI() {
 
         mSpecularIntensity.addWidget("specular intensity", 0.0f, 3.0f);
 
-        mMetallic.addWidget("metallic");
-        if (mMetallic.isFile) enqueueTextureRequest(mMetallic);
+        if (mMaterialType != MaterialType::Cloth) {
+            mMetallic.addWidget("metallic");
+            if (mMetallic.isFile) enqueueTextureRequest(mMetallic);
+        }
 
         mOcclusion.addWidget("occlusion");
         if (mOcclusion.isFile) enqueueTextureRequest(mOcclusion);
@@ -149,19 +155,20 @@ void TweakableMaterial::drawUI() {
         if (mClearCoatRoughness.isFile) enqueueTextureRequest(mClearCoatRoughness);
     }
 
-    if (ImGui::CollapsingHeader("Cloth (sheen, etc.) settings")) {
-        mSheenColor.addWidget("sheen color");
+    switch (mMaterialType) {
+    case MaterialType::Opaque: {
+        if (ImGui::CollapsingHeader("Sheen settings")) {
+            mSheenColor.addWidget("sheen color");
+        }
 
-        mSheenRoughness.addWidget("sheen roughness");
-        if (mSheenRoughness.isFile) enqueueTextureRequest(mSheenRoughness);
-    }
-
-    if (mMaterialType == MaterialType::Opaque) {
         if (ImGui::CollapsingHeader("Metal (anisotropy, etc.) settings")) {
             mAnisotropy.addWidget("anisotropy", -1.0f, 1.0f);
             mAnisotropyDirection.addWidget("anisotropy direction", -1.0f, 1.0f);
         }
-    } else { 
+        break;
+    }
+    case MaterialType::TransparentSolid:
+    case MaterialType::TransparentThin: {
         if (ImGui::CollapsingHeader("Transparent and refractive properties")) {
             ImGui::SliderFloat("Tile: refractive textures", &mRefractiveTextureScale, 1.0f / 1024.0f, 32.0f);
             ImGui::Separator();
@@ -173,6 +180,30 @@ void TweakableMaterial::drawUI() {
             mMaxThickness.addWidget("thickness scale", 1.0f, 32.0f);
             mThickness.addWidget("thickness");
         }
+        break;
+    }
+    case MaterialType::Cloth: {
+        if (ImGui::CollapsingHeader("Cloth settings")) {
+            mSubsurfaceColor.addWidget("subsurface color");
+            mSheenColor.addWidget("sheen color");
+
+            mSheenRoughness.addWidget("sheen roughness");
+            if (mSheenRoughness.isFile) enqueueTextureRequest(mSheenRoughness);
+        }
+        break;
+    }
+    case MaterialType::Subsurface: {
+        if (ImGui::CollapsingHeader("Subsurface settings")) {
+            mSubsurfaceColor.addWidget("subsurface color");
+            mSheenColor.addWidget("sheen color");
+
+            mSheenRoughness.addWidget("sheen roughness");
+            if (mSheenRoughness.isFile) enqueueTextureRequest(mSheenRoughness);
+
+            mSubsurfacePower.addWidget("subsurface power", 0.125f, 16.0f);
+        }
+        break;
+    }
     }
 }
 

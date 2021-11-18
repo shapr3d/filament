@@ -279,6 +279,16 @@ void FEngine::init() {
         .package(MATERIALS_SHAPRGENERALMATERIALTRANSPARENTTHIN_DATA, MATERIALS_SHAPRGENERALMATERIALTRANSPARENTTHIN_SIZE)
         .build(*const_cast<FEngine*>(this))
     );
+    mShaprGeneralMaterials[3] = upcast(
+        FMaterial::Builder()
+        .package(MATERIALS_SHAPRGENERALMATERIALCLOTH_DATA, MATERIALS_SHAPRGENERALMATERIALCLOTH_SIZE)
+        .build(*const_cast<FEngine*>(this))
+    );
+    mShaprGeneralMaterials[4] = upcast(
+        FMaterial::Builder()
+        .package(MATERIALS_SHAPRGENERALMATERIALSUBSURFACE_DATA, MATERIALS_SHAPRGENERALMATERIALSUBSURFACE_SIZE)
+        .build(*const_cast<FEngine*>(this))
+    );
 
     mPostProcessManager.init();
     mLightManager.init(*this);

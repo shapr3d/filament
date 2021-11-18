@@ -94,18 +94,24 @@ public:
 
     TweakableProperty<float> mAnisotropy{}; // for metals
     TweakableProperty<filament::math::float3, false, false> mAnisotropyDirection{}; // for metals; not color
-
+    
+    TweakableProperty<filament::math::float3> mSubsurfaceColor{}; // for cloth and subsurface
     TweakableProperty<filament::math::float3> mSheenColor{}; // for cloth
     TweakablePropertyTextured<float> mSheenRoughness{}; // for cloth
+
+    TweakableProperty<float> mSubsurfacePower{1.0f}; // for subsurface
 
     TweakableProperty<filament::math::float3> mAbsorption{}; // for refractive
     TweakablePropertyTextured<float> mTransmission{}; // for refractive
     TweakableProperty<float> mMaxThickness{}; // for refractive; this scales the values read from a thickness property/texture
-    TweakablePropertyTextured<float> mThickness{}; // for refractive
+    TweakablePropertyTextured<float> mThickness{}; // for refractive and subsurface
     TweakableProperty<float> mIorScale{}; // for refractive
     TweakablePropertyTextured<float> mIor{}; // for refractive
 
-    enum MaterialType { Opaque, TransparentSolid, TransparentThin};
+    float mBlendPower{ 2.0f };
+    float mBlendBias{ 0.2f };
+
+    enum MaterialType { Opaque, TransparentSolid, TransparentThin, Cloth, Subsurface };
     MaterialType mMaterialType{};
 
 private:
