@@ -301,6 +301,7 @@ fragment {
         } else {
             material.ambientOcclusion = materialParams.occlusion;
         }
+
         // Let Filament compute the global shading parameters. Note that material.normal stays in tangent space. Its world space coordinates
         // are stored in the global variable shading_normal.
         prepareMaterial(material);
