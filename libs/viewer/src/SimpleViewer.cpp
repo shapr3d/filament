@@ -66,7 +66,7 @@ static void loadTexture(Engine* engine, const std::string& filePath, Texture** m
         utils::Path path(filePath);
         utils::Path artRootPath(artRootPathStr);
         if (path.isAbsolute() && !artRootPath.isEmpty()) {
-            std::cout << "Texture path is absolutte. Making it relative to '" << artRootPathStr << "'" << std::endl;
+            std::cout << "\tTexture path is absolute. Making it relative to '" << artRootPathStr << "'" << std::endl;
             path.makeRelativeTo(artRootPath);
         }
         path = artRootPath + path;
@@ -663,6 +663,27 @@ void SimpleViewer::loadTweaksFromFile(const std::string& entityName, const std::
     inFile >> js;
     inFile.close();
     tweaks.fromJson(js);
+
+    auto checkAndFixPathRelative([](auto& propertyWithPath) {
+        if (propertyWithPath.isFile) {
+            utils::Path asPath(propertyWithPath.filename);
+            if (asPath.isAbsolute()) {
+                std::string newFilePath = asPath.makeRelativeTo(g_ArtRootPathStr).c_str();
+                propertyWithPath.filename = newFilePath;
+            }
+        }
+    });
+
+    checkAndFixPathRelative(tweaks.mBaseColor);
+    checkAndFixPathRelative(tweaks.mNormal);
+    checkAndFixPathRelative(tweaks.mRoughness);
+    checkAndFixPathRelative(tweaks.mMetallic);
+    checkAndFixPathRelative(tweaks.mClearCoatNormal);
+    checkAndFixPathRelative(tweaks.mClearCoatRoughness);
+    checkAndFixPathRelative(tweaks.mSheenRoughness);
+    checkAndFixPathRelative(tweaks.mTransmission);
+    checkAndFixPathRelative(tweaks.mThickness);
+    checkAndFixPathRelative(tweaks.mIor);
 }
 
 void SimpleViewer::updateUserInterface() {
@@ -728,11 +749,7 @@ void SimpleViewer::updateUserInterface() {
                         if (SD_OpenFileDialog(fileDialogPath, materialFileFilter)) {
                             TweakableMaterial::MaterialType prevType = tweaks.mMaterialType;
 
-                            std::fstream inFile(fileDialogPath, std::ios::binary | std::ios::in);
-                            nlohmann::json js{};
-                            inFile >> js;
-                            inFile.close();
-                            tweaks.fromJson(js);
+                            loadTweaksFromFile(entityName, fileDialogPath);
 
                             mLastSavedEntityName = entityName;
                             mLastSavedFileName = fileDialogPath;
@@ -1345,6 +1362,7 @@ void SimpleViewer::updateUserInterface() {
             utils::Path tempPath = tempArtRootPath;
             if (tempPath.exists()) {
                 mSettings.viewer.artRootPath = tempPath.c_str();
+                g_ArtRootPathStr = tempArtRootPath;
                 mDoSaveSettings();
             }
             else {
