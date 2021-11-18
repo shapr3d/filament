@@ -463,7 +463,7 @@ int main(int argc, char** argv) {
     auto setup = [&](Engine* engine, View* view, Scene* scene) {
         app.engine = engine;
         app.names = new NameComponentManager(EntityManager::get());
-        app.viewer = new SimpleViewer(engine, scene, view, 410);
+        app.viewer = new SimpleViewer(engine, scene, view);
         app.viewer->getSettings().viewer.autoScaleEnabled = !app.actualSize;
         app.viewer->getSettings().lighting.enableSunlight = false;
 

@@ -58,7 +58,7 @@ public:
     using FilamentAsset = gltfio::FilamentAsset;
     using FilamentInstance =  gltfio::FilamentInstance;
 
-    static constexpr int DEFAULT_SIDEBAR_WIDTH = 350;
+    static constexpr int DEFAULT_SIDEBAR_WIDTH = 600;
 
     /**
      * Constructs a SimpleViewer that has a fixed association with the given Filament objects.
