@@ -127,6 +127,9 @@ void TweakableMaterial::drawUI() {
 
         mMetallic.addWidget("metallic");
         if (mMetallic.isFile) enqueueTextureRequest(mMetallic);
+
+        mOcclusion.addWidget("occlusion");
+        if (mOcclusion.isFile) enqueueTextureRequest(mOcclusion);
     }
 
     if (ImGui::CollapsingHeader("Clear coat settings")) {

@@ -88,6 +88,19 @@ material {
 
         {
             type : int,
+            name : useOcclusionTexture
+        },
+        {
+            type : sampler2d,
+            name : occlusionTexture
+        },
+        {
+            type : float,
+            name : occlusion
+        },
+
+        {
+            type : int,
             name : useSheenRoughnessTexture
         },
         {
@@ -283,6 +296,11 @@ fragment {
             material.clearCoatNormal = clearCoatNormalWS * getWorldTangentFrame();
         }
 
+        if ( materialParams.useOcclusionTexture == 1 ) {
+           material.ambientOcclusion = triplanarTexture(materialParams_occlusionTexture, materialParams.textureScaler.y, pos, normal).r;
+        } else {
+            material.ambientOcclusion = materialParams.occlusion;
+        }
         // Let Filament compute the global shading parameters. Note that material.normal stays in tangent space. Its world space coordinates
         // are stored in the global variable shading_normal.
         prepareMaterial(material);
