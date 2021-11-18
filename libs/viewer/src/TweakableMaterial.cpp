@@ -26,6 +26,8 @@ json TweakableMaterial::toJson() {
 
     writeTexturedToJson(result, "metallic", mMetallic);
 
+    writeTexturedToJson(result, "occlusion", mOcclusion);
+
     result["clearCoat"] = mClearCoat.value;
     writeTexturedToJson(result, "clearCoatNormal", mClearCoatNormal);
 
@@ -68,6 +70,8 @@ void TweakableMaterial::fromJson(const json& source) {
         readTexturedFromJson(source, "roughness", mRoughness);
 
         readTexturedFromJson(source, "metallic", mMetallic);
+
+        readTexturedFromJson(source, "occlusion", mOcclusion);
 
         readValueFromJson(source, "clearCoat", mClearCoat, 0.0f);
         readTexturedFromJson(source, "clearCoatNormal", mClearCoatNormal);
