@@ -118,7 +118,7 @@ void TweakableMaterial::drawUI() {
         mNormal.addWidget("normal");
         if (mNormal.isFile) enqueueTextureRequest(mNormal);
 
-        mRoughnessScale.addWidget("roughness scale");
+        mRoughnessScale.addWidget("roughness scale", 0.0f, 3.0f);
 
         mRoughness.addWidget("roughness");
         if (mRoughness.isFile) enqueueTextureRequest(mRoughness);
@@ -127,6 +127,9 @@ void TweakableMaterial::drawUI() {
 
         mMetallic.addWidget("metallic");
         if (mMetallic.isFile) enqueueTextureRequest(mMetallic);
+
+        mOcclusion.addWidget("occlusion");
+        if (mOcclusion.isFile) enqueueTextureRequest(mOcclusion);
     }
 
     if (ImGui::CollapsingHeader("Clear coat settings")) {

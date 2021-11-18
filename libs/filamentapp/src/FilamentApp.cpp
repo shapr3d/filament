@@ -839,10 +839,10 @@ void FilamentApp::Window::configureCamerasForWindow() {
     // the sidebar. To prevent this we simply clamp the width of the main viewport.
     const uint32_t mainWidth = splitview ? width : std::max(1, (int) width - sidebar);
 
-    double near = 0.1;
+    double near = 0.0078125;
     double far = 100;
     mMainCamera->setLensProjection(mFilamentApp->mCameraFocalLength, double(mainWidth) / height, near, far);
-    mDebugCamera->setProjection(45.0, double(width) / height, 0.0625, 4096, Camera::Fov::VERTICAL);
+    mDebugCamera->setProjection(45.0, double(width) / height, 0.0078125, 4096, Camera::Fov::VERTICAL);
     mOrthoCamera->setProjection(Camera::Projection::ORTHO, -3, 3, -3 * ratio, 3 * ratio, near, far);
     mOrthoCamera->lookAt({ 4, -4, 0 }, { 0, -4, 0 });
 
