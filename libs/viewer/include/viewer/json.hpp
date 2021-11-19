@@ -21335,7 +21335,7 @@ class basic_json // NOLINT(cppcoreguidelines-special-member-functions,hicpp-spec
         // const operator[] only works for objects
         if (JSON_HEDLEY_LIKELY(is_object()))
         {
-            JSON_ASSERT(m_value.object->find(key) != m_value.object->end());
+            //JSON_ASSERT(m_value.object->find(key) != m_value.object->end());
             if (m_value.object->find(key) != m_value.object->end()) {
                 return m_value.object->find(key)->second;
             } else {
