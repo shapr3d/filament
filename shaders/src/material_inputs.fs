@@ -24,10 +24,7 @@ struct MaterialInputs {
     vec4  emissive;
     float specularScale;
     float diffuseScale;
-    float roughnessScale;
     float specularIntensity;
-    //float normalScale;
-    float clearCoatScale;
 
 #if !defined(SHADING_MODEL_CLOTH) && !defined(SHADING_MODEL_SUBSURFACE) && !defined(SHADING_MODEL_UNLIT)
     vec3 sheenColor;

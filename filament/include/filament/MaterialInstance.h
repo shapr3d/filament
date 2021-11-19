@@ -217,17 +217,9 @@ public:
      */
     void setDepthCulling(bool enable) noexcept;
 
-    float& getClearCoatScale() noexcept;
-    float& getClearCoatNormalScale() noexcept;
-    float& getNormalScale() noexcept;
-    float& getRoughnessScale() noexcept;
     float& getSpecularScale() noexcept;
     float& getDiffuseScale() noexcept;
 
-    void setClearCoatScale(float clearCoatScale) noexcept;
-    void setClearCoatNormalScale( float clearCoatNormalScale ) noexcept;
-    void setNormalScale( float normalScale ) noexcept;
-    void setRoughnessScale( float roughnessScale ) noexcept;
     void setSpecularScale(float specularScale) noexcept;
     void setDiffuseScale( float diffuseScale ) noexcept;
 };

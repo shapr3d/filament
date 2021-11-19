@@ -830,13 +830,6 @@ void SimpleViewer::updateUserInterface() {
             if (ImGui::CollapsingHeader("Non-persistent tweaks")) {
                 ImGui::SliderFloat("IBL Diffuse intensity multiplier", &matInstance->getDiffuseScale(), 0.0f, 8.0f);
                 ImGui::SliderFloat("IBL Specular intensity multiplier", &matInstance->getSpecularScale(), 0.0f, 8.0f);
-                ImGui::SliderFloat("Roughness multiplier", &matInstance->getRoughnessScale(), 0.0f, 8.0f);
-                ImGui::SliderFloat("Normal multiplier", &matInstance->getNormalScale(), 0.0f, 8.0f);
-                ImGui::SliderFloat("Clear coat intensity multiplier", &matInstance->getClearCoatScale(), 0.0f, 8.0f);
-                bool hasClearCoat = mat->hasParameter("clearCoatNormalScale");
-                if (hasClearCoat) {
-                    ImGui::SliderFloat("Clear coat normal multiplier", &matInstance->getClearCoatNormalScale(), 0.0f, 8.0f);
-                }
             }
             
             if (mname) {

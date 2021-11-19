@@ -234,9 +234,7 @@ fragment {
 
     void material(inout MaterialInputs material) {
         material.specularScale  = 1.0 + materialParams.scalingControl.x;
-        material.roughnessScale = 1.0 + materialParams.scalingControl.y;
         material.diffuseScale   = 1.0 + materialParams.scalingControl.z;
-        material.clearCoatScale = 1.0 + materialParams.scalingControl.w;
 
         highp vec3 pos = getWorldPosition() + getWorldOffset();
 #if 1
