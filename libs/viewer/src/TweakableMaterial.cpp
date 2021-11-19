@@ -73,7 +73,7 @@ void TweakableMaterial::fromJson(const json& source) {
 
         readTexturedFromJson(source, "metallic", mMetallic);
 
-        readTexturedFromJson(source, "occlusion", mOcclusion);
+        readTexturedFromJson(source, "occlusion", mOcclusion, 1.0f);
 
         readValueFromJson(source, "clearCoat", mClearCoat, 0.0f);
         readTexturedFromJson(source, "clearCoatNormal", mClearCoatNormal);
