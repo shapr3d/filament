@@ -664,17 +664,9 @@ void SimpleViewer::loadTweaksFromFile(const std::string& entityName, const std::
     inFile.close();
     tweaks.fromJson(js);
 
-    auto checkAndFixPathRelative([](auto& propertyWithPath) {
-        if (propertyWithPath.isFile) {
-            utils::Path asPath(propertyWithPath.filename);
-            if (asPath.isAbsolute()) {
-                std::string newFilePath = asPath.makeRelativeTo(g_ArtRootPathStr).c_str();
-                propertyWithPath.filename = newFilePath;
-            }
-        }
-    });
+    
 
-    checkAndFixPathRelative(tweaks.mBaseColor);
+    /*checkAndFixPathRelative(tweaks.mBaseColor);
     checkAndFixPathRelative(tweaks.mNormal);
     checkAndFixPathRelative(tweaks.mRoughness);
     checkAndFixPathRelative(tweaks.mMetallic);
@@ -683,7 +675,7 @@ void SimpleViewer::loadTweaksFromFile(const std::string& entityName, const std::
     checkAndFixPathRelative(tweaks.mSheenRoughness);
     checkAndFixPathRelative(tweaks.mTransmission);
     checkAndFixPathRelative(tweaks.mThickness);
-    checkAndFixPathRelative(tweaks.mIor);
+    checkAndFixPathRelative(tweaks.mIor);*/
 }
 
 void SimpleViewer::updateUserInterface() {
@@ -802,9 +794,20 @@ void SimpleViewer::updateUserInterface() {
 
                     tweaks.drawUI();
 
+                    auto checkAndFixPathRelative([](auto& path) {
+                        utils::Path asPath(path);
+                        if (asPath.isAbsolute()) {
+                            std::string newFilePath = asPath.makeRelativeTo(g_ArtRootPathStr).c_str();
+                            std::cout << "\t\tMaking path relative: " << path << std::endl;
+                            std::cout << "\t\tMade path relative: " << newFilePath << std::endl;
+                            path = newFilePath;
+                        }
+                    });
+
                     // Load the requested textures
                     TweakableMaterial::RequestedTexture currentRequestedTexture = tweaks.nextRequestedTexture();
                     while (currentRequestedTexture.filename != "") {
+                        checkAndFixPathRelative(currentRequestedTexture.filename);
                         std::string keyName = currentRequestedTexture.filename;
                         auto textureEntry = mTextures.find(keyName);
                         if (textureEntry == mTextures.end() ) {

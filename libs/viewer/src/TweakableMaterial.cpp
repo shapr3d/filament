@@ -100,6 +100,28 @@ void TweakableMaterial::fromJson(const json& source) {
         readTexturedFromJson(source, "thickness", mThickness);
         readTexturedFromJson(source, "transmission", mTransmission);
         readValueFromJson(source, "maxThickness", mMaxThickness, 1.0f);
+        readValueFromJson(source, "textureExplicitLod", mTextureExplicitLod, 0.0f);
+
+        auto checkAndFixPathRelative([](auto& propertyWithPath) {
+            if (propertyWithPath.isFile) {
+                utils::Path asPath(propertyWithPath.filename);
+                if (asPath.isAbsolute()) {
+                    std::string newFilePath = asPath.makeRelativeTo(g_ArtRootPathStr).c_str();
+                    propertyWithPath.filename = newFilePath;
+                }
+            }
+        });
+
+        checkAndFixPathRelative(mBaseColor);
+        checkAndFixPathRelative(mNormal);
+        checkAndFixPathRelative(mRoughness);
+        checkAndFixPathRelative(mMetallic);
+        checkAndFixPathRelative(mClearCoatNormal);
+        checkAndFixPathRelative(mClearCoatRoughness);
+        checkAndFixPathRelative(mSheenRoughness);
+        checkAndFixPathRelative(mTransmission);
+        checkAndFixPathRelative(mThickness);
+        checkAndFixPathRelative(mIor);
     }
     catch (...) {
         std::cout << "Could not load material file.\n";
