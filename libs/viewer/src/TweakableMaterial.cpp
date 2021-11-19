@@ -159,6 +159,8 @@ void TweakableMaterial::drawUI() {
     case MaterialType::Opaque: {
         if (ImGui::CollapsingHeader("Sheen settings")) {
             mSheenColor.addWidget("sheen color");
+            mSheenRoughness.addWidget("sheen roughness");
+            if (mSheenRoughness.isFile) enqueueTextureRequest(mSheenRoughness);
         }
 
         if (ImGui::CollapsingHeader("Metal (anisotropy, etc.) settings")) {
@@ -186,9 +188,6 @@ void TweakableMaterial::drawUI() {
         if (ImGui::CollapsingHeader("Cloth settings")) {
             mSubsurfaceColor.addWidget("subsurface color");
             mSheenColor.addWidget("sheen color");
-
-            mSheenRoughness.addWidget("sheen roughness");
-            if (mSheenRoughness.isFile) enqueueTextureRequest(mSheenRoughness);
         }
         break;
     }

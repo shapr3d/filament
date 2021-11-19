@@ -978,7 +978,7 @@ void SimpleViewer::updateUserInterface() {
                         matInstance->setParameter("thickness", tweaks.mThickness.value);
                         setTextureIfPresent(tweaks.mThickness.isFile, tweaks.mThickness.filename, "thickness");
                         matInstance->setParameter("subsurfaceColor", tweaks.mSubsurfaceColor.value);
-                        matInstance->setParameter("subsurfaceColor", tweaks.mSubsurfaceColor.value);
+                        matInstance->setParameter("subsurfacePower", tweaks.mSubsurfacePower.value);
                     }
 
                     if (tweaks.mMaterialType == TweakableMaterial::MaterialType::Opaque) {
