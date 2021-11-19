@@ -100,7 +100,6 @@ void TweakableMaterial::fromJson(const json& source) {
         readTexturedFromJson(source, "thickness", mThickness);
         readTexturedFromJson(source, "transmission", mTransmission);
         readValueFromJson(source, "maxThickness", mMaxThickness, 1.0f);
-        readValueFromJson(source, "textureExplicitLod", mTextureExplicitLod, 0.0f);
 
         auto checkAndFixPathRelative([](auto& propertyWithPath) {
             if (propertyWithPath.isFile) {
