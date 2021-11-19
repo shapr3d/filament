@@ -309,7 +309,8 @@ fragment {
         //   turns out this is also required for clear coat normals
         if ( materialParams.useClearCoatNormalTexture == 1 ) {
             vec3 clearCoatNormalWS = triplanarNormalMap( materialParams_clearCoatNormalTexture, materialParams.textureScaler.z, pos, normal );
-            material.clearCoatNormal = clearCoatNormalWS * getWorldTangentFrame();
+            material.clearCoatNormal     = clearCoatNormalWS * getWorldTangentFrame();
+            material.clearCoatNormal.xy *= materialParams.clearCoatNormalScale;
         }
 
         if ( materialParams.useOcclusionTexture == 1 ) {

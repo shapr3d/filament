@@ -29,8 +29,8 @@ json TweakableMaterial::toJson() {
     writeTexturedToJson(result, "occlusion", mOcclusion);
 
     result["clearCoat"] = mClearCoat.value;
+    result["clearCoatNormalIntensity"] = mClearCoatNormalIntensity.value;
     writeTexturedToJson(result, "clearCoatNormal", mClearCoatNormal);
-
     writeTexturedToJson(result, "clearCoatRoughness", mClearCoatRoughness);
 
     result["baseTextureScale"] = mBaseTextureScale;
@@ -76,6 +76,7 @@ void TweakableMaterial::fromJson(const json& source) {
         readTexturedFromJson(source, "occlusion", mOcclusion, 1.0f);
 
         readValueFromJson(source, "clearCoat", mClearCoat, 0.0f);
+        readValueFromJson(source, "clearCoatNormalIntensity", mClearCoatNormalIntensity, 1.0f);
         readTexturedFromJson(source, "clearCoatNormal", mClearCoatNormal);
         readTexturedFromJson(source, "clearCoatRoughness", mClearCoatRoughness);
 
@@ -148,6 +149,7 @@ void TweakableMaterial::drawUI() {
 
         mClearCoat.addWidget("clearCoat intensity");
 
+        mClearCoatNormalIntensity.addWidget("clearCoat normal intensity");
         mClearCoatNormal.addWidget("clearCoat normal");
         if (mClearCoatNormal.isFile) enqueueTextureRequest(mClearCoatNormal);
 
