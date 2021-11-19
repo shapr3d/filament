@@ -805,13 +805,14 @@ void SimpleViewer::updateUserInterface() {
                     // Load the requested textures
                     TweakableMaterial::RequestedTexture currentRequestedTexture = tweaks.nextRequestedTexture();
                     while (currentRequestedTexture.filename != "") {
-                        auto textureEntry = mTextures.find(currentRequestedTexture.filename);
+                        std::string keyName = currentRequestedTexture.filename;
+                        auto textureEntry = mTextures.find(keyName);
                         if (textureEntry == mTextures.end() ) {
-                            mTextures[entityName] = nullptr;
-                            loadTexture(mEngine, currentRequestedTexture.filename, &mTextures[currentRequestedTexture.filename], currentRequestedTexture.isSrgb, currentRequestedTexture.isAlpha, mSettings.viewer.artRootPath);
+                            mTextures[keyName] = nullptr;
+                            loadTexture(mEngine, currentRequestedTexture.filename, &mTextures[keyName], currentRequestedTexture.isSrgb, currentRequestedTexture.isAlpha, mSettings.viewer.artRootPath);
                         } else if (currentRequestedTexture.doRequestReload) {
-                            if (mTextures[entityName] != nullptr) mEngine->destroy(mTextures[entityName]);
-                            loadTexture(mEngine, currentRequestedTexture.filename, &mTextures[currentRequestedTexture.filename], currentRequestedTexture.isSrgb, currentRequestedTexture.isAlpha, mSettings.viewer.artRootPath);
+                            if (mTextures[keyName] != nullptr) mEngine->destroy(mTextures[keyName]);
+                            loadTexture(mEngine, currentRequestedTexture.filename, &mTextures[keyName], currentRequestedTexture.isSrgb, currentRequestedTexture.isAlpha, mSettings.viewer.artRootPath);
                         }
 
                         currentRequestedTexture = tweaks.nextRequestedTexture();
