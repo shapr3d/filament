@@ -789,6 +789,9 @@ void SimpleViewer::updateUserInterface() {
                         }
                     }
 
+                    ImGui::SliderFloat("Triplanar mapping power", &tweaks.mBlendPower, 1.0f, 32.0f);
+                    ImGui::SliderFloat("Triplanar mapping bias", &tweaks.mBlendBias, 0.0f, 1.0f);
+
                     tweaks.drawUI();
 
                     auto checkAndFixPathRelative([](auto& path) {
@@ -930,7 +933,10 @@ void SimpleViewer::updateUserInterface() {
                             matInstance->setParameter(useTextureName.c_str(), 0);
                         }
 
-                    };                    
+                    };
+
+                    matInstance->setParameter("blendPower", tweaks.mBlendPower);
+                    matInstance->setParameter("blendBias", tweaks.mBlendBias);
 
                     setTextureIfPresent(tweaks.mBaseColor.isFile, tweaks.mBaseColor.filename, "albedo");
 
