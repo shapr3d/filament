@@ -797,8 +797,8 @@ void SimpleViewer::updateUserInterface() {
                         utils::Path asPath(path);
                         if (asPath.isAbsolute()) {
                             std::string newFilePath = asPath.makeRelativeTo(g_ArtRootPathStr).c_str();
-                            std::cout << "\t\tMaking path relative: " << path << std::endl;
-                            std::cout << "\t\tMade path relative: " << newFilePath << std::endl;
+                            //std::cout << "\t\tMaking path relative: " << path << std::endl;
+                            //std::cout << "\t\tMade path relative: " << newFilePath << std::endl;
                             path = newFilePath;
                         }
                     });
