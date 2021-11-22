@@ -218,9 +218,6 @@ void TweakableMaterial::drawUI() {
             mSubsurfaceColor.addWidget("subsurface color");
             mSheenColor.addWidget("sheen color");
 
-            mSheenRoughness.addWidget("sheen roughness");
-            if (mSheenRoughness.isFile) enqueueTextureRequest(mSheenRoughness);
-
             mSubsurfacePower.addWidget("subsurface power", 0.125f, 16.0f);
 
             mMaxThickness.addWidget("thickness scale", 1.0f, 32.0f);
