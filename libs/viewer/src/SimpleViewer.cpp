@@ -778,10 +778,6 @@ void SimpleViewer::updateUserInterface() {
                                 changeMaterialTypeTo(TweakableMaterial::MaterialType::TransparentSolid);
                             }
                             ImGui::SameLine();
-                            if (ImGui::Button("Transparent thin")) {
-                                changeMaterialTypeTo(TweakableMaterial::MaterialType::TransparentThin);
-                            }
-                            ImGui::SameLine();
                             if (ImGui::Button("Cloth")) {
                                 changeMaterialTypeTo(TweakableMaterial::MaterialType::Cloth);
                             }
@@ -987,7 +983,7 @@ void SimpleViewer::updateUserInterface() {
                         matInstance->setParameter("sheenColor", tweaks.mSheenColor.value);
                         setTextureIfPresent(tweaks.mSheenRoughness.isFile, tweaks.mSheenRoughness.filename, "sheenRoughness");
                         matInstance->setParameter("sheenRoughness", tweaks.mSheenRoughness.value);
-                    } else if (tweaks.mMaterialType == TweakableMaterial::MaterialType::TransparentThin || tweaks.mMaterialType == TweakableMaterial::MaterialType::TransparentSolid) {
+                    } else if (tweaks.mMaterialType == TweakableMaterial::MaterialType::TransparentSolid) {
                         // Only transparent materials have the properties below
                         matInstance->setParameter("absorption", tweaks.mAbsorption.value);
 

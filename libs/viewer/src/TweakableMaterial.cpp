@@ -192,8 +192,7 @@ void TweakableMaterial::drawUI() {
         }
         break;
     }
-    case MaterialType::TransparentSolid:
-    case MaterialType::TransparentThin: {
+    case MaterialType::TransparentSolid: {
         if (ImGui::CollapsingHeader("Transparent and refractive properties")) {
             ImGui::SliderFloat("Tile: refractive textures", &mRefractiveTextureScale, 1.0f / 1024.0f, 32.0f);
             ImGui::Separator();

@@ -274,9 +274,10 @@ void FEngine::init() {
         .package(MATERIALS_SHAPRGENERALMATERIALTRANSPARENTSOLID_DATA, MATERIALS_SHAPRGENERALMATERIALTRANSPARENTSOLID_SIZE)
         .build(*const_cast<FEngine*>(this))
     );
+    // for legacy reasons
     mShaprGeneralMaterials[2] = upcast(
         FMaterial::Builder()
-        .package(MATERIALS_SHAPRGENERALMATERIALTRANSPARENTTHIN_DATA, MATERIALS_SHAPRGENERALMATERIALTRANSPARENTTHIN_SIZE)
+        .package(MATERIALS_SHAPRGENERALMATERIALTRANSPARENTSOLID_DATA, MATERIALS_SHAPRGENERALMATERIALTRANSPARENTSOLID_SIZE)
         .build(*const_cast<FEngine*>(this))
     );
     mShaprGeneralMaterials[3] = upcast(
