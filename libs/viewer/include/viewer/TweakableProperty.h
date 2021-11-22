@@ -76,14 +76,14 @@ struct TweakableProperty {
             }
             else {
                 static char fileDialogResult[MAX_FILENAME_LENGTH];
-                ImGui::LabelText("Filename", &filename[0]);
+                ImGui::LabelText("Filename", "%s", filename.asString().c_str());
                 std::string loadTextureLabel = std::string("Load##") + label;
                 if (ImGui::Button(loadTextureLabel.c_str()) && SD_OpenFileDialog(fileDialogResult)) {
                     utils::Path fileDialogPath(fileDialogResult);
                     filename = fileDialogPath.makeRelativeTo(g_ArtRootPathStr);
                 }
 
-                if (filename != "") {
+                if (!filename.empty()) {
                     ImGui::SameLine();
                     if (ImGui::Button("Reload")) {
                         doRequestReload = true;
@@ -126,8 +126,53 @@ struct TweakableProperty {
 
     T value{};
     bool isFile{};
-    std::string filename{};
     bool doRequestReload{};
+
+//private:
+    class FilenameHolder {
+        std::string mFilename{};
+
+    public:
+        FilenameHolder() : mFilename() {}
+        FilenameHolder(const FilenameHolder&) = delete;
+        FilenameHolder(const FilenameHolder&& o) {
+            mFilename = std::move(o.mFilename);
+        }
+
+        FilenameHolder& operator=(const FilenameHolder&) = delete;
+        FilenameHolder& operator=(const FilenameHolder&&) = delete;
+
+        FilenameHolder& operator=(const std::string& filename) {
+            utils::Path path(filename);
+            if (path.isAbsolute() && !g_ArtRootPathStr.empty()) {
+                std::cout << "Making path '" << filename << "' relative to '" << g_ArtRootPathStr << "'" << std::endl;
+                mFilename = path.makeRelativeTo(g_ArtRootPathStr).c_str();
+            } else {
+                mFilename = filename;
+            }
+            return *this;
+        }
+
+        operator std::string() {
+            utils::Path path(mFilename);
+            if (path.isAbsolute() && !g_ArtRootPathStr.empty()) {
+                std::cout << "Warning! Stored path is absolute, but art root is set!" << std::endl;
+                std::cout << "\tMaking path '" << mFilename << "' relative to '" << g_ArtRootPathStr << "'" << std::endl;
+                mFilename = path.makeRelativeTo(g_ArtRootPathStr).c_str();
+            }
+            return mFilename;
+        }
+
+        const std::string asString() const {
+            return mFilename;
+        }
+
+        bool empty() { return mFilename.empty(); }
+        void clear() { mFilename.clear(); }
+    };
+    
+    //std::string filename{};
+    FilenameHolder filename{};
 };
 
 template <typename T, bool IsColor = true, typename = IsValidTweakableType<T> >

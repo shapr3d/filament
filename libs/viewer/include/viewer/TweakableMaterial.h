@@ -85,6 +85,8 @@ public:
 
     std::vector< RequestedTexture > mRequestedTextures{};
 
+    TweakableProperty<float> mTextureExplicitLod{};
+
     float mBaseTextureScale = 1.0f; // applied to baseColor texture
     float mNormalTextureScale = 1.0f; // applied to normal.xy, roughness, and metallic maps
     float mClearCoatTextureScale = 1.0f; // applied to clearcloat normal.xy, roughness, and value textures
@@ -114,6 +116,8 @@ public:
     enum MaterialType { Opaque, TransparentSolid, TransparentThin, Cloth, Subsurface };
     MaterialType mMaterialType{};
 
+    void resetWithType(MaterialType newType);
+
 private:
     template< typename T, bool MayContainFile = false, bool IsColor = true, typename = IsValidTweakableType<T> >
     void enqueueTextureRequest(TweakableProperty<T, MayContainFile, IsColor>& item, bool isSrgb = false, bool isAlpa = false) {
@@ -127,7 +131,7 @@ private:
     void writeTexturedToJson(json& result, const std::string& prefix, const TweakableProperty<T, MayContainFile, IsColor>& item) {
         result[prefix] = item.value;
         result[prefix + "IsFile"] = item.isFile;
-        result[prefix + "Texture"] = item.filename;
+        result[prefix + "Texture"] = item.filename.asString();
     }
 
     template< typename T, bool MayContainFile = false, bool IsColor = true, typename = IsValidTweakableType<T> >
@@ -135,9 +139,10 @@ private:
         try {
             item.value = source[prefix];
             item.isFile = source[prefix + "IsFile"];
-            item.filename = source[prefix + "Texture"];
+            std::string filename = source[prefix + "Texture"];
+            item.filename = filename;
             item.doRequestReload = true;
-            if (item.isFile) enqueueTextureRequest(item.filename, item.doRequestReload);
+            if (item.isFile) enqueueTextureRequest(item.filename.asString(), item.doRequestReload);
         } catch (...) {
             std::cout << "Unable to read textured property '" << prefix << "', reverting to default value without texture." << std::endl;
             item.value = defaultValue;

@@ -55,6 +55,7 @@ json TweakableMaterial::toJson() {
     writeTexturedToJson(result, "thickness", mThickness);
     writeTexturedToJson(result, "transmission", mTransmission);
     result["maxThickness"] = mMaxThickness.value;
+    result["textureExplicitLod"] = mTextureExplicitLod.value;
 
     return result;
 }
@@ -125,6 +126,59 @@ void TweakableMaterial::fromJson(const json& source) {
     catch (...) {
         std::cout << "Could not load material file.\n";
     }
+}
+
+template <typename T, bool MayContainFile = false, bool IsColor = true, typename = IsValidTweakableType<T> >
+void resetMemberToValue(TweakableProperty<T, MayContainFile, IsColor>& prop, T value) {
+    prop.value = value;
+    prop.isFile = false;
+}
+
+void TweakableMaterial::resetWithType(MaterialType newType) {
+
+    resetMemberToValue(mBaseColor, {0.0f, 0.0f, 0.0f, 1.0f});
+
+    resetMemberToValue(mNormal, {});
+    resetMemberToValue(mOcclusion, { 1.0f });
+    resetMemberToValue(mRoughnessScale, 1.0f);
+    resetMemberToValue(mRoughness, 0.0f);
+    resetMemberToValue(mMetallic, {});
+
+    resetMemberToValue(mClearCoat, {});
+    resetMemberToValue(mClearCoatNormal, {});
+    resetMemberToValue(mClearCoatRoughness, {});
+
+    mRequestedTextures = {};
+
+    resetMemberToValue(mTextureExplicitLod, {});
+
+    mBaseTextureScale = 1.0f;
+    mNormalTextureScale = 1.0f;
+    mClearCoatTextureScale = 1.0f;
+    mRefractiveTextureScale = 1.0f;
+    resetMemberToValue(mSpecularIntensity, 1.0f);
+    resetMemberToValue(mNormalIntensity, 1.0f);
+
+    resetMemberToValue(mAnisotropy, {});
+    resetMemberToValue(mAnisotropyDirection, { 1.0f, 0.0f, 0.0f });
+
+    resetMemberToValue(mSubsurfaceColor, {});
+    resetMemberToValue(mSheenColor, {});
+    resetMemberToValue(mSheenRoughness, {});
+
+    resetMemberToValue(mSubsurfacePower, { 1.0f });
+
+    resetMemberToValue(mAbsorption, {});
+    resetMemberToValue(mTransmission, {});
+    resetMemberToValue(mMaxThickness, 1.0f);
+    resetMemberToValue(mThickness, {});
+    resetMemberToValue(mIorScale, 1.0f);
+    resetMemberToValue(mIor, 1.5f);
+
+    mBlendPower = 2.0f;
+    mBlendBias = 0.2f;
+
+    mMaterialType = newType;
 }
 
 void TweakableMaterial::drawUI() {
@@ -226,6 +280,8 @@ void TweakableMaterial::drawUI() {
         break;
     }
     }
+
+    mTextureExplicitLod.addWidget("textureExplicitLod", 0.0f, 8.0f);
 }
 
 const TweakableMaterial::RequestedTexture TweakableMaterial::nextRequestedTexture() {

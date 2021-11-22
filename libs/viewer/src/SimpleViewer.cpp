@@ -710,7 +710,7 @@ void SimpleViewer::updateUserInterface() {
             if (entityMaterial == mTweakedMaterials.end()) {
                 // Only allow adding a new material, nothing else
                 if (ImGui::Button("Add custom material")) {                
-                    mTweakedMaterials[entityName] = {};
+                    mTweakedMaterials.emplace(std::pair<std::string, TweakableMaterial>(entityName, TweakableMaterial{}));
                     filament::MaterialInstance* newInstance = mEngine->getShaprMaterial(0)->createInstance();
                     mMaterialInstances.push_back(newInstance);
                     rm.setMaterialInstanceAt(instance, prim, newInstance);
@@ -752,8 +752,7 @@ void SimpleViewer::updateUserInterface() {
                             ImGui::SameLine();
                             if (ImGui::Button("Reset")) {
                                 TweakableMaterial::MaterialType prevType = tweaks.mMaterialType;
-                                tweaks = {};
-                                tweaks.mMaterialType = prevType;
+                                tweaks.resetWithType(prevType);
                             }
 
                             std::function<void( TweakableMaterial::MaterialType materialType)> changeMaterialTypeTo;
@@ -924,14 +923,14 @@ void SimpleViewer::updateUserInterface() {
                 for (size_t prim = 0; prim < numPrims; ++prim) {
                     const auto& matInstance = rm.getMaterialInstanceAt(instance, prim);
 
-                    std::function<void(bool, std::string, std::string)> setTextureIfPresent;
-                    setTextureIfPresent = [&](bool useTexture, const std::string& filename, const std::string& propertyName) {
+                    //std::function<void(bool, std::string, std::string)> setTextureIfPresent;
+                    auto setTextureIfPresent ([&](bool useTexture, const auto& filename, const std::string& propertyName) {
                         std::string useTextureName = "use" + propertyName + "Texture";
                         std::string samplerName = propertyName + "Texture";
 
                         useTextureName[3] = std::toupper(useTextureName[3]);
 
-                        auto textureEntry = mTextures.find(filename);
+                        auto textureEntry = mTextures.find(filename.asString());
                         if (useTexture && textureEntry != mTextures.end()) {
                             matInstance->setParameter(useTextureName.c_str(), 1);
                             matInstance->setParameter(samplerName.c_str(), textureEntry->second, trilinSampler);
@@ -940,7 +939,7 @@ void SimpleViewer::updateUserInterface() {
                             matInstance->setParameter(useTextureName.c_str(), 0);
                         }
 
-                    };                    
+                    });
 
                     setTextureIfPresent(tweaks.mBaseColor.isFile, tweaks.mBaseColor.filename, "albedo");
 
@@ -984,6 +983,8 @@ void SimpleViewer::updateUserInterface() {
                         matInstance->setParameter("subsurfaceColor", tweaks.mSubsurfaceColor.value);
                         matInstance->setParameter("subsurfacePower", tweaks.mSubsurfacePower.value);
                     }
+
+                    matInstance->setParameter("textureExplicitLod", tweaks.mTextureExplicitLod.value);
 
                     if (tweaks.mMaterialType == TweakableMaterial::MaterialType::Opaque) {
                         // Transparent materials do not expose anisotropy and sheen, these are not present in their UBOs
