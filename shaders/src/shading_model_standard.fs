@@ -125,7 +125,7 @@ vec3 surfaceShading(const MaterialInputs material, const PixelParams pixel, cons
 
 #if defined(MATERIAL_HAS_CLEAR_COAT)
     float Fcc;
-    float clearCoat = material.clearCoatScale * clearCoatLobe(pixel, h, NoH, LoH, Fcc);
+    float clearCoat = clearCoatLobe(pixel, h, NoH, LoH, Fcc);
     float attenuation = 1.0 - Fcc;
 
 #if defined(MATERIAL_HAS_NORMAL) || defined(MATERIAL_HAS_CLEAR_COAT_NORMAL)

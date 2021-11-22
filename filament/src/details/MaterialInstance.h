@@ -168,10 +168,6 @@ private:
             (uint32_t)std::numeric_limits<int32_t>::max()
     };
 
-    float clearCoatScale{1.0f};
-    float clearCoatNormalScale{ 1.0f };
-    float normalScale{ 1.0f };
-    float roughnessScale{ 1.0f };
     float specularScale{ 1.0f };
     float diffuseScale{ 1.0f };
 

@@ -29,8 +29,8 @@ json TweakableMaterial::toJson() {
     writeTexturedToJson(result, "occlusion", mOcclusion);
 
     result["clearCoat"] = mClearCoat.value;
+    result["clearCoatNormalIntensity"] = mClearCoatNormalIntensity.value;
     writeTexturedToJson(result, "clearCoatNormal", mClearCoatNormal);
-
     writeTexturedToJson(result, "clearCoatRoughness", mClearCoatRoughness);
 
     result["baseTextureScale"] = mBaseTextureScale;
@@ -77,6 +77,7 @@ void TweakableMaterial::fromJson(const json& source) {
         readTexturedFromJson(source, "occlusion", mOcclusion, 1.0f);
 
         readValueFromJson(source, "clearCoat", mClearCoat, 0.0f);
+        readValueFromJson(source, "clearCoatNormalIntensity", mClearCoatNormalIntensity, 1.0f);
         readTexturedFromJson(source, "clearCoatNormal", mClearCoatNormal);
         readTexturedFromJson(source, "clearCoatRoughness", mClearCoatRoughness);
 
@@ -100,7 +101,6 @@ void TweakableMaterial::fromJson(const json& source) {
         readTexturedFromJson(source, "thickness", mThickness);
         readTexturedFromJson(source, "transmission", mTransmission);
         readValueFromJson(source, "maxThickness", mMaxThickness, 1.0f);
-        readValueFromJson(source, "textureExplicitLod", mTextureExplicitLod, 0.0f);
 
         auto checkAndFixPathRelative([](auto& propertyWithPath) {
             if (propertyWithPath.isFile) {
@@ -224,6 +224,7 @@ void TweakableMaterial::drawUI() {
 
         mClearCoat.addWidget("clearCoat intensity");
 
+        mClearCoatNormalIntensity.addWidget("clearCoat normal intensity");
         mClearCoatNormal.addWidget("clearCoat normal");
         if (mClearCoatNormal.isFile) enqueueTextureRequest(mClearCoatNormal);
 
@@ -276,6 +277,9 @@ void TweakableMaterial::drawUI() {
             if (mSheenRoughness.isFile) enqueueTextureRequest(mSheenRoughness);
 
             mSubsurfacePower.addWidget("subsurface power", 0.125f, 16.0f);
+
+            mMaxThickness.addWidget("thickness scale", 1.0f, 32.0f);
+            mThickness.addWidget("thickness");
         }
         break;
     }

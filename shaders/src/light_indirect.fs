@@ -367,7 +367,7 @@ void isEvaluateClearCoatIBL(const MaterialInputs material, const PixelParams pix
     p.anisotropy = 0.0;
 #endif
 
-    vec3 clearCoatLobe = material.clearCoatScale * isEvaluateSpecularIBL(material, p, clearCoatNormal, shading_view, clearCoatNoV);
+    vec3 clearCoatLobe = isEvaluateSpecularIBL(material, p, clearCoatNormal, shading_view, clearCoatNoV);
     Fr += clearCoatLobe * (specularAO * pixel.clearCoat);
 #endif
 }
@@ -419,7 +419,7 @@ void evaluateClearCoatIBL(const MaterialInputs material, const PixelParams pixel
     float attenuation = 1.0 - Fc;
     Fd *= attenuation;
     Fr *= attenuation;
-    Fr += material.clearCoatScale * prefilteredRadiance(clearCoatR, pixel.clearCoatPerceptualRoughness) * (specularAO * Fc);
+    Fr += prefilteredRadiance(clearCoatR, pixel.clearCoatPerceptualRoughness) * (specularAO * Fc);
 #endif
 }
 

@@ -829,13 +829,6 @@ void SimpleViewer::updateUserInterface() {
             if (ImGui::CollapsingHeader("Non-persistent tweaks")) {
                 ImGui::SliderFloat("IBL Diffuse intensity multiplier", &matInstance->getDiffuseScale(), 0.0f, 8.0f);
                 ImGui::SliderFloat("IBL Specular intensity multiplier", &matInstance->getSpecularScale(), 0.0f, 8.0f);
-                ImGui::SliderFloat("Roughness multiplier", &matInstance->getRoughnessScale(), 0.0f, 8.0f);
-                ImGui::SliderFloat("Normal multiplier", &matInstance->getNormalScale(), 0.0f, 8.0f);
-                ImGui::SliderFloat("Clear coat intensity multiplier", &matInstance->getClearCoatScale(), 0.0f, 8.0f);
-                bool hasClearCoat = mat->hasParameter("clearCoatNormalScale");
-                if (hasClearCoat) {
-                    ImGui::SliderFloat("Clear coat normal multiplier", &matInstance->getClearCoatNormalScale(), 0.0f, 8.0f);
-                }
             }
             
             if (mname) {
@@ -952,6 +945,7 @@ void SimpleViewer::updateUserInterface() {
                         matInstance->setParameter("occlusion", tweaks.mOcclusion.value);
                     }
 
+                    matInstance->setParameter("clearCoatNormalScale", tweaks.mClearCoatNormalIntensity.value);
                     setTextureIfPresent(tweaks.mClearCoatNormal.isFile, tweaks.mClearCoatNormal.filename, "clearCoatNormal");
                     setTextureIfPresent(tweaks.mClearCoatRoughness.isFile, tweaks.mClearCoatRoughness.filename, "clearCoatRoughness");
 
@@ -1014,13 +1008,7 @@ void SimpleViewer::updateUserInterface() {
             for (size_t prim = 0; prim < numPrims; ++prim) {
                 // These attributes apply to all materials as we inject them manually into the shaders generated for GLTF import
                 const auto& matInstance = rm.getMaterialInstanceAt(instance, prim);
-                matInstance->setParameter("scalingControl", math::float4(matInstance->getSpecularScale() - 1.0f, matInstance->getRoughnessScale() - 1.0f, matInstance->getDiffuseScale() - 1.0f, matInstance->getClearCoatScale() - 1.0f));
-                const auto* mat = matInstance->getMaterial();
-                bool hasClearCoat = mat->hasParameter("clearCoatNormalScale");
-                if (hasClearCoat) {
-                    matInstance->setParameter("clearCoatNormalScale", matInstance->getClearCoatNormalScale());
-                }
-
+                matInstance->setParameter("scalingControl", math::float4(matInstance->getSpecularScale() - 1.0f, 0.0f, matInstance->getDiffuseScale() - 1.0f, 0.0f));
             }
         }
         tm.getChildren(tinstance, children.data(), children.size());

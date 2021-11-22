@@ -153,9 +153,7 @@ std::string shaderFromKey(const MaterialKey& config) {
         // for controlling the roughness and specular scales
         shader += R"SHADER(
                 material.specularScale     = 1.0 + materialParams.scalingControl.x;
-                material.roughnessScale    = 1.0 + materialParams.scalingControl.y;
                 material.diffuseScale      = 1.0 + materialParams.scalingControl.z;
-                material.clearCoatScale    = 1.0 + materialParams.scalingControl.w;
                 material.specularIntensity = 1.0;
             )SHADER";
 
@@ -167,7 +165,7 @@ std::string shaderFromKey(const MaterialKey& config) {
             )SHADER";
         } else {
             shader += R"SHADER(
-                material.roughness = materialParams.roughnessFactor * material.roughnessScale;
+                material.roughness = materialParams.roughnessFactor;
                 material.metallic = materialParams.metallicFactor;
                 material.emissive = vec4(materialParams.emissiveFactor.rgb, 0.0);
             )SHADER";

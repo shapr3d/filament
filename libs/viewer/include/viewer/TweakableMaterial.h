@@ -80,6 +80,7 @@ public:
     TweakablePropertyTextured<float> mMetallic{};
 
     TweakableProperty<float> mClearCoat{};
+    TweakableProperty<float> mClearCoatNormalIntensity{1.0f};
     TweakablePropertyTextured<float, false> mClearCoatNormal{};
     TweakablePropertyTextured<float> mClearCoatRoughness{};
 

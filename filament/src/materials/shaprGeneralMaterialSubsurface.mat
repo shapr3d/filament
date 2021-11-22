@@ -263,9 +263,7 @@ fragment {
 
     void material(inout MaterialInputs material) {
         material.specularScale  = 1.0 + materialParams.scalingControl.x;
-        material.roughnessScale = 1.0 + materialParams.scalingControl.y;
         material.diffuseScale   = 1.0 + materialParams.scalingControl.z;
-        material.clearCoatScale = 1.0 + materialParams.scalingControl.w;
 
         highp vec3 pos = getWorldPosition() + getWorldOffset();
 #if 1
@@ -309,7 +307,8 @@ fragment {
         //   turns out this is also required for clear coat normals
         if ( materialParams.useClearCoatNormalTexture == 1 ) {
             vec3 clearCoatNormalWS = triplanarNormalMap( materialParams_clearCoatNormalTexture, materialParams.textureScaler.z, pos, normal );
-            material.clearCoatNormal = clearCoatNormalWS * getWorldTangentFrame();
+            material.clearCoatNormal     = clearCoatNormalWS * getWorldTangentFrame();
+            material.clearCoatNormal.xy *= materialParams.clearCoatNormalScale;
         }
 
         if ( materialParams.useOcclusionTexture == 1 ) {
@@ -380,8 +379,8 @@ fragment {
         material.clearCoat = materialParams.clearCoat;
         material.subsurfaceColor = materialParams.subsurfaceColor;
         material.subsurfacePower = materialParams.subsurfacePower;
-
         material.specularIntensity = materialParams.specularIntensity;
+
         // Debug coloring
         //material.baseColor.rgb *= 1e-6;
         //material.baseColor.rgb += 0.5 * ( material.normal + vec3(1) );
