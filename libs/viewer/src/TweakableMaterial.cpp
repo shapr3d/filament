@@ -55,7 +55,6 @@ json TweakableMaterial::toJson() {
     writeTexturedToJson(result, "thickness", mThickness);
     writeTexturedToJson(result, "transmission", mTransmission);
     result["maxThickness"] = mMaxThickness.value;
-    result["textureExplicitLod"] = mTextureExplicitLod.value;
 
     return result;
 }
@@ -149,8 +148,6 @@ void TweakableMaterial::resetWithType(MaterialType newType) {
     resetMemberToValue(mClearCoatRoughness, {});
 
     mRequestedTextures = {};
-
-    resetMemberToValue(mTextureExplicitLod, {});
 
     mBaseTextureScale = 1.0f;
     mNormalTextureScale = 1.0f;
@@ -280,8 +277,6 @@ void TweakableMaterial::drawUI() {
         break;
     }
     }
-
-    mTextureExplicitLod.addWidget("textureExplicitLod", 0.0f, 8.0f);
 }
 
 const TweakableMaterial::RequestedTexture TweakableMaterial::nextRequestedTexture() {

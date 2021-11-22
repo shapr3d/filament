@@ -86,8 +86,6 @@ public:
 
     std::vector< RequestedTexture > mRequestedTextures{};
 
-    TweakableProperty<float> mTextureExplicitLod{};
-
     float mBaseTextureScale = 1.0f; // applied to baseColor texture
     float mNormalTextureScale = 1.0f; // applied to normal.xy, roughness, and metallic maps
     float mClearCoatTextureScale = 1.0f; // applied to clearcloat normal.xy, roughness, and value textures

@@ -980,8 +980,6 @@ void SimpleViewer::updateUserInterface() {
                         matInstance->setParameter("subsurfacePower", tweaks.mSubsurfacePower.value);
                     }
 
-                    matInstance->setParameter("textureExplicitLod", tweaks.mTextureExplicitLod.value);
-
                     if (tweaks.mMaterialType == TweakableMaterial::MaterialType::Opaque) {
                         // Transparent materials do not expose anisotropy and sheen, these are not present in their UBOs
                         matInstance->setParameter("anisotropy", tweaks.mAnisotropy.value);

@@ -136,10 +136,6 @@ material {
             type : float,
             name : clearCoatNormalScale
         },
-        { // explicit LOD (mip level) setting for detail textures
-            type : float,
-            name : textureExplicitLod
-        },
         //////////////////////////////////////////////////////////////////////////////////////////////////
         // material attributes that are purely driven by UBO values
         //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -218,19 +214,12 @@ fragment {
     // This is a whiteout blended tripalanar normal mapping, where each plane's tangent frame is
     // approximated by the appropriate sequence and flips of world space axes. For more details
     // Refer to https://bgolus.medium.com/normal-mapping-for-a-triplanar-shader-10bf39dca05a
-    vec3 triplanarNormalMap( sampler2D normalMap, float scaler, highp vec3 pos, lowp vec3 normal, float lod ) {
+    vec3 triplanarNormalMap( sampler2D normalMap, float scaler, highp vec3 pos, lowp vec3 normal ) {
         // Whiteout blend
         // Triplanar uvs
         vec2 uvX = scaler * pos.zy; // x facing plane
         vec2 uvY = scaler * pos.xz; // y facing plane
         vec2 uvZ = scaler * pos.xy; // z facing plane
-
-        vec2 duvXdx = dFdx(uvX);
-        vec2 duvYdx = dFdx(uvY);
-        vec2 duvZdx = dFdx(uvZ);
-        vec2 duvXdy = dFdy(uvX);
-        vec2 duvYdy = dFdy(uvY);
-        vec2 duvZdy = dFdy(uvZ);
 
         // Tangent space normal maps
 #if 0
@@ -242,16 +231,9 @@ fragment {
         // 2-channel XY TS normal texture: this saves 33% on storage, but also
         // pushes us into the direction of choosing what attributes to pack
         // together into the same texture (e.g. normal-roughness-metallic?)
-#if 0
-        lowp vec3 tnormalX = unpackNormal( textureLod( normalMap, uvX, lod ).xy );
-        lowp vec3 tnormalY = unpackNormal( textureLod( normalMap, uvY, lod ).xy );
-        lowp vec3 tnormalZ = unpackNormal( textureLod( normalMap, uvZ, lod ).xy );
-#else
         lowp vec3 tnormalX = unpackNormal( texture( normalMap, uvX ).xy );
         lowp vec3 tnormalY = unpackNormal( texture( normalMap, uvY ).xy );
         lowp vec3 tnormalZ = unpackNormal( texture( normalMap, uvZ ).xy );
-#endif
-
 #endif
         // Swizzle world normals into tangent space and apply Whiteout blend
         tnormalX = vec3(
@@ -289,11 +271,10 @@ fragment {
         vec3 normal = normalize( cross( DxPos, DyPos ) );
 #endif
 
-        float normalLod = materialParams.textureExplicitLod;
         if ( materialParams.useNormalTexture == 1 ) {
             // We combine the normals in world space, hence the transformation in the end from world to tangent, assuming an
             // orthonormal tangent frame (which may not hold actually but looks fine enough for now).
-            vec3 normalWS = triplanarNormalMap( materialParams_normalTexture, materialParams.textureScaler.y, pos, normal, normalLod );
+            vec3 normalWS = triplanarNormalMap( materialParams_normalTexture, materialParams.textureScaler.y, pos, normal );
             material.normal = normalWS * getWorldTangentFrame();
         } 
         
@@ -320,8 +301,7 @@ fragment {
         // Filament material docs state normals should be set _before_ calling prepareMaterial,
         //   turns out this is also required for clear coat normals
         if ( materialParams.useClearCoatNormalTexture == 1 ) {
-            float clearCoatNormalLod = materialParams.textureExplicitLod;
-            vec3 clearCoatNormalWS = triplanarNormalMap( materialParams_clearCoatNormalTexture, materialParams.textureScaler.z, pos, normal, clearCoatNormalLod );
+            vec3 clearCoatNormalWS = triplanarNormalMap( materialParams_clearCoatNormalTexture, materialParams.textureScaler.z, pos, normal );
             material.clearCoatNormal = clearCoatNormalWS * getWorldTangentFrame();
             material.clearCoatNormal.xy *= materialParams.clearCoatNormalScale;
         }
@@ -393,6 +373,5 @@ fragment {
         //material.baseColor.rgb *= 1e-6;
         //material.baseColor.rgb += 0.5 * ( material.normal + vec3(1) );
         //material.baseColor.rgb += normal;
-        //material.baseColor.rgb += normalLod / 7.0;
     }
 }
