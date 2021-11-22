@@ -664,7 +664,8 @@ void SimpleViewer::loadTweaksFromFile(const std::string& entityName, const std::
     inFile.close();
     tweaks.fromJson(js);
 
-    
+    // fixup legacy transparent thin material
+    if (tweaks.mMaterialType == TweakableMaterial::MaterialType::TransparentThin) tweaks.mMaterialType = TweakableMaterial::MaterialType::TransparentSolid;
 
     /*checkAndFixPathRelative(tweaks.mBaseColor);
     checkAndFixPathRelative(tweaks.mNormal);
