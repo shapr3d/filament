@@ -154,14 +154,6 @@ material {
             type : float,
             name : subsurfacePower
         },
-        {
-            type : float,
-            name : blendPower
-        },
-        {
-            type : float,
-            name : blendBias
-        },
         // this is somewhat special because the value here will be assigned to both material.thickness and material.microThickness
         {
             type : int,
@@ -178,6 +170,14 @@ material {
         {
             type : float,
             name : maxThickness
+        },
+        {
+            type : float,
+            name : blendPower
+        },
+        {
+            type : float,
+            name : blendBias
         }
     ]
 }

@@ -183,6 +183,14 @@ material {
         {
             type : float,
             name : roughnessScale
+        },
+        {
+            type : float,
+            name : blendPower
+        },
+        {
+            type : float,
+            name : blendBias
         }
     ]
 }
@@ -199,7 +207,8 @@ fragment {
 #else
         // This one has a region where there is no blend, creating more defined interpolations
         vec3 blend = abs(normal.xyz);
-        blend = max(blend - 0.2, vec3(0.0) );
+        blend = max(blend - materialParams.blendBias, vec3(0.0) );
+        blend = pow( blend, vec3( abs( materialParams.blendPower) ) );
         blend /= (blend.x + blend.y + blend.z);
         return blend;
 #endif

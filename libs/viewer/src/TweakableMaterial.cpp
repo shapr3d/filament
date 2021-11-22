@@ -246,8 +246,7 @@ void TweakableMaterial::drawUI() {
         }
         break;
     }
-    case MaterialType::TransparentSolid:
-    case MaterialType::TransparentThin: {
+    case MaterialType::TransparentSolid: {
         if (ImGui::CollapsingHeader("Transparent and refractive properties")) {
             ImGui::SliderFloat("Tile: refractive textures", &mRefractiveTextureScale, 1.0f / 1024.0f, 32.0f);
             ImGui::Separator();
@@ -272,9 +271,6 @@ void TweakableMaterial::drawUI() {
         if (ImGui::CollapsingHeader("Subsurface settings")) {
             mSubsurfaceColor.addWidget("subsurface color");
             mSheenColor.addWidget("sheen color");
-
-            mSheenRoughness.addWidget("sheen roughness");
-            if (mSheenRoughness.isFile) enqueueTextureRequest(mSheenRoughness);
 
             mSubsurfacePower.addWidget("subsurface power", 0.125f, 16.0f);
 

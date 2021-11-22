@@ -664,7 +664,8 @@ void SimpleViewer::loadTweaksFromFile(const std::string& entityName, const std::
     inFile.close();
     tweaks.fromJson(js);
 
-    
+    // fixup legacy transparent thin material
+    if (tweaks.mMaterialType == TweakableMaterial::MaterialType::TransparentThin) tweaks.mMaterialType = TweakableMaterial::MaterialType::TransparentSolid;
 
     /*checkAndFixPathRelative(tweaks.mBaseColor);
     checkAndFixPathRelative(tweaks.mNormal);
@@ -777,10 +778,6 @@ void SimpleViewer::updateUserInterface() {
                                 changeMaterialTypeTo(TweakableMaterial::MaterialType::TransparentSolid);
                             }
                             ImGui::SameLine();
-                            if (ImGui::Button("Transparent thin")) {
-                                changeMaterialTypeTo(TweakableMaterial::MaterialType::TransparentThin);
-                            }
-                            ImGui::SameLine();
                             if (ImGui::Button("Cloth")) {
                                 changeMaterialTypeTo(TweakableMaterial::MaterialType::Cloth);
                             }
@@ -790,6 +787,9 @@ void SimpleViewer::updateUserInterface() {
                             }
                         }
                     }
+
+                    ImGui::SliderFloat("Triplanar mapping power", &tweaks.mBlendPower, 1.0f, 32.0f);
+                    ImGui::SliderFloat("Triplanar mapping bias", &tweaks.mBlendBias, 0.0f, 1.0f);
 
                     tweaks.drawUI();
 
@@ -916,7 +916,6 @@ void SimpleViewer::updateUserInterface() {
                 for (size_t prim = 0; prim < numPrims; ++prim) {
                     const auto& matInstance = rm.getMaterialInstanceAt(instance, prim);
 
-                    //std::function<void(bool, std::string, std::string)> setTextureIfPresent;
                     auto setTextureIfPresent ([&](bool useTexture, const auto& filename, const std::string& propertyName) {
                         std::string useTextureName = "use" + propertyName + "Texture";
                         std::string samplerName = propertyName + "Texture";
@@ -933,6 +932,9 @@ void SimpleViewer::updateUserInterface() {
                         }
 
                     });
+
+                    matInstance->setParameter("blendPower", tweaks.mBlendPower);
+                    matInstance->setParameter("blendBias", tweaks.mBlendBias);
 
                     setTextureIfPresent(tweaks.mBaseColor.isFile, tweaks.mBaseColor.filename, "albedo");
 
@@ -988,7 +990,7 @@ void SimpleViewer::updateUserInterface() {
                         matInstance->setParameter("sheenColor", tweaks.mSheenColor.value);
                         setTextureIfPresent(tweaks.mSheenRoughness.isFile, tweaks.mSheenRoughness.filename, "sheenRoughness");
                         matInstance->setParameter("sheenRoughness", tweaks.mSheenRoughness.value);
-                    } else if (tweaks.mMaterialType == TweakableMaterial::MaterialType::TransparentThin || tweaks.mMaterialType == TweakableMaterial::MaterialType::TransparentSolid) {
+                    } else if (tweaks.mMaterialType == TweakableMaterial::MaterialType::TransparentSolid) {
                         // Only transparent materials have the properties below
                         matInstance->setParameter("absorption", tweaks.mAbsorption.value);
 

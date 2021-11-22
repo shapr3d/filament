@@ -166,12 +166,21 @@ material {
         {
             type : float,
             name : roughnessScale
+        },
+        {
+            type : float,
+            name : blendPower
+        },
+        {
+            type : float,
+            name : blendBias
         }
     ]
 }
 
 fragment {
     const float EPSILON = 1.0 / 2048.0;
+
     // A simple linear blend with normalization
     vec3 computeWeights( vec3 normal ) {
 #if 0
@@ -181,7 +190,8 @@ fragment {
 #else
         // This one has a region where there is no blend, creating more defined interpolations
         vec3 blend = abs(normal.xyz);
-        blend = max(blend - 0.2, vec3(0.0) );
+        blend = max(blend - materialParams.blendBias, vec3(0.0) );
+        blend = pow( blend, vec3( abs( materialParams.blendPower) ) );
         blend /= (blend.x + blend.y + blend.z);
         return blend;
 #endif
