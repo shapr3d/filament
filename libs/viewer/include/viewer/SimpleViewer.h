@@ -226,6 +226,8 @@ public:
 private:
     void updateIndirectLight();
 
+    void changeAllVisibility(utils::Entity entity, bool changeToVisible);
+
     void quickLoad();
     void undoLastModification();
     //void redoLastModification();
@@ -307,6 +309,10 @@ private:
         static bool shouldUndoOnKeyDownEvent(int keyCode, uint16_t modState) {
             return keyCode == 'z' && (modState & MOD_FOR_HOTKEYS);
         }
+
+        static bool shouldToggleVisibilityOnKeyDownEvent(int keyCode, uint16_t modState) {
+            return keyCode == 'i' && (modState & MOD_FOR_HOTKEYS);
+        }
     };
 
 public:
@@ -320,6 +326,12 @@ public:
                 return true;
             } else if (SimpleViewerInputPredicates::shouldQuickLoadOnKeyDownEvent(keyCode, modState)) {
                 quickLoad();
+                return true;
+            }
+            else if (SimpleViewerInputPredicates::shouldToggleVisibilityOnKeyDownEvent(keyCode, modState)) {
+                static bool currentlyVisible = true;
+                currentlyVisible = !currentlyVisible;
+                changeAllVisibility(mAsset->getRoot(), currentlyVisible);
                 return true;
             }
             return false;

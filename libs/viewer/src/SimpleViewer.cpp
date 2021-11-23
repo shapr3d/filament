@@ -679,6 +679,26 @@ void SimpleViewer::loadTweaksFromFile(const std::string& entityName, const std::
     checkAndFixPathRelative(tweaks.mIor);*/
 }
 
+void SimpleViewer::changeAllVisibility(utils::Entity entity, bool changeToVisible) {
+    auto& tm = mEngine->getTransformManager();
+    bool rvis = mScene->hasEntity(entity);
+    if (!changeToVisible) {
+        mScene->remove(entity);
+    }
+    else {
+        mScene->addEntity(entity);
+    }
+
+    auto tinstance = tm.getInstance(entity);
+
+    std::vector<utils::Entity> children(tm.getChildCount(tinstance));
+
+    tm.getChildren(tinstance, children.data(), children.size());
+    for (auto ce : children) {
+        changeAllVisibility(ce, changeToVisible);
+    }
+};
+
 void SimpleViewer::updateUserInterface() {
     using namespace filament;
 
@@ -693,7 +713,7 @@ void SimpleViewer::updateUserInterface() {
     auto renderableTreeItem = [this, &rm](utils::Entity entity) {
         bool rvis = mScene->hasEntity(entity);
         ImGui::Checkbox("visible", &rvis);
-        if (rvis) {
+        if ( rvis ) {
             mScene->addEntity(entity);
         } else {
             mScene->remove(entity);
@@ -1298,6 +1318,13 @@ void SimpleViewer::updateUserInterface() {
 
     if (mAsset != nullptr) {
         if (ImGui::CollapsingHeader("Hierarchy")) {
+            if (ImGui::Button("Make all visible")) {
+                changeAllVisibility(mAsset->getRoot(), true);
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Make all invisible")) {
+                changeAllVisibility(mAsset->getRoot(), false);
+            }
             ImGui::Indent();
             ImGui::Checkbox("Show bounds", &mEnableWireframe);
             treeNode(mAsset->getRoot());
