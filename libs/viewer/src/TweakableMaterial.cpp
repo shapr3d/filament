@@ -63,7 +63,9 @@ void TweakableMaterial::fromJson(const json& source) {
     try {
         mMaterialType = source["materialType"];
 
-        readTexturedFromJson(source, "baseColor", mBaseColor);
+        bool isAlpha = (mMaterialType == TweakableMaterial::MaterialType::TransparentSolid) || (mMaterialType == mMaterialType == TweakableMaterial::MaterialType::TransparentThin);
+
+        readTexturedFromJson(source, "baseColor", mBaseColor, true, isAlpha);
 
         readValueFromJson(source, "normalIntensity", mNormalIntensity, 1.0f);
         readTexturedFromJson(source, "normalTexture", mNormal);
