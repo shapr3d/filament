@@ -943,7 +943,7 @@ void SimpleViewer::updateUserInterface() {
                         useTextureName[3] = std::toupper(useTextureName[3]);
 
                         auto textureEntry = mTextures.find(filename.asString());
-                        if (useTexture && textureEntry != mTextures.end()) {
+                        if (useTexture && textureEntry != mTextures.end() && textureEntry->second != nullptr) {
                             matInstance->setParameter(useTextureName.c_str(), 1);
                             matInstance->setParameter(samplerName.c_str(), textureEntry->second, trilinSampler);
                         }
