@@ -679,9 +679,45 @@ void SimpleViewer::loadTweaksFromFile(const std::string& entityName, const std::
     checkAndFixPathRelative(tweaks.mIor);*/
 }
 
+void SimpleViewer::changeElementVisibility( utils::Entity entity, int& elementIndex, bool newVisibility ) {
+    if (elementIndex < 0) return;
+
+    auto& tm = mEngine->getTransformManager();
+    auto& rm = mEngine->getRenderableManager();
+    
+    auto rinstance = rm.getInstance(entity);
+    auto tinstance = tm.getInstance(entity);
+
+    if (rinstance) {
+        // Only count child nodes
+        if (tm.getChildCount(tinstance) == 0) {
+            if (elementIndex == 0) {
+                if (!newVisibility) {
+                    mScene->remove(entity);
+                } else {
+                    mScene->addEntity(entity);
+                }
+                // To terminate all remaining, no longer relevant calls
+                --elementIndex;
+                return;
+            } else {
+                // To track that this was not yet the child we want to decrement
+                --elementIndex;
+            }
+        }
+    }
+
+    std::vector<utils::Entity> children(tm.getChildCount(tinstance));
+
+    tm.getChildren(tinstance, children.data(), children.size());
+    for (auto ce : children) {
+        auto crinstance = rm.getInstance(ce);
+        changeElementVisibility(ce, elementIndex, newVisibility);
+    }
+}
+
 void SimpleViewer::changeAllVisibility(utils::Entity entity, bool changeToVisible) {
     auto& tm = mEngine->getTransformManager();
-    bool rvis = mScene->hasEntity(entity);
     if (!changeToVisible) {
         mScene->remove(entity);
     }
@@ -1320,10 +1356,12 @@ void SimpleViewer::updateUserInterface() {
         if (ImGui::CollapsingHeader("Hierarchy")) {
             if (ImGui::Button("Make all visible")) {
                 changeAllVisibility(mAsset->getRoot(), true);
+                for (bool& isVisible : mVisibility) isVisible = true;
             }
             ImGui::SameLine();
             if (ImGui::Button("Make all invisible")) {
                 changeAllVisibility(mAsset->getRoot(), false);
+                for (bool& isVisible : mVisibility) isVisible = false;
             }
             ImGui::Indent();
             ImGui::Checkbox("Show bounds", &mEnableWireframe);

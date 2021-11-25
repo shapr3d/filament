@@ -226,6 +226,7 @@ public:
 private:
     void updateIndirectLight();
 
+    void changeElementVisibility(utils::Entity entity, int& elementIndex, bool newVisibility);
     void changeAllVisibility(utils::Entity entity, bool changeToVisible);
 
     void quickLoad();
@@ -281,6 +282,7 @@ private:
     std::unordered_map<std::string, TweakableMaterial> mTweakedMaterials{};
     std::vector<filament::MaterialInstance*> mMaterialInstances{};
     std::unordered_map<std::string, filament::Texture*> mTextures{};
+    bool mVisibility[10]{ true, true, true, true, true, true, true, true, true, true };
 
     TextureSampler trilinSampler = TextureSampler(TextureSampler::MinFilter::LINEAR_MIPMAP_LINEAR, TextureSampler::MagFilter::LINEAR, TextureSampler::WrapMode::REPEAT);
 
@@ -313,6 +315,10 @@ private:
         static bool shouldToggleVisibilityOnKeyDownEvent(int keyCode, uint16_t modState) {
             return keyCode == 'i' && (modState & MOD_FOR_HOTKEYS);
         }
+
+        static bool shouldToggleElementVisibilityOnKeyDownEvent(int keyCode, uint16_t modState) {
+            return keyCode >= '1' && keyCode <= '9' && (modState & MOD_FOR_HOTKEYS);
+        }        
     };
 
 public:
@@ -327,12 +333,18 @@ public:
             } else if (SimpleViewerInputPredicates::shouldQuickLoadOnKeyDownEvent(keyCode, modState)) {
                 quickLoad();
                 return true;
-            }
-            else if (SimpleViewerInputPredicates::shouldToggleVisibilityOnKeyDownEvent(keyCode, modState)) {
+            } else if (SimpleViewerInputPredicates::shouldToggleVisibilityOnKeyDownEvent(keyCode, modState)) {
                 static bool currentlyVisible = true;
                 currentlyVisible = !currentlyVisible;
                 changeAllVisibility(mAsset->getRoot(), currentlyVisible);
+                for (bool& isVisible : mVisibility) isVisible = currentlyVisible;
                 return true;
+            } else if (SimpleViewerInputPredicates::shouldToggleElementVisibilityOnKeyDownEvent(keyCode, modState)) {
+                int indexToModify = keyCode - '1';
+                if (indexToModify >= 0 && indexToModify <= 8) {
+                    mVisibility[indexToModify] = !mVisibility[indexToModify];
+                    changeElementVisibility(mAsset->getRoot(), indexToModify, mVisibility[indexToModify]);
+                }
             }
             return false;
         };
