@@ -93,7 +93,7 @@ private:
 
 struct ColorGradingSettings {
     bool enabled = true;
-    filament::ColorGrading::QualityLevel quality = filament::ColorGrading::QualityLevel::MEDIUM;
+    filament::ColorGrading::QualityLevel quality = filament::ColorGrading::QualityLevel::ULTRA;
     ToneMapping toneMapping = ToneMapping::LINEAR;
     float temperature = 0;
     float tint = 0;
