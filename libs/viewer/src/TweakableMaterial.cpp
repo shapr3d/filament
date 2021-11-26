@@ -241,7 +241,11 @@ void TweakableMaterial::drawUI() {
 
         if (ImGui::CollapsingHeader("Metal (anisotropy, etc.) settings")) {
             mAnisotropy.addWidget("anisotropy", -1.0f, 1.0f);
-            mAnisotropyDirection.addWidget("anisotropy direction", -1.0f, 1.0f);
+            
+            // This is more intuitive to toggle like this
+            ImGui::Separator();
+            ImGui::LabelText("anisotropy direction", "anisotropy direction");
+            ImGuiExt::DirectionWidget("anisotropyDirection", mAnisotropyDirection.value.v);
         }
         break;
     }
