@@ -226,7 +226,7 @@ public:
 private:
     void updateIndirectLight();
 
-    void changeElementVisibility(utils::Entity entity, int& elementIndex, bool newVisibility);
+    void changeElementVisibility(utils::Entity entity, int elementIndex, bool newVisibility);
     void changeAllVisibility(utils::Entity entity, bool changeToVisible);
 
     void quickLoad();

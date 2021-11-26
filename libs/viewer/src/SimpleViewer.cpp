@@ -605,8 +605,7 @@ void SimpleViewer::renderUserInterface(float timeStepInSeconds, View* guiView, f
     });
 }
 
-void SimpleViewer::mouseEvent(float mouseX, float mouseY, bool mouseButton, float mouseWheelY,
-        bool control) {
+void SimpleViewer::mouseEvent(float mouseX, float mouseY, bool mouseButton, float mouseWheelY, bool control) {
     if (mImGuiHelper) {
         ImGuiIO& io = ImGui::GetIO();
         io.MousePos.x = mouseX;
@@ -637,7 +636,7 @@ void SimpleViewer::keyPressEvent(int charCode) {
     }
 }
 
-void SimpleViewer::saveTweaksToFile(TweakableMaterial *tweaks, const char *filePath) {
+void SimpleViewer::saveTweaksToFile(TweakableMaterial* tweaks, const char* filePath) {
     nlohmann::json js = tweaks->toJson();
     std::string filePathStr = filePath;
     if (filePathStr.rfind(".json") != (filePathStr.size() - 5)) {
@@ -679,40 +678,36 @@ void SimpleViewer::loadTweaksFromFile(const std::string& entityName, const std::
     checkAndFixPathRelative(tweaks.mIor);*/
 }
 
-void SimpleViewer::changeElementVisibility( utils::Entity entity, int& elementIndex, bool newVisibility ) {
-    if (elementIndex < 0) return;
-
+void SimpleViewer::changeElementVisibility(utils::Entity entity, int elementIndex, bool newVisibility) {
+    // The children of the root are the below-Node level nodes in the graph - indexing refers to them by artist request
     auto& tm = mEngine->getTransformManager();
     auto& rm = mEngine->getRenderableManager();
-    
+
     auto rinstance = rm.getInstance(entity);
     auto tinstance = tm.getInstance(entity);
 
-    if (rinstance) {
-        // Only count child nodes
-        if (tm.getChildCount(tinstance) == 0) {
-            if (elementIndex == 0) {
-                if (!newVisibility) {
-                    mScene->remove(entity);
-                } else {
-                    mScene->addEntity(entity);
-                }
-                // To terminate all remaining, no longer relevant calls
-                --elementIndex;
-                return;
-            } else {
-                // To track that this was not yet the child we want to decrement
-                --elementIndex;
-            }
+    auto getNthChild = [&](utils::Entity& parentEntity, int N = 0) {
+        auto tparentEntity = tm.getInstance(parentEntity);
+        utils::Entity nthChild;
+        if (N < tm.getChildCount(tparentEntity)) {
+            tm.getChildren(tparentEntity, &nthChild, N);
         }
-    }
+        return nthChild;
+    };
 
-    std::vector<utils::Entity> children(tm.getChildCount(tinstance));
+    auto hasChild = [&](utils::Entity& parentEntity) {
+        auto tparentEntity = tm.getInstance(parentEntity);
+        return tm.getChildCount(tparentEntity) != 0;
+    };
 
-    tm.getChildren(tinstance, children.data(), children.size());
-    for (auto ce : children) {
-        auto crinstance = rm.getInstance(ce);
-        changeElementVisibility(ce, elementIndex, newVisibility);
+    if (hasChild(entity)) {
+        auto tparentOfRoi = tm.getInstance(entity);
+        std::vector<utils::Entity> children(tm.getChildCount(tparentOfRoi));
+        tm.getChildren(tinstance, children.data(), children.size());
+
+        if (elementIndex < children.size()) {
+            changeAllVisibility(children[elementIndex], newVisibility);
+        }
     }
 }
 
