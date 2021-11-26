@@ -78,6 +78,29 @@ float D_GGX(float roughness, float NoH, const vec3 h) {
     return saturateMediump(d);
 }
 
+float pow2( float x ) {
+    return x*x;
+}
+
+float D_GGX_Anisotropic_Ward(float at, float ab, float ToH, float BoH, float NoH, float NoL, float NoV) {
+    // It's OK to divide by at and ab as both of them are clamped to MIN_ROUGHNESS, which is larger than 0
+    float  oneOverAt = 1.0 / at;
+    float  oneOverAb = 1.0 / ab;
+    float  exponent  = -( pow2( ToH * oneOverAt ) + pow2( BoH * oneOverAb ) ) / pow2( NoH );
+
+    const float oneOverFourPi = 1.0 / (4.0 * PI );
+    // We go out on a limb believing that NoL * NoV is sufficiently large to '1/sqrt' it unless we max-it; 2^(-14/2) = 2^-7 = 
+    float  Distribution  = oneOverFourPi * oneOverAt * oneOverAb * inversesqrt( max( NoL * NoV, 0.0078125 ) );
+           Distribution *= exp(exponent);
+
+    return Distribution;
+
+    /*float  exponent = -(pow2(ToH/at) + pow2(BoH/ab)) / pow2(NoH);
+    float  Distribution = 1.0 / (4.0 * PI * at * ab * sqrt(NoL * NoV));
+           Distribution *= exp(exponent);
+    return Distribution;*/
+}
+
 float D_GGX_Anisotropic(float at, float ab, float ToH, float BoH, float NoH) {
     // Burley 2012, "Physically-Based Shading at Disney"
 
@@ -181,11 +204,17 @@ vec3 fresnel(const vec3 f0, float LoH) {
 #endif
 }
 
-float distributionAnisotropic(float at, float ab, float ToH, float BoH, float NoH) {
+float distributionAnisotropic(float at, float ab, float ToH, float BoH, float NoH, float NoL, float NoV) {
+#if BRDF_ANISOTROPIC_D == SPECULAR_D_GGX_ANISOTROPIC                                  
+    return D_GGX_Anisotropic_Ward(at, ab, ToH, BoH, NoH, NoL, NoV);
+#endif
+}
+
+/*float distributionAnisotropic(float at, float ab, float ToH, float BoH, float NoH) {
 #if BRDF_ANISOTROPIC_D == SPECULAR_D_GGX_ANISOTROPIC
     return D_GGX_Anisotropic(at, ab, ToH, BoH, NoH);
 #endif
-}
+}*/
 
 float visibilityAnisotropic(float roughness, float at, float ab,
         float ToV, float BoV, float ToL, float BoL, float NoV, float NoL) {
