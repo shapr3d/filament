@@ -172,6 +172,10 @@ material {
             name : maxThickness
         },
         {
+            type : int,
+            name : useWard
+        },
+        {
             type : float,
             name : blendPower
         },
@@ -380,6 +384,7 @@ fragment {
         material.subsurfaceColor = materialParams.subsurfaceColor;
         material.subsurfacePower = materialParams.subsurfacePower;
         material.specularIntensity = materialParams.specularIntensity;
+        material.useWard = (materialParams.useWard == 1) ? true : false;
 
         // Debug coloring
         //material.baseColor.rgb *= 1e-6;

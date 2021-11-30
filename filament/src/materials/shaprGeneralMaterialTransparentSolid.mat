@@ -185,6 +185,10 @@ material {
             name : roughnessScale
         },
         {
+            type : int,
+            name : useWard
+        },
+        {
             type : float,
             name : blendPower
         },
@@ -404,5 +408,6 @@ fragment {
         // simplies
         //--------
         material.specularIntensity = materialParams.specularIntensity;
+        material.useWard = (materialParams.useWard == 1) ? true : false;
     }
 }

@@ -164,6 +164,10 @@ material {
             name : roughnessScale
         },
         {
+            type : int,
+            name : useWard
+        },
+        {
             type : float,
             name : blendPower
         },
@@ -369,6 +373,7 @@ fragment {
         material.sheenColor = materialParams.sheenColor;
 
         material.specularIntensity = materialParams.specularIntensity;
+        material.useWard = (materialParams.useWard == 1) ? true : false;
         // Debug coloring
         //material.baseColor.rgb *= 1e-6;
         //material.baseColor.rgb += 0.5 * ( material.normal + vec3(1) );

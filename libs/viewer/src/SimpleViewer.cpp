@@ -986,6 +986,7 @@ void SimpleViewer::updateUserInterface() {
 
                     matInstance->setParameter("blendPower", tweaks.mBlendPower);
                     matInstance->setParameter("blendBias", tweaks.mBlendBias);
+                    matInstance->setParameter("useWard", (tweaks.mUseWard) ? 1 : 0 );
 
                     setTextureIfPresent(tweaks.mBaseColor.isFile, tweaks.mBaseColor.filename, "baseColor");
 

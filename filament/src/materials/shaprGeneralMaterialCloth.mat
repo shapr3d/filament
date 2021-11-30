@@ -142,6 +142,10 @@ material {
             name : subsurfaceColor
         },
         {
+            type : int,
+            name : useWard
+        },
+        {
             type : float,
             name : blendPower
         },
@@ -329,8 +333,8 @@ fragment {
         material.anisotropy = materialParams.anisotropy;
         material.anisotropyDirection = materialParams.anisotropyDirection;
         material.clearCoat = materialParams.clearCoat;
-
         material.specularIntensity = materialParams.specularIntensity;
+        material.useWard = (materialParams.useWard == 1) ? true : false;
 
         //material.specularIntensity = 1.0;
         //material.baseColor.rgb = vec3(0.25);

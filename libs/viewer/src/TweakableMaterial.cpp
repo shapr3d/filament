@@ -15,6 +15,8 @@ json TweakableMaterial::toJson() {
 
     result["materialType"] = mMaterialType;
 
+    result["useWard"] = mUseWard;
+
     writeTexturedToJson(result, "baseColor", mBaseColor);
 
     result["normalIntensity"] = mNormalIntensity.value;
@@ -64,6 +66,8 @@ void TweakableMaterial::fromJson(const json& source) {
         mMaterialType = source["materialType"];
 
         bool isAlpha = (mMaterialType == TweakableMaterial::MaterialType::TransparentSolid) || (mMaterialType == mMaterialType == TweakableMaterial::MaterialType::TransparentThin);
+
+        readValueFromJson(source, "useWard", mUseWard, false);
 
         readTexturedFromJson(source, "baseColor", mBaseColor, true, isAlpha);
 
@@ -138,7 +142,7 @@ void resetMemberToValue(TweakableProperty<T, MayContainFile, IsColor, IsDerivabl
 void TweakableMaterial::resetWithType(MaterialType newType) {
 
     resetMemberToValue(mBaseColor, {0.0f, 0.0f, 0.0f, 1.0f});
-
+    mUseWard = false;
     resetMemberToValue(mNormal, {});
     resetMemberToValue(mOcclusion, { 1.0f });
     resetMemberToValue(mRoughnessScale, 1.0f);
@@ -181,6 +185,10 @@ void TweakableMaterial::resetWithType(MaterialType newType) {
 }
 
 void TweakableMaterial::drawUI() {
+    if (ImGui::CollapsingHeader("Shader setup")) {
+        ImGui::Checkbox("Use Ward specular normal distribution", &mUseWard);
+    }
+
     if (ImGui::CollapsingHeader("Base color")) {
         ImGui::SliderFloat("Tile: albedo texture", &mBaseTextureScale, 1.0f / 1024.0f, 32.0f);
         ImGui::Separator();

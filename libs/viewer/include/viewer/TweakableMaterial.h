@@ -109,6 +109,7 @@ public:
     TweakableProperty<float> mIorScale{}; // for refractive
     TweakablePropertyTextured<float> mIor{}; // for refractive
 
+    bool mUseWard{};
     float mBlendPower{ 2.0f };
     float mBlendBias{ 0.2f };
 
@@ -170,6 +171,18 @@ private:
         try {
             item = source[prefix];
         } catch (...) {
+            std::cout << "Material file did not have attribute '" << prefix << "'. Using default (" << defaultValue << ") instead." << std::endl;
+            item = defaultValue;
+        }
+    }
+
+    // And this is only here for the non-directly tweakable/transferred types, such as bools
+    // TODO: clean up this mess!
+    void readValueFromJson(const json& source, const std::string& prefix, bool& item, const bool defaultValue ) {
+        try {
+            item = source[prefix];
+        }
+        catch (...) {
             std::cout << "Material file did not have attribute '" << prefix << "'. Using default (" << defaultValue << ") instead." << std::endl;
             item = defaultValue;
         }
