@@ -7,7 +7,7 @@ material {
         },
         {
            type : int,
-           name : constantColor
+           name : skyboxType
         },
         {
            type : samplerCubemap,
@@ -29,26 +29,107 @@ material {
 }
 
 fragment {
+
+    float3 approxInverseSRGB(float3 srgb) {
+        return pow(srgb, vec3(2.2));
+    }
+
+    // Conversion code from: https://bottosson.github.io/posts/oklab/
+    float3 linear_srgb_to_oklab(float3 c) 
+    {
+        float l = 0.4122214708 * c.r + 0.5363325363 * c.g + 0.0514459929 * c.b;
+        float m = 0.2119034982 * c.r + 0.6806995451 * c.g + 0.1073969566 * c.b;
+        float s = 0.0883024619 * c.r + 0.2817188376 * c.g + 0.6299787005 * c.b;
+
+        float l_ = pow(l, 1.0/3.0);
+        float m_ = pow(m, 1.0/3.0);
+        float s_ = pow(s, 1.0/3.0);
+
+        return float3(
+            0.2104542553*l_ + 0.7936177850*m_ - 0.0040720468*s_,
+            1.9779984951*l_ - 2.4285922050*m_ + 0.4505937099*s_,
+            0.0259040371*l_ + 0.7827717662*m_ - 0.8086757660*s_
+        );
+    }
+
+    float3 oklab_to_linear_srgb(float3 c) 
+    {
+        float l_ = c.r + 0.3963377774 * c.g + 0.2158037573 * c.b;
+        float m_ = c.r - 0.1055613458 * c.g - 0.0638541728 * c.b;
+        float s_ = c.r - 0.0894841775 * c.g - 1.2914855480 * c.b;
+
+        float l = l_*l_*l_;
+        float m = m_*m_*m_;
+        float s = s_*s_*s_;
+
+        return float3(
+            +4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+            -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+            -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s
+        );
+    }
+
+    float computeGradient(float t) {
+        float DIMMING_FACTOR = 0.6;
+        float GRAD_START_HIGH = 0.9;
+        float GRAD_LOCATION = 0.4;
+        float GRAD_START_LOW = 0.2;
+
+        float grad;
+        if (t >= GRAD_LOCATION) {
+            grad = DIMMING_FACTOR + (t - GRAD_LOCATION) * (1.0 / (GRAD_START_HIGH - GRAD_LOCATION)) * (1.0 - DIMMING_FACTOR);
+        } else {
+            grad = 1.0 - (t - GRAD_START_LOW) * (1.0 / (GRAD_LOCATION - GRAD_START_LOW)) * (1.0 - DIMMING_FACTOR);
+        }
+        return saturate(grad);
+    }
+
+    float3 shaprSky_general() {
+        float SHAPR_THRESH = 0.5;
+
+        float upDirection = normalize(variable_eyeDirection).y;
+        float3 colorRGB = approxInverseSRGB(materialParams.color.rgb);
+        float3 colorConverted = linear_srgb_to_oklab(colorRGB);
+        if (colorConverted.r > SHAPR_THRESH) {
+            colorConverted.r *= computeGradient(upDirection * 0.5 + 0.5);
+        } else {
+            float SHAPR_DARK_COLORS_BIAS = 2.0;
+
+            colorConverted.r *= (SHAPR_DARK_COLORS_BIAS - computeGradient(upDirection * 0.5 + 0.5));
+        }
+        return oklab_to_linear_srgb(colorConverted);
+    }
+
     void material(inout MaterialInputs material) {
         prepareMaterial(material);
-        vec4 sky;
-        if (materialParams.constantColor != 0) {
-            sky = materialParams.color;
+        float4 sky;
+        if (materialParams.skyboxType == 0) {
+            sky = float4(approxInverseSRGB(materialParams.color.rgb), materialParams.color.a);
+        } else if (materialParams.skyboxType == 1) {
+            float3 shaprSkyColor = shaprSky_general();
+            sky = float4(shaprSkyColor, 1.0);
         } else {
-            sky = vec4(textureLod(materialParams_skybox, variable_eyeDirection.xyz, 0.0).rgb, 1.0);
+            sky = float4(textureLod(materialParams_skybox, variable_eyeDirection.xyz, 0.0).rgb, 1.0);
             sky.rgb *= frameUniforms.iblLuminance;
         }
+
         if (materialParams.showSun != 0 && frameUniforms.sun.w >= 0.0f) {
-            vec3 direction = normalize(variable_eyeDirection.xyz);
+            float3 direction = normalize(variable_eyeDirection.xyz);
             // Assume the sun is a sphere
-            vec3 sun = frameUniforms.lightColorIntensity.rgb *
+            float3 sun = frameUniforms.lightColorIntensity.rgb *
                     (frameUniforms.lightColorIntensity.a * (4.0 * PI));
             float cosAngle = dot(direction, frameUniforms.lightDirection);
             float x = (cosAngle - frameUniforms.sun.x) * frameUniforms.sun.z;
             float gradient = pow(1.0 - saturate(x), frameUniforms.sun.w);
             sky.rgb = sky.rgb + gradient * sun;
         }
-        material.baseColor = sky;
+
+        if (materialParams.skyboxType != 2) {
+            material.baseColor = float4(0.0);
+            material.postLightingColor = sky;
+        } else {
+            material.baseColor = sky;
+        }
     }
 }
 

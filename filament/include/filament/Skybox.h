@@ -64,6 +64,12 @@ class UTILS_PUBLIC Skybox : public FilamentAPI {
     struct BuilderDetails;
 
 public:
+    enum SkyboxType {
+        COLOR = 0,
+        GRADIENT = 1,
+        ENVIRONMENT = 2
+    };
+
     //! Use Builder to construct an Skybox object instance
     class Builder : public BuilderBase<BuilderDetails> {
         friend struct BuilderDetails;
@@ -131,6 +137,11 @@ public:
         Builder& color(math::float4 color) noexcept;
 
         /**
+        * Sets the skybox type, between solid color, gradient and environment.
+        */
+        Builder& type(SkyboxType type) noexcept;
+
+        /**
          * Creates the Skybox object and returns a pointer to it.
          *
          * @param engine Reference to the filament::Engine to associate this Skybox with.
@@ -144,6 +155,8 @@ public:
     };
 
     void setColor(math::float4 color) noexcept;
+
+    void setType(SkyboxType type) noexcept;
 
     /**
      * Sets bits in a visibility mask. By default, this is 0x1.
