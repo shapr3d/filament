@@ -417,7 +417,7 @@ void SimpleViewer::generateDummyMaterial() {
     static constexpr uint16_t TRIANGLE_INDICES[3] = { 0, 1, 2 };
 
     const Material* currentMaterial = mEngine->getShaprMaterial(0);
-    const_cast<MaterialInstance*>(currentMaterial->getDefaultInstance())->setParameter("albedo", filament::math::float4{ 100.0f, 0.0f, 0.0f, 0.0f });
+    const_cast<MaterialInstance*>(currentMaterial->getDefaultInstance())->setParameter("baseColor", filament::math::float4{ 1.0f, 0.0f, 0.0f, 1.0f });
 
     mDummyVB = VertexBuffer::Builder()
         .vertexCount(3)
@@ -987,7 +987,7 @@ void SimpleViewer::updateUserInterface() {
                     matInstance->setParameter("blendPower", tweaks.mBlendPower);
                     matInstance->setParameter("blendBias", tweaks.mBlendBias);
 
-                    setTextureIfPresent(tweaks.mBaseColor.isFile, tweaks.mBaseColor.filename, "albedo");
+                    setTextureIfPresent(tweaks.mBaseColor.isFile, tweaks.mBaseColor.filename, "baseColor");
 
                     matInstance->setParameter("normalScale", tweaks.mNormalIntensity.value);
                     setTextureIfPresent(tweaks.mNormal.isFile, tweaks.mNormal.filename, "normal");
@@ -1011,7 +1011,7 @@ void SimpleViewer::updateUserInterface() {
                     gammaBaseColor.g = std::pow(tweaks.mBaseColor.value.g, 2.22f);
                     gammaBaseColor.b = std::pow(tweaks.mBaseColor.value.b, 2.22f);
                     gammaBaseColor.a = tweaks.mBaseColor.value.a;
-                    matInstance->setParameter("albedo", gammaBaseColor);
+                    matInstance->setParameter("baseColor", gammaBaseColor);
                     matInstance->setParameter("roughness", tweaks.mRoughness.value);
                     matInstance->setParameter("clearCoat", tweaks.mClearCoat.value);
                     matInstance->setParameter("clearCoatRoughness", tweaks.mClearCoatRoughness.value);

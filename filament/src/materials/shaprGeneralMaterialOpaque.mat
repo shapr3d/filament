@@ -9,15 +9,15 @@ material {
         //////////////////////////////////////////////////////////////////////////////////////////////////
         {
             type : int,
-            name : useAlbedoTexture
+            name : useBaseColorTexture
         },
         {
             type : sampler2d,
-            name : albedoTexture
+            name : baseColorTexture
         },
         {
             type : float4,
-            name : albedo
+            name : baseColor
         },
 
         {
@@ -317,10 +317,10 @@ fragment {
         prepareMaterial(material);
 
         // And overwrite whatever we need to overwrite
-        if ( materialParams.useAlbedoTexture == 1 ) {
-            material.baseColor = triplanarTexture(materialParams_albedoTexture, materialParams.textureScaler.x, pos, normal);
+        if ( materialParams.useBaseColorTexture == 1 ) {
+            material.baseColor = triplanarTexture(materialParams_baseColorTexture, materialParams.textureScaler.x, pos, normal);
         } else {
-            material.baseColor = materialParams.albedo;
+            material.baseColor = materialParams.baseColor;
         }
 
         // TODO @gvalasek: to conform to standards, .r is treated as occlusion, .b is roughness,
