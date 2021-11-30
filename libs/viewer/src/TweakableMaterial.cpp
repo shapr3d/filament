@@ -92,11 +92,11 @@ void TweakableMaterial::fromJson(const json& source) {
         readValueFromJson(source, "anisotropyDirection", mAnisotropyDirection, { 1.0f, 0.0f, 0.0f });
 
         readTexturedFromJson(source, "sheenRoughness", mSheenRoughness);
-        readValueFromJson<filament::math::float3, true>(source, "sheenColor", mSheenColor, { 0.0f, 0.0f, 0.0f });
+        readValueFromJson<filament::math::float3, true, true>(source, "sheenColor", mSheenColor, { 0.0f, 0.0f, 0.0f });
         readValueFromJson<filament::math::float3, true>(source, "subsurfaceColor", mSubsurfaceColor, { 0.0f, 0.0f, 0.0f });        
-        readValueFromJson(source, "subsurfacePower", mSubsurfacePower.value, 1.0f);
+        readValueFromJson(source, "subsurfacePower", mSubsurfacePower, 1.0f);
 
-        readValueFromJson<filament::math::float3, true>(source, "absorption", mAbsorption, { 0.0f, 0.0f, 0.0f });
+        readValueFromJson<filament::math::float3, true, true>(source, "absorption", mAbsorption, { 0.0f, 0.0f, 0.0f });
         readValueFromJson(source, "iorScale", mIorScale, 1.0f);
         readTexturedFromJson(source, "ior", mIor);
         readTexturedFromJson(source, "thickness", mThickness);
@@ -129,8 +129,8 @@ void TweakableMaterial::fromJson(const json& source) {
     }
 }
 
-template <typename T, bool MayContainFile = false, bool IsColor = true, typename = IsValidTweakableType<T> >
-void resetMemberToValue(TweakableProperty<T, MayContainFile, IsColor>& prop, T value) {
+template <typename T, bool MayContainFile = false, bool IsColor = true, bool IsDerivable = false, typename = IsValidTweakableType<T> >
+void resetMemberToValue(TweakableProperty<T, MayContainFile, IsColor, IsDerivable>& prop, T value) {
     prop.value = value;
     prop.isFile = false;
 }
