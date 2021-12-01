@@ -84,7 +84,7 @@ fragment {
         return saturate(grad);
     }
 
-    float3 shaprSky_general() {
+    float3 shaprSkyGradient() {
         float SHAPR_THRESH = 0.5;
 
         float upDirection = normalize(variable_eyeDirection).y;
@@ -106,7 +106,7 @@ fragment {
         if (materialParams.skyboxType == 0) {
             sky = float4(approxInverseSRGB(materialParams.color.rgb), materialParams.color.a);
         } else if (materialParams.skyboxType == 1) {
-            float3 shaprSkyColor = shaprSky_general();
+            float3 shaprSkyColor = shaprSkyGradient();
             sky = float4(shaprSkyColor, 1.0);
         } else {
             sky = float4(textureLod(materialParams_skybox, variable_eyeDirection.xyz, 0.0).rgb, 1.0);
