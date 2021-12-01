@@ -52,6 +52,8 @@ public:
 
     FTexture const* getTexture() const noexcept { return mSkyboxTexture; }
 
+    void setType(SkyboxType type) noexcept;
+
     void setColor(math::float4 color) noexcept;
 
     // commits UBOs
@@ -67,6 +69,7 @@ private:
     FRenderableManager& mRenderableManager;
     float mIntensity = 0.0f;
     uint8_t mLayerMask = 0x1;
+    SkyboxType mType = Skybox::ENVIRONMENT;
 };
 
 FILAMENT_UPCAST(Skybox)
