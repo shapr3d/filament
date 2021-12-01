@@ -50,8 +50,12 @@ vec3 anisotropicLobe(const MaterialInputs material, const PixelParams pixel, con
     float ab = max(pixel.roughness * (1.0 - pixel.anisotropy), MIN_ROUGHNESS);
 
     // specular anisotropic BRDF
-    //float D = distributionAnisotropic(at, ab, ToH, BoH, NoH); // Filament
-    float D = distributionAnisotropic(at, ab, ToH, BoH, NoH, NoL, NoV); // Ward
+    float D = 0.0;    
+    if (material.useWard) {
+        D = distributionAnisotropicWard(at, ab, ToH, BoH, NoH, NoL, NoV); // Ward
+    } else {
+        D = distributionAnisotropic(at, ab, ToH, BoH, NoH); // Filament
+    }
     float V = visibilityAnisotropic(pixel.roughness, at, ab, ToV, BoV, ToL, BoL, NoV, NoL);
     vec3  F = material.specularIntensity * fresnel(pixel.f0, LoH);
 

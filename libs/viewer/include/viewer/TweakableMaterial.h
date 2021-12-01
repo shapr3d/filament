@@ -97,18 +97,19 @@ public:
     TweakableProperty<filament::math::float3, false, false> mAnisotropyDirection{}; // for metals; not color
     
     TweakableProperty<filament::math::float3> mSubsurfaceColor{}; // for cloth and subsurface
-    TweakableProperty<filament::math::float3> mSheenColor{}; // for cloth
+    TweakablePropertyDerivable<filament::math::float3> mSheenColor{}; // for cloth
     TweakablePropertyTextured<float> mSheenRoughness{}; // for cloth
 
     TweakableProperty<float> mSubsurfacePower{1.0f}; // for subsurface
 
-    TweakableProperty<filament::math::float3> mAbsorption{}; // for refractive
+    TweakablePropertyDerivable<filament::math::float3> mAbsorption{}; // for refractive
     TweakablePropertyTextured<float> mTransmission{}; // for refractive
     TweakableProperty<float> mMaxThickness{}; // for refractive; this scales the values read from a thickness property/texture
     TweakablePropertyTextured<float> mThickness{}; // for refractive and subsurface
     TweakableProperty<float> mIorScale{}; // for refractive
     TweakablePropertyTextured<float> mIor{}; // for refractive
 
+    bool mUseWard{};
     float mBlendPower{ 2.0f };
     float mBlendBias{ 0.2f };
 
@@ -118,7 +119,7 @@ public:
     void resetWithType(MaterialType newType);
 
 private:
-    template< typename T, bool MayContainFile = false, bool IsColor = true, typename = IsValidTweakableType<T> >
+    template< typename T, bool MayContainFile = false, bool IsColor = true, bool IsDerivable = false, typename = IsValidTweakableType<T> >
     void enqueueTextureRequest(TweakableProperty<T, MayContainFile, IsColor>& item, bool isSrgb = false, bool isAlpa = false) {
         enqueueTextureRequest(item.filename, item.doRequestReload, isSrgb, isAlpa);
         item.doRequestReload = false;
@@ -126,14 +127,14 @@ private:
 
     void enqueueTextureRequest(const std::string& filename, bool doRequestReload, bool isSrgb = false, bool isAlpa = false);
 
-    template< typename T, bool MayContainFile = false, bool IsColor = true, typename = IsValidTweakableType<T> >
+    template< typename T, bool MayContainFile = false, bool IsColor = true, bool IsDerivable = false, typename = IsValidTweakableType<T> >
     void writeTexturedToJson(json& result, const std::string& prefix, const TweakableProperty<T, MayContainFile, IsColor>& item) {
         result[prefix] = item.value;
         result[prefix + "IsFile"] = item.isFile;
         result[prefix + "Texture"] = item.filename.asString();
     }
 
-    template< typename T, bool MayContainFile = false, bool IsColor = true, typename = IsValidTweakableType<T> >
+    template< typename T, bool MayContainFile = false, bool IsColor = true, bool IsDerivable = false, typename = IsValidTweakableType<T> >
     void readTexturedFromJson(const json& source, const std::string& prefix, TweakableProperty<T, MayContainFile, IsColor>& item, bool isSrgb = false, bool isAlpha = false, T defaultValue = {}) {
         try {
             item.value = source[prefix];
@@ -150,21 +151,38 @@ private:
         }
     }
 
-    template< typename T, bool IsColor = false, typename = IsValidTweakableType<T> >
-    void readValueFromJson(const json& source, const std::string& prefix, TweakableProperty<T, false, IsColor>& item, const T defaultValue = T()) {
+    template< typename T, bool IsColor = false, bool IsDerivable = false, typename = IsValidTweakableType<T> >
+    void readValueFromJson(const json& source, const std::string& prefix, TweakableProperty<T, false, IsColor, IsDerivable>& item, const T defaultValue = T()) {
         try {
             item.value = source[prefix];
+            if (IsDerivable) {
+                item.useDerivedQuantity = source[prefix + "UseDerivable"];
+            }
         } catch (...) {
             std::cout << "Material file did not have attribute '" << prefix << "'. Using default (" << defaultValue << ") instead." << std::endl;
             item.value = defaultValue;
+            item.useDerivedQuantity = false;
         }
     }
 
+    // If you pass in the plain value without the encapsulating TweakableProperty
     template< typename T, bool IsColor = false, typename = IsValidTweakableType<T> >
     void readValueFromJson(const json& source, const std::string& prefix, T& item, const T defaultValue = T()) {
         try {
             item = source[prefix];
         } catch (...) {
+            std::cout << "Material file did not have attribute '" << prefix << "'. Using default (" << defaultValue << ") instead." << std::endl;
+            item = defaultValue;
+        }
+    }
+
+    // And this is only here for the non-directly tweakable/transferred types, such as bools
+    // TODO: clean up this mess!
+    void readValueFromJson(const json& source, const std::string& prefix, bool& item, const bool defaultValue ) {
+        try {
+            item = source[prefix];
+        }
+        catch (...) {
             std::cout << "Material file did not have attribute '" << prefix << "'. Using default (" << defaultValue << ") instead." << std::endl;
             item = defaultValue;
         }

@@ -204,17 +204,17 @@ vec3 fresnel(const vec3 f0, float LoH) {
 #endif
 }
 
-float distributionAnisotropic(float at, float ab, float ToH, float BoH, float NoH, float NoL, float NoV) {
+float distributionAnisotropicWard(float at, float ab, float ToH, float BoH, float NoH, float NoL, float NoV) {
 #if BRDF_ANISOTROPIC_D == SPECULAR_D_GGX_ANISOTROPIC                                  
     return D_GGX_Anisotropic_Ward(at, ab, ToH, BoH, NoH, NoL, NoV);
 #endif
 }
 
-/*float distributionAnisotropic(float at, float ab, float ToH, float BoH, float NoH) {
+float distributionAnisotropic(float at, float ab, float ToH, float BoH, float NoH) {
 #if BRDF_ANISOTROPIC_D == SPECULAR_D_GGX_ANISOTROPIC
     return D_GGX_Anisotropic(at, ab, ToH, BoH, NoH);
 #endif
-}*/
+}
 
 float visibilityAnisotropic(float roughness, float at, float ab,
         float ToV, float BoV, float ToL, float BoL, float NoV, float NoL) {

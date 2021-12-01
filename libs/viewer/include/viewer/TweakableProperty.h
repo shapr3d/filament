@@ -61,15 +61,19 @@ template <> constexpr float* getPointerTo<float>(float& instance) {
 //////////////////////////////////////////////////////////////////////////////////////////////////
 // A tweakable property with its own ImGui-based UI
 //////////////////////////////////////////////////////////////////////////////////////////////////
-template <typename T, bool MayContainFile = false, bool IsColor = true, typename = IsValidTweakableType<T> >
+template <typename T, bool MayContainFile = false, bool IsColor = true, bool IsDerivable = false, typename = IsValidTweakableType<T> >
 struct TweakableProperty {
     TweakableProperty() {}
     TweakableProperty(const T& prop) : value(prop) {}
 
     void addWidget(const char* label, float min = 0.0f, float max = 1.0f, const char* format = "%.3f", float power = 1.0f) {
         ImGui::LabelText(label, label);
-        std::string customTextureLabel = std::string("Use texture: ") + label;
+        if constexpr (IsDerivable) {
+            std::string customDerivableLabel = std::string("Use derived value for: ") + label;
+            ImGui::Checkbox(customDerivableLabel.c_str(), &useDerivedQuantity);
+        }
         if constexpr (MayContainFile) {
+            std::string customTextureLabel = std::string("Use texture: ") + label;
             ImGui::Checkbox(customTextureLabel.c_str(), &isFile);
             if (!isFile) {
                 drawValueWidget(label, min, max, format, power);
@@ -99,6 +103,7 @@ struct TweakableProperty {
     }
 
     void drawValueWidget(const char* label, float min = 0.0f, float max = 1.0f, const char* format = "%.3f", float power = 1.0f) {
+        if (useDerivedQuantity) return;
         if constexpr (dimCount<T>() == 4) {
             if constexpr (IsColor) {
                 ImGui::ColorEdit4(label, getPointerTo(value));
@@ -126,6 +131,7 @@ struct TweakableProperty {
 
     T value{};
     bool isFile{};
+    bool useDerivedQuantity{};
     bool doRequestReload{};
 
 //private:
@@ -177,3 +183,9 @@ struct TweakableProperty {
 
 template <typename T, bool IsColor = true, typename = IsValidTweakableType<T> >
 using TweakablePropertyTextured = TweakableProperty<T, true, IsColor>;
+
+template <typename T, bool IsColor = true, typename = IsValidTweakableType<T> >
+using TweakablePropertyDerivableTextured = TweakableProperty<T, true, IsColor, true>;
+
+template <typename T, bool IsColor = true, typename = IsValidTweakableType<T> >
+using TweakablePropertyDerivable = TweakableProperty<T, false, IsColor, true>;

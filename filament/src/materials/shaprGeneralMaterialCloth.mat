@@ -9,15 +9,15 @@ material {
         //////////////////////////////////////////////////////////////////////////////////////////////////
         {
             type : int,
-            name : useAlbedoTexture
+            name : useBaseColorTexture
         },
         {
             type : sampler2d,
-            name : albedoTexture
+            name : baseColorTexture
         },
         {
             type : float4,
-            name : albedo
+            name : baseColor
         },
 
         {
@@ -140,6 +140,10 @@ material {
         {
             type : float3,
             name : subsurfaceColor
+        },
+        {
+            type : int,
+            name : useWard
         },
         {
             type : float,
@@ -293,10 +297,10 @@ fragment {
         prepareMaterial(material);
 
         // And overwrite whatever we need to overwrite
-        if ( materialParams.useAlbedoTexture == 1 ) {
-            material.baseColor = triplanarTexture(materialParams_albedoTexture, materialParams.textureScaler.x, pos, normal);
+        if ( materialParams.useBaseColorTexture == 1 ) {
+            material.baseColor = triplanarTexture(materialParams_baseColorTexture, materialParams.textureScaler.x, pos, normal);
         } else {
-            material.baseColor = materialParams.albedo;
+            material.baseColor = materialParams.baseColor;
         }
 
         // TODO @gvalasek: to conform to standards, .r is treated as occlusion, .b is roughness,
@@ -329,8 +333,8 @@ fragment {
         material.anisotropy = materialParams.anisotropy;
         material.anisotropyDirection = materialParams.anisotropyDirection;
         material.clearCoat = materialParams.clearCoat;
-
         material.specularIntensity = materialParams.specularIntensity;
+        material.useWard = (materialParams.useWard == 1) ? true : false;
 
         //material.specularIntensity = 1.0;
         //material.baseColor.rgb = vec3(0.25);

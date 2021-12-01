@@ -15,6 +15,8 @@ json TweakableMaterial::toJson() {
 
     result["materialType"] = mMaterialType;
 
+    result["useWard"] = mUseWard;
+
     writeTexturedToJson(result, "baseColor", mBaseColor);
 
     result["normalIntensity"] = mNormalIntensity.value;
@@ -65,6 +67,8 @@ void TweakableMaterial::fromJson(const json& source) {
 
         bool isAlpha = (mMaterialType == TweakableMaterial::MaterialType::TransparentSolid) || (mMaterialType == mMaterialType == TweakableMaterial::MaterialType::TransparentThin);
 
+        readValueFromJson(source, "useWard", mUseWard, false);
+
         readTexturedFromJson(source, "baseColor", mBaseColor, true, isAlpha);
 
         readValueFromJson(source, "normalIntensity", mNormalIntensity, 1.0f);
@@ -92,11 +96,11 @@ void TweakableMaterial::fromJson(const json& source) {
         readValueFromJson(source, "anisotropyDirection", mAnisotropyDirection, { 1.0f, 0.0f, 0.0f });
 
         readTexturedFromJson(source, "sheenRoughness", mSheenRoughness);
-        readValueFromJson<filament::math::float3, true>(source, "sheenColor", mSheenColor, { 0.0f, 0.0f, 0.0f });
+        readValueFromJson<filament::math::float3, true, true>(source, "sheenColor", mSheenColor, { 0.0f, 0.0f, 0.0f });
         readValueFromJson<filament::math::float3, true>(source, "subsurfaceColor", mSubsurfaceColor, { 0.0f, 0.0f, 0.0f });        
-        readValueFromJson(source, "subsurfacePower", mSubsurfacePower.value, 1.0f);
+        readValueFromJson(source, "subsurfacePower", mSubsurfacePower, 1.0f);
 
-        readValueFromJson<filament::math::float3, true>(source, "absorption", mAbsorption, { 0.0f, 0.0f, 0.0f });
+        readValueFromJson<filament::math::float3, true, true>(source, "absorption", mAbsorption, { 0.0f, 0.0f, 0.0f });
         readValueFromJson(source, "iorScale", mIorScale, 1.0f);
         readTexturedFromJson(source, "ior", mIor);
         readTexturedFromJson(source, "thickness", mThickness);
@@ -129,8 +133,8 @@ void TweakableMaterial::fromJson(const json& source) {
     }
 }
 
-template <typename T, bool MayContainFile = false, bool IsColor = true, typename = IsValidTweakableType<T> >
-void resetMemberToValue(TweakableProperty<T, MayContainFile, IsColor>& prop, T value) {
+template <typename T, bool MayContainFile = false, bool IsColor = true, bool IsDerivable = false, typename = IsValidTweakableType<T> >
+void resetMemberToValue(TweakableProperty<T, MayContainFile, IsColor, IsDerivable>& prop, T value) {
     prop.value = value;
     prop.isFile = false;
 }
@@ -138,7 +142,7 @@ void resetMemberToValue(TweakableProperty<T, MayContainFile, IsColor>& prop, T v
 void TweakableMaterial::resetWithType(MaterialType newType) {
 
     resetMemberToValue(mBaseColor, {0.0f, 0.0f, 0.0f, 1.0f});
-
+    mUseWard = false;
     resetMemberToValue(mNormal, {});
     resetMemberToValue(mOcclusion, { 1.0f });
     resetMemberToValue(mRoughnessScale, 1.0f);
@@ -181,6 +185,10 @@ void TweakableMaterial::resetWithType(MaterialType newType) {
 }
 
 void TweakableMaterial::drawUI() {
+    if (ImGui::CollapsingHeader("Shader setup")) {
+        ImGui::Checkbox("Use Ward specular normal distribution", &mUseWard);
+    }
+
     if (ImGui::CollapsingHeader("Base color")) {
         ImGui::SliderFloat("Tile: albedo texture", &mBaseTextureScale, 1.0f / 1024.0f, 32.0f);
         ImGui::Separator();
