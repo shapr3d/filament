@@ -130,6 +130,10 @@ material {
             name : anisotropyDirection
         },
         {
+            type : int,
+            name : doDeriveSheenColor
+        },
+        {
             type : float3,
             name : sheenColor
         },
@@ -324,7 +328,7 @@ fragment {
         //--------
         // cloth
         //--------
-        material.sheenColor = materialParams.sheenColor;
+        material.sheenColor = ( materialParams.doDeriveSheenColor == 1 ) ? sqrt( material.baseColor.rgb ) : materialParams.sheenColor;
         material.subsurfaceColor = materialParams.subsurfaceColor;
 
         //--------

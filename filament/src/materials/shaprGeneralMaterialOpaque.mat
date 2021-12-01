@@ -168,6 +168,10 @@ material {
             name : useWard
         },
         {
+            type : int,
+            name : doDeriveSheenColor
+        },
+        {
             type : float,
             name : blendPower
         },
@@ -370,7 +374,7 @@ fragment {
         material.anisotropy = materialParams.anisotropy;
         material.anisotropyDirection = materialParams.anisotropyDirection;
         material.clearCoat = materialParams.clearCoat;
-        material.sheenColor = materialParams.sheenColor;
+        material.sheenColor = ( materialParams.doDeriveSheenColor == 1 ) ? sqrt( material.baseColor.rgb ) : materialParams.sheenColor;
 
         material.specularIntensity = materialParams.specularIntensity;
         material.useWard = (materialParams.useWard == 1) ? true : false;

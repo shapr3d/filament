@@ -47,11 +47,13 @@ json TweakableMaterial::toJson() {
 
     result["sheenColor"] = mSheenColor.value;
     result["subsurfaceColor"] = mSubsurfaceColor.value;
+    result["isSubsurfaceColorDerived"] = mSubsurfaceColor.useDerivedQuantity;
     result["subsurfacePower"] = mSubsurfacePower.value;
     writeTexturedToJson(result, "sheenRoughness", mSheenRoughness);
 
     // Transparent and refractive attributes
     result["absorption"] = mAbsorption.value;
+    result["isAbsorptionDerived"] = mAbsorption.useDerivedQuantity;
     result["iorScale"] = mIorScale.value;
     writeTexturedToJson(result, "ior", mIor);
     writeTexturedToJson(result, "thickness", mThickness);
@@ -97,10 +99,12 @@ void TweakableMaterial::fromJson(const json& source) {
 
         readTexturedFromJson(source, "sheenRoughness", mSheenRoughness);
         readValueFromJson<filament::math::float3, true, true>(source, "sheenColor", mSheenColor, { 0.0f, 0.0f, 0.0f });
-        readValueFromJson<filament::math::float3, true>(source, "subsurfaceColor", mSubsurfaceColor, { 0.0f, 0.0f, 0.0f });        
+        readValueFromJson(source, "isSubsurfaceColorDerived", mSubsurfaceColor.useDerivedQuantity, false);
+        readValueFromJson<filament::math::float3, true>(source, "subsurfaceColor", mSubsurfaceColor, { 0.0f, 0.0f, 0.0f });
         readValueFromJson(source, "subsurfacePower", mSubsurfacePower, 1.0f);
 
         readValueFromJson<filament::math::float3, true, true>(source, "absorption", mAbsorption, { 0.0f, 0.0f, 0.0f });
+        readValueFromJson(source, "isAbsorptionDerived", mAbsorption.useDerivedQuantity, false);
         readValueFromJson(source, "iorScale", mIorScale, 1.0f);
         readTexturedFromJson(source, "ior", mIor);
         readTexturedFromJson(source, "thickness", mThickness);
@@ -142,7 +146,6 @@ void resetMemberToValue(TweakableProperty<T, MayContainFile, IsColor, IsDerivabl
 void TweakableMaterial::resetWithType(MaterialType newType) {
 
     resetMemberToValue(mBaseColor, {0.0f, 0.0f, 0.0f, 1.0f});
-    mUseWard = false;
     resetMemberToValue(mNormal, {});
     resetMemberToValue(mOcclusion, { 1.0f });
     resetMemberToValue(mRoughnessScale, 1.0f);
@@ -178,6 +181,10 @@ void TweakableMaterial::resetWithType(MaterialType newType) {
     resetMemberToValue(mIorScale, 1.0f);
     resetMemberToValue(mIor, 1.5f);
 
+    mAbsorption.useDerivedQuantity = false;
+    mSheenColor.useDerivedQuantity = false;
+    mUseWard = false;
+
     mBlendPower = 2.0f;
     mBlendBias = 0.2f;
 
@@ -185,10 +192,6 @@ void TweakableMaterial::resetWithType(MaterialType newType) {
 }
 
 void TweakableMaterial::drawUI() {
-    if (ImGui::CollapsingHeader("Shader setup")) {
-        ImGui::Checkbox("Use Ward specular normal distribution", &mUseWard);
-    }
-
     if (ImGui::CollapsingHeader("Base color")) {
         ImGui::SliderFloat("Tile: albedo texture", &mBaseTextureScale, 1.0f / 1024.0f, 32.0f);
         ImGui::Separator();
@@ -290,6 +293,10 @@ void TweakableMaterial::drawUI() {
         }
         break;
     }
+    }
+
+    if (ImGui::CollapsingHeader("Shader setup")) {
+        ImGui::Checkbox("Use Ward specular normal distribution", &mUseWard);
     }
 }
 

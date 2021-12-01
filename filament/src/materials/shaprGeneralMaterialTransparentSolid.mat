@@ -189,6 +189,10 @@ material {
             name : useWard
         },
         {
+            type : int,
+            name : doDeriveAbsorption
+        },
+        {
             type : float,
             name : blendPower
         },
@@ -374,7 +378,7 @@ fragment {
         //////////////////////////////////////////////////////////////////////////////////////////////////
         // Attributes for transparent/refractive materials
         //////////////////////////////////////////////////////////////////////////////////////////////////
-        material.absorption = materialParams.absorption;
+        material.absorption = ( materialParams.doDeriveAbsorption == 1 ) ? 1.0 - material.baseColor.rgb : materialParams.absorption;
 
         if ( materialParams.useIorTexture == 1 ) {
             material.ior = 1.0 + materialParams.iorScale * triplanarTexture(materialParams_iorTexture, materialParams.textureScaler.w, pos, normal).r;
