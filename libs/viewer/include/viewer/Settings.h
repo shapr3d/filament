@@ -23,6 +23,7 @@
 #include <filament/MaterialInstance.h>
 #include <filament/Scene.h>
 #include <filament/View.h>
+#include <filament/Skybox.h>
 
 #include <math/vec3.h>
 #include <math/vec4.h>
@@ -163,6 +164,7 @@ struct LightSettings {
     float iblIntensity = 30000.0f;
     float skyIntensity = 30000.0f;
     float iblRotation = 0.0f;
+    Skybox::SkyboxType skyboxType = Skybox::ENVIRONMENT;
 };
 
 struct ViewerOptions {

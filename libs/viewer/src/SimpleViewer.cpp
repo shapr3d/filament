@@ -543,6 +543,7 @@ void SimpleViewer::updateIndirectLight() {
         );
     }
     mScene->getSkybox()->setIntensity(mSettings.lighting.skyIntensity);
+    mScene->getSkybox()->setType(mSettings.lighting.skyboxType);
 }
 
 void SimpleViewer::applyAnimation(double currentTime) {
@@ -1254,7 +1255,10 @@ void SimpleViewer::updateUserInterface() {
         ImGui::Checkbox("Scale to unit cube", &mSettings.viewer.autoScaleEnabled);
         updateRootTransform();
 
-        ImGui::Checkbox("Show skybox", &mSettings.viewer.skyboxEnabled);
+        int skyboxType = (int)mSettings.lighting.skyboxType;
+        ImGui::Combo("Skybox type", &skyboxType,
+            "Solid color\0Gradient\0Environment\0\0");
+        mSettings.lighting.skyboxType = (decltype(mSettings.lighting.skyboxType))skyboxType;
         ImGui::ColorEdit3("Background color", &mSettings.viewer.backgroundColor.r);
 
         // We do not yet support ground shadow in remote mode (i.e. when mAsset is null)
