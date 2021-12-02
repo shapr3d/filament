@@ -114,7 +114,7 @@ fragment {
             sky.rgb *= frameUniforms.iblLuminance;
         }
 
-        if (materialParams.showSun != 0 && frameUniforms.sun.w >= 0.0f) {
+        if (materialParams.skyboxType == 2 && materialParams.showSun != 0 && frameUniforms.sun.w >= 0.0f) {
             float3 direction = normalize(variable_eyeDirection.xyz);
             // Assume the sun is a sphere
             float3 sun = frameUniforms.lightColorIntensity.rgb *

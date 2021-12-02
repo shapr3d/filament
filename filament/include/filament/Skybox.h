@@ -64,7 +64,7 @@ class UTILS_PUBLIC Skybox : public FilamentAPI {
     struct BuilderDetails;
 
 public:
-    enum SkyboxType {
+    enum class SkyboxType : uint8_t {
         COLOR = 0,
         GRADIENT = 1,
         ENVIRONMENT = 2

@@ -44,7 +44,7 @@ struct Skybox::BuilderDetails {
     float4 mColor{0, 0, 0, 1};
     float mIntensity = FIndirectLight::DEFAULT_INTENSITY;
     bool mShowSun = false;
-    SkyboxType mType = Skybox::ENVIRONMENT;
+    SkyboxType mType = Skybox::SkyboxType::ENVIRONMENT;
 };
 
 using BuilderType = Skybox;
@@ -107,7 +107,7 @@ FSkybox::FSkybox(FEngine& engine, const Builder& builder) noexcept
     FTexture const* texture = mSkyboxTexture ? mSkyboxTexture : engine.getDummyCubemap();
     pInstance->setParameter("skybox", texture, sampler);
     pInstance->setParameter("showSun", builder->mShowSun);
-    pInstance->setParameter("skyboxType", (int)mType);
+    pInstance->setParameter("skyboxType", (uint32_t)builder->mType);
     pInstance->setParameter("color", builder->mColor);
 
     mSkybox = engine.getEntityManager().create();
@@ -150,8 +150,7 @@ void FSkybox::setLayerMask(uint8_t select, uint8_t values) noexcept {
 }
 
 void FSkybox::setType(SkyboxType type) noexcept {
-    mType = type;
-    mSkyboxMaterialInstance->setParameter("skyboxType", (int)mType);
+    mSkyboxMaterialInstance->setParameter("skyboxType", (uint32_t)type);
 }
 
 void FSkybox::setColor(math::float4 color) noexcept {
