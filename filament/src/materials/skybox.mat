@@ -70,10 +70,10 @@ fragment {
     }
 
     float computeGradient(float t) {
-        float DIMMING_FACTOR = 0.6;
-        float GRAD_START_HIGH = 0.9;
-        float GRAD_LOCATION = 0.4;
-        float GRAD_START_LOW = 0.2;
+        const float DIMMING_FACTOR = 0.6;
+        const float GRAD_START_HIGH = 0.9;
+        const float GRAD_LOCATION = 0.4;
+        const float GRAD_START_LOW = 0.2;
 
         float grad;
         if (t >= GRAD_LOCATION) {
@@ -85,19 +85,20 @@ fragment {
     }
 
     float3 shaprSkyGradient() {
-        float SHAPR_THRESH = 0.5;
+        const float SHAPR_THRESH = 0.5;
 
-        float upDirection = normalize(variable_eyeDirection).y;
+        float upDirectionMapped = normalize(variable_eyeDirection).y * 0.5 + 0.5;
         float3 colorRGB = approxInverseSRGB(materialParams.color.rgb);
-        float3 colorConverted = linear_srgb_to_oklab(colorRGB);
-        if (colorConverted.r > SHAPR_THRESH) {
-            colorConverted.r *= computeGradient(upDirection * 0.5 + 0.5);
+        float3 colorOklab = linear_srgb_to_oklab(colorRGB);
+        if (colorOklab.r > SHAPR_THRESH) {
+            // oklab.r is the luminance channel
+            colorOklab.r *= computeGradient(upDirectionMapped);
         } else {
-            float SHAPR_DARK_COLORS_BIAS = 2.0;
-
-            colorConverted.r *= (SHAPR_DARK_COLORS_BIAS - computeGradient(upDirection * 0.5 + 0.5));
+            const float SHAPR_DARK_COLORS_BIAS = 2.0;
+            // oklab.r is the luminance channel
+            colorOklab.r *= (SHAPR_DARK_COLORS_BIAS - computeGradient(upDirectionMapped));
         }
-        return oklab_to_linear_srgb(colorConverted);
+        return oklab_to_linear_srgb(colorOklab);
     }
 
     void material(inout MaterialInputs material) {
