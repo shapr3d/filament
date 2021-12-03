@@ -8,6 +8,7 @@ TweakableMaterial::TweakableMaterial() {
     mIorScale.value = 1.0f;
     mNormalIntensity.value = 1.0f;
     mRoughnessScale.value = 1.0f;
+    mOcclusionIntensity.value = 1.0f;
 }
 
 json TweakableMaterial::toJson() {
@@ -29,6 +30,7 @@ json TweakableMaterial::toJson() {
 
     writeTexturedToJson(result, "metallic", mMetallic);
 
+    result["occlusionIntensity"] = mOcclusionIntensity.value;
     writeTexturedToJson(result, "occlusion", mOcclusion);
 
     result["clearCoat"] = mClearCoat.value;
@@ -89,6 +91,7 @@ void TweakableMaterial::fromJson(const json& source) {
 
         readTexturedFromJson(source, "metallic", mMetallic);
 
+        readValueFromJson(source, "occlusionIntensity", mOcclusionIntensity.value, 1.0f);
         readTexturedFromJson(source, "occlusion", mOcclusion, 1.0f);
 
         readValueFromJson(source, "clearCoat", mClearCoat, 0.0f);
@@ -239,6 +242,7 @@ void TweakableMaterial::drawUI() {
             if (mMetallic.isFile) enqueueTextureRequest(mMetallic);
         }
 
+        mOcclusionIntensity.addWidget("occlusion intensity");
         mOcclusion.addWidget("occlusion");
         if (mOcclusion.isFile) enqueueTextureRequest(mOcclusion);
     }

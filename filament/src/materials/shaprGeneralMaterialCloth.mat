@@ -85,6 +85,10 @@ material {
             type : float,
             name : occlusion
         },
+        {
+            type : float,
+            name : occlusionIntensity
+        },
 
         //////////////////////////////////////////////////////////////////////////////////////////////////
         // Texture lookup scaling that transforms world coordinates to triplanar coordinates
@@ -295,6 +299,7 @@ fragment {
         } else {
             material.ambientOcclusion = materialParams.occlusion;
         }
+        material.ambientOcclusion = 1.0 - materialParams.occlusionIntensity * ( 1.0 - material.ambientOcclusion );
 
         // Let Filament compute the global shading parameters. Note that material.normal stays in tangent space. Its world space coordinates
         // are stored in the global variable shading_normal.
