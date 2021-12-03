@@ -133,7 +133,7 @@ private:
     void writeTexturedToJson(json& result, const std::string& prefix, const TweakableProperty<T, MayContainFile, IsColor>& item) {
         result[prefix] = item.value;
         result[prefix + "IsFile"] = item.isFile;
-        result[prefix + "Texture"] = item.filename.asString();
+        result[prefix + "Texture"] = (item.isFile) ? item.filename.asString() : "";
     }
 
     template< typename T, bool MayContainFile = false, bool IsColor = true, bool IsDerivable = false, typename = IsValidTweakableType<T> >
