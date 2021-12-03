@@ -1433,7 +1433,14 @@ void SimpleViewer::updateUserInterface() {
         if (ImGui::Button("Set art root") && mDoSaveSettings && SD_OpenFolderDialog(&tempArtRootPath[0])) {
             utils::Path tempPath = tempArtRootPath;
             if (tempPath.exists()) {
+                auto sanitizePath = [](std::string& path) {
+                    for (int i = 0; i < path.length(); ++i) {
+                        if (path[i] == '\\') path[i] = '/';
+                    }
+                };
+
                 mSettings.viewer.artRootPath = tempPath.c_str();
+                sanitizePath(mSettings.viewer.artRootPath);
                 g_ArtRootPathStr = tempArtRootPath;
                 mDoSaveSettings();
             }
