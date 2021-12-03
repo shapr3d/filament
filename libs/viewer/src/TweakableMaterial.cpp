@@ -61,6 +61,8 @@ json TweakableMaterial::toJson() {
     writeTexturedToJson(result, "transmission", mTransmission);
     result["maxThickness"] = mMaxThickness.value;
 
+    result["doRelease"] = mDoRelease;
+
     return result;
 }
 
@@ -116,6 +118,8 @@ void TweakableMaterial::fromJson(const json& source) {
         readTexturedFromJson(source, "thickness", mThickness);
         readTexturedFromJson(source, "transmission", mTransmission);
         readValueFromJson(source, "maxThickness", mMaxThickness, 1.0f);
+        
+        readValueFromJson(source, "doRelease", mDoRelease, false);
 
         auto checkAndFixPathRelative([](auto& propertyWithPath) {
             if (propertyWithPath.isFile) {
@@ -194,12 +198,15 @@ void TweakableMaterial::resetWithType(MaterialType newType) {
     mBlendPower = 2.0f;
     mBlendBias = 0.2f;
 
-    mMaterialType = newType;
+    mDoRelease = false;
 
     mShaderType = newType;
 }
 
 void TweakableMaterial::drawUI() {
+    if (ImGui::CollapsingHeader("Integration")) {
+        ImGui::Checkbox("Release material", &mDoRelease);
+    }
     if (ImGui::CollapsingHeader("Base color")) {
         ImGui::SliderFloat("Tile: albedo texture", &mBaseTextureScale, 1.0f / 1024.0f, 32.0f);
         ImGui::Separator();
