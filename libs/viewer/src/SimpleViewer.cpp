@@ -840,8 +840,8 @@ void SimpleViewer::updateUserInterface() {
                         }
                     }
 
-                    ImGui::SliderFloat("Triplanar mapping power", &tweaks.mBlendPower, 1.0f, 32.0f);
-                    ImGui::SliderFloat("Triplanar mapping bias", &tweaks.mBlendBias, 0.0f, 1.0f);
+                    //ImGui::SliderFloat("Triplanar mapping power", &tweaks.mBlendPower, 1.0f, 32.0f);
+                    //ImGui::SliderFloat("Triplanar mapping bias", &tweaks.mBlendBias, 0.0f, 1.0f);
 
                     tweaks.drawUI();
 
