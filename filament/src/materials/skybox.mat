@@ -30,6 +30,10 @@ material {
 
 fragment {
 
+#define SHAPR_SKYBOX_TYPE_SOLID_COLOR 0
+#define SHAPR_SKYBOX_TYPE_GRADIENT 1
+#define SHAPR_SKYBOX_TYPE_ENVIRONMENT 2
+
     float3 approxInverseSRGB(float3 srgb) {
         return pow(srgb, vec3(2.2));
     }
@@ -70,33 +74,33 @@ fragment {
     }
 
     float computeGradient(float t) {
-        const float DIMMING_FACTOR = 0.6;
-        const float GRAD_START_HIGH = 0.9;
-        const float GRAD_LOCATION = 0.4;
-        const float GRAD_START_LOW = 0.2;
+        const float dimmingFactor = 0.6;
+        const float gradientStartHigh = 0.9;
+        const float gradientLocation = 0.4;
+        const float gradientStartLow = 0.2;
 
         float grad;
-        if (t >= GRAD_LOCATION) {
-            grad = DIMMING_FACTOR + (t - GRAD_LOCATION) * (1.0 / (GRAD_START_HIGH - GRAD_LOCATION)) * (1.0 - DIMMING_FACTOR);
+        if (t >= gradientLocation) {
+            grad = dimmingFactor + (t - gradientLocation) * (1.0 / (gradientStartHigh - gradientLocation)) * (1.0 - dimmingFactor);
         } else {
-            grad = 1.0 - (t - GRAD_START_LOW) * (1.0 / (GRAD_LOCATION - GRAD_START_LOW)) * (1.0 - DIMMING_FACTOR);
+            grad = 1.0 - (t - gradientStartLow) * (1.0 / (gradientLocation - gradientStartLow)) * (1.0 - dimmingFactor);
         }
         return saturate(grad);
     }
 
     float3 shaprSkyGradient() {
-        const float SHAPR_THRESH = 0.5;
+        const float shaprThreshold = 0.5;
 
         float upDirectionMapped = normalize(variable_eyeDirection).y * 0.5 + 0.5;
         float3 colorRGB = approxInverseSRGB(materialParams.color.rgb);
         float3 colorOklab = linear_srgb_to_oklab(colorRGB);
-        if (colorOklab.r > SHAPR_THRESH) {
+        if (colorOklab.r > shaprThreshold) {
             // oklab.r is the luminance channel
             colorOklab.r *= computeGradient(upDirectionMapped);
         } else {
-            const float SHAPR_DARK_COLORS_BIAS = 2.0;
+            const float shaprDarkColorsBias = 2.0;
             // oklab.r is the luminance channel
-            colorOklab.r *= (SHAPR_DARK_COLORS_BIAS - computeGradient(upDirectionMapped));
+            colorOklab.r *= (shaprDarkColorsBias - computeGradient(upDirectionMapped));
         }
         return oklab_to_linear_srgb(colorOklab);
     }
@@ -104,14 +108,16 @@ fragment {
     void material(inout MaterialInputs material) {
         prepareMaterial(material);
         float4 sky;
-        if (materialParams.skyboxType == 0) {
+        if (materialParams.skyboxType == SHAPR_SKYBOX_TYPE_SOLID_COLOR) {
             sky = float4(approxInverseSRGB(materialParams.color.rgb), materialParams.color.a);
-        } else if (materialParams.skyboxType == 1) {
+        } else if (materialParams.skyboxType == SHAPR_SKYBOX_TYPE_GRADIENT) {
             float3 shaprSkyColor = shaprSkyGradient();
             sky = float4(shaprSkyColor, 1.0);
-        } else {
+        } else if (materialParams.skyboxType == SHAPR_SKYBOX_TYPE_ENVIRONMENT) {
             sky = float4(textureLod(materialParams_skybox, variable_eyeDirection.xyz, 0.0).rgb, 1.0);
             sky.rgb *= frameUniforms.iblLuminance;
+        } else {
+            sky = float4(1.0, 0.0, 1.0, 1.0);
         }
 
         if (materialParams.skyboxType == 2 && materialParams.showSun != 0 && frameUniforms.sun.w >= 0.0f) {

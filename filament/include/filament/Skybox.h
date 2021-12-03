@@ -128,7 +128,7 @@ public:
         /**
          * Sets the skybox to a constant color. Default is opaque black.
          *
-         * Ignored if an environment is set.
+         * Applied when the type is set to COLOR or GRADIENT.
          *
          * @param color
          *
