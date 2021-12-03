@@ -114,7 +114,7 @@ public:
     float mBlendBias{ 0.2f };
 
     enum MaterialType { Opaque, TransparentSolid, TransparentThin, Cloth, Subsurface };
-    MaterialType mMaterialType{};
+    MaterialType mShaderType{};
 
     void resetWithType(MaterialType newType);
 

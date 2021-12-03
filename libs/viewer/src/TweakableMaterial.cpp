@@ -13,7 +13,8 @@ TweakableMaterial::TweakableMaterial() {
 json TweakableMaterial::toJson() {
     json result{};
 
-    result["materialType"] = mMaterialType;
+    //result["materialType"] = mMaterialType;
+    result["shaderType"] = mShaderType;
 
     result["useWard"] = mUseWard;
 
@@ -65,9 +66,14 @@ json TweakableMaterial::toJson() {
 
 void TweakableMaterial::fromJson(const json& source) {
     try {
-        mMaterialType = source["materialType"];
+        // handle renaming materialType to shaderType
+        if (source.find("shaderType") != source.cend()) {
+            mShaderType = source["shaderType"];
+        } else {
+            mShaderType = source["materialType"];
+        }
 
-        bool isAlpha = (mMaterialType == TweakableMaterial::MaterialType::TransparentSolid) || (mMaterialType == mMaterialType == TweakableMaterial::MaterialType::TransparentThin);
+        bool isAlpha = (mShaderType == TweakableMaterial::MaterialType::TransparentSolid) || (mShaderType == mShaderType == TweakableMaterial::MaterialType::TransparentThin);
 
         readValueFromJson(source, "useWard", mUseWard, false);
 
@@ -189,6 +195,8 @@ void TweakableMaterial::resetWithType(MaterialType newType) {
     mBlendBias = 0.2f;
 
     mMaterialType = newType;
+
+    mShaderType = newType;
 }
 
 void TweakableMaterial::drawUI() {
@@ -198,7 +206,7 @@ void TweakableMaterial::drawUI() {
 
         mBaseColor.addWidget("baseColor");
         if (mBaseColor.isFile) {
-            bool isAlpha = (mMaterialType != MaterialType::Opaque);
+            bool isAlpha = (mShaderType != MaterialType::Opaque);
             enqueueTextureRequest(mBaseColor, true, isAlpha);
         }
     }
@@ -219,7 +227,7 @@ void TweakableMaterial::drawUI() {
 
         mSpecularIntensity.addWidget("specular intensity", 0.0f, 3.0f);
 
-        if (mMaterialType != MaterialType::Cloth) {
+        if (mShaderType != MaterialType::Cloth) {
             mMetallic.addWidget("metallic");
             if (mMetallic.isFile) enqueueTextureRequest(mMetallic);
         }
@@ -242,7 +250,7 @@ void TweakableMaterial::drawUI() {
         if (mClearCoatRoughness.isFile) enqueueTextureRequest(mClearCoatRoughness);
     }
 
-    switch (mMaterialType) {
+    switch (mShaderType) {
     case MaterialType::Opaque: {
         if (ImGui::CollapsingHeader("Sheen settings")) {
             mSheenColor.addWidget("sheen color");

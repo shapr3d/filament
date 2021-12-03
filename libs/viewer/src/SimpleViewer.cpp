@@ -665,7 +665,7 @@ void SimpleViewer::loadTweaksFromFile(const std::string& entityName, const std::
     tweaks.fromJson(js);
 
     // fixup legacy transparent thin material
-    if (tweaks.mMaterialType == TweakableMaterial::MaterialType::TransparentThin) tweaks.mMaterialType = TweakableMaterial::MaterialType::TransparentSolid;
+    if (tweaks.mShaderType == TweakableMaterial::MaterialType::TransparentThin) tweaks.mShaderType = TweakableMaterial::MaterialType::TransparentSolid;
 
     /*checkAndFixPathRelative(tweaks.mBaseColor);
     checkAndFixPathRelative(tweaks.mNormal);
@@ -776,19 +776,19 @@ void SimpleViewer::updateUserInterface() {
                     if (ImGui::Button("Load material")) {
 
                         if (SD_OpenFileDialog(fileDialogPath, materialFileFilter)) {
-                            TweakableMaterial::MaterialType prevType = tweaks.mMaterialType;
+                            TweakableMaterial::MaterialType prevType = tweaks.mShaderType;
 
                             loadTweaksFromFile(entityName, fileDialogPath);
 
                             mLastSavedEntityName = entityName;
                             mLastSavedFileName = fileDialogPath;
 
-                            if (tweaks.mMaterialType != prevType) {
+                            if (tweaks.mShaderType != prevType) {
                                 filament::MaterialInstance* currentInstance = rm.getMaterialInstanceAt(instance, prim);
                                 for (auto& mat : mMaterialInstances) if (mat == currentInstance) mat = nullptr;
                                 mEngine->destroy(currentInstance);
 
-                                filament::MaterialInstance* newInstance = mEngine->getShaprMaterial(tweaks.mMaterialType)->createInstance();
+                                filament::MaterialInstance* newInstance = mEngine->getShaprMaterial(tweaks.mShaderType)->createInstance();
                                 mMaterialInstances.push_back(newInstance);
                                 rm.setMaterialInstanceAt(instance, prim, newInstance);
                             }
@@ -804,13 +804,13 @@ void SimpleViewer::updateUserInterface() {
                         } else {
                             ImGui::SameLine();
                             if (ImGui::Button("Reset")) {
-                                TweakableMaterial::MaterialType prevType = tweaks.mMaterialType;
+                                TweakableMaterial::MaterialType prevType = tweaks.mShaderType;
                                 tweaks.resetWithType(prevType);
                             }
 
                             std::function<void( TweakableMaterial::MaterialType materialType)> changeMaterialTypeTo;
                             changeMaterialTypeTo = [&]( TweakableMaterial::MaterialType materialType) {
-                                if (tweaks.mMaterialType != materialType) {
+                                if (tweaks.mShaderType != materialType) {
                                     filament::MaterialInstance* currentInstance = rm.getMaterialInstanceAt(instance, prim);
                                     for (auto& mat : mMaterialInstances) if (mat == currentInstance) mat = nullptr;
                                     mEngine->destroy(currentInstance);
@@ -819,22 +819,22 @@ void SimpleViewer::updateUserInterface() {
                                     mMaterialInstances.push_back(newInstance);
                                     rm.setMaterialInstanceAt(instance, prim, newInstance);
                                 }
-                                tweaks.mMaterialType = materialType;
+                                tweaks.mShaderType = materialType;
                             };
 
-                            if (ImGui::Button("Opaque")) {
+                            if (ImGui::RadioButton("Opaque", tweaks.mShaderType == TweakableMaterial::MaterialType::Opaque)) {
                                 changeMaterialTypeTo(TweakableMaterial::MaterialType::Opaque);
                             }
                             ImGui::SameLine();
-                            if (ImGui::Button("Transparent solid")) {
+                            if (ImGui::RadioButton("Transparent solid", tweaks.mShaderType == TweakableMaterial::MaterialType::TransparentSolid)) {
                                 changeMaterialTypeTo(TweakableMaterial::MaterialType::TransparentSolid);
                             }
                             ImGui::SameLine();
-                            if (ImGui::Button("Cloth")) {
+                            if (ImGui::RadioButton("Cloth", tweaks.mShaderType == TweakableMaterial::MaterialType::Cloth)) {
                                 changeMaterialTypeTo(TweakableMaterial::MaterialType::Cloth);
                             }
                             ImGui::SameLine();
-                            if (ImGui::Button("Subsurface")) {
+                            if (ImGui::RadioButton("Subsurface", tweaks.mShaderType == TweakableMaterial::MaterialType::Subsurface)) {
                                 changeMaterialTypeTo(TweakableMaterial::MaterialType::Subsurface);
                             }
                         }
@@ -995,7 +995,7 @@ void SimpleViewer::updateUserInterface() {
                     setTextureIfPresent(tweaks.mNormal.isFile, tweaks.mNormal.filename, "normal");
                     matInstance->setParameter("roughnessScale", tweaks.mRoughnessScale.value);
                     setTextureIfPresent(tweaks.mRoughness.isFile, tweaks.mRoughness.filename, "roughness");
-                    if (tweaks.mMaterialType == TweakableMaterial::MaterialType::Opaque || tweaks.mMaterialType == TweakableMaterial::MaterialType::Cloth || tweaks.mMaterialType == TweakableMaterial::MaterialType::Subsurface) {
+                    if (tweaks.mShaderType == TweakableMaterial::MaterialType::Opaque || tweaks.mShaderType == TweakableMaterial::MaterialType::Cloth || tweaks.mShaderType == TweakableMaterial::MaterialType::Subsurface) {
                         setTextureIfPresent(tweaks.mOcclusion.isFile, tweaks.mOcclusion.filename, "occlusion");
                         matInstance->setParameter("occlusion", tweaks.mOcclusion.value);
                     }
@@ -1018,12 +1018,12 @@ void SimpleViewer::updateUserInterface() {
                     matInstance->setParameter("clearCoat", tweaks.mClearCoat.value);
                     matInstance->setParameter("clearCoatRoughness", tweaks.mClearCoatRoughness.value);
                     
-                    if (tweaks.mMaterialType != TweakableMaterial::MaterialType::Cloth) {
+                    if (tweaks.mShaderType != TweakableMaterial::MaterialType::Cloth) {
                         setTextureIfPresent(tweaks.mMetallic.isFile, tweaks.mMetallic.filename, "metallic");
                         matInstance->setParameter("metallic", tweaks.mMetallic.value);
                     }
 
-                    if (tweaks.mMaterialType == TweakableMaterial::MaterialType::Cloth) {
+                    if (tweaks.mShaderType == TweakableMaterial::MaterialType::Cloth) {
                         if (tweaks.mSheenColor.useDerivedQuantity) {
                             matInstance->setParameter("doDeriveSheenColor", 1);
                         } else {
@@ -1031,14 +1031,14 @@ void SimpleViewer::updateUserInterface() {
                             matInstance->setParameter("doDeriveSheenColor", 0);
                         }
                         matInstance->setParameter("subsurfaceColor", tweaks.mSubsurfaceColor.value);
-                    } else if (tweaks.mMaterialType == TweakableMaterial::MaterialType::Subsurface) {
+                    } else if (tweaks.mShaderType == TweakableMaterial::MaterialType::Subsurface) {
                         matInstance->setParameter("thickness", tweaks.mThickness.value);
                         setTextureIfPresent(tweaks.mThickness.isFile, tweaks.mThickness.filename, "thickness");
                         matInstance->setParameter("subsurfaceColor", tweaks.mSubsurfaceColor.value);
                         matInstance->setParameter("subsurfacePower", tweaks.mSubsurfacePower.value);
                     }
 
-                    if (tweaks.mMaterialType == TweakableMaterial::MaterialType::Opaque) {
+                    if (tweaks.mShaderType == TweakableMaterial::MaterialType::Opaque) {
                         // Transparent materials do not expose anisotropy and sheen, these are not present in their UBOs
                         matInstance->setParameter("anisotropy", tweaks.mAnisotropy.value);
                         matInstance->setParameter("anisotropyDirection", normalize(tweaks.mAnisotropyDirection.value));
@@ -1052,7 +1052,7 @@ void SimpleViewer::updateUserInterface() {
                         }
                         setTextureIfPresent(tweaks.mSheenRoughness.isFile, tweaks.mSheenRoughness.filename, "sheenRoughness");
                         matInstance->setParameter("sheenRoughness", tweaks.mSheenRoughness.value);
-                    } else if (tweaks.mMaterialType == TweakableMaterial::MaterialType::TransparentSolid) {
+                    } else if (tweaks.mShaderType == TweakableMaterial::MaterialType::TransparentSolid) {
                         // Only transparent materials have the properties below
                         if (tweaks.mSheenColor.useDerivedQuantity) {
                             matInstance->setParameter("doDeriveAbsorption", 1);
