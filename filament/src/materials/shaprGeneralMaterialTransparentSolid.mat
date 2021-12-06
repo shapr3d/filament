@@ -227,6 +227,7 @@ fragment {
     vec3 unpackNormal( vec3 packedNormal ) {
         return packedNormal * 2.0 - 1.0;
     }
+
     // This is a whiteout blended tripalanar normal mapping, where each plane's tangent frame is
     // approximated by the appropriate sequence and flips of world space axes. For more details
     // Refer to https://bgolus.medium.com/normal-mapping-for-a-triplanar-shader-10bf39dca05a
@@ -237,19 +238,11 @@ fragment {
         vec2 uvY = scaler * pos.xz; // y facing plane
         vec2 uvZ = scaler * pos.xy; // z facing plane
         // Tangent space normal maps
-#if 0
-        // 3-channel TS normal texture
-        lowp vec3 tnormalX = unpackNormal( texture( normalMap, uvX ).xyz );
-        lowp vec3 tnormalY = unpackNormal( texture( normalMap, uvY ).xyz );
-        lowp vec3 tnormalZ = unpackNormal( texture( normalMap, uvZ ).xyz );
-#else
-        // 2-channel XY TS normal texture: this saves 33% on storage, but also
-        // pushes us into the direction of choosing what attributes to pack
-        // together into the same texture (e.g. normal-roughness-metallic?)
+        // 2-channel XY TS normal texture: this saves 33% on storage
         lowp vec3 tnormalX = unpackNormal( texture( normalMap, uvX ).xy );
         lowp vec3 tnormalY = unpackNormal( texture( normalMap, uvY ).xy );
         lowp vec3 tnormalZ = unpackNormal( texture( normalMap, uvZ ).xy );
-#endif
+
         // Swizzle world normals into tangent space and apply Whiteout blend
         tnormalX = vec3(
             tnormalX.xy + normal.zy,
@@ -335,11 +328,10 @@ fragment {
         // Pre-multiply by alpha
         material.baseColor.rgb *= material.baseColor.a;
 
-        // Careful: reflectance affects non-metals, so this can make things overly shiny
+        // Careful: reflectance affects non-metals, so this alone may still make things overly shiny - we added specularIntensity
+        // to handle specular response on all lighting paths.
         material.reflectance = clamp( 1.0 - material.roughness, 0.0, 1.0 );
 
-        // TODO @gvalasek: to conform to standards, .r is treated as occlusion, .b is roughness,
-        //       and .b as metallness. For now, only roughness is taken into account for M2.
         if ( materialParams.useRoughnessTexture == 1 ) {
             material.roughness = triplanarTexture(materialParams_roughnessTexture, materialParams.textureScaler.y, pos, normal).r;
         } else {
