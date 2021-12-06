@@ -265,7 +265,8 @@ fragment {
 #else
         // Since I have to re-add this so many times to debug issues, I'm leaving this commented out for the time being
         // Still, be careful: OGL did not expose the fine gradients until 4.5 (!!!) core, so you cannot know if these are
-        // coarse (=constant for the 2x2 fragment quad) or fine (forward/backward difference'd) derivatives        vec3 DxPos = dFdx( pos );
+        // coarse (=constant for the 2x2 fragment quad) or fine (forward/backward difference'd) derivatives
+        vec3 DxPos = dFdx( pos );
         vec3 DyPos = dFdy( pos );
         vec3 normal = normalize( cross( DxPos, DyPos ) );
 #endif
@@ -323,8 +324,6 @@ fragment {
             material.baseColor = materialParams.baseColor;
         }
 
-        // TODO @gvalasek: to conform to standards, .r is treated as occlusion, .b is roughness,
-        //       and .b as metallness. For now, only roughness is taken into account for M2.
         if ( materialParams.useRoughnessTexture == 1 ) {
             material.roughness = triplanarTexture(materialParams_roughnessTexture, materialParams.textureScaler.y, pos, normal).r;
         } else {
@@ -332,7 +331,8 @@ fragment {
         }
         material.roughness *= materialParams.roughnessScale;
 
-        // Careful: reflectance affects non-metals, so this can make things overly shiny
+        // Careful: reflectance affects non-metals, so this alone may still make things overly shiny - we added specularIntensity
+        // to handle specular response on all lighting paths.
         material.reflectance = clamp( 1.0 - material.roughness, 0.0, 1.0 );
 
         // TODO @gvalasek: see as above, technically all this should have been a single fetch
@@ -370,9 +370,5 @@ fragment {
 
         material.specularIntensity = materialParams.specularIntensity;
         material.useWard = (materialParams.useWard == 1) ? true : false;
-        // Debug coloring
-        //material.baseColor.rgb *= 1e-6;
-        //material.baseColor.rgb += 0.5 * ( material.normal + vec3(1) );
-        //material.baseColor.rgb += normal;
     }
 }

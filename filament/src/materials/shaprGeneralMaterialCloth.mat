@@ -178,7 +178,6 @@ fragment {
                weights.z * texture(tex, queryPos.xy);
     }
 
-
     vec3 unpackNormal( vec2 packedNormal ) {
         float x = packedNormal.x * 2.0 - 1.0;
         float y = packedNormal.y * 2.0 - 1.0;
@@ -187,6 +186,7 @@ fragment {
     vec3 unpackNormal( vec3 packedNormal ) {
         return packedNormal * 2.0 - 1.0;
     }
+
     // This is a whiteout blended tripalanar normal mapping, where each plane's tangent frame is
     // approximated by the appropriate sequence and flips of world space axes. For more details
     // Refer to https://bgolus.medium.com/normal-mapping-for-a-triplanar-shader-10bf39dca05a
@@ -197,19 +197,11 @@ fragment {
         vec2 uvY = scaler * pos.xz; // y facing plane
         vec2 uvZ = scaler * pos.xy; // z facing plane
         // Tangent space normal maps
-#if 0
-        // 3-channel TS normal texture
-        lowp vec3 tnormalX = unpackNormal( texture( normalMap, uvX ).xyz );
-        lowp vec3 tnormalY = unpackNormal( texture( normalMap, uvY ).xyz );
-        lowp vec3 tnormalZ = unpackNormal( texture( normalMap, uvZ ).xyz );
-#else
-        // 2-channel XY TS normal texture: this saves 33% on storage, but also
-        // pushes us into the direction of choosing what attributes to pack
-        // together into the same texture (e.g. normal-roughness-metallic?)
+        // 2-channel XY TS normal texture: this saves 33% on storage
         lowp vec3 tnormalX = unpackNormal( texture( normalMap, uvX ).xy );
         lowp vec3 tnormalY = unpackNormal( texture( normalMap, uvY ).xy );
         lowp vec3 tnormalZ = unpackNormal( texture( normalMap, uvZ ).xy );
-#endif
+        
         // Swizzle world normals into tangent space and apply Whiteout blend
         tnormalX = vec3(
             tnormalX.xy + normal.zy,
@@ -241,7 +233,8 @@ fragment {
 #else
         // Since I have to re-add this so many times to debug issues, I'm leaving this commented out for the time being
         // Still, be careful: OGL did not expose the fine gradients until 4.5 (!!!) core, so you cannot know if these are
-        // coarse (=constant for the 2x2 fragment quad) or fine (forward/backward difference'd) derivatives        vec3 DxPos = dFdx( pos );
+        // coarse (=constant for the 2x2 fragment quad) or fine (forward/backward difference'd) derivatives
+        vec3 DxPos = dFdx( pos );
         vec3 DyPos = dFdy( pos );
         vec3 normal = normalize( cross( DxPos, DyPos ) );
 #endif
@@ -299,8 +292,6 @@ fragment {
             material.baseColor = materialParams.baseColor;
         }
 
-        // TODO @gvalasek: to conform to standards, .r is treated as occlusion, .b is roughness,
-        //       and .b as metallness. For now, only roughness is taken into account for M2.
         if ( materialParams.useRoughnessTexture == 1 ) {
             material.roughness = triplanarTexture(materialParams_roughnessTexture, materialParams.textureScaler.y, pos, normal).r;
         } else {
@@ -331,15 +322,5 @@ fragment {
         material.clearCoat = materialParams.clearCoat;
         material.specularIntensity = materialParams.specularIntensity;
         material.useWard = (materialParams.useWard == 1) ? true : false;
-
-        //material.specularIntensity = 1.0;
-        //material.baseColor.rgb = vec3(0.25);
-        //material.roughness = 0.5;
-        //material.sheenColor = vec3(0.5);
-        //material.subsurfaceColor = vec3(0.5);
-        // Debug coloring
-        //material.baseColor.rgb *= 1e-6;
-        //material.baseColor.rgb += 0.5 * ( material.normal + vec3(1) );
-        //material.baseColor.rgb += normal;
     }
 }
