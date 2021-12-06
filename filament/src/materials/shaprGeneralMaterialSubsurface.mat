@@ -212,7 +212,7 @@ fragment {
     vec3 unpackNormal( vec3 packedNormal ) {
         return packedNormal * 2.0 - 1.0;
     }
-
+    
     // This is a whiteout blended tripalanar normal mapping, where each plane's tangent frame is
     // approximated by the appropriate sequence and flips of world space axes. For more details
     // Refer to https://bgolus.medium.com/normal-mapping-for-a-triplanar-shader-10bf39dca05a
