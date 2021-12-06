@@ -113,9 +113,6 @@ public:
     bool mUseWard{};
     bool mDoRelease{}; // this notifies the material integrator tool that this material needs to be checked into the codebase
 
-    float mBlendPower{ 2.0f };
-    float mBlendBias{ 0.2f };
-
     enum MaterialType { Opaque, TransparentSolid, TransparentThin, Cloth, Subsurface };
     MaterialType mShaderType{};
 

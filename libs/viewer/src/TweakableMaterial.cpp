@@ -198,9 +198,6 @@ void TweakableMaterial::resetWithType(MaterialType newType) {
     mSheenColor.useDerivedQuantity = false;
     mUseWard = false;
 
-    mBlendPower = 2.0f;
-    mBlendBias = 0.2f;
-
     mDoRelease = false;
 
     mShaderType = newType;

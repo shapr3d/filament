@@ -178,14 +178,6 @@ material {
         {
             type : int,
             name : useWard
-        },
-        {
-            type : float,
-            name : blendPower
-        },
-        {
-            type : float,
-            name : blendBias
         }
     ]
 }
@@ -194,18 +186,13 @@ fragment {
     const float EPSILON = 1.0 / 2048.0;
     // A simple linear blend with normalization
     vec3 computeWeights( vec3 normal ) {
-#if 0
-        // This was the blend Zaza used:
-        // We assume that the normal is of unit length, so below is an actual barycentric combination
-        return normal * normal;
-#else
         // This one has a region where there is no blend, creating more defined interpolations
+        const float blendBias = 0.2;
         vec3 blend = abs(normal.xyz);
-        blend = max(blend - materialParams.blendBias, vec3(0.0) );
-        blend = pow( blend, vec3( abs( materialParams.blendPower) ) );
+        blend = max(blend - blendBias, vec3(0.0) );
+        blend = blend * blend;
         blend /= (blend.x + blend.y + blend.z);
         return blend;
-#endif
     }
 
     vec4 triplanarTexture(sampler2D tex, float scaler, highp vec3 pos, lowp vec3 normal) {
