@@ -19,7 +19,8 @@ material {
         }
     ],
     variables : [
-         eyeDirection
+         eyeDirection,
+         clipPos
     ],
     vertexDomain : device,
     depthWrite : false,
@@ -33,9 +34,24 @@ fragment {
 #define SHAPR_SKYBOX_TYPE_SOLID_COLOR 0
 #define SHAPR_SKYBOX_TYPE_GRADIENT 1
 #define SHAPR_SKYBOX_TYPE_ENVIRONMENT 2
+#define SHAPR_SKYBOX_TYPE_CHECKERBOARD 3
 
     float3 approxInverseSRGB(float3 srgb) {
         return pow(srgb, vec3(2.2));
+    }
+
+    float3 shaprCheckerboardPattern(float2 positionScreenPixelSpace) {
+        const float colorLight = 1.0;
+        const float colorDark = 0.53;
+
+        const float squareSizePixels = 8.0;
+
+        float2 sinParam = positionScreenPixelSpace / squareSizePixels * PI;
+        int2 patterns = int2(saturate(1000.0 * sin(sinParam)));
+        float finalPatternValue = float(patterns.x ^ patterns.y);
+
+        float resultColor = finalPatternValue > 0.5 ? colorLight : colorDark;
+        return float3(resultColor, resultColor, resultColor);
     }
 
     // Conversion code from: https://bottosson.github.io/posts/oklab/
@@ -116,11 +132,15 @@ fragment {
         } else if (materialParams.skyboxType == SHAPR_SKYBOX_TYPE_ENVIRONMENT) {
             sky = float4(textureLod(materialParams_skybox, variable_eyeDirection.xyz, 0.0).rgb, 1.0);
             sky.rgb *= frameUniforms.iblLuminance;
+        } else if (materialParams.skyboxType == SHAPR_SKYBOX_TYPE_CHECKERBOARD) {
+            float2 pixelPosition = (variable_clipPos.xy * 0.5 + 0.5) * getResolution().xy;
+            float3 checkerboardColor = shaprCheckerboardPattern(pixelPosition);
+            sky = float4(checkerboardColor, 1.0);
         } else {
             sky = float4(1.0, 0.0, 1.0, 1.0);
         }
 
-        if (materialParams.skyboxType == 2 && materialParams.showSun != 0 && frameUniforms.sun.w >= 0.0f) {
+        if (materialParams.skyboxType == SHAPR_SKYBOX_TYPE_ENVIRONMENT && materialParams.showSun != 0 && frameUniforms.sun.w >= 0.0f) {
             float3 direction = normalize(variable_eyeDirection.xyz);
             // Assume the sun is a sphere
             float3 sun = frameUniforms.lightColorIntensity.rgb *
@@ -131,7 +151,7 @@ fragment {
             sky.rgb = sky.rgb + gradient * sun;
         }
 
-        if (materialParams.skyboxType != 2) {
+        if (materialParams.skyboxType != SHAPR_SKYBOX_TYPE_ENVIRONMENT) {
             material.baseColor = float4(0.0);
             material.postLightingColor = sky;
         } else {
@@ -145,5 +165,6 @@ vertex {
         float3 p = getPosition().xyz;
         float3 unprojected = mulMat4x4Float3(getViewFromClipMatrix(), p).xyz;
         material.eyeDirection.xyz = mulMat3x3Float3(getWorldFromViewMatrix(), unprojected);
+        material.clipPos.xy = p.xy;
     }
 }

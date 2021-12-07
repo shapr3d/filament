@@ -67,7 +67,8 @@ public:
     enum class SkyboxType : uint8_t {
         COLOR = 0,
         GRADIENT = 1,
-        ENVIRONMENT = 2
+        ENVIRONMENT = 2,
+        CHECKERBOARD = 3
     };
 
     //! Use Builder to construct an Skybox object instance
@@ -137,7 +138,7 @@ public:
         Builder& color(math::float4 color) noexcept;
 
         /**
-        * Sets the skybox type, between solid color, gradient and environment.
+        * Sets the skybox type, between solid color, gradient, environment and checkerboard.
         */
         Builder& type(SkyboxType type) noexcept;
 
