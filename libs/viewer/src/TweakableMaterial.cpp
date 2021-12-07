@@ -50,7 +50,7 @@ json TweakableMaterial::toJson() {
 
     result["sheenColor"] = mSheenColor.value;
     result["subsurfaceColor"] = mSubsurfaceColor.value;
-    result["isSubsurfaceColorDerived"] = mSubsurfaceColor.useDerivedQuantity;
+    result["isSheenColorDerived"] = mSheenColor.useDerivedQuantity;
     result["subsurfacePower"] = mSubsurfacePower.value;
     writeTexturedToJson(result, "sheenRoughness", mSheenRoughness);
 
@@ -110,7 +110,8 @@ void TweakableMaterial::fromJson(const json& source) {
 
         readTexturedFromJson(source, "sheenRoughness", mSheenRoughness);
         readValueFromJson<filament::math::float3, true, true>(source, "sheenColor", mSheenColor, { 0.0f, 0.0f, 0.0f });
-        readValueFromJson(source, "isSubsurfaceColorDerived", mSubsurfaceColor.useDerivedQuantity, false);
+
+        readValueFromJson(source, "isSheenColorDerived", mSheenColor.useDerivedQuantity, false);
         readValueFromJson<filament::math::float3, true>(source, "subsurfaceColor", mSubsurfaceColor, { 0.0f, 0.0f, 0.0f });
         readValueFromJson(source, "subsurfacePower", mSubsurfacePower, 1.0f);
 
