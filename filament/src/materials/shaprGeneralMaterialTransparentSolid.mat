@@ -265,8 +265,10 @@ fragment {
     }
 
     void material(inout MaterialInputs material) {
+#if !defined( IN_SHAPR_SHADER )
         material.specularScale  = 1.0 + materialParams.scalingControl.x;
         material.diffuseScale   = 1.0 + materialParams.scalingControl.z;
+#endif
 
         highp vec3 pos = getWorldPosition() + getWorldOffset();
 #if 1
