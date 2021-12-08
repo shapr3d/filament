@@ -16,11 +16,14 @@ material {
         {
            type : float4,
            name : color
+        },
+        {
+           type : float,
+           name : uiScaleFactor
         }
     ],
     variables : [
-         eyeDirection,
-         clipPos
+         eyeDirection
     ],
     vertexDomain : device,
     depthWrite : false,
@@ -54,7 +57,7 @@ fragment {
         const float colorDark = 0.53;
 
         // Size of a square in pixels
-        const float2 squareSizePixels = float2(8.0, 8.0);
+        float2 squareSizePixels = float2(8.0, 8.0) * max(materialParams.uiScaleFactor, 1.0);
 
         float pattern = checker(positionScaledClipSpace, getResolution().xy / squareSizePixels);
         float resultColor = mix(colorLight, colorDark, pattern);
@@ -140,7 +143,7 @@ fragment {
             sky = float4(textureLod(materialParams_skybox, variable_eyeDirection.xyz, 0.0).rgb, 1.0);
             sky.rgb *= frameUniforms.iblLuminance;
         } else if (materialParams.skyboxType == SHAPR_SKYBOX_TYPE_CHECKERBOARD) {
-            float3 checkerboardColor = shaprCheckerboardPattern(variable_clipPos.xy * 0.5 + 0.5);
+            float3 checkerboardColor = shaprCheckerboardPattern(getNormalizedViewportCoord().xy);
             sky = float4(checkerboardColor, 1.0);
         } else {
             sky = float4(1.0, 0.0, 1.0, 1.0);
@@ -171,6 +174,5 @@ vertex {
         float3 p = getPosition().xyz;
         float3 unprojected = mulMat4x4Float3(getViewFromClipMatrix(), p).xyz;
         material.eyeDirection.xyz = mulMat3x3Float3(getWorldFromViewMatrix(), unprojected);
-        material.clipPos.xy = p.xy;
     }
 }
