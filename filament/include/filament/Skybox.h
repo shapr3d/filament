@@ -143,6 +143,12 @@ public:
         Builder& type(SkyboxType type) noexcept;
 
         /**
+        * Sets the UI scale factor for the checkerboard pattern. The pattern has 8x8 pixel squares,
+        * when the scale is 1. The default value is 1.
+        */
+        Builder& uiScale(float scale) noexcept;
+
+        /**
          * Creates the Skybox object and returns a pointer to it.
          *
          * @param engine Reference to the filament::Engine to associate this Skybox with.
@@ -158,6 +164,8 @@ public:
     void setColor(math::float4 color) noexcept;
 
     void setType(SkyboxType type) noexcept;
+
+    void setUiScale(float scale) noexcept;
 
     /**
      * Sets bits in a visibility mask. By default, this is 0x1.
