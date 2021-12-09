@@ -117,7 +117,7 @@ fragment {
     float3 shaprSkyGradient() {
         const float shaprThreshold = 0.5;
 
-        float upDirectionMapped = normalize(variable_eyeDirection).y * 0.5 + 0.5;
+        float upDirectionMapped = normalize(variable_eyeDirection).z * 0.5 + 0.5;
         float3 colorRGB = approxInverseSRGB(materialParams.color.rgb);
         float3 colorOklab = linear_srgb_to_oklab(colorRGB);
         if (colorOklab.r > shaprThreshold) {
