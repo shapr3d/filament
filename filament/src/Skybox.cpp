@@ -46,6 +46,8 @@ struct Skybox::BuilderDetails {
     bool mShowSun = false;
     SkyboxType mType = Skybox::SkyboxType::ENVIRONMENT;
     float mUiScale = 1.0f;
+    float2 mCheckerboardGrays{1.0, 0.8};
+    float4 mGradientSettings{0.8, 0.93, 0.55, 0.4};
 };
 
 using BuilderType = Skybox;
@@ -79,6 +81,16 @@ Skybox::Builder& Skybox::Builder::type(SkyboxType type) noexcept {
 
 Skybox::Builder& Skybox::Builder::uiScale(float scale) noexcept {
     mImpl->mUiScale = scale;
+    return *this;
+}
+
+Skybox::Builder& Skybox::Builder::checkerboardGrays(math::float2 grays) noexcept {
+    mImpl->mCheckerboardGrays = grays;
+    return *this;
+}
+
+Skybox::Builder& Skybox::Builder::gradientSettings(math::float4 settings) noexcept {
+    mImpl->mGradientSettings = settings;
     return *this;
 }
 
@@ -116,6 +128,8 @@ FSkybox::FSkybox(FEngine& engine, const Builder& builder) noexcept
     pInstance->setParameter("skyboxType", (uint32_t)builder->mType);
     pInstance->setParameter("color", builder->mColor);
     pInstance->setParameter("uiScaleFactor", builder->mUiScale);
+    pInstance->setParameter("checkerboardGrays", builder->mCheckerboardGrays);
+    pInstance->setParameter("gradientSettings", builder->mGradientSettings);
 
     mSkybox = engine.getEntityManager().create();
 

@@ -149,6 +149,21 @@ public:
         Builder& uiScale(float scale) noexcept;
 
         /**
+        * Sets the checkerboard pattern's colors. Both are the level of gray between 0 and 1.
+        * 
+        * Defaults to 1.0 and 0.8.
+        */
+        Builder& checkerboardGrays(math::float2 grays) noexcept;
+
+        /**
+        * Sets the gradient's position and dimming factor. Dimming factor is in X, upper limit
+        * is in Y, location is in Z, and lower limit is in W.
+        * 
+        * Defaults are 0.8, 0.93, 0.55, 0.4.
+        */
+        Builder& gradientSettings(math::float4 settings) noexcept;
+
+        /**
          * Creates the Skybox object and returns a pointer to it.
          *
          * @param engine Reference to the filament::Engine to associate this Skybox with.
