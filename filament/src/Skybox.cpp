@@ -193,6 +193,10 @@ void FSkybox::setUpDirectionAxis(UpDirectionAxis axis) noexcept {
     mSkyboxMaterialInstance->setParameter("upDirectionAxis", (uint32_t)axis);
 }
 
+void FSkybox::setCheckerboardGrays(math::float2 grays) noexcept {
+    mSkyboxMaterialInstance->setParameter("checkerboardGrays", grays);
+}
+
 void FSkybox::commit(backend::DriverApi& driver) noexcept {
     mSkyboxMaterialInstance->commit(driver);
 }
@@ -227,6 +231,10 @@ void Skybox::setUiScale(float scale) noexcept {
 
 void Skybox::setUpDirectionAxis(UpDirectionAxis axis) noexcept {
     upcast(this)->setUpDirectionAxis(axis);
+}
+
+void Skybox::setCheckerboardGrays(math::float2 grays) noexcept {
+    upcast(this)->setCheckerboardGrays(grays);
 }
 
 Texture const* Skybox::getTexture() const noexcept {

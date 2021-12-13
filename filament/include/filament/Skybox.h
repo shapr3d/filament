@@ -194,6 +194,8 @@ public:
 
     void setUpDirectionAxis(UpDirectionAxis axis) noexcept;
 
+    void setCheckerboardGrays(math::float2 grays) noexcept;
+
     /**
      * Sets bits in a visibility mask. By default, this is 0x1.
      *
