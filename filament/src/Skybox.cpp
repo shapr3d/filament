@@ -47,8 +47,8 @@ struct Skybox::BuilderDetails {
     SkyboxType mType = Skybox::SkyboxType::ENVIRONMENT;
     float mUiScale = 1.0f;
     UpDirectionAxis mUpDirectionAxis = UpDirectionAxis::Y_UP;
-    float2 mCheckerboardGrays{1.0, 0.8};
-    float4 mGradientSettings{0.8, 0.93, 0.55, 0.4};
+    float2 mCheckerboardGrays{1.0f, 0.8f};
+    float4 mGradientSettings{0.8f, 0.93f, 0.55f, 0.4f};
 };
 
 using BuilderType = Skybox;
