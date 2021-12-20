@@ -77,7 +77,7 @@ void TweakableMaterial::fromJson(const json& source) {
             mShaderType = source["materialType"];
         }
 
-        bool isAlpha = (mShaderType == TweakableMaterial::MaterialType::TransparentSolid) || (mShaderType == mShaderType == TweakableMaterial::MaterialType::TransparentThin);
+        bool isAlpha = (mShaderType == TweakableMaterial::MaterialType::TransparentSolid) || (mShaderType == TweakableMaterial::MaterialType::TransparentThin);
 
         readValueFromJson(source, "useWard", mUseWard, false);
 

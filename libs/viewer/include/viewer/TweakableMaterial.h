@@ -5,6 +5,8 @@
 #include <math/mat4.h>
 #include <math/vec3.h>
 
+#include <mathio/ostream.h>
+
 #include <viewer/json.hpp>
 #include <vector>
 #include <string>
@@ -159,7 +161,8 @@ private:
                 item.useDerivedQuantity = source[prefix + "UseDerivable"];
             }
         } catch (...) {
-            std::cout << "Material file did not have attribute '" << prefix << "'. Using default (" << defaultValue << ") instead." << std::endl;
+            // TODO @ViktorHeisenberger MERGE there's something going on with mathio/ostream.h and operator<<, fix it
+            std::cout << "Material file did not have attribute '" << prefix << "'. Using default (" /*<< defaultValue <<*/ ") instead." << std::endl;
             item.value = defaultValue;
             item.useDerivedQuantity = false;
         }

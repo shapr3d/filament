@@ -19,6 +19,7 @@
 #include <functional>
 #include <string>
 #include <type_traits>
+#include <iostream>
 
 // This is really nasty, instantiated in SimpleViewer.cpp
 extern std::string g_ArtRootPathStr;
@@ -67,7 +68,7 @@ struct TweakableProperty {
     TweakableProperty(const T& prop) : value(prop) {}
 
     void addWidget(const char* label, float min = 0.0f, float max = 1.0f, const char* format = "%.3f", float power = 1.0f) {
-        ImGui::LabelText(label, label);
+        ImGui::LabelText(label, "%s", label);
         if constexpr (IsDerivable) {
             std::string customDerivableLabel = std::string("Use derived value for: ") + label;
             ImGui::Checkbox(customDerivableLabel.c_str(), &useDerivedQuantity);

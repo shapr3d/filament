@@ -75,7 +75,7 @@ private:
     FRenderableManager& mRenderableManager;
     float mIntensity = 0.0f;
     uint8_t mLayerMask = 0x1;
-    SkyboxType mType = Skybox::ENVIRONMENT;
+    SkyboxType mType = Skybox::SkyboxType::ENVIRONMENT;
 };
 
 FILAMENT_UPCAST(Skybox)

@@ -1214,6 +1214,7 @@ void SimpleViewer::updateUserInterface() {
             ImGui::Checkbox("High quality upsampling", &upsampling);
             ImGui::SliderFloat("Min Horizon angle", &ssao.minHorizonAngleRad, 0.0f, (float)M_PI_4);
             ImGui::SliderFloat("Bilateral Threshold", &ssao.bilateralThreshold, 0.0f, 0.1f);
+            bool halfRes = ssao.resolution == 1.0f ? false : true;
             ImGui::Checkbox("Half resolution", &halfRes);
             ssao.resolution = halfRes ? 0.5f : 1.0f;
 

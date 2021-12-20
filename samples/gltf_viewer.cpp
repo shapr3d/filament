@@ -381,7 +381,7 @@ int main(int argc, char** argv) {
 
     int optionIndex = handleCommandLineArguments(argc, argv, &app);
 
-    utils::Path filename = "C:\\Users\\gabor\\Desktop\\Viewers\\viewer_20211026\\defaultCoffee.glb";
+    utils::Path filename;
     int num_args = argc - optionIndex;
     if (num_args >= 1) {
         filename = argv[optionIndex];

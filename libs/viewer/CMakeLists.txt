@@ -45,7 +45,7 @@ endif()
 # Include and target definitions
 # ==================================================================================================
 add_library(${TARGET} STATIC ${PUBLIC_HDRS} ${SRCS})
-target_link_libraries(${TARGET} PUBLIC imgui filament gltfio_core filagui jsmn civetweb ${PLATFORM_ADDITIONAL_LIBS})
+target_link_libraries(${TARGET} PUBLIC imgui filament gltfio_core filagui jsmn civetweb mathio ${PLATFORM_ADDITIONAL_LIBS})
 target_include_directories(${TARGET} PUBLIC ${PUBLIC_HDR_DIR})
 
 # ==================================================================================================

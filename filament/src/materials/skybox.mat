@@ -40,7 +40,7 @@ material {
     vertexDomain : device,
     depthWrite : false,
     shadingModel : unlit,
-    variantFilter : [ skinning, shadowReceiver ],
+    variantFilter : [ skinning, shadowReceiver, vsm ],
     culling: none
 }
 
@@ -165,6 +165,7 @@ fragment {
         if (materialParams.skyboxType == SHAPR_SKYBOX_TYPE_ENVIRONMENT && materialParams.showSun != 0 && frameUniforms.sun.w >= 0.0f) {
             float3 direction = normalize(variable_eyeDirection.xyz);
             // Assume the sun is a sphere
+            float3 sun = frameUniforms.lightColorIntensity.rgb *
                     (frameUniforms.lightColorIntensity.a * (4.0 * PI));
             float cosAngle = dot(direction, frameUniforms.lightDirection);
             float x = (cosAngle - frameUniforms.sun.x) * frameUniforms.sun.z;
