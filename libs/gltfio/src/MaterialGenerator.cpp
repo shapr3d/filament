@@ -150,8 +150,10 @@ std::string shaderFromKey(const MaterialKey& config) {
     }
 
     if (!config.unlit) {
-        // This is a custom Shapr3D property that controls specular reflectance of materials on all lighting paths
+        // for controlling the roughness and specular scales
         shader += R"SHADER(
+                material.specularScale     = 1.0 + materialParams.scalingControl.x;
+                material.diffuseScale      = 1.0 + materialParams.scalingControl.z;
                 material.specularIntensity = 1.0;
             )SHADER";
 
@@ -330,7 +332,7 @@ static Material* createMaterial(Engine* engine, const MaterialKey& config, const
     MaterialBuilder builder = MaterialBuilder()
             .name(name)
             .flipUV(false)
-            .specularAmbientOcclusion(MaterialBuilder::SpecularAmbientOcclusion::SIMPLE)
+            .specularAmbientOcclusion(MaterialBuilder::SpecularAmbientOcclusion::BENT_NORMALS)
             .specularAntiAliasing(true)
             .clearCoatIorChange(false)
             .material(shader.c_str())
@@ -374,6 +376,9 @@ static Material* createMaterial(Engine* engine, const MaterialKey& config, const
     // METALLIC-ROUGHNESS
     builder.parameter(MaterialBuilder::UniformType::FLOAT, "metallicFactor");
     builder.parameter(MaterialBuilder::UniformType::FLOAT, "roughnessFactor");
+
+    builder.parameter(MaterialBuilder::UniformType::FLOAT4, "scalingControl");
+    
     if (config.hasMetallicRoughnessTexture) {
         builder.parameter(MaterialBuilder::SamplerType::SAMPLER_2D, "metallicRoughnessMap");
         if (config.hasTextureTransforms) {

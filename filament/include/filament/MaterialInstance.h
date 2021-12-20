@@ -224,6 +224,12 @@ public:
      * Overrides the default depth testing state that was set on the material.
      */
     void setDepthCulling(bool enable) noexcept;
+
+    float& getSpecularScale() noexcept;
+    float& getDiffuseScale() noexcept;
+
+    void setSpecularScale(float specularScale) noexcept;
+    void setDiffuseScale( float diffuseScale ) noexcept;
 };
 
 } // namespace filament

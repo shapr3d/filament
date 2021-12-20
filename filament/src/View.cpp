@@ -310,14 +310,17 @@ void FView::prepareLighting(FEngine& engine, FEngine::DriverApi& driver, ArenaSc
     // associated with the skybox.
     float intensity;
     FIndirectLight const* ibl = scene->getIndirectLight();
+    float skyIntensity = scene->getSkybox() ? scene->getSkybox()->getIntensity() : 1.0f;
     if (UTILS_LIKELY(ibl)) {
         intensity = ibl->getIntensity();
     } else {
         ibl = engine.getDefaultIndirectLight();
         FSkybox const* const skybox = scene->getSkybox();
-        intensity = skybox ? skybox->getIntensity() : FIndirectLight::DEFAULT_INTENSITY;
+        intensity = skybox ? skyIntensity : FIndirectLight::DEFAULT_INTENSITY;
     }
 
+    // TODO @ViktorHeisenberger MERGE
+    // s.skyLuminance = skyIntensity * exposure;
     mPerViewUniforms.prepareAmbientLight(*ibl, intensity, exposure);
 
     /*

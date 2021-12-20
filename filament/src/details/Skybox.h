@@ -48,6 +48,7 @@ public:
     uint8_t getLayerMask() const noexcept { return mLayerMask; }
 
     float getIntensity() const noexcept { return mIntensity; }
+    void setIntensity(float intensity) noexcept { mIntensity = intensity; }
 
     FTexture const* getTexture() const noexcept { return mSkyboxTexture; }
 
@@ -74,6 +75,7 @@ private:
     FRenderableManager& mRenderableManager;
     float mIntensity = 0.0f;
     uint8_t mLayerMask = 0x1;
+    SkyboxType mType = Skybox::ENVIRONMENT;
 };
 
 FILAMENT_UPCAST(Skybox)

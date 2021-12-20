@@ -22,6 +22,7 @@
 
 #include <stdint.h>
 #include <sys/types.h>
+#include <iostream>
 
 namespace filament {
 namespace math {
@@ -107,6 +108,13 @@ public:
                 u[0] * v[1] - u[1] * v[0] };
     }
 };
+
+// hacky, but oh well...
+template <typename T>
+std::ostream& operator<<(std::ostream& out, const TVec3<T>& value) {
+    out << "{ " << value.x << "; " << value.y << "; " << value.z << " }";
+    return out;
+}
 
 }  // namespace details
 
