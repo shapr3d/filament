@@ -23,8 +23,6 @@ struct MaterialInputs {
     float ambientOcclusion;
 #endif
     vec4  emissive;
-    float specularScale;
-    float diffuseScale;
     float specularIntensity;
 
 #if !defined(SHADING_MODEL_CLOTH) && !defined(SHADING_MODEL_SUBSURFACE) && !defined(SHADING_MODEL_UNLIT)

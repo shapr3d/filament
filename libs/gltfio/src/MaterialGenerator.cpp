@@ -150,10 +150,8 @@ std::string shaderFromKey(const MaterialKey& config) {
     }
 
     if (!config.unlit) {
-        // for controlling the roughness and specular scales
+        // This is a custom Shapr3D property that controls specular reflectance of materials on all lighting paths
         shader += R"SHADER(
-                material.specularScale     = 1.0 + materialParams.scalingControl.x;
-                material.diffuseScale      = 1.0 + materialParams.scalingControl.z;
                 material.specularIntensity = 1.0;
             )SHADER";
 

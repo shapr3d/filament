@@ -567,8 +567,8 @@ void applyRefraction(
     Ft *= T;
 #endif
 
-    Fd *= material.diffuseScale * frameUniforms.iblLuminance;
-    Fr *= material.specularIntensity * material.specularScale * frameUniforms.iblLuminance;
+    Fr *= material.specularIntensity * frameUniforms.iblLuminance;
+    Fd *= frameUniforms.iblLuminance;
     color.rgb += Fr + mix(Fd, Ft, pixel.transmission);
 }
 #endif
@@ -581,7 +581,7 @@ void combineDiffuseAndSpecular(
 #if defined(HAS_REFRACTION)
     applyRefraction(material, pixel, n, E, Fd, Fr, color);
 #else
-    color.rgb += (material.diffuseScale * Fd + material.specularIntensity * material.specularScale * Fr) * frameUniforms.iblLuminance;
+    color.rgb += (Fd + material.specularIntensity * Fr) * frameUniforms.iblLuminance;
 #endif
 }
 

@@ -173,21 +173,6 @@ template UTILS_PUBLIC void MaterialInstance::setParameter<float3>  (const char* 
 template UTILS_PUBLIC void MaterialInstance::setParameter<float4>  (const char* name, const float4   *v, size_t c) noexcept;
 template UTILS_PUBLIC void MaterialInstance::setParameter<mat4f>   (const char* name, const mat4f    *v, size_t c) noexcept;
 
-float& MaterialInstance::getSpecularScale() noexcept {
-    return upcast(this)->specularScale;
-}
-float& MaterialInstance::getDiffuseScale() noexcept {
-    return upcast(this)->diffuseScale;
-}
-
-void MaterialInstance::setSpecularScale( float specularScale ) noexcept {
-    upcast(this)->specularScale = specularScale;
-}
-void MaterialInstance::setDiffuseScale(float diffuseScale) noexcept {
-    upcast(this)->diffuseScale = diffuseScale;
-}
-
-
 // ------------------------------------------------------------------------------------------------
 
 FMaterialInstance::FMaterialInstance() noexcept = default;
@@ -201,9 +186,7 @@ FMaterialInstance::FMaterialInstance(FEngine& engine,
           mDepthWrite(other->mDepthWrite),
           mDepthFunc(other->mDepthFunc),
           mScissorRect(other->mScissorRect),
-          mName(name ? CString(name) : other->mName),
-          specularScale{ 1.0f },
-          diffuseScale{ 1.0f } {
+          mName(name ? CString(name) : other->mName) {
 
     FEngine::DriverApi& driver = engine.getDriverApi();
     FMaterial const* const material = other->getMaterial();

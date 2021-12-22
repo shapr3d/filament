@@ -546,7 +546,6 @@ void SimpleViewer::populateScene(FilamentAsset* asset,  FilamentInstance* instan
         }
         mScene->addEntities(renderables, numWritten);
     }
-
 }
 
 void SimpleViewer::removeAsset() {
@@ -937,12 +936,7 @@ void SimpleViewer::updateUserInterface() {
 
             const auto& matInstance = rm.getMaterialInstanceAt(instance, prim);
             const char* mname = matInstance->getName();
-            const auto* mat = matInstance->getMaterial();            
-
-            if (ImGui::CollapsingHeader("Non-persistent tweaks")) {
-                ImGui::SliderFloat("IBL Diffuse intensity multiplier", &matInstance->getDiffuseScale(), 0.0f, 8.0f);
-                ImGui::SliderFloat("IBL Specular intensity multiplier", &matInstance->getSpecularScale(), 0.0f, 8.0f);
-            }
+            const auto* mat = matInstance->getMaterial();
             
             if (mname) {
                 ImGui::Text("prim %zu: material %s", prim, mname);
@@ -1133,12 +1127,6 @@ void SimpleViewer::updateUserInterface() {
                         matInstance->setParameter("maxThickness", tweaks.mMaxThickness.value);
                     }
                 }
-            }
-
-            for (size_t prim = 0; prim < numPrims; ++prim) {
-                // These attributes apply to all materials as we inject them manually into the shaders generated for GLTF import
-                const auto& matInstance = rm.getMaterialInstanceAt(instance, prim);
-                matInstance->setParameter("scalingControl", math::float4(matInstance->getSpecularScale() - 1.0f, 0.0f, matInstance->getDiffuseScale() - 1.0f, 0.0f));
             }
         }
         tm.getChildren(tinstance, children.data(), children.size());

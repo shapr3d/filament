@@ -173,9 +173,6 @@ private:
             (uint32_t)std::numeric_limits<int32_t>::max()
     };
 
-    float specularScale{ 1.0f };
-    float diffuseScale{ 1.0f };
-
     utils::CString mName;
 };
 
