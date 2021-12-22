@@ -7,7 +7,17 @@
 
 #include <mathio/ostream.h>
 
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wreturn-stack-address"
+#endif
+
 #include <viewer/json.hpp>
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
+
 #include <vector>
 #include <string>
 #include <iostream>

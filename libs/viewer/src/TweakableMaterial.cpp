@@ -161,7 +161,7 @@ void TweakableMaterial::resetWithType(MaterialType newType) {
 
     resetMemberToValue(mBaseColor, {0.0f, 0.0f, 0.0f, 1.0f});
     resetMemberToValue(mNormal, {});
-    resetMemberToValue(mOcclusion, { 1.0f });
+    resetMemberToValue(mOcclusion, 1.0f);
     resetMemberToValue(mRoughnessScale, 1.0f);
     resetMemberToValue(mRoughness, 0.0f);
     resetMemberToValue(mMetallic, {});
@@ -186,7 +186,7 @@ void TweakableMaterial::resetWithType(MaterialType newType) {
     resetMemberToValue(mSheenColor, {});
     resetMemberToValue(mSheenRoughness, {});
 
-    resetMemberToValue(mSubsurfacePower, { 1.0f });
+    resetMemberToValue(mSubsurfacePower, 1.0f);
 
     resetMemberToValue(mAbsorption, {});
     resetMemberToValue(mTransmission, {});
@@ -277,6 +277,8 @@ void TweakableMaterial::drawUI() {
         }
         break;
     }
+    // For backward compatibility and warning supression (the enum value needs to be kept)
+    case MaterialType::TransparentThin:
     case MaterialType::TransparentSolid: {
         if (ImGui::CollapsingHeader("Transparent and refractive properties")) {
             ImGui::SliderFloat("Tile: refractive textures", &mRefractiveTextureScale, 1.0f / 1024.0f, 32.0f);
