@@ -238,6 +238,11 @@ void PerViewUniforms::prepareAmbientLight(FIndirectLight const& ibl,
             }});
 }
 
+void PerViewUniforms::prepareSkyLuminance(float intensity, float exposure) noexcept {
+    auto& s = mPerViewUb.edit();
+    s.skyLuminance = intensity * exposure;
+}
+
 void PerViewUniforms::prepareDynamicLights(Froxelizer& froxelizer) noexcept {
     auto& s = mPerViewUb.edit();
     froxelizer.updateUniforms(s);
