@@ -10,7 +10,9 @@
 #pragma clang diagnostic ignored "-Wreturn-stack-address"
 #endif
 
+#define JSON_NOEXCEPTION
 #include <viewer/json.hpp>
+#undef JSON_NOEXCEPTION
 
 #ifdef __clang__
 #pragma clang diagnostic pop
@@ -146,55 +148,33 @@ private:
 
     template< typename T, bool MayContainFile = false, bool IsColor = true, bool IsDerivable = false, typename = IsValidTweakableType<T> >
     void readTexturedFromJson(const json& source, const std::string& prefix, TweakableProperty<T, MayContainFile, IsColor>& item, bool isSrgb = false, bool isAlpha = false, T defaultValue = {}) {
-        try {
-            item.value = source[prefix];
-            item.isFile = source[prefix + "IsFile"];
-            std::string filename = source[prefix + "Texture"];
-            item.filename = filename;
-            item.doRequestReload = true;
-            if (item.isFile) enqueueTextureRequest(item.filename.asString(), item.doRequestReload, isSrgb, isAlpha);
-        } catch (...) {
-            std::cout << "Unable to read textured property '" << prefix << "', reverting to default value without texture." << std::endl;
-            item.value = defaultValue;
-            item.isFile = false;
-            item.filename.clear();
+        item.value = source.value(prefix, defaultValue);
+        item.isFile = source.value(prefix + "IsFile", false);
+        std::string filename = source.value(prefix + "Texture", "");
+        item.filename = filename;
+        item.doRequestReload = true;
+        if (item.isFile) {
+            enqueueTextureRequest(item.filename.asString(), item.doRequestReload, isSrgb, isAlpha);
         }
     }
 
     template< typename T, bool IsColor = false, bool IsDerivable = false, typename = IsValidTweakableType<T> >
     void readValueFromJson(const json& source, const std::string& prefix, TweakableProperty<T, false, IsColor, IsDerivable>& item, const T defaultValue = T()) {
-        try {
-            item.value = source[prefix];
-            if (IsDerivable) {
-                item.useDerivedQuantity = source[prefix + "UseDerivable"];
-            }
-        } catch (...) {
-            std::cout << "Material file did not have attribute '" << prefix << "'. Using default (" << defaultValue << ") instead." << std::endl;
-            item.value = defaultValue;
-            item.useDerivedQuantity = false;
+        item.value = source.value(prefix, defaultValue);
+        if (IsDerivable) {
+            item.useDerivedQuantity = source.value(prefix + "UseDerivable", false);
         }
     }
 
     // If you pass in the plain value without the encapsulating TweakableProperty
     template< typename T, bool IsColor = false, typename = IsValidTweakableType<T> >
     void readValueFromJson(const json& source, const std::string& prefix, T& item, const T defaultValue = T()) {
-        try {
-            item = source[prefix];
-        } catch (...) {
-            std::cout << "Material file did not have attribute '" << prefix << "'. Using default (" << defaultValue << ") instead." << std::endl;
-            item = defaultValue;
-        }
+        item = source.value(prefix, defaultValue);
     }
 
     // And this is only here for the non-directly tweakable/transferred types, such as bools
     // TODO: clean up this mess!
     void readValueFromJson(const json& source, const std::string& prefix, bool& item, const bool defaultValue ) {
-        try {
-            item = source[prefix];
-        }
-        catch (...) {
-            std::cout << "Material file did not have attribute '" << prefix << "'. Using default (" << defaultValue << ") instead." << std::endl;
-            item = defaultValue;
-        }
+        item = source.value(prefix, defaultValue);
     }
 };

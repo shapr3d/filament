@@ -69,7 +69,7 @@ json TweakableMaterial::toJson() {
 }
 
 void TweakableMaterial::fromJson(const json& source) {
-    try {
+    //try {
         // handle renaming materialType to shaderType
         if (source.find("shaderType") != source.cend()) {
             mShaderType = source["shaderType"];
@@ -145,10 +145,10 @@ void TweakableMaterial::fromJson(const json& source) {
         checkAndFixPathRelative(mTransmission);
         checkAndFixPathRelative(mThickness);
         checkAndFixPathRelative(mIor);
-    }
+    /*}
     catch (...) {
         std::cout << "Could not load material file.\n";
-    }
+    }*/
 }
 
 template <typename T, bool MayContainFile = false, bool IsColor = true, bool IsDerivable = false, typename = IsValidTweakableType<T> >

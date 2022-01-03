@@ -319,7 +319,6 @@ void FView::prepareLighting(FEngine& engine, FEngine::DriverApi& driver, ArenaSc
         intensity = skybox ? skyIntensity : FIndirectLight::DEFAULT_INTENSITY;
     }
 
-    mPerViewUniforms.prepareSkyLuminance(skyIntensity, exposure);
     mPerViewUniforms.prepareAmbientLight(*ibl, intensity, exposure);
 
     /*

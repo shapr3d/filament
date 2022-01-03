@@ -376,7 +376,11 @@ int main(int argc, char** argv) {
     app.config.iblDirectory = FilamentApp::getRootAssetsPath() + DEFAULT_IBL;
     app.config.skyboxDirectory = FilamentApp::getRootAssetsPath() + DEFAULT_IBL;
     app.config.cameraMode = camutils::Mode::FREE_FLIGHT;
+#ifdef __APPLE__
+    app.config.backend = Engine::Backend::METAL;
+#else
     app.config.backend = Engine::Backend::OPENGL;
+#endif
     app.config.escapeKeyExitsApp = false;
 
     int optionIndex = handleCommandLineArguments(argc, argv, &app);

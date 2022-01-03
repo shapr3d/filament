@@ -66,8 +66,6 @@ UniformInterfaceBlock const& UibGenerator::getPerViewUib() noexcept  {
             .add("oneOverFroxelDimension",  1, UniformInterfaceBlock::Type::FLOAT)
             // ibl
             .add("iblLuminance",            1, UniformInterfaceBlock::Type::FLOAT)
-            // sky
-            .add("skyLuminance",            1, UniformInterfaceBlock::Type::FLOAT)
             // camera
             .add("exposure",                1, UniformInterfaceBlock::Type::FLOAT, Precision::HIGH) // high precision to work around #3602 (qualcomm)
             .add("ev100",                   1, UniformInterfaceBlock::Type::FLOAT)
