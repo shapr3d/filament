@@ -59,7 +59,7 @@ static NSArray<UTType*>* ConvertFormatsToUTI(const char* formats)
 
     return result;
 }
-#endif
+#endif // __MAC_OS_X_VERSION_MIN_REQUIRED >= 110000
 
 bool SD_MacOpenFileDialog(char* browsedFile, const char* formats, bool folderOnly) {
     NSOpenPanel* openPanel = [NSOpenPanel openPanel];
@@ -98,7 +98,7 @@ bool SD_MacSaveFileDialog(char* browsedFile, const char* formats) {
     }
 }
 
-#else
+#else // TARGET_OS_OSX
 
 bool SD_MacOpenFileDialog(char* browsedFile, const char* formats, bool folderOnly) {
     return false;
@@ -108,6 +108,6 @@ bool SD_MacSaveFileDialog(char* browsedFile, const char* formats) {
     return false;
 }
 
-#endif
+#endif // TARGET_OS_OSX
 
-#endif
+#endif // __APPLE__
