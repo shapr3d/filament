@@ -1,7 +1,8 @@
 #ifdef __APPLE__
 
+#include <Availability.h>
 #include <TargetConditionals.h>
-#if (TARGET_OS_OSX == 1)
+#if TARGET_OS_OSX
 
 #import <AppKit/Appkit.h>
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
@@ -39,6 +40,7 @@ static NSArray<NSString*>* GetExtensionsFromFormatString(const char* formats) {
     return result;
 }
 
+#if (__MAC_OS_X_VERSION_MIN_REQUIRED >= 110000)
 static NSArray<UTType*>* ConvertFormatsToUTI(const char* formats)
 {
     NSMutableArray<UTType*>* result = [[NSMutableArray<UTType*> alloc] init];
@@ -57,6 +59,7 @@ static NSArray<UTType*>* ConvertFormatsToUTI(const char* formats)
 
     return result;
 }
+#endif
 
 bool SD_MacOpenFileDialog(char* browsedFile, const char* formats, bool folderOnly) {
     NSOpenPanel* openPanel = [NSOpenPanel openPanel];

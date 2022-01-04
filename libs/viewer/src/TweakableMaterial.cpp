@@ -69,86 +69,81 @@ json TweakableMaterial::toJson() {
 }
 
 void TweakableMaterial::fromJson(const json& source) {
-    //try {
-        // handle renaming materialType to shaderType
-        if (source.find("shaderType") != source.cend()) {
-            mShaderType = source["shaderType"];
-        } else {
-            mShaderType = source["materialType"];
-        }
+    // handle renaming materialType to shaderType
+    if (source.find("shaderType") != source.cend()) {
+        mShaderType = source["shaderType"];
+    } else {
+        mShaderType = source["materialType"];
+    }
 
-        bool isAlpha = (mShaderType == TweakableMaterial::MaterialType::TransparentSolid) || (mShaderType == TweakableMaterial::MaterialType::TransparentThin);
+    bool isAlpha = (mShaderType == TweakableMaterial::MaterialType::TransparentSolid) || (mShaderType == TweakableMaterial::MaterialType::TransparentThin);
 
-        readValueFromJson(source, "useWard", mUseWard, false);
+    readValueFromJson(source, "useWard", mUseWard, false);
 
-        readTexturedFromJson(source, "baseColor", mBaseColor, true, isAlpha);
+    readTexturedFromJson(source, "baseColor", mBaseColor, true, isAlpha);
 
-        readValueFromJson(source, "normalIntensity", mNormalIntensity, 1.0f);
-        readTexturedFromJson(source, "normalTexture", mNormal);
+    readValueFromJson(source, "normalIntensity", mNormalIntensity, 1.0f);
+    readTexturedFromJson(source, "normalTexture", mNormal);
 
-        readValueFromJson(source, "roughnessScale", mRoughnessScale, 1.0f);
-        readTexturedFromJson(source, "roughness", mRoughness);
+    readValueFromJson(source, "roughnessScale", mRoughnessScale, 1.0f);
+    readTexturedFromJson(source, "roughness", mRoughness);
 
-        readTexturedFromJson(source, "metallic", mMetallic);
+    readTexturedFromJson(source, "metallic", mMetallic);
 
-        readValueFromJson(source, "occlusionIntensity", mOcclusionIntensity.value, 1.0f);
-        readTexturedFromJson(source, "occlusion", mOcclusion, 1.0f);
+    readValueFromJson(source, "occlusionIntensity", mOcclusionIntensity.value, 1.0f);
+    readTexturedFromJson(source, "occlusion", mOcclusion, 1.0f);
 
-        readValueFromJson(source, "clearCoat", mClearCoat, 0.0f);
-        readValueFromJson(source, "clearCoatNormalIntensity", mClearCoatNormalIntensity, 1.0f);
-        readTexturedFromJson(source, "clearCoatNormal", mClearCoatNormal);
-        readTexturedFromJson(source, "clearCoatRoughness", mClearCoatRoughness);
+    readValueFromJson(source, "clearCoat", mClearCoat, 0.0f);
+    readValueFromJson(source, "clearCoatNormalIntensity", mClearCoatNormalIntensity, 1.0f);
+    readTexturedFromJson(source, "clearCoatNormal", mClearCoatNormal);
+    readTexturedFromJson(source, "clearCoatRoughness", mClearCoatRoughness);
 
-        readValueFromJson(source, "baseTextureScale", mBaseTextureScale, 1.0f);
-        readValueFromJson(source, "normalTextureScale", mNormalTextureScale, 1.0f);
-        readValueFromJson(source, "clearCoatTextureScale", mClearCoatTextureScale, 1.0f);
-        readValueFromJson(source, "refractiveTextureScale", mRefractiveTextureScale, 1.0f);
-        readValueFromJson(source, "reflectanceScale", mSpecularIntensity, 1.0f);
+    readValueFromJson(source, "baseTextureScale", mBaseTextureScale, 1.0f);
+    readValueFromJson(source, "normalTextureScale", mNormalTextureScale, 1.0f);
+    readValueFromJson(source, "clearCoatTextureScale", mClearCoatTextureScale, 1.0f);
+    readValueFromJson(source, "refractiveTextureScale", mRefractiveTextureScale, 1.0f);
+    readValueFromJson(source, "reflectanceScale", mSpecularIntensity, 1.0f);
 
-        readValueFromJson(source, "anisotropy", mAnisotropy, 0.0f);
-        readValueFromJson(source, "anisotropyDirection", mAnisotropyDirection, { 1.0f, 0.0f, 0.0f });
+    readValueFromJson(source, "anisotropy", mAnisotropy, 0.0f);
+    readValueFromJson(source, "anisotropyDirection", mAnisotropyDirection, { 1.0f, 0.0f, 0.0f });
 
-        readTexturedFromJson(source, "sheenRoughness", mSheenRoughness);
-        readValueFromJson<filament::math::float3, true, true>(source, "sheenColor", mSheenColor, { 0.0f, 0.0f, 0.0f });
+    readTexturedFromJson(source, "sheenRoughness", mSheenRoughness);
+    readValueFromJson<filament::math::float3, true, true>(source, "sheenColor", mSheenColor, { 0.0f, 0.0f, 0.0f });
 
-        readValueFromJson(source, "isSheenColorDerived", mSheenColor.useDerivedQuantity, false);
-        readValueFromJson<filament::math::float3, true>(source, "subsurfaceColor", mSubsurfaceColor, { 0.0f, 0.0f, 0.0f });
-        readValueFromJson(source, "subsurfacePower", mSubsurfacePower, 1.0f);
+    readValueFromJson(source, "isSheenColorDerived", mSheenColor.useDerivedQuantity, false);
+    readValueFromJson<filament::math::float3, true>(source, "subsurfaceColor", mSubsurfaceColor, { 0.0f, 0.0f, 0.0f });
+    readValueFromJson(source, "subsurfacePower", mSubsurfacePower, 1.0f);
 
-        readValueFromJson<filament::math::float3, true, true>(source, "absorption", mAbsorption, { 0.0f, 0.0f, 0.0f });
-        readValueFromJson(source, "isAbsorptionDerived", mAbsorption.useDerivedQuantity, false);
-        readValueFromJson(source, "iorScale", mIorScale, 1.0f);
-        readTexturedFromJson(source, "ior", mIor);
-        readTexturedFromJson(source, "thickness", mThickness);
-        readTexturedFromJson(source, "transmission", mTransmission);
-        readValueFromJson(source, "maxThickness", mMaxThickness, 1.0f);
-        
-        readValueFromJson(source, "doRelease", mDoRelease, false);
+    readValueFromJson<filament::math::float3, true, true>(source, "absorption", mAbsorption, { 0.0f, 0.0f, 0.0f });
+    readValueFromJson(source, "isAbsorptionDerived", mAbsorption.useDerivedQuantity, false);
+    readValueFromJson(source, "iorScale", mIorScale, 1.0f);
+    readTexturedFromJson(source, "ior", mIor);
+    readTexturedFromJson(source, "thickness", mThickness);
+    readTexturedFromJson(source, "transmission", mTransmission);
+    readValueFromJson(source, "maxThickness", mMaxThickness, 1.0f);
 
-        auto checkAndFixPathRelative([](auto& propertyWithPath) {
-            if (propertyWithPath.isFile) {
-                utils::Path asPath(propertyWithPath.filename);
-                if (asPath.isAbsolute()) {
-                    std::string newFilePath = asPath.makeRelativeTo(g_ArtRootPathStr).c_str();
-                    propertyWithPath.filename = newFilePath;
-                }
+    readValueFromJson(source, "doRelease", mDoRelease, false);
+
+    auto checkAndFixPathRelative([](auto& propertyWithPath) {
+        if (propertyWithPath.isFile) {
+            utils::Path asPath(propertyWithPath.filename);
+            if (asPath.isAbsolute()) {
+                std::string newFilePath = asPath.makeRelativeTo(g_ArtRootPathStr).c_str();
+                propertyWithPath.filename = newFilePath;
             }
-        });
+        }
+    });
 
-        checkAndFixPathRelative(mBaseColor);
-        checkAndFixPathRelative(mNormal);
-        checkAndFixPathRelative(mRoughness);
-        checkAndFixPathRelative(mMetallic);
-        checkAndFixPathRelative(mClearCoatNormal);
-        checkAndFixPathRelative(mClearCoatRoughness);
-        checkAndFixPathRelative(mSheenRoughness);
-        checkAndFixPathRelative(mTransmission);
-        checkAndFixPathRelative(mThickness);
-        checkAndFixPathRelative(mIor);
-    /*}
-    catch (...) {
-        std::cout << "Could not load material file.\n";
-    }*/
+    checkAndFixPathRelative(mBaseColor);
+    checkAndFixPathRelative(mNormal);
+    checkAndFixPathRelative(mRoughness);
+    checkAndFixPathRelative(mMetallic);
+    checkAndFixPathRelative(mClearCoatNormal);
+    checkAndFixPathRelative(mClearCoatRoughness);
+    checkAndFixPathRelative(mSheenRoughness);
+    checkAndFixPathRelative(mTransmission);
+    checkAndFixPathRelative(mThickness);
+    checkAndFixPathRelative(mIor);
 }
 
 template <typename T, bool MayContainFile = false, bool IsColor = true, bool IsDerivable = false, typename = IsValidTweakableType<T> >

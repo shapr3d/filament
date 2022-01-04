@@ -729,17 +729,6 @@ void SimpleViewer::loadTweaksFromFile(const std::string& entityName, const std::
 
     // fixup legacy transparent thin material
     if (tweaks.mShaderType == TweakableMaterial::MaterialType::TransparentThin) tweaks.mShaderType = TweakableMaterial::MaterialType::TransparentSolid;
-
-    /*checkAndFixPathRelative(tweaks.mBaseColor);
-    checkAndFixPathRelative(tweaks.mNormal);
-    checkAndFixPathRelative(tweaks.mRoughness);
-    checkAndFixPathRelative(tweaks.mMetallic);
-    checkAndFixPathRelative(tweaks.mClearCoatNormal);
-    checkAndFixPathRelative(tweaks.mClearCoatRoughness);
-    checkAndFixPathRelative(tweaks.mSheenRoughness);
-    checkAndFixPathRelative(tweaks.mTransmission);
-    checkAndFixPathRelative(tweaks.mThickness);
-    checkAndFixPathRelative(tweaks.mIor);*/
 }
 
 void SimpleViewer::changeElementVisibility(utils::Entity entity, int elementIndex, bool newVisibility) {

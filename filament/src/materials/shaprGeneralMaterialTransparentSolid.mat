@@ -103,14 +103,6 @@ material {
             name : transmission
         },
 
-        {
-            type : int,
-            name : useIorTexture
-        },
-        {
-            type : sampler2d,
-            name : iorTexture
-        },
         {   // default: 1.5
             type : float,
             name : ior
@@ -356,12 +348,7 @@ fragment {
         // Attributes for transparent/refractive materials
         //////////////////////////////////////////////////////////////////////////////////////////////////
         material.absorption = ( materialParams.doDeriveAbsorption == 1 ) ? 1.0 - material.baseColor.rgb : materialParams.absorption;
-
-        if ( materialParams.useIorTexture == 1 ) {
-            material.ior = 1.0 + materialParams.iorScale * triplanarTexture(materialParams_iorTexture, materialParams.textureScaler.w, pos, normal).r;
-        } else {
-            material.ior = 1.0 + materialParams.iorScale * ( materialParams.ior - 1.0 );
-        }
+        material.ior = 1.0 + materialParams.iorScale * ( materialParams.ior - 1.0 );
 
 
         if ( materialParams.useTransmissionTexture == 1 ) {
