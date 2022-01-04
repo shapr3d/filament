@@ -117,7 +117,7 @@ void TweakableMaterial::fromJson(const json& source) {
     readValueFromJson<filament::math::float3, true, true>(source, "absorption", mAbsorption, { 0.0f, 0.0f, 0.0f });
     readValueFromJson(source, "isAbsorptionDerived", mAbsorption.useDerivedQuantity, false);
     readValueFromJson(source, "iorScale", mIorScale, 1.0f);
-    readTexturedFromJson(source, "ior", mIor);
+    readValueFromJson(source, "ior", mIor);
     readTexturedFromJson(source, "thickness", mThickness);
     readTexturedFromJson(source, "transmission", mTransmission);
     readValueFromJson(source, "maxThickness", mMaxThickness, 1.0f);

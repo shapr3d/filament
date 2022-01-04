@@ -120,7 +120,7 @@ public:
     TweakableProperty<float> mMaxThickness{}; // for refractive; this scales the values read from a thickness property/texture
     TweakablePropertyTextured<float> mThickness{}; // for refractive and subsurface
     TweakableProperty<float> mIorScale{}; // for refractive
-    TweakablePropertyTextured<float> mIor{}; // for refractive
+    TweakableProperty<float> mIor{}; // for refractive
 
     bool mUseWard{};
     bool mDoRelease{}; // this notifies the material integrator tool that this material needs to be checked into the codebase
@@ -149,12 +149,19 @@ private:
     template< typename T, bool MayContainFile = false, bool IsColor = true, bool IsDerivable = false, typename = IsValidTweakableType<T> >
     void readTexturedFromJson(const json& source, const std::string& prefix, TweakableProperty<T, MayContainFile, IsColor>& item, bool isSrgb = false, bool isAlpha = false, T defaultValue = {}) {
         item.value = source.value(prefix, defaultValue);
-        item.isFile = source.value(prefix + "IsFile", false);
-        std::string filename = source.value(prefix + "Texture", "");
-        item.filename = filename;
-        item.doRequestReload = true;
-        if (item.isFile) {
-            enqueueTextureRequest(item.filename.asString(), item.doRequestReload, isSrgb, isAlpha);
+        if (source.find(prefix) == source.end()) {
+            std::cout << "Unable to read textured property '" << prefix << "', reverting to default value without texture." << std::endl;
+            item.value = defaultValue;
+            item.isFile = false;
+            item.filename.clear();
+        } else {
+            item.isFile = source.value(prefix + "IsFile", false);
+            std::string filename = source.value(prefix + "Texture", "");
+            item.filename = filename;
+            item.doRequestReload = true;
+            if (item.isFile) {
+                enqueueTextureRequest(item.filename.asString(), item.doRequestReload, isSrgb, isAlpha);
+            }
         }
     }
 
@@ -164,17 +171,29 @@ private:
         if (IsDerivable) {
             item.useDerivedQuantity = source.value(prefix + "UseDerivable", false);
         }
+
+        if (source.find(prefix) == source.end()) {
+            std::cout << "Material file did not have attribute '" << prefix << "'. Using default (" << defaultValue << ") instead." << std::endl;
+        }
     }
 
     // If you pass in the plain value without the encapsulating TweakableProperty
     template< typename T, bool IsColor = false, typename = IsValidTweakableType<T> >
     void readValueFromJson(const json& source, const std::string& prefix, T& item, const T defaultValue = T()) {
         item = source.value(prefix, defaultValue);
+
+        if (source.find(prefix) == source.end()) {
+            std::cout << "Material file did not have attribute '" << prefix << "'. Using default (" << defaultValue << ") instead." << std::endl;
+        }
     }
 
     // And this is only here for the non-directly tweakable/transferred types, such as bools
     // TODO: clean up this mess!
     void readValueFromJson(const json& source, const std::string& prefix, bool& item, const bool defaultValue ) {
         item = source.value(prefix, defaultValue);
+
+        if (source.find(prefix) == source.end()) {
+            std::cout << "Material file did not have attribute '" << prefix << "'. Using default (" << defaultValue << ") instead." << std::endl;
+        }
     }
 };

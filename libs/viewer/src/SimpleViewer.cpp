@@ -1104,8 +1104,7 @@ void SimpleViewer::updateUserInterface() {
                             matInstance->setParameter("absorption", tweaks.mAbsorption.value);
                             matInstance->setParameter("doDeriveAbsorption", 0);
                         }
-
-                        setTextureIfPresent(tweaks.mIor.isFile, tweaks.mIor.filename, "ior");
+                        
                         setTextureIfPresent(tweaks.mTransmission.isFile, tweaks.mTransmission.filename, "transmission");
                         setTextureIfPresent(tweaks.mThickness.isFile, tweaks.mThickness.filename, "thickness");
 
