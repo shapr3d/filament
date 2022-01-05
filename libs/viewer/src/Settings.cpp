@@ -913,9 +913,6 @@ static int parse(jsmntok_t const* tokens, int i, const char* jsonChunk, Tweakabl
         if (compare(tok, jsonChunk, "isFile") == 0) {
             i = parse(tokens, i + 1, jsonChunk, &out->isFile);
         }
-        //else if (compare(tok, jsonChunk, "filename") == 0) {
-        //    i = parse(tokens, i + 1, jsonChunk, &out->filename);
-        //}
         else if (compare(tok, jsonChunk, "value") == 0) {
             i = parse(tokens, i + 1, jsonChunk, &out->value);
         }
@@ -966,23 +963,6 @@ int parse(jsmntok_t const* tokens, int i, const char* jsonChunk, TweakableMateri
         if (compare(tok, jsonChunk, "baseColor") == 0) {
             i = parse(tokens, i + 1, jsonChunk, &out->mBaseColor.value);
         }
-        /*else if (compare(tok, jsonChunk, "material") == 0) {
-            i = parse(tokens, i + 1, jsonChunk, &out->material);
-        }
-        else if (compare(tok, jsonChunk, "lighting") == 0) {
-            i = parse(tokens, i + 1, jsonChunk, &out->lighting);
-        }
-        else if (compare(tok, jsonChunk, "viewer") == 0) {
-            i = parse(tokens, i + 1, jsonChunk, &out->viewer);
-        }
-        else {
-            slog.w << "Invalid group key: '" << STR(tok, jsonChunk) << "'" << io::endl;
-            i = parse(tokens, i + 1);
-        }
-        if (i < 0) {
-            slog.e << "Invalid group value: '" << STR(tok, jsonChunk) << "'" << io::endl;
-            return i;
-        }*/
     }
     return i;
 }

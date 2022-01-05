@@ -41,7 +41,7 @@
 using namespace filament::math;
 using namespace filament;
 
-unsigned int IBLPrefilterContext::cubemapFaceResolution = 256;
+uint32_t IBLPrefilterContext::cubemapFaceResolution = 256;
 
 constexpr static float4 sFullScreenTriangleVertices[3] = {
         { -1.0f, -1.0f, 1.0f, 1.0f },
@@ -160,8 +160,7 @@ IBLPrefilterContext& IBLPrefilterContext::operator=(IBLPrefilterContext&& rhs) n
     return *this;
 }
 
-void IBLPrefilterContext::setCubemapFaceResolution(unsigned int res)
-{
+void IBLPrefilterContext::setCubemapFaceResolution(uint32_t res) {
     cubemapFaceResolution = res;
 }
 

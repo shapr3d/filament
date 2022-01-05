@@ -239,7 +239,7 @@ private:
     utils::Entity mCameraEntity{};
     filament::View* mView{};
     filament::Material* mIntegrationMaterial{};
-    static unsigned int cubemapFaceResolution;
+    static uint32_t cubemapFaceResolution;
 };
 
 #endif //TNT_IBL_PREFILTER_IBLPREFILTER_H
