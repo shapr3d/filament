@@ -88,7 +88,7 @@ Froxelizer::Froxelizer(FEngine& engine)
             "Record Buffer must use bytes");
 
     mRecordsBuffer = driverApi.createBufferObject(RECORD_BUFFER_ENTRY_COUNT,
-            BufferObjectBinding::UNIFORM, BufferUsage::DYNAMIC);
+            BufferObjectBinding::UNIFORM, BufferUsage::DYNAMIC, false);
 
     mFroxelTexture = driverApi.createTexture(SamplerType::SAMPLER_2D, 1,
             backend::TextureFormat::RG16UI, 1,

@@ -205,11 +205,8 @@ FVertexBuffer::FVertexBuffer(FEngine& engine, const VertexBuffer::Builder& build
         for (size_t i = 0; i < MAX_VERTEX_BUFFER_COUNT; ++i) {
             if (bufferSizes[i] > 0) {
                 BufferObjectHandle bo = driver.createBufferObject(bufferSizes[i],
-<<<<<<< HEAD
-                        backend::BufferObjectBinding::VERTEX, mExternalBuffersEnabled);
-=======
-                        backend::BufferObjectBinding::VERTEX, backend::BufferUsage::STATIC);
->>>>>>> Shapr3D/release
+                        backend::BufferObjectBinding::VERTEX, backend::BufferUsage::STATIC,
+                        mExternalBuffersEnabled);
                 driver.setVertexBufferObject(mHandle, i, bo);
                 mBufferObjects[i] = bo;
             }

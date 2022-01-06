@@ -54,12 +54,8 @@ BufferObject* BufferObject::Builder::build(Engine& engine) {
 FBufferObject::FBufferObject(FEngine& engine, const BufferObject::Builder& builder)
         : mByteCount(builder->mByteCount), mBindingType(builder->mBindingType) {
     FEngine::DriverApi& driver = engine.getDriverApi();
-<<<<<<< HEAD
-    mHandle = driver.createBufferObject(builder->mByteCount, builder->mBindingType, false);
-=======
     mHandle = driver.createBufferObject(builder->mByteCount, builder->mBindingType,
-            backend::BufferUsage::STATIC);
->>>>>>> Shapr3D/release
+            backend::BufferUsage::STATIC, false);
 }
 
 void FBufferObject::terminate(FEngine& engine) {

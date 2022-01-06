@@ -757,15 +757,6 @@ function validate_build_command {
             exit 1
         fi
     fi
-<<<<<<< HEAD
-    # Make sure we have Java
-    local javac_binary=$(command -v javac)
-    if [[ "${ISSUE_DESKTOP_BUILD}" == "true" ]] && ([[ "${JAVA_HOME}" == "" ]] || [[ ! "${javac_binary}" ]]); then
-        echo "Warning: JAVA_HOME is not set, skipping Java projects"
-        FILAMENT_ENABLE_JAVA=OFF
-    fi
-=======
->>>>>>> Shapr3D/release
     # If building a WebAssembly module, ensure we know where Emscripten lives.
     if [[ "${EMSDK}" == "" ]] && [[ "${ISSUE_WEBGL_BUILD}" == "true" ]]; then
         echo "Error: EMSDK is not set, exiting"

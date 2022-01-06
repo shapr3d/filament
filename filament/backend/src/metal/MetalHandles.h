@@ -115,11 +115,8 @@ private:
 
 class MetalBufferObject : public HwBufferObject {
 public:
-<<<<<<< HEAD
-    MetalBufferObject(MetalContext& context, uint32_t byteCount, bool wrapsExternalBuffer);
-=======
-    MetalBufferObject(MetalContext& context, BufferUsage usage, uint32_t byteCount);
->>>>>>> Shapr3D/release
+    MetalBufferObject(MetalContext& context, BufferUsage usage, uint32_t byteCount,
+            bool wrapsExternalBuffer);
 
     void updateBuffer(void* data, size_t size, uint32_t byteOffset);
     MetalBuffer* getBuffer() { return &buffer; }

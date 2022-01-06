@@ -426,45 +426,25 @@ void OpenGLDriver::createIndexBufferR(
     }
 }
 
-<<<<<<< HEAD
-void OpenGLDriver::createBufferObjectR(
-        Handle<HwBufferObject> boh,
-        uint32_t byteCount,
-        BufferObjectBinding bindingType,
-        bool wrapsExternalBuffer) {   
-=======
 void OpenGLDriver::createBufferObjectR(Handle<HwBufferObject> boh,
-        uint32_t byteCount, BufferObjectBinding bindingType, BufferUsage usage) {
->>>>>>> Shapr3D/release
+        uint32_t byteCount, BufferObjectBinding bindingType, BufferUsage usage,
+        bool wrapsExternalBuffer) {
     DEBUG_MARKER()
     assert_invariant(byteCount > 0);
 
     auto& gl = mContext;
-<<<<<<< HEAD
-    GLBufferObject* bo = construct<GLBufferObject>(boh, byteCount);
-    glGenBuffers(1, &bo->gl.id);
-    bo->gl.isExternal = wrapsExternalBuffer;
-    if (!wrapsExternalBuffer) {
-        gl.bindVertexArray(nullptr);
-
-        assert_invariant(byteCount > 0);
-        assert_invariant(bindingType == BufferObjectBinding::VERTEX);
-
-        gl.bindBuffer(GL_ARRAY_BUFFER, bo->gl.id);
-        glBufferData(GL_ARRAY_BUFFER, byteCount, nullptr, GL_STATIC_DRAW);
-        CHECK_GL_ERROR(utils::slog.e)
-    }
-=======
-    if (bindingType == BufferObjectBinding::VERTEX) {
+    if (bindingType == BufferObjectBinding::VERTEX && !wrapsExternalBuffer) {
         gl.bindVertexArray(nullptr);
     }
 
     GLBufferObject* bo = construct<GLBufferObject>(boh, byteCount, bindingType, usage);
     glGenBuffers(1, &bo->gl.id);
-    gl.bindBuffer(bo->gl.binding, bo->gl.id);
-    glBufferData(bo->gl.binding, byteCount, nullptr, getBufferUsage(usage));
-    CHECK_GL_ERROR(utils::slog.e)
->>>>>>> Shapr3D/release
+    bo->gl.isExternal = wrapsExternalBuffer;
+    if (!wrapsExternalBuffer) {
+        gl.bindBuffer(bo->gl.binding, bo->gl.id);
+        glBufferData(bo->gl.binding, byteCount, nullptr, getBufferUsage(usage));
+        CHECK_GL_ERROR(utils::slog.e)
+    }
 }
 
 void OpenGLDriver::createRenderPrimitiveR(Handle<HwRenderPrimitive> rph, int) {
@@ -1226,13 +1206,9 @@ void OpenGLDriver::destroyBufferObject(Handle<HwBufferObject> boh) {
     if (boh) {
         auto& gl = mContext;
         GLBufferObject const* bo = handle_cast<const GLBufferObject*>(boh);
-<<<<<<< HEAD
         if (!bo->gl.isExternal) {
-            gl.deleteBuffers(1, &bo->gl.id, GL_ARRAY_BUFFER);
+            gl.deleteBuffers(1, &bo->gl.id, bo->gl.binding);
         }
-=======
-        gl.deleteBuffers(1, &bo->gl.id, bo->gl.binding);
->>>>>>> Shapr3D/release
         destruct(boh, bo);
     }
 }

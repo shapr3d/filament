@@ -66,6 +66,7 @@ struct MetalContext {
         uint8_t common;
         uint8_t apple;
         uint8_t mac;
+        uint8_t macCatalyst;
     } highestSupportedGpuFamily;
 
     // sampleCountLookup[requestedSamples] gives a <= sample count supported by the device.

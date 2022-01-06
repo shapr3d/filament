@@ -95,12 +95,9 @@ private:
 
     BufferUsage mUsage;
     size_t mBufferSize = 0;
-<<<<<<< HEAD
     id<MTLBuffer> mExternalBuffer = nil;
-=======
     size_t mCurrentStreamStart = 0;
     size_t mCurrentStreamEnd = 0;
->>>>>>> Shapr3D/release
     const MetalBufferPoolEntry* mBufferPoolEntry = nullptr;
     void* mCpuBuffer = nullptr;
     MetalContext& mContext;

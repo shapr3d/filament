@@ -188,7 +188,7 @@ TEST_F(BackendTest, FeedbackLoops) {
             auto sgroup = api.createSamplerGroup(samplers.getSize());
             api.updateSamplerGroup(sgroup, std::move(samplers.toCommandStream()));
             auto ubuffer = api.createBufferObject(sizeof(MaterialParams),
-                    BufferObjectBinding::UNIFORM, BufferUsage::STATIC);
+                    BufferObjectBinding::UNIFORM, BufferUsage::STATIC, false);
             api.makeCurrent(swapChain, swapChain);
             api.beginFrame(0, 0);
             api.bindSamplers(0, sgroup);

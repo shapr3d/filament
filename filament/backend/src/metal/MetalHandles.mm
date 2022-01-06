@@ -263,13 +263,8 @@ void MetalSwapChain::scheduleFrameCompletedCallback() {
     }];
 }
 
-<<<<<<< HEAD
-MetalBufferObject::MetalBufferObject(MetalContext& context, uint32_t byteCount, bool wrapsExternalBuffer)
-        : HwBufferObject(byteCount), buffer(std::make_unique<MetalBuffer>(context, byteCount, wrapsExternalBuffer)) {}
-=======
-MetalBufferObject::MetalBufferObject(MetalContext& context, BufferUsage usage, uint32_t byteCount)
-        : HwBufferObject(byteCount), buffer(context, usage, byteCount) {}
->>>>>>> Shapr3D/release
+MetalBufferObject::MetalBufferObject(MetalContext& context, BufferUsage usage, uint32_t byteCount,bool wrapsExternalBuffer)
+        : HwBufferObject(byteCount), buffer(context, usage, byteCount, wrapsExternalBuffer) {}
 
 void MetalBufferObject::updateBuffer(void* data, size_t size, uint32_t byteOffset) {
     buffer.copyIntoBuffer(data, size, byteOffset);
@@ -376,21 +371,6 @@ MetalProgram::MetalProgram(id<MTLDevice> device, const Program& program) noexcep
     samplerGroupInfo = program.getSamplerGroupInfo();
 }
 
-<<<<<<< HEAD
-static MTLPixelFormat decidePixelFormat(id<MTLDevice> device, TextureFormat format) {
-    const MTLPixelFormat metalFormat = getMetalFormat(device, format);
-#if !defined(IOS)
-    // Some devices do not support the Depth24_Stencil8 format, so we'll fallback to Depth32.
-    if (metalFormat == MTLPixelFormatDepth24Unorm_Stencil8 &&
-        !device.depth24Stencil8PixelFormatSupported) {
-        return MTLPixelFormatDepth32Float;
-    }
-#endif
-    return metalFormat;
-}
-
-=======
->>>>>>> Shapr3D/release
 MetalTexture::MetalTexture(MetalContext& context, SamplerType target, uint8_t levels,
         TextureFormat format, uint8_t samples, uint32_t width, uint32_t height, uint32_t depth,
         TextureUsage usage, TextureSwizzle r, TextureSwizzle g, TextureSwizzle b,
@@ -687,35 +667,6 @@ void MetalTexture::loadSlice(uint32_t level, MTLRegion region, uint32_t byteOffs
     if (conversionNecessary || largeUpload) {
         loadWithBlit(level, slice, region, data, shape);
     } else {
-<<<<<<< HEAD
-        // The texture is too large to fit into a single buffer, create a staging texture instead.
-        MTLTextureDescriptor* descriptor =
-                [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:metalPixelFormat
-                                                                   width:width
-                                                                  height:height
-                                                               mipmapped:NO];
-        if (depth > 1) {
-            descriptor.textureType = MTLTextureType3D;
-            descriptor.depth = depth;
-        }
-        id<MTLTexture> stagingTexture = [context.device newTextureWithDescriptor:descriptor];
-        [stagingTexture replaceRegion:MTLRegionMake3D(0, 0, 0, width, height, depth)
-                          mipmapLevel:0
-                                slice:0
-                            withBytes:static_cast<uint8_t*>(data.buffer) + sourceOffset
-                          bytesPerRow:bytesPerRow
-                        bytesPerImage:bytesPerSlice];
-        [blitCommandEncoder copyFromTexture:stagingTexture
-                                sourceSlice:0
-                                sourceLevel:0
-                               sourceOrigin:MTLOriginMake(0, 0, 0)
-                                 sourceSize:MTLSizeMake(width, height, depth)
-                                  toTexture:texture
-                           destinationSlice:slice
-                           destinationLevel:level
-                          destinationOrigin:MTLOriginMake(xoffset, yoffset, zoffset)];
-    }
-=======
         loadWithCopyBuffer(level, slice, region, data, shape);
     }
 }
@@ -758,11 +709,6 @@ void MetalTexture::loadWithBlit(uint32_t level, uint32_t slice, MTLRegion region
     descriptor.height = region.size.height;
     descriptor.depth = region.size.depth;
 
-#if defined(IOS)
-    descriptor.storageMode = MTLStorageModeShared;
-#else
-    descriptor.storageMode = MTLStorageModeManaged;
-#endif
 
     id<MTLTexture> stagingTexture = [context.device newTextureWithDescriptor:descriptor];
     MTLRegion sourceRegion = MTLRegionMake3D(0, 0, 0,
@@ -802,7 +748,6 @@ void MetalTexture::loadWithBlit(uint32_t level, uint32_t slice, MTLRegion region
     args.source.color = stagingTexture;
     args.destination.color = destinationTexture;
     context.blitter->blit(getPendingCommandBuffer(&context), args);
->>>>>>> Shapr3D/release
 }
 
 void MetalTexture::updateLodRange(uint32_t level) {
@@ -987,20 +932,6 @@ id<MTLTexture> MetalRenderTarget::createMultisampledTexture(id<MTLDevice> device
     descriptor.sampleCount = samples;
     descriptor.usage = MTLTextureUsageRenderTarget;
     descriptor.resourceOptions = MTLResourceStorageModePrivate;
-<<<<<<< HEAD
-#if !defined(FILAMENT_IOS_SIMULATOR)
-#if defined(IOS) && !TARGET_OS_MACCATALYST
-    descriptor.resourceOptions = MTLResourceStorageModeMemoryless;
-#else
-    if (@available(macOS 11.0, macCatalyst 14.0, *)) {
-        if ([device supportsFamily:MTLGPUFamilyApple1]) {
-            descriptor.resourceOptions = MTLResourceStorageModeMemoryless;
-        }
-    }
-#endif
-#endif
-=======
->>>>>>> Shapr3D/release
 
     return [device newTextureWithDescriptor:descriptor];
 }

@@ -182,11 +182,8 @@ DECL_DRIVER_API_R_N(backend::IndexBufferHandle, createIndexBuffer,
 DECL_DRIVER_API_R_N(backend::BufferObjectHandle, createBufferObject,
         uint32_t, byteCount,
         backend::BufferObjectBinding, bindingType,
-<<<<<<< HEAD
+        backend::BufferUsage, usage,
         bool, wrapsExternalBuffer)
-=======
-        backend::BufferUsage, usage)
->>>>>>> Shapr3D/release
 
 DECL_DRIVER_API_R_N(backend::TextureHandle, createTexture,
         backend::SamplerType, target,

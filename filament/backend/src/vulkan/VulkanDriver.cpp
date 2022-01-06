@@ -447,17 +447,10 @@ void VulkanDriver::destroyIndexBuffer(Handle<HwIndexBuffer> ibh) {
     }
 }
 
-<<<<<<< HEAD
 void VulkanDriver::createBufferObjectR(Handle<HwBufferObject> boh, uint32_t byteCount,
-        BufferObjectBinding bindingType, bool wrapsExternalBuffer) {
-    auto bufferObject = construct_handle<VulkanBufferObject>(mHandleMap, boh, mContext, mStagePool,
-            byteCount);
-=======
-void VulkanDriver::createBufferObjectR(Handle<HwBufferObject> boh,
-        uint32_t byteCount, BufferObjectBinding bindingType, BufferUsage usage) {
+        BufferObjectBinding bindingType, BufferUsage usage, bool wrapsExternalBuffer) {
     auto bufferObject = construct<VulkanBufferObject>(boh, mContext, mStagePool, byteCount,
             bindingType, usage);
->>>>>>> Shapr3D/release
     mDisposer.createDisposable(bufferObject, [this, boh] () {
        destruct<VulkanBufferObject>(mContext, boh);
     });

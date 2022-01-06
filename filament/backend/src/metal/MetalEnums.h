@@ -25,37 +25,6 @@
 
 #include <Availability.h>
 
-namespace {
-#if defined(FILAMENT_IOS_SIMULATOR)
-    constexpr bool SupportsEAC_ETC(id<MTLDevice>) { return false; }
-    constexpr bool SupportsASTC(id<MTLDevice>) { return false; }
-#else
-    bool SupportsEAC_ETC(id<MTLDevice> device) {
-        assert(device);
-        if (@available(iOS 13.0, macOS 10.15, *)) {
-            return [device supportsFamily:MTLGPUFamilyApple1];
-#if defined(IOS) && !TARGET_OS_MACCATALYST
-        } else {
-            return [device supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily1_v1];
-#endif
-        }
-        return false;
-    }
-
-    bool SupportsASTC(id<MTLDevice> device) {
-        assert(device);
-        if (@available(iOS 13.0, macOS 10.15, *)) {
-            return [device supportsFamily:MTLGPUFamilyApple2];
-#if defined(IOS) && !TARGET_OS_MACCATALYST
-        } else {
-            return [device supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily2_v1];
-#endif
-        }
-        return false;
-    }
-#endif
-}
-
 namespace filament {
 namespace backend {
 namespace metal {
@@ -160,112 +129,15 @@ constexpr inline MTLVertexFormat getMetalFormat(ElementType type, bool normalize
     return MTLVertexFormatInvalid;
 }
 
-<<<<<<< HEAD
-inline MTLPixelFormat getMetalFormat(id<MTLDevice> device, TextureFormat format) noexcept {
-    if (@available(macOS 11.0, macCatalyst 14.0, *)) {
-        if (SupportsASTC(device)) {
-            // Only iOS 13.0 + Apple GPU family 6 and above supports the ASTC HDR profile.
-            // Older versions of iOS fallback to LDR. The HDR profile is a superset of the LDR profile.
-            if (@available(iOS 13.0, *)) {
-                if ([device supportsFamily:MTLGPUFamilyApple6]) {
-                    switch (format) {
-                        case TextureFormat::RGBA_ASTC_4x4: return MTLPixelFormatASTC_4x4_HDR;
-                        case TextureFormat::RGBA_ASTC_5x4: return MTLPixelFormatASTC_5x4_HDR;
-                        case TextureFormat::RGBA_ASTC_5x5: return MTLPixelFormatASTC_5x5_HDR;
-                        case TextureFormat::RGBA_ASTC_6x5: return MTLPixelFormatASTC_6x5_HDR;
-                        case TextureFormat::RGBA_ASTC_6x6: return MTLPixelFormatASTC_6x6_HDR;
-                        case TextureFormat::RGBA_ASTC_8x5: return MTLPixelFormatASTC_8x5_HDR;
-                        case TextureFormat::RGBA_ASTC_8x6: return MTLPixelFormatASTC_8x6_HDR;
-                        case TextureFormat::RGBA_ASTC_8x8: return MTLPixelFormatASTC_8x8_HDR;
-                        case TextureFormat::RGBA_ASTC_10x5: return MTLPixelFormatASTC_10x5_HDR;
-                        case TextureFormat::RGBA_ASTC_10x6: return MTLPixelFormatASTC_10x6_HDR;
-                        case TextureFormat::RGBA_ASTC_10x8: return MTLPixelFormatASTC_10x8_HDR;
-                        case TextureFormat::RGBA_ASTC_10x10: return MTLPixelFormatASTC_10x10_HDR;
-                        case TextureFormat::RGBA_ASTC_12x10: return MTLPixelFormatASTC_12x10_HDR;
-                        case TextureFormat::RGBA_ASTC_12x12: return MTLPixelFormatASTC_12x12_HDR;
-                        default: break;
-                    }
-                }
-            }
-
-            switch (format) {
-                case TextureFormat::SRGB8_ALPHA8_ASTC_4x4: return MTLPixelFormatASTC_4x4_sRGB;
-                case TextureFormat::SRGB8_ALPHA8_ASTC_5x4: return MTLPixelFormatASTC_5x4_sRGB;
-                case TextureFormat::SRGB8_ALPHA8_ASTC_5x5: return MTLPixelFormatASTC_5x5_sRGB;
-                case TextureFormat::SRGB8_ALPHA8_ASTC_6x5: return MTLPixelFormatASTC_6x5_sRGB;
-                case TextureFormat::SRGB8_ALPHA8_ASTC_6x6: return MTLPixelFormatASTC_6x6_sRGB;
-                case TextureFormat::SRGB8_ALPHA8_ASTC_8x5: return MTLPixelFormatASTC_8x5_sRGB;
-                case TextureFormat::SRGB8_ALPHA8_ASTC_8x6: return MTLPixelFormatASTC_8x6_sRGB;
-                case TextureFormat::SRGB8_ALPHA8_ASTC_8x8: return MTLPixelFormatASTC_8x8_sRGB;
-                case TextureFormat::SRGB8_ALPHA8_ASTC_10x5: return MTLPixelFormatASTC_10x5_sRGB;
-                case TextureFormat::SRGB8_ALPHA8_ASTC_10x6: return MTLPixelFormatASTC_10x6_sRGB;
-                case TextureFormat::SRGB8_ALPHA8_ASTC_10x8: return MTLPixelFormatASTC_10x8_sRGB;
-                case TextureFormat::SRGB8_ALPHA8_ASTC_10x10: return MTLPixelFormatASTC_10x10_sRGB;
-                case TextureFormat::SRGB8_ALPHA8_ASTC_12x10: return MTLPixelFormatASTC_12x10_sRGB;
-                case TextureFormat::SRGB8_ALPHA8_ASTC_12x12: return MTLPixelFormatASTC_12x12_sRGB;
-
-                case TextureFormat::RGBA_ASTC_4x4: return MTLPixelFormatASTC_4x4_LDR;
-                case TextureFormat::RGBA_ASTC_5x4: return MTLPixelFormatASTC_5x4_LDR;
-                case TextureFormat::RGBA_ASTC_5x5: return MTLPixelFormatASTC_5x5_LDR;
-                case TextureFormat::RGBA_ASTC_6x5: return MTLPixelFormatASTC_6x5_LDR;
-                case TextureFormat::RGBA_ASTC_6x6: return MTLPixelFormatASTC_6x6_LDR;
-                case TextureFormat::RGBA_ASTC_8x5: return MTLPixelFormatASTC_8x5_LDR;
-                case TextureFormat::RGBA_ASTC_8x6: return MTLPixelFormatASTC_8x6_LDR;
-                case TextureFormat::RGBA_ASTC_8x8: return MTLPixelFormatASTC_8x8_LDR;
-                case TextureFormat::RGBA_ASTC_10x5: return MTLPixelFormatASTC_10x5_LDR;
-                case TextureFormat::RGBA_ASTC_10x6: return MTLPixelFormatASTC_10x6_LDR;
-                case TextureFormat::RGBA_ASTC_10x8: return MTLPixelFormatASTC_10x8_LDR;
-                case TextureFormat::RGBA_ASTC_10x10: return MTLPixelFormatASTC_10x10_LDR;
-                case TextureFormat::RGBA_ASTC_12x10: return MTLPixelFormatASTC_12x10_LDR;
-                case TextureFormat::RGBA_ASTC_12x12: return MTLPixelFormatASTC_12x12_LDR;
-                default: break;
-            }
-        }
-
-        if (SupportsEAC_ETC(device)) {
-            switch (format) {
-                case TextureFormat::EAC_R11: return MTLPixelFormatEAC_R11Unorm;
-                case TextureFormat::EAC_R11_SIGNED: return MTLPixelFormatEAC_R11Snorm;
-                case TextureFormat::EAC_RG11: return MTLPixelFormatEAC_RG11Unorm;
-                case TextureFormat::EAC_RG11_SIGNED: return MTLPixelFormatEAC_RG11Snorm;
-                case TextureFormat::ETC2_RGB8: return MTLPixelFormatETC2_RGB8;
-                case TextureFormat::ETC2_SRGB8: return MTLPixelFormatETC2_RGB8_sRGB;
-                case TextureFormat::ETC2_RGB8_A1: return MTLPixelFormatETC2_RGB8A1;
-                case TextureFormat::ETC2_SRGB8_A1: return MTLPixelFormatETC2_RGB8A1_sRGB;
-                case TextureFormat::ETC2_EAC_RGBA8: return MTLPixelFormatEAC_RGBA8;
-                case TextureFormat::ETC2_EAC_SRGBA8: return MTLPixelFormatEAC_RGBA8_sRGB;        
-                default: break;
-            }
-        }
-    }
-
-#if !defined(IOS) || TARGET_OS_MACCATALYST
-    switch (format) {
-        // DXT (BC) formats are only available on macOS desktop.
-        // See https://en.wikipedia.org/wiki/S3_Texture_Compression#S3TC_format_comparison
-        case TextureFormat::DXT1_RGBA: return MTLPixelFormatBC1_RGBA;
-        case TextureFormat::DXT1_SRGBA: return MTLPixelFormatBC1_RGBA_sRGB;
-        case TextureFormat::DXT3_RGBA: return MTLPixelFormatBC2_RGBA;
-        case TextureFormat::DXT3_SRGBA: return MTLPixelFormatBC2_RGBA_sRGB;
-        case TextureFormat::DXT5_RGBA: return MTLPixelFormatBC3_RGBA;
-        case TextureFormat::DXT5_SRGBA: return MTLPixelFormatBC3_RGBA_sRGB;
-
-        case TextureFormat::DXT1_RGB: return MTLPixelFormatInvalid;
-        case TextureFormat::DXT1_SRGB: return MTLPixelFormatInvalid;
-        default: break;
-    }
-#endif
-=======
 MTLPixelFormat getMetalFormat(MetalContext* context, TextureFormat format) noexcept;
 
 // Converts PixelBufferDescriptor format + type pair into a MTLPixelFormat.
 inline MTLPixelFormat getMetalFormat(PixelDataFormat format, PixelDataType type) {
     if (type == PixelDataType::UINT_2_10_10_10_REV) return MTLPixelFormatRGB10A2Unorm;
     if (type == PixelDataType::UINT_10F_11F_11F_REV) return MTLPixelFormatRG11B10Float;
-    if (@available(macOS 11, *)) {
+    if (@available(macOS 11, macCatalyst 14.0, *)) {
         if (type == PixelDataType::USHORT_565) return MTLPixelFormatB5G6R5Unorm;
     }
->>>>>>> Shapr3D/release
 
     #define CONVERT(FORMAT, TYPE, MTL) \
     if (PixelDataFormat::FORMAT == format && PixelDataType::TYPE == type)  return MTLPixelFormat ## MTL;
@@ -312,38 +184,6 @@ inline MTLPixelFormat getMetalFormatLinear(MTLPixelFormat format) {
         case MTLPixelFormatRGBA8Unorm_sRGB: return MTLPixelFormatRGBA8Unorm;
         case MTLPixelFormatBGRA8Unorm_sRGB: return MTLPixelFormatBGRA8Unorm;
 #if !defined(IOS)
-<<<<<<< HEAD
-        case TextureFormat::DEPTH24_STENCIL8: return MTLPixelFormatDepth24Unorm_Stencil8;
-#else
-        case TextureFormat::DEPTH24_STENCIL8: return MTLPixelFormatDepth32Float_Stencil8;
-#endif
-        case TextureFormat::DEPTH32F_STENCIL8: return MTLPixelFormatDepth32Float_Stencil8;
-
-        // 48-bits per element
-        case TextureFormat::RGB16F:
-        case TextureFormat::RGB16UI:
-        case TextureFormat::RGB16I:
-            return MTLPixelFormatInvalid;
-
-        // 64-bits per element
-        case TextureFormat::RG32F: return MTLPixelFormatRG32Float;
-        case TextureFormat::RG32UI: return MTLPixelFormatRG32Uint;
-        case TextureFormat::RG32I: return MTLPixelFormatRG32Sint;
-        case TextureFormat::RGBA16F: return MTLPixelFormatRGBA16Float;
-        case TextureFormat::RGBA16UI: return MTLPixelFormatRGBA16Uint;
-        case TextureFormat::RGBA16I: return MTLPixelFormatRGBA16Sint;
-
-        // 96-bits per element
-        case TextureFormat::RGB32F:
-        case TextureFormat::RGB32UI:
-        case TextureFormat::RGB32I:
-            return MTLPixelFormatInvalid;
-
-        // 128-bits per element
-        case TextureFormat::RGBA32F: return MTLPixelFormatRGBA32Float;
-        case TextureFormat::RGBA32UI: return MTLPixelFormatRGBA32Uint;
-        case TextureFormat::RGBA32I: return MTLPixelFormatRGBA32Sint;
-=======
         case MTLPixelFormatBC1_RGBA_sRGB: return MTLPixelFormatBC1_RGBA;
         case MTLPixelFormatBC2_RGBA_sRGB: return MTLPixelFormatBC2_RGBA;
         case MTLPixelFormatBC3_RGBA_sRGB: return MTLPixelFormatBC3_RGBA;
@@ -351,7 +191,7 @@ inline MTLPixelFormat getMetalFormatLinear(MTLPixelFormat format) {
 #endif
         default: break;
     }
-    if (@available(macOS 11, *)) {
+    if (@available(macOS 11, macCatalyst 14.0, *)) {
         switch (format) {
             case MTLPixelFormatASTC_4x4_sRGB: return MTLPixelFormatASTC_4x4_LDR;
             case MTLPixelFormatASTC_5x4_sRGB: return MTLPixelFormatASTC_5x4_LDR;
@@ -404,7 +244,6 @@ constexpr inline bool isMetalFormatInteger(MTLPixelFormat format) {
         case MTLPixelFormatRGBA32Uint:
         case MTLPixelFormatRGBA32Sint:
             return true;
->>>>>>> Shapr3D/release
 
         default:
             return false;

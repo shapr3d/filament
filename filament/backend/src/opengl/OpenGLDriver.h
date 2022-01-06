@@ -69,28 +69,21 @@ public:
 
     struct GLBufferHandle {
         GLuint id = 0;
+        GLenum binding = 0;
         bool isExternal = false;
     };
 
     struct GLBufferObject : public backend::HwBufferObject {
         using HwBufferObject::HwBufferObject;
-<<<<<<< HEAD
-        GLBufferObject(uint32_t size) noexcept : HwBufferObject(size) {}
-        GLBufferHandle gl;
-=======
         GLBufferObject(uint32_t size,
                 backend::BufferObjectBinding bindingType, backend::BufferUsage usage) noexcept
                 : HwBufferObject(size), usage(usage) {
             gl.binding = GLUtils::getBufferBindingType(bindingType);
         }
-        struct {
-            GLuint id = 0;
-            GLenum binding = 0;
-        } gl;
+        GLBufferHandle gl;
         uint32_t base = 0;
         uint32_t size = 0;
         backend::BufferUsage usage = {};
->>>>>>> Shapr3D/release
     };
 
     struct GLVertexBuffer : public backend::HwVertexBuffer {

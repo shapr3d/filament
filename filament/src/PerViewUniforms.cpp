@@ -46,7 +46,7 @@ PerViewUniforms::PerViewUniforms(FEngine& engine) noexcept
     mPerViewSbh = driver.createSamplerGroup(mPerViewSb.getSize());
 
     mPerViewUbh = driver.createBufferObject(mPerViewUb.getSize(),
-            BufferObjectBinding::UNIFORM, BufferUsage::DYNAMIC);
+            BufferObjectBinding::UNIFORM, BufferUsage::DYNAMIC, false);
 
     // with a clip-space of [-w, w] ==> z' = -z
     // with a clip-space of [0,  w] ==> z' = (w - z)/2

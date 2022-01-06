@@ -54,14 +54,8 @@ TrianglePrimitive::TrianglePrimitive(filament::backend::DriverApi& driverApi,
     enabledAttributes.set(VertexAttribute::POSITION);
 
     const size_t size = sizeof(math::float2) * 3;
-<<<<<<< HEAD
-    mBufferObject = mDriverApi.createBufferObject(size, BufferObjectBinding::VERTEX, false);
-    mVertexBuffer = mDriverApi.createVertexBuffer(1, 1, mVertexCount, attributes,
-            BufferUsage::STATIC);
-=======
-    mBufferObject = mDriverApi.createBufferObject(size, BufferObjectBinding::VERTEX, BufferUsage::STATIC);
+    mBufferObject = mDriverApi.createBufferObject(size, BufferObjectBinding::VERTEX, BufferUsage::STATIC, false);
     mVertexBuffer = mDriverApi.createVertexBuffer(1, 1, mVertexCount, attributes);
->>>>>>> Shapr3D/release
     mDriverApi.setVertexBufferObject(mVertexBuffer, 0, mBufferObject);
     BufferDescriptor vertexBufferDesc(gVertices, size, nullptr);
     mDriverApi.updateBufferObject(mBufferObject, std::move(vertexBufferDesc), 0);

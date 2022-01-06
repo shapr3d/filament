@@ -74,41 +74,24 @@ MetalDriver::MetalDriver(backend::MetalPlatform* platform) noexcept
     if (mContext->highestSupportedGpuFamily.mac > 0) {
         utils::slog.d << "  MTLGPUFamilyMac" << (int) mContext->highestSupportedGpuFamily.mac << utils::io::endl;
     }
+    if (mContext->highestSupportedGpuFamily.macCatalyst > 0) {
+        utils::slog.d << "  MTLGPUFamilyMacCatalyst" << (int) mContext->highestSupportedGpuFamily.macCatalyst << utils::io::endl;
+    }
 
     // In order to support texture swizzling, the GPU needs to support it and the system be running
     // iOS 13+.
     mContext->supportsTextureSwizzling = false;
-<<<<<<< HEAD
-    if (@available(macOS 10.15, iOS 13, *)) {
-#if TARGET_OS_MACCATALYST
-        mContext->supportsTextureSwizzling = [mContext->device supportsFamily:MTLGPUFamilyMacCatalyst2];
-#elif defined(IOS)
-        mContext->supportsTextureSwizzling = [mContext->device supportsFamily:MTLGPUFamilyApple1];
-#else
-        mContext->supportsTextureSwizzling = [mContext->device supportsFamily:MTLGPUFamilyMac2];
-#endif
-    }
-
-    mContext->maxColorRenderTargets = 4;
-#if TARGET_OS_MACCATALYST
-    mContext->maxColorRenderTargets = 8;
-#elif defined(IOS)
-    if ([mContext->device supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily2_v1]) {
-        mContext->maxColorRenderTargets = 8;
-    }
-#else
-    if ([mContext->device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily1_v1]) {
-=======
     if (@available(iOS 13, *)) {
         mContext->supportsTextureSwizzling =
-            mContext->highestSupportedGpuFamily.apple >= 1 ||   // all Apple GPUs
-            mContext->highestSupportedGpuFamily.mac   >= 2;     // newer macOS GPUs
+            mContext->highestSupportedGpuFamily.apple >= 1 ||       // all Apple GPUs
+            mContext->highestSupportedGpuFamily.mac   >= 2 ||       // newer macOS GPUs
+            mContext->highestSupportedGpuFamily.macCatalyst >= 2;   // newer Mac Catalyst GPUs
     }
 
     mContext->maxColorRenderTargets = 4;
     if (mContext->highestSupportedGpuFamily.apple >= 2 ||
-        mContext->highestSupportedGpuFamily.mac >= 1) {
->>>>>>> Shapr3D/release
+        mContext->highestSupportedGpuFamily.mac >= 1 ||
+        mContext->highestSupportedGpuFamily.macCatalyst >= 1) {
         mContext->maxColorRenderTargets = 8;
     }
 
@@ -241,13 +224,8 @@ void MetalDriver::createIndexBufferR(Handle<HwIndexBuffer> ibh, ElementType elem
 }
 
 void MetalDriver::createBufferObjectR(Handle<HwBufferObject> boh, uint32_t byteCount,
-<<<<<<< HEAD
-        BufferObjectBinding bindingType, bool wrapsExternalBuffer) {
-    construct_handle<MetalBufferObject>(mHandleMap, boh, *mContext, byteCount, wrapsExternalBuffer);
-=======
-        BufferObjectBinding bindingType, BufferUsage usage) {
-    construct_handle<MetalBufferObject>(boh, *mContext, usage, byteCount);
->>>>>>> Shapr3D/release
+        BufferObjectBinding bindingType, BufferUsage usage, bool wrapsExternalBuffer) {
+    construct_handle<MetalBufferObject>(boh, *mContext, usage, byteCount, wrapsExternalBuffer);
 }
 
 void MetalDriver::createTextureR(Handle<HwTexture> th, SamplerType target, uint8_t levels,
@@ -288,11 +266,7 @@ void MetalDriver::importTextureR(Handle<HwTexture> th, intptr_t i,
     ASSERT_PRECONDITION(metalTexture.mipmapLevelCount == levels,
             "Imported id<MTLTexture> levels (%d) != Filament texture levels (%d)",
             metalTexture.mipmapLevelCount, levels);
-<<<<<<< HEAD
-    MTLPixelFormat filamentMetalFormat = getMetalFormat(mContext->device, format);
-=======
     MTLPixelFormat filamentMetalFormat = getMetalFormat(mContext, format);
->>>>>>> Shapr3D/release
     ASSERT_PRECONDITION(metalTexture.pixelFormat == filamentMetalFormat,
             "Imported id<MTLTexture> format (%d) != Filament texture format (%d)",
             metalTexture.pixelFormat, filamentMetalFormat);
@@ -631,12 +605,7 @@ FenceStatus MetalDriver::wait(Handle<HwFence> fh, uint64_t timeout) {
 }
 
 bool MetalDriver::isTextureFormatSupported(TextureFormat format) {
-<<<<<<< HEAD
-    return getMetalFormat(mContext->device, format) != MTLPixelFormatInvalid ||
-           TextureReshaper::canReshapeTextureFormat(format);
-=======
     return MetalTexture::decidePixelFormat(mContext, format) != MTLPixelFormatInvalid;
->>>>>>> Shapr3D/release
 }
 
 bool MetalDriver::isTextureSwizzleSupported() {
@@ -683,11 +652,7 @@ bool MetalDriver::isTextureFormatMipmappable(TextureFormat format) {
 }
 
 bool MetalDriver::isRenderTargetFormatSupported(TextureFormat format) {
-<<<<<<< HEAD
-    MTLPixelFormat mtlFormat = getMetalFormat(mContext->device, format);
-=======
     MTLPixelFormat mtlFormat = getMetalFormat(mContext, format);
->>>>>>> Shapr3D/release
     // RGB9E5 isn't supported on Mac as a color render target.
     return mtlFormat != MTLPixelFormatInvalid && mtlFormat != MTLPixelFormatRGB9E5Float;
 }
@@ -695,13 +660,8 @@ bool MetalDriver::isRenderTargetFormatSupported(TextureFormat format) {
 bool MetalDriver::isFrameBufferFetchSupported() {
 #if defined(FILAMENT_IOS_SIMULATOR)
     return false;
-#elif defined(IOS) && !TARGET_OS_MACCATALYST
-    return true;
 #else
-    if (@available(macOS 10.15, *)) {
-        return [mContext->device supportsFamily:MTLGPUFamilyApple1];
-    }
-    return false;
+    return mContext->highestSupportedGpuFamily.apple >= 1;
 #endif
 }
 
@@ -747,13 +707,13 @@ void MetalDriver::updateBufferObject(Handle<HwBufferObject> boh, BufferDescripto
 }
 
 void MetalDriver::setExternalIndexBuffer(Handle<HwIndexBuffer> ibh, void* externalBuffer) {
-    auto* ib = handle_cast<MetalIndexBuffer>(mHandleMap, ibh);
+    auto* ib = handle_cast<MetalIndexBuffer>(ibh);
     ib->buffer.releaseExternalBuffer();
     ib->buffer.wrapExternalBuffer((__bridge id<MTLBuffer>)externalBuffer);
 }
 
 void MetalDriver::setExternalBuffer(Handle<HwBufferObject> boh, void* externalBuffer) {
-    auto* bo = handle_cast<MetalBufferObject>(mHandleMap, boh);
+    auto* bo = handle_cast<MetalBufferObject>(boh);
     bo->getBuffer()->releaseExternalBuffer();
     bo->getBuffer()->wrapExternalBuffer((__bridge id<MTLBuffer>)externalBuffer);
 }

@@ -18,11 +18,8 @@
 
 #include <utils/Panic.h>
 
-<<<<<<< HEAD
-#include <TargetConditionals.h> // TARGET_OS_IOS
-=======
 #include <array>
->>>>>>> Shapr3D/release
+#include <TargetConditionals.h> // TARGET_OS_IOS
 
 namespace filament {
 namespace backend {
@@ -60,7 +57,6 @@ MetalBuffer::~MetalBuffer() {
     }
 }
 
-<<<<<<< HEAD
 void MetalBuffer::wrapExternalBuffer(id <MTLBuffer> buffer) {
     ASSERT_PRECONDITION(!mExternalBuffer, "A external buffer is already wrapped. Call releaseExternalBuffer()");
     ASSERT_PRECONDITION(buffer, "External buffer cannot be nil");
@@ -80,10 +76,7 @@ bool MetalBuffer::releaseExternalBuffer() {
     return true;
 }
 
-void MetalBuffer::copyIntoBuffer(void* src, size_t size) {
-=======
 void MetalBuffer::copyIntoBuffer(void* src, size_t size, size_t byteOffset) {
->>>>>>> Shapr3D/release
     if (size <= 0) {
         return;
     }
