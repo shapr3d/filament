@@ -573,8 +573,8 @@ Handle<HwStream> MetalDriver::createStreamAcquired() {
     return {};
 }
 
-void MetalDriver::setAcquiredImage(Handle<HwStream> sh, void* image, backend::StreamCallback cb,
-        void* userData) {
+void MetalDriver::setAcquiredImage(Handle<HwStream> sh, void* image,
+        backend::CallbackHandler* handler, backend::StreamCallback cb, void* userData) {
 }
 
 void MetalDriver::setStreamDimensions(Handle<HwStream> stream, uint32_t width,
@@ -663,6 +663,10 @@ bool MetalDriver::isFrameBufferFetchSupported() {
 #else
     return mContext->highestSupportedGpuFamily.apple >= 1;
 #endif
+}
+
+bool MetalDriver::isFrameBufferFetchMultiSampleSupported() {
+    return isFrameBufferFetchSupported();
 }
 
 bool MetalDriver::isFrameTimeSupported() {
