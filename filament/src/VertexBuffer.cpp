@@ -197,8 +197,7 @@ FVertexBuffer::FVertexBuffer(FEngine& engine, const VertexBuffer::Builder& build
     FEngine::DriverApi& driver = engine.getDriverApi();
 
     mHandle = driver.createVertexBuffer(
-            mBufferCount, attributeCount, mVertexCount, attributeArray,
-            backend::BufferUsage::STATIC);
+            mBufferCount, attributeCount, mVertexCount, attributeArray);
 
     // If buffer objects are not enabled at the API level, then we create them internally.
     if (!mBufferObjectsEnabled) {
@@ -206,7 +205,11 @@ FVertexBuffer::FVertexBuffer(FEngine& engine, const VertexBuffer::Builder& build
         for (size_t i = 0; i < MAX_VERTEX_BUFFER_COUNT; ++i) {
             if (bufferSizes[i] > 0) {
                 BufferObjectHandle bo = driver.createBufferObject(bufferSizes[i],
+<<<<<<< HEAD
                         backend::BufferObjectBinding::VERTEX, mExternalBuffersEnabled);
+=======
+                        backend::BufferObjectBinding::VERTEX, backend::BufferUsage::STATIC);
+>>>>>>> Shapr3D/release
                 driver.setVertexBufferObject(mHandle, i, bo);
                 mBufferObjects[i] = bo;
             }

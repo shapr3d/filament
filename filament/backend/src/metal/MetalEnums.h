@@ -58,6 +58,9 @@ namespace {
 
 namespace filament {
 namespace backend {
+namespace metal {
+
+struct MetalContext;
 
 constexpr inline MTLCompareFunction getMetalCompareFunction(RasterState::DepthFunc func)
         noexcept {
@@ -157,6 +160,7 @@ constexpr inline MTLVertexFormat getMetalFormat(ElementType type, bool normalize
     return MTLVertexFormatInvalid;
 }
 
+<<<<<<< HEAD
 inline MTLPixelFormat getMetalFormat(id<MTLDevice> device, TextureFormat format) noexcept {
     if (@available(macOS 11.0, macCatalyst 14.0, *)) {
         if (SupportsASTC(device)) {
@@ -251,66 +255,64 @@ inline MTLPixelFormat getMetalFormat(id<MTLDevice> device, TextureFormat format)
         default: break;
     }
 #endif
+=======
+MTLPixelFormat getMetalFormat(MetalContext* context, TextureFormat format) noexcept;
 
+// Converts PixelBufferDescriptor format + type pair into a MTLPixelFormat.
+inline MTLPixelFormat getMetalFormat(PixelDataFormat format, PixelDataType type) {
+    if (type == PixelDataType::UINT_2_10_10_10_REV) return MTLPixelFormatRGB10A2Unorm;
+    if (type == PixelDataType::UINT_10F_11F_11F_REV) return MTLPixelFormatRG11B10Float;
+    if (@available(macOS 11, *)) {
+        if (type == PixelDataType::USHORT_565) return MTLPixelFormatB5G6R5Unorm;
+    }
+>>>>>>> Shapr3D/release
+
+    #define CONVERT(FORMAT, TYPE, MTL) \
+    if (PixelDataFormat::FORMAT == format && PixelDataType::TYPE == type)  return MTLPixelFormat ## MTL;
+
+    CONVERT(R, UBYTE, R8Unorm);
+    CONVERT(R, BYTE, R8Snorm);
+    CONVERT(R_INTEGER, UBYTE, R8Uint);
+    CONVERT(R_INTEGER, BYTE, R8Sint);
+    CONVERT(RG, UBYTE, RG8Unorm);
+    CONVERT(RG, BYTE, RG8Snorm);
+    CONVERT(RG_INTEGER, UBYTE, RG8Uint);
+    CONVERT(RG_INTEGER, BYTE, RG8Sint);
+    CONVERT(RGBA, UBYTE, RGBA8Unorm);
+    CONVERT(RGBA, BYTE, RGBA8Snorm);
+    CONVERT(RGBA_INTEGER, UBYTE, RGBA8Uint);
+    CONVERT(RGBA_INTEGER, BYTE, RGBA8Sint);
+    CONVERT(R_INTEGER, USHORT, R16Uint);
+    CONVERT(R_INTEGER, SHORT, R16Sint);
+    CONVERT(R, HALF, R16Float);
+    CONVERT(RG_INTEGER, USHORT, RG16Uint);
+    CONVERT(RG_INTEGER, SHORT, RG16Sint);
+    CONVERT(RG, HALF, RG16Float);
+    CONVERT(RGBA_INTEGER, USHORT, RGBA16Uint);
+    CONVERT(RGBA_INTEGER, SHORT, RGBA16Sint);
+    CONVERT(RGBA, HALF, RGBA16Float);
+    CONVERT(R_INTEGER, UINT, R32Uint);
+    CONVERT(R_INTEGER, INT, R32Sint);
+    CONVERT(R, FLOAT, R32Float);
+    CONVERT(RG_INTEGER, UINT, RG32Uint);
+    CONVERT(RG_INTEGER, INT, RG32Sint);
+    CONVERT(RG, FLOAT, RG32Float);
+    CONVERT(RGBA_INTEGER, UINT, RGBA32Uint);
+    CONVERT(RGBA_INTEGER, INT, RGBA32Sint);
+    CONVERT(RGBA, FLOAT, RGBA32Float);
+    #undef CONVERT
+
+    return MTLPixelFormatInvalid;
+}
+
+inline MTLPixelFormat getMetalFormatLinear(MTLPixelFormat format) {
     switch (format) {
-        // 8-bits per element
-        case TextureFormat::R8: return MTLPixelFormatR8Unorm;
-        case TextureFormat::R8_SNORM: return MTLPixelFormatR8Snorm;
-        case TextureFormat::R8UI: return MTLPixelFormatR8Uint;
-        case TextureFormat::R8I: return MTLPixelFormatR8Sint;
-        case TextureFormat::STENCIL8: return MTLPixelFormatStencil8;
-
-        // 16-bits per element
-        case TextureFormat::R16F: return MTLPixelFormatR16Float;
-        case TextureFormat::R16UI: return MTLPixelFormatR16Uint;
-        case TextureFormat::R16I: return MTLPixelFormatR16Sint;
-        case TextureFormat::RG8: return MTLPixelFormatRG8Unorm;
-        case TextureFormat::RG8_SNORM: return MTLPixelFormatRG8Snorm;
-        case TextureFormat::RG8UI: return MTLPixelFormatRG8Uint;
-        case TextureFormat::RG8I: return MTLPixelFormatRG8Sint;
-
-#if defined(IOS)
-        // iOS does not support 16 bit or 24 bit depth textures.
-        case TextureFormat::DEPTH16:
-        case TextureFormat::DEPTH24:
-            return MTLPixelFormatDepth32Float;
-#else
-        case TextureFormat::DEPTH16: return MTLPixelFormatDepth16Unorm;
-        // MacOS only supports 24 bit depth + 8 bits Stencil
-        case TextureFormat::DEPTH24: return MTLPixelFormatDepth24Unorm_Stencil8;
-#endif
-
-        // TODO: Add packed 16 bit formats- only available on iOS
-        case TextureFormat::RGB565:
-        case TextureFormat::RGB5_A1:
-        case TextureFormat::RGBA4:
-            return MTLPixelFormatInvalid;
-
-        // 24-bits per element, not supported by Metal.
-        case TextureFormat::RGB8:
-        case TextureFormat::SRGB8:
-        case TextureFormat::RGB8_SNORM:
-        case TextureFormat::RGB8UI:
-        case TextureFormat::RGB8I:
-            return MTLPixelFormatInvalid;
-
-        // 32-bits per element
-        case TextureFormat::R32F: return MTLPixelFormatR32Float;
-        case TextureFormat::R32UI: return MTLPixelFormatR32Uint;
-        case TextureFormat::R32I: return MTLPixelFormatR32Sint;
-        case TextureFormat::RG16F: return MTLPixelFormatRG16Float;
-        case TextureFormat::RG16UI: return MTLPixelFormatRG16Uint;
-        case TextureFormat::RG16I: return MTLPixelFormatRG16Sint;
-        case TextureFormat::R11F_G11F_B10F: return MTLPixelFormatRG11B10Float;
-        case TextureFormat::RGB9_E5: return MTLPixelFormatRGB9E5Float;
-        case TextureFormat::RGBA8: return MTLPixelFormatRGBA8Unorm;
-        case TextureFormat::SRGB8_A8: return MTLPixelFormatRGBA8Unorm_sRGB;
-        case TextureFormat::RGBA8_SNORM: return MTLPixelFormatRGBA8Snorm;
-        case TextureFormat::RGB10_A2: return MTLPixelFormatRGB10A2Unorm;
-        case TextureFormat::RGBA8UI: return MTLPixelFormatRGBA8Uint;
-        case TextureFormat::RGBA8I: return MTLPixelFormatRGBA8Sint;
-        case TextureFormat::DEPTH32F: return MTLPixelFormatDepth32Float;
+        case MTLPixelFormatR8Unorm_sRGB: return MTLPixelFormatR8Unorm;
+        case MTLPixelFormatRG8Unorm_sRGB: return MTLPixelFormatRG8Unorm;
+        case MTLPixelFormatRGBA8Unorm_sRGB: return MTLPixelFormatRGBA8Unorm;
+        case MTLPixelFormatBGRA8Unorm_sRGB: return MTLPixelFormatBGRA8Unorm;
 #if !defined(IOS)
+<<<<<<< HEAD
         case TextureFormat::DEPTH24_STENCIL8: return MTLPixelFormatDepth24Unorm_Stencil8;
 #else
         case TextureFormat::DEPTH24_STENCIL8: return MTLPixelFormatDepth32Float_Stencil8;
@@ -341,10 +343,71 @@ inline MTLPixelFormat getMetalFormat(id<MTLDevice> device, TextureFormat format)
         case TextureFormat::RGBA32F: return MTLPixelFormatRGBA32Float;
         case TextureFormat::RGBA32UI: return MTLPixelFormatRGBA32Uint;
         case TextureFormat::RGBA32I: return MTLPixelFormatRGBA32Sint;
+=======
+        case MTLPixelFormatBC1_RGBA_sRGB: return MTLPixelFormatBC1_RGBA;
+        case MTLPixelFormatBC2_RGBA_sRGB: return MTLPixelFormatBC2_RGBA;
+        case MTLPixelFormatBC3_RGBA_sRGB: return MTLPixelFormatBC3_RGBA;
+        case MTLPixelFormatBC7_RGBAUnorm_sRGB: return MTLPixelFormatBC7_RGBAUnorm;
+#endif
+        default: break;
+    }
+    if (@available(macOS 11, *)) {
+        switch (format) {
+            case MTLPixelFormatASTC_4x4_sRGB: return MTLPixelFormatASTC_4x4_LDR;
+            case MTLPixelFormatASTC_5x4_sRGB: return MTLPixelFormatASTC_5x4_LDR;
+            case MTLPixelFormatASTC_5x5_sRGB: return MTLPixelFormatASTC_5x5_LDR;
+            case MTLPixelFormatASTC_6x5_sRGB: return MTLPixelFormatASTC_6x5_LDR;
+            case MTLPixelFormatASTC_6x6_sRGB: return MTLPixelFormatASTC_6x6_LDR;
+            case MTLPixelFormatASTC_8x5_sRGB: return MTLPixelFormatASTC_8x5_LDR;
+            case MTLPixelFormatASTC_8x6_sRGB: return MTLPixelFormatASTC_8x6_LDR;
+            case MTLPixelFormatASTC_8x8_sRGB: return MTLPixelFormatASTC_8x8_LDR;
+            case MTLPixelFormatASTC_10x5_sRGB: return MTLPixelFormatASTC_10x5_LDR;
+            case MTLPixelFormatASTC_10x6_sRGB: return MTLPixelFormatASTC_10x6_LDR;
+            case MTLPixelFormatASTC_10x8_sRGB: return MTLPixelFormatASTC_10x8_LDR;
+            case MTLPixelFormatASTC_10x10_sRGB: return MTLPixelFormatASTC_10x10_LDR;
+            case MTLPixelFormatASTC_12x10_sRGB: return MTLPixelFormatASTC_12x10_LDR;
+            case MTLPixelFormatASTC_12x12_sRGB: return MTLPixelFormatASTC_12x12_LDR;
+            case MTLPixelFormatPVRTC_RGB_2BPP_sRGB: return MTLPixelFormatPVRTC_RGB_2BPP;
+            case MTLPixelFormatPVRTC_RGB_4BPP_sRGB: return MTLPixelFormatPVRTC_RGB_4BPP;
+            case MTLPixelFormatPVRTC_RGBA_2BPP_sRGB: return MTLPixelFormatPVRTC_RGBA_2BPP;
+            case MTLPixelFormatPVRTC_RGBA_4BPP_sRGB: return MTLPixelFormatPVRTC_RGBA_4BPP;
+            case MTLPixelFormatEAC_RGBA8_sRGB: return MTLPixelFormatEAC_RGBA8;
+            case MTLPixelFormatETC2_RGB8_sRGB: return MTLPixelFormatETC2_RGB8;
+            case MTLPixelFormatETC2_RGB8A1_sRGB: return MTLPixelFormatETC2_RGB8A1;
+            case MTLPixelFormatBGR10_XR_sRGB: return MTLPixelFormatBGR10_XR;
+            case MTLPixelFormatBGRA10_XR_sRGB: return MTLPixelFormatBGRA10_XR;
+            default: break;
+        }
+    }
+    return format;
+}
+
+constexpr inline bool isMetalFormatInteger(MTLPixelFormat format) {
+    switch (format) {
+        case MTLPixelFormatR8Uint:
+        case MTLPixelFormatR8Sint:
+        case MTLPixelFormatR16Uint:
+        case MTLPixelFormatR16Sint:
+        case MTLPixelFormatRG8Uint:
+        case MTLPixelFormatRG8Sint:
+        case MTLPixelFormatR32Uint:
+        case MTLPixelFormatR32Sint:
+        case MTLPixelFormatRG16Uint:
+        case MTLPixelFormatRG16Sint:
+        case MTLPixelFormatRGBA8Uint:
+        case MTLPixelFormatRGBA8Sint:
+        case MTLPixelFormatRGB10A2Uint:
+        case MTLPixelFormatRG32Uint:
+        case MTLPixelFormatRG32Sint:
+        case MTLPixelFormatRGBA16Uint:
+        case MTLPixelFormatRGBA16Sint:
+        case MTLPixelFormatRGBA32Uint:
+        case MTLPixelFormatRGBA32Sint:
+            return true;
+>>>>>>> Shapr3D/release
 
         default:
-        case TextureFormat::UNUSED:
-            return MTLPixelFormatInvalid;
+            return false;
     }
 }
 
@@ -476,7 +539,7 @@ constexpr inline MTLCompareFunction getCompareFunction(SamplerCompareFunc compar
     }
 }
 
-API_AVAILABLE(macos(10.15), ios(13.0))
+API_AVAILABLE(ios(13.0))
 constexpr inline MTLTextureSwizzle getSwizzle(TextureSwizzle swizzle) {
     switch (swizzle) {
         case TextureSwizzle::SUBSTITUTE_ZERO:
@@ -494,13 +557,14 @@ constexpr inline MTLTextureSwizzle getSwizzle(TextureSwizzle swizzle) {
     }
 }
 
-API_AVAILABLE(macos(10.15), ios(13.0))
+API_AVAILABLE(ios(13.0))
 inline MTLTextureSwizzleChannels getSwizzleChannels(TextureSwizzle r, TextureSwizzle g, TextureSwizzle b,
         TextureSwizzle a) {
     return MTLTextureSwizzleChannelsMake(getSwizzle(r), getSwizzle(g), getSwizzle(b),
             getSwizzle(a));
 }
 
+} // namespace metal
 } // namespace backend
 } // namespace filament
 
