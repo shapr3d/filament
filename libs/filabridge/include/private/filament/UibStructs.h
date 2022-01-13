@@ -54,9 +54,10 @@ struct PerViewUib { // NOLINT(cppcoreguidelines-pro-type-member-init)
 
     math::float4 resolution; // viewport width, height, 1/width, 1/height
 
-    // camera position in view space (when camera_at_origin is enabled), i.e. it's (0,0,0).
+    // PERSPECTIVE: camera position in view space (when camera_at_origin is enabled), i.e. it's (0,0,0).
     // Always add worldOffset in the shader to get the true world-space position of the camera.
-    math::float3 cameraPosition;
+    // ORTHO: the forward direction in view space.
+    math::float3 cameraPositionOrForward;
 
     float time; // time in seconds, with a 1 second period
 

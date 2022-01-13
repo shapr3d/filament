@@ -45,7 +45,7 @@ UniformInterfaceBlock const& UibGenerator::getPerViewUib() noexcept  {
             // view
             .add("resolution",              1, UniformInterfaceBlock::Type::FLOAT4, Precision::HIGH)
             // camera
-            .add("cameraPosition",          1, UniformInterfaceBlock::Type::FLOAT3, Precision::HIGH)
+            .add("cameraPositionOrForward", 1, UniformInterfaceBlock::Type::FLOAT3, Precision::HIGH)
             // time
             .add("time",                    1, UniformInterfaceBlock::Type::FLOAT, Precision::HIGH)
             // directional light
