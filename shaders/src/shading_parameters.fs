@@ -33,7 +33,7 @@ void computeShadingParams() {
 #endif
 
     shading_position = vertex_worldPosition;
-    if (frameUniforms.clipFromViewMatrix[2].w == -1.0) {
+    if (frameUniforms.clipFromViewMatrix[2].w != 0.0) {
         // Perspective projection
         shading_view = normalize(frameUniforms.cameraPosition - shading_position);
     } else {

@@ -43,7 +43,7 @@ vec3 getWorldViewVector() {
 
 /** @public-api */
 vec3 getWorldViewVectorFrom(vec3 p) {
-    if (frameUniforms.clipFromViewMatrix[2].w == -1.0) {
+    if (frameUniforms.clipFromViewMatrix[2].w != 0.0) {
         // Perspective camera
         return p - frameUniforms.cameraPosition;
     } else {
