@@ -280,8 +280,9 @@ static void setup(Engine* engine, View* view, Scene* scene) {
             vec2 uvDx = dFdx(uv0);
             vec2 uvDy = dFdy(uv0);
 
+            // This only works with perspective camera (this sample uses that)
             mat3 tangentFromWorld = transpose(getWorldTangentFrame());
-            vec3 tangentCameraPosition = tangentFromWorld * getWorldCameraPosition();
+            vec3 tangentCameraPosition = tangentFromWorld * getWorldPerspectiveCameraPosition();
             vec3 tangentFragPosition = tangentFromWorld * getWorldPosition();
             vec3 v = normalize(tangentCameraPosition - tangentFragPosition);
 
