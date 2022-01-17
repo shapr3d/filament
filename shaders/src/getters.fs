@@ -42,13 +42,13 @@ vec3 getWorldViewVector() {
 }
 
 /** @public-api */
-vec3 getWorldViewVectorFrom(vec3 p) {
+vec3 getWorldViewVectorWithMagnitude() {
     if (frameUniforms.clipFromViewMatrix[2].w != 0.0) {
         // Perspective camera
-        return p - frameUniforms.cameraPosition;
+        return shading_position - frameUniforms.cameraPosition;
     } else {
         // Distance from plane: (orthoEyePos, orthoViewDir)
-        float d = dot(shading_view, p - frameUniforms.cameraPosition);
+        float d = dot(shading_view, shading_position - frameUniforms.cameraPosition);
         return d * shading_view;
     }
 }
