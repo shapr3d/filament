@@ -43,14 +43,7 @@ highp vec4 getResolution() {
 
 /** @public-api */
 highp vec3 getWorldPerspectiveCameraPosition() {
-    // NOTE: for perspective camera only
-    return frameUniforms.cameraPositionOrForward;
-}
-
-/** @public-api */
-highp vec3 getWorldCameraForward() {
-    // NOTE: for orthographic camera only
-    return frameUniforms.cameraPositionOrForward;
+    return frameUniforms.cameraPosition;
 }
 
 /** @public-api */

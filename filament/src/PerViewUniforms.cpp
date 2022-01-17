@@ -69,7 +69,6 @@ void PerViewUniforms::prepareCamera(const CameraInfo& camera) noexcept {
     mat4f const& viewFromWorld = camera.view;
     mat4f const& worldFromView = camera.model;
     mat4f const& clipFromView  = camera.projection;
-    const bool isPerspective = clipFromView[2][3] == -1;
 
     const mat4f viewFromClip{ inverse((mat4)camera.projection) };
     const mat4f clipFromWorld{ highPrecisionMultiply(clipFromView, viewFromWorld) };
@@ -82,7 +81,8 @@ void PerViewUniforms::prepareCamera(const CameraInfo& camera) noexcept {
     s.viewFromClipMatrix  = viewFromClip;     // 1/projection
     s.clipFromWorldMatrix = clipFromWorld;    // projection * view
     s.worldFromClipMatrix = worldFromClip;    // 1/(projection * view)
-    s.cameraPositionOrForward= float3{ isPerspective ? camera.getPosition() : camera.getForwardVector() };
+    s.cameraPosition = float3{ camera.getPosition() };
+    s.cameraForward = float3{ camera.getForwardVector() };
     s.worldOffset = camera.worldOffset;
     s.cameraFar = camera.zf;
     s.clipControl = mClipControl;

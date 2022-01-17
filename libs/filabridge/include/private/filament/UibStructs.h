@@ -54,10 +54,13 @@ struct PerViewUib { // NOLINT(cppcoreguidelines-pro-type-member-init)
 
     math::float4 resolution; // viewport width, height, 1/width, 1/height
 
-    // PERSPECTIVE: camera position in view space (when camera_at_origin is enabled), i.e. it's (0,0,0).
+    // camera forward in view space (when camera_at_origin is enabled).
+    math::float3 cameraForward;
+    float padding0;
+
+    // camera position in view space (when camera_at_origin is enabled), i.e. it's (0,0,0).
     // Always add worldOffset in the shader to get the true world-space position of the camera.
-    // ORTHO: the forward direction in view space.
-    math::float3 cameraPositionOrForward;
+    math::float3 cameraPosition;
 
     float time; // time in seconds, with a 1 second period
 
@@ -65,7 +68,7 @@ struct PerViewUib { // NOLINT(cppcoreguidelines-pro-type-member-init)
 
     math::float4 sun; // cos(sunAngle), sin(sunAngle), 1/(sunAngle*HALO_SIZE-sunAngle), HALO_EXP
 
-    math::float3 padding0;
+    math::float3 padding1;
     uint32_t lightChannels;
 
     math::float3 lightDirection;
@@ -122,7 +125,7 @@ struct PerViewUib { // NOLINT(cppcoreguidelines-pro-type-member-init)
     float aoReserved3;
 
     math::float2 clipControl;
-    math::float2 padding1;
+    math::float2 padding2;
 
     float vsmExponent;
     float vsmDepthScale;
@@ -135,7 +138,7 @@ struct PerViewUib { // NOLINT(cppcoreguidelines-pro-type-member-init)
     float reserved3;
 
     // bring PerViewUib to 2 KiB
-    math::float4 padding2[58];
+    math::float4 padding3[57];
 };
 
 // 2 KiB == 128 float4s

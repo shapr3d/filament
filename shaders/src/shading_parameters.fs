@@ -34,11 +34,11 @@ void computeShadingParams() {
 
     shading_position = vertex_worldPosition;
     if (frameUniforms.clipFromViewMatrix[2].w == -1.0) {
-        // Perspective projection (cameraPositionOrForward contains eye position)
-        shading_view = normalize(frameUniforms.cameraPositionOrForward - shading_position);
+        // Perspective projection
+        shading_view = normalize(frameUniforms.cameraPosition - shading_position);
     } else {
-        // Orthographic projection (cameraPositionOrForward contains forward direction)
-        shading_view = normalize(-frameUniforms.cameraPositionOrForward);
+        // Orthographic projection
+        shading_view = normalize(-frameUniforms.cameraForward);
     }
 
     // we do this so we avoid doing (matrix multiply), but we burn 4 varyings:
