@@ -61,7 +61,6 @@ struct PerViewUib { // NOLINT(cppcoreguidelines-pro-type-member-init)
     // camera position in view space (when camera_at_origin is enabled), i.e. it's (0,0,0).
     // Always add worldOffset in the shader to get the true world-space position of the camera.
     math::float3 cameraPosition;
-
     float time; // time in seconds, with a 1 second period
 
     math::float4 lightColorIntensity; // directional light
