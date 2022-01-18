@@ -46,7 +46,7 @@ UniformInterfaceBlock const& UibGenerator::getPerViewUib() noexcept  {
             .add("resolution",              1, UniformInterfaceBlock::Type::FLOAT4, Precision::HIGH)
             // camera
             .add("cameraForward",           1, UniformInterfaceBlock::Type::FLOAT3, Precision::HIGH)
-            .add("padding0",             1, UniformInterfaceBlock::Type::FLOAT)
+            .add("padding0",                1, UniformInterfaceBlock::Type::FLOAT)
             .add("cameraPosition",          1, UniformInterfaceBlock::Type::FLOAT3, Precision::HIGH)
             // time
             .add("time",                    1, UniformInterfaceBlock::Type::FLOAT, Precision::HIGH)
