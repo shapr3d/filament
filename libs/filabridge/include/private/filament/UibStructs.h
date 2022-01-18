@@ -54,7 +54,6 @@ struct PerViewUib { // NOLINT(cppcoreguidelines-pro-type-member-init)
 
     math::float4 resolution; // viewport width, height, 1/width, 1/height
 
-    // camera forward in view space (when camera_at_origin is enabled).
     math::float3 cameraForward;
     float padding0;
 
