@@ -45,15 +45,13 @@ UniformInterfaceBlock const& UibGenerator::getPerViewUib() noexcept  {
             // view
             .add("resolution",              1, UniformInterfaceBlock::Type::FLOAT4, Precision::HIGH)
             // camera
-            .add("cameraForward",           1, UniformInterfaceBlock::Type::FLOAT3, Precision::HIGH)
-            .add("padding0",                1, UniformInterfaceBlock::Type::FLOAT)
             .add("cameraPosition",          1, UniformInterfaceBlock::Type::FLOAT3, Precision::HIGH)
             // time
             .add("time",                    1, UniformInterfaceBlock::Type::FLOAT, Precision::HIGH)
             // directional light
             .add("lightColorIntensity",     1, UniformInterfaceBlock::Type::FLOAT4)
             .add("sun",                     1, UniformInterfaceBlock::Type::FLOAT4)
-            .add("padding1",                1, UniformInterfaceBlock::Type::FLOAT3)
+            .add("padding0",                1, UniformInterfaceBlock::Type::FLOAT3)
             .add("lightChannels",           1, UniformInterfaceBlock::Type::UINT)
             .add("lightDirection",          1, UniformInterfaceBlock::Type::FLOAT3)
             .add("fParamsX",                1, UniformInterfaceBlock::Type::UINT)
@@ -116,8 +114,12 @@ UniformInterfaceBlock const& UibGenerator::getPerViewUib() noexcept  {
             .add("reserved2",               1, UniformInterfaceBlock::Type::FLOAT)
             .add("reserved3",               1, UniformInterfaceBlock::Type::FLOAT)
 
+            // camera
+            .add("cameraForward", 1, UniformInterfaceBlock::Type::FLOAT3, Precision::HIGH)
+            .add("padding3", 1, UniformInterfaceBlock::Type::FLOAT)
+
             // bring PerViewUib to 2 KiB
-            .add("padding3", 57, UniformInterfaceBlock::Type::FLOAT4)
+            .add("paddingArray", 57, UniformInterfaceBlock::Type::FLOAT4)
             .build();
     return uib;
 }
