@@ -591,6 +591,7 @@ void SimpleViewer::updateRootTransform() {
     if (mSettings.viewer.autoScaleEnabled) {
         transform = fitIntoUnitCube(mAsset->getBoundingBox(), 4);
     }
+    transform *= filament::math::mat4f::rotation(filament::math::F_PI_2, filament::math::vec3<float>(-1, 0, 0));
     tcm.setTransform(root, transform);
 }
 
