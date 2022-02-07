@@ -69,9 +69,6 @@ bool MetalBuffer::releaseExternalBuffer() {
         return false;
     }
 
-#if !__has_feature(objc_arc)
-    [mExternalBuffer release];
-#endif
     mExternalBuffer = nil;
     return true;
 }
