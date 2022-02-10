@@ -11,7 +11,7 @@ void computeShadingParams() {
     highp vec3 n = vertex_worldNormal;
 #if defined(MATERIAL_NEEDS_TBN)
     highp vec3 t = vertex_worldTangent.xyz;
-    highp vec3 b = cross(n, t) * sign(vertex_worldTangent.w);
+    highp vec3 b = cross(n, t) * (vertex_worldTangent.w < 0.0 ? -1.0 : 1.0);
 #endif
 
 #if defined(MATERIAL_HAS_DOUBLE_SIDED_CAPABILITY)
