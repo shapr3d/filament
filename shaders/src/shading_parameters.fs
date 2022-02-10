@@ -56,7 +56,11 @@ void computeShadingParams() {
 void prepareMaterial(const MaterialInputs material) {
 #if defined(HAS_ATTRIBUTE_TANGENTS)
 #if defined(MATERIAL_HAS_NORMAL)
+#if defined(SHAPR_USE_WORLD_NORMALS)
+    shading_normal = material.normal;
+#else
     shading_normal = normalize(shading_tangentToWorld * material.normal);
+#endif
 #else
     shading_normal = getWorldGeometricNormalVector();
 #endif
@@ -64,12 +68,20 @@ void prepareMaterial(const MaterialInputs material) {
     shading_reflected = reflect(-shading_view, shading_normal);
 
 #if defined(MATERIAL_HAS_BENT_NORMAL)
+#if defined(SHAPR_USE_WORLD_NORMALS)
+    shading_bentNormal = material.bentNormal;
+#else
     shading_bentNormal = normalize(shading_tangentToWorld * material.bentNormal);
+#endif
 #endif
 
 #if defined(MATERIAL_HAS_CLEAR_COAT)
 #if defined(MATERIAL_HAS_CLEAR_COAT_NORMAL)
+#if defined(SHAPR_USE_WORLD_NORMALS)
+    shading_clearCoatNormal = material.clearCoatNormal;
+#else
     shading_clearCoatNormal = normalize(shading_tangentToWorld * material.clearCoatNormal);
+#endif
 #else
     shading_clearCoatNormal = getWorldGeometricNormalVector();
 #endif
