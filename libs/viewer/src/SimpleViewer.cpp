@@ -986,6 +986,9 @@ void SimpleViewer::updateUserInterface() {
     auto& rm = mEngine->getRenderableManager();
     auto& lm = mEngine->getLightManager();
 
+    static filament::math::mat3f triplanarTransform = filament::math::mat3f(1.0f);
+    static filament::math::mat3f triplanarNormalTransform = filament::math::mat3f(1.0f);
+
     // Show a common set of UI widgets for all renderables.
     auto renderableTreeItem = [this, &rm](utils::Entity entity) {
         bool rvis = mScene->hasEntity(entity);
@@ -1240,6 +1243,12 @@ void SimpleViewer::updateUserInterface() {
                         }
 
                     });
+
+                    matInstance->setParameter("triplanarTransform", triplanarTransform);
+                    if (tweaks.mShaderType != TweakableMaterial::MaterialType::Refractive) {
+                        // ::HACK:: Refractive has too many parameters, we cannot fit the normal transform so we can only pass it over for non-refractive materials
+                        matInstance->setParameter("triplanarNormalTransform", triplanarNormalTransform);
+                    }
 
                     matInstance->setParameter("useWard", (tweaks.mUseWard) ? 1 : 0 );
 
@@ -1624,6 +1633,22 @@ void SimpleViewer::updateUserInterface() {
         lm.setShadowOptions(ci, light.shadowOptions);
         lm.setShadowCaster(ci, light.enableShadows);
     });
+
+    if (ImGui::CollapsingHeader("Triplanar setup")) {
+        static float yaw = 0.0f;
+        static float pitch = 0.0f;
+        static float roll = 0.0f;
+        ImGui::SliderAngle("Yaw (Y)", &yaw);
+        ImGui::SliderAngle("Pitch (X)", &pitch);
+        ImGui::SliderAngle("Roll (Z)", &roll);
+
+        // We are setting the inverse of the triplanar transform here so that the shader does not have
+        // to deal with the back-and-forth transforms between spaces (as triplanar computations will be
+        // carried out in the local coordinate system of the triplanar box). 
+        triplanarTransform = filament::math::mat3f::eulerYXZ(-yaw, -pitch, -roll);
+        triplanarNormalTransform = filament::math::mat3f::getTransformForNormals(triplanarTransform);
+    }
+
 
     if (mAsset != nullptr) {
         if (ImGui::CollapsingHeader("Hierarchy")) {
