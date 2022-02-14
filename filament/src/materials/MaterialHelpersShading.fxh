@@ -135,8 +135,6 @@ void ApplyNormalMap(inout MaterialInputs material, inout FragmentData fragmentDa
                                            fragmentData.normal,
                                            materialParams.normalIntensity);
         material.normal = normalWS * getWorldTangentFrame();
-
-        //material.postLightingColor.rgb = fragmentData.normal; //normalWS;
     }
     // By this time the normal should be ready, it is safe to apply the normal scale
     //material.normal.xy *= materialParams.normalIntensity;
@@ -150,9 +148,8 @@ void ApplyClearCoatNormalMap(inout MaterialInputs material, inout FragmentData f
                                                     materialParams.textureScaler.z,
                                                     fragmentData.pos,
                                                     fragmentData.normal,
-                                                    materialParams.normalIntensity);
+                                                    materialParams.clearCoatNormalIntensity);
         material.clearCoatNormal = clearCoatNormalWS * getWorldTangentFrame();
-        //material.clearCoatNormal.xy *= materialParams.clearCoatNormalIntensity;
     }
 #endif
 }
@@ -354,7 +351,7 @@ void ApplyNonTextured(inout MaterialInputs material, inout FragmentData fragment
     material.subsurfacePower = materialParams.subsurfacePower;
 #endif
 #if defined(MATERIAL_HAS_POST_LIGHTING_COLOR)
-//    material.postLightingColor.rgb = float3(materialParams.ambient);
+    material.postLightingColor.rgb = float3(materialParams.ambient);
 #endif
 }
 
