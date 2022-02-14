@@ -136,8 +136,6 @@ void ApplyNormalMap(inout MaterialInputs material, inout FragmentData fragmentDa
                                            materialParams.normalIntensity);
         material.normal = normalWS * getWorldTangentFrame();
     }
-    // By this time the normal should be ready, it is safe to apply the normal scale
-    //material.normal.xy *= materialParams.normalIntensity;
 #endif
 }
 
