@@ -107,7 +107,7 @@ vec3 TriplanarNormalMap(sampler2D normalMap, float scaler, highp vec3 pos, lowp 
     vec2 uvX = scaler * pos.yz * vec2(1, -1); // x facing plane
     vec2 uvY = scaler * -pos.xz; // y facing plane
     vec2 uvZ = scaler * pos.yx; // z facing plane
-#else
+#else // defined(IN_SHAPR_SHADER)
     // Filament coordinates
     vec2 uvX = scaler * -pos.zy; // x facing plane
     vec2 uvY = scaler * pos.xz; // y facing plane
