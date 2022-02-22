@@ -80,10 +80,10 @@ vec4 TriplanarTexture(sampler2D tex, float scaler, highp vec3 pos, lowp vec3 nor
 #if defined(IN_SHAPR_SHADER)
     return weights.x * texture(tex, queryPos.yz * vec2(1, -1)) + weights.y * texture(tex, -queryPos.xz) +
            weights.z * texture(tex, queryPos.yx);
-#else // defined(IN_SHAPR_SHADER)
+#else
     return weights.x * texture(tex, -queryPos.zy) + weights.y * texture(tex, queryPos.xz) +
            weights.z * texture(tex, queryPos.xy * vec2(1, -1));
-#endif
+#endif // defined(IN_SHAPR_SHADER)
 }
 
 vec3 UnpackNormal(vec2 packedNormal) {
@@ -107,12 +107,12 @@ vec3 TriplanarNormalMap(sampler2D normalMap, float scaler, highp vec3 pos, lowp 
     vec2 uvX = scaler * pos.yz * vec2(1, -1); // x facing plane
     vec2 uvY = scaler * -pos.xz; // y facing plane
     vec2 uvZ = scaler * pos.yx; // z facing plane
-#else // defined(IN_SHAPR_SHADER)
+#else
     // Filament coordinates
     vec2 uvX = scaler * -pos.zy; // x facing plane
     vec2 uvY = scaler * pos.xz; // y facing plane
     vec2 uvZ = scaler * pos.xy * vec2(1, -1); // z facing plane
-#endif
+#endif // defined(IN_SHAPR_SHADER)
 
     // Tangent space normal maps
     // 2-channel XY TS normal texture: this saves 33% on storage
