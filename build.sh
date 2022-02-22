@@ -47,6 +47,8 @@ function print_help {
     echo "        Add iOS simulator support to the iOS build."
     echo "    -t"
     echo "        Enable SwiftShader support for Vulkan in desktop builds."
+    echo "    -e"
+    echo "        Enable C++ exceptions in Release builds."
     echo "    -l"
     echo "        Build arm64/x86_64 universal libraries."
     echo "        For iOS, this builds universal binaries for devices and the simulator (implies -s)."
@@ -162,6 +164,8 @@ OPENGL_IOS_OPTION="-DFILAMENT_SUPPORTS_OPENGL=ON"
 SWIFTSHADER_OPTION="-DFILAMENT_USE_SWIFTSHADER=OFF"
 
 MATDBG_OPTION="-DFILAMENT_ENABLE_MATDBG=OFF"
+
+ENABLE_CPP_EXCEPTIONS_OPTION="-DFILAMENT_ENABLE_CPP_EXCEPTIONS=OFF"
 
 IOS_BUILD_SIMULATOR=false
 BUILD_UNIVERSAL_LIBRARIES=false
@@ -599,6 +603,7 @@ function build_ios_target {
             -DCMAKE_TOOLCHAIN_FILE=../../third_party/clang/iOS.cmake \
             ${MATDBG_OPTION} \
             ${OPENGL_IOS_OPTION} \
+            ${ENABLE_CPP_EXCEPTIONS_OPTION} \
             ../..
     fi
 
@@ -805,7 +810,7 @@ function run_tests {
 
 pushd "$(dirname "$0")" > /dev/null
 
-while getopts ":hacCfijmp:q:uvgslwtdk:" opt; do
+while getopts ":hacCfijmp:q:uvgslwtedk:" opt; do
     case ${opt} in
         h)
             print_help
@@ -918,6 +923,9 @@ while getopts ":hacCfijmp:q:uvgslwtdk:" opt; do
         t)
             SWIFTSHADER_OPTION="-DFILAMENT_USE_SWIFTSHADER=ON"
             echo "SwiftShader support enabled."
+            ;;
+        e)
+            ENABLE_CPP_EXCEPTIONS_OPTION="-DFILAMENT_ENABLE_CPP_EXCEPTIONS=ON"
             ;;
         l)
             BUILD_UNIVERSAL_LIBRARIES=true
