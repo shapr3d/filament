@@ -17,6 +17,8 @@ option(FILAMENT_USE_SWIFTSHADER "Compile Filament against SwiftShader" OFF)
 
 option(FILAMENT_ENABLE_LTO "Enable link-time optimizations if supported by the compiler" OFF)
 
+option(FILAMENT_ENABLE_CPP_EXCEPTIONS "Enable the use of C++ exceptions" OFF)
+
 option(FILAMENT_SKIP_SAMPLES "Don't build samples" OFF)
 
 option(FILAMENT_SUPPORTS_XCB "Include XCB support in Linux builds" ON)
@@ -283,7 +285,10 @@ if (ANDROID)
 endif()
 
 if (CYGWIN)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions -fno-rtti")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
+    if (NOT FILAMENT_ENABLE_CPP_EXCEPTIONS)
+        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -fno-exceptions")
+    endif()
 endif()
 
 if (MSVC)
@@ -320,7 +325,10 @@ endif()
 # On Android RELEASE builds, we disable exceptions and RTTI to save some space (about 75 KiB
 # saved by -fno-exception and 10 KiB saved by -fno-rtti).
 if (ANDROID OR IOS OR WEBGL)
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-rtti")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-rtti")
+    if (NOT FILAMENT_ENABLE_CPP_EXCEPTIONS)
+        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fno-exceptions")
+    endif()
 endif()
 
 # With WebGL, we disable RTTI even for debug builds because we pass emscripten::val back and forth
