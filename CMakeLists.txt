@@ -287,7 +287,7 @@ endif()
 if (CYGWIN)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
     if (NOT FILAMENT_ENABLE_CPP_EXCEPTIONS)
-        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -fno-exceptions")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions")
     endif()
 endif()
 
