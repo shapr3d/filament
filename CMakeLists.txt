@@ -309,6 +309,7 @@ endif()
 # Release compiler flags
 # ==================================================================================================
 if (NOT MSVC AND NOT IOS)
+    # Omitting stack frame pointers prevents the generation of readable stack traces in crash reports on iOS
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fomit-frame-pointer")
     # These aren't compatible with -fembed-bitcode (and seem to have no effect on Apple platforms anyway)
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -ffunction-sections -fdata-sections")
@@ -319,6 +320,7 @@ endif()
 if (ANDROID OR IOS OR WEBGL)
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fno-exceptions -fno-rtti")
     if (ANDROID OR WEBGL)
+        # Omitting unwind info prevents the generation of readable stack traces in crash reports on iOS
         set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fno-unwind-tables -fno-asynchronous-unwind-tables")
     endif()
 endif()
