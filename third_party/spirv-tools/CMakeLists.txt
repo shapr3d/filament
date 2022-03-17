@@ -252,6 +252,7 @@ if(CMAKE_VERSION VERSION_LESS "3.12" OR ${CMAKE_SYSTEM_NAME} MATCHES "Windows")
   find_host_package(PythonInterp 3 REQUIRED)
 else()
   find_package(Python3 COMPONENTS Interpreter)
+  set(PYTHON_EXECUTABLE "${Python3_EXECUTABLE}")
 endif()
 
 # Check for symbol exports on Linux.
