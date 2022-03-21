@@ -88,6 +88,9 @@ MetalDriver::MetalDriver(backend::MetalPlatform* platform) noexcept
             mContext->highestSupportedGpuFamily.macCatalyst >= 2;   // newer Mac Catalyst GPUs
     }
 
+    // In order to support memoryless render targets, an Apple GPU is needed.
+    mContext->supportsMemorylessRenderTargets = mContext->highestSupportedGpuFamily.apple >= 1;
+
     mContext->maxColorRenderTargets = 4;
     if (mContext->highestSupportedGpuFamily.apple >= 2 ||
         mContext->highestSupportedGpuFamily.mac >= 1 ||
