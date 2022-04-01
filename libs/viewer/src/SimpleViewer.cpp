@@ -1681,16 +1681,6 @@ void SimpleViewer::updateUserInterface() {
     }
 
     {
-        // IBL rotation UI
-        ImGui::Separator();
-        ImGui::Text("IBL rotation Z");
-        float angleRad = mIbl->getRotationZ();
-        if (ImGui::SliderAngle("IBL rot Z", &angleRad, -180.0f, 179.9f)) {
-            mIbl->setRotationZ(angleRad);
-        }
-    }
-
-    {
         // Camera movement speed setting UI
         ImGui::Separator();
         if (ImGui::SliderFloat("Cam move speed", &mSettings.viewer.cameraMovementSpeed, 1.0f, 100.0f)) {

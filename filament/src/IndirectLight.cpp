@@ -288,14 +288,6 @@ const math::mat3f& IndirectLight::getRotation() const noexcept {
     return upcast(this)->getRotation();
 }
 
-void IndirectLight::setRotationZ(float rotation) noexcept {
-    upcast(this)->setRotationZ(rotation);
-}
-
-float IndirectLight::getRotationZ() const noexcept {
-    return upcast(this)->getRotationZ();
-}
-
 Texture const* IndirectLight::getReflectionsTexture() const noexcept {
     return upcast(this)->getReflectionsTexture();
 }

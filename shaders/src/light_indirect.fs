@@ -101,10 +101,7 @@ vec3 diffuseIrradiance(const vec3 n) {
 // Helper function that converts the incoming Z-up world space reflection vector
 // to a Filament IBL texture lookup vector, where the top face is actually +Y.
 vec3 zUpToIblDirection(vec3 r) {
-    mat3 zRot = mat3(vec3( frameUniforms.iblRotationZtrig.y, frameUniforms.iblRotationZtrig.x, 0.0),
-                     vec3(-frameUniforms.iblRotationZtrig.x, frameUniforms.iblRotationZtrig.y, 0.0),
-                     vec3(0.0, 0.0, 1.0));
-    r = zRot * r;
+    r = (frameUniforms.iblRotation * vec4(r, 0.0)).xyz;
 #if defined(IN_SHAPR_SHADER)
     return vec3(-r.x, r.z, r.y);
 #else

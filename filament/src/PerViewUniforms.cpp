@@ -218,13 +218,12 @@ void PerViewUniforms::prepareAmbientLight(FIndirectLight const& ibl,
         float intensity, float exposure) noexcept {
     auto& engine = mEngine;
     auto& s = mPerViewUb.edit();
-    float rotationZradians = ibl.getRotationZ();
 
     // Set up uniforms and sampler for the IBL, guaranteed to be non-null at this point.
     float iblRoughnessOneLevel = ibl.getLevelCount() - 1.0f;
     s.iblRoughnessOneLevel = iblRoughnessOneLevel;
     s.iblLuminance = intensity * exposure;
-    s.iblRotationZtrig = math::float2(sin(rotationZradians), cos(rotationZradians));
+    s.iblRotation = math::mat4f(ibl.getRotation());
     std::transform(ibl.getSH(), ibl.getSH() + 9, s.iblSH, [](float3 v) {
         return float4(v, 0.0f);
     });
