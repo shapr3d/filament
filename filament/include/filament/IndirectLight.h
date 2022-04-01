@@ -282,6 +282,21 @@ public:
     const math::mat3f& getRotation() const noexcept;
 
     /**
+     * Specifies the rotation around the Z axis to apply to the IBL. Performs rotation in shaders,
+     * without applying a root transformation to the scene.
+     *
+     * @param rotation Angle value in radians.
+     *
+     * @return This Builder, for chaining calls.
+     */
+    void setRotationZ(float rotation) noexcept;
+
+    /**
+     * Returns the rotation around the Z axis applied to the IBL, in radians.
+     */
+    float getRotationZ() const noexcept;
+
+    /**
      * Returns the associated reflection map, or null if it does not exist.
      */
     Texture const* getReflectionsTexture() const noexcept;

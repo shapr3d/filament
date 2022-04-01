@@ -116,8 +116,11 @@ UniformInterfaceBlock const& UibGenerator::getPerViewUib() noexcept  {
             .add("reserved2",               1, UniformInterfaceBlock::Type::FLOAT)
             .add("reserved3",               1, UniformInterfaceBlock::Type::FLOAT)
 
+            .add("iblRotationZtrig",        1, UniformInterfaceBlock::Type::FLOAT2)
+            .add("padding3",                1, UniformInterfaceBlock::Type::FLOAT2)
+
             // bring PerViewUib to 2 KiB
-            .add("padding3", 57, UniformInterfaceBlock::Type::FLOAT4)
+            .add("padding4", 56, UniformInterfaceBlock::Type::FLOAT4)
             .build();
     return uib;
 }

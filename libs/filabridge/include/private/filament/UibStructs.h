@@ -135,8 +135,11 @@ struct PerViewUib { // NOLINT(cppcoreguidelines-pro-type-member-init)
     float reserved2;
     float reserved3;
 
+    math::float2 iblRotationZtrig; // contains [sin(iblRotationZ), cos(iblRotationZ)] to avoid trigonometry in fragment shaders
+    math::float2 padding3;
+
     // bring PerViewUib to 2 KiB
-    math::float4 padding3[57];
+    math::float4 padding4[56];
 };
 
 // 2 KiB == 128 float4s

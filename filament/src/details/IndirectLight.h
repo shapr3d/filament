@@ -49,6 +49,8 @@ public:
     void setIntensity(float intensity) noexcept { mIntensity = intensity; }
     void setRotation(math::mat3f const& rotation) noexcept { mRotation = rotation; }
     const math::mat3f& getRotation() const noexcept { return mRotation; }
+    void setRotationZ(float rotation) noexcept { mRotationZ = rotation; }
+    float getRotationZ() const noexcept { return mRotationZ; }
     FTexture const* getReflectionsTexture() const noexcept { return mReflectionsTexture; }
     FTexture const* getIrradianceTexture() const noexcept { return mIrradianceTexture; }
     size_t getLevelCount() const noexcept { return mLevelCount; }
@@ -63,6 +65,7 @@ private:
     std::array<math::float3, 9> mIrradianceCoefs;
     float mIntensity = DEFAULT_INTENSITY;
     math::mat3f mRotation;
+    float mRotationZ = 0.0f;
     uint8_t mLevelCount = 0;
 };
 
