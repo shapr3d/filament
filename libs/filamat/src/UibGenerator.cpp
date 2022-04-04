@@ -116,7 +116,8 @@ UniformInterfaceBlock const& UibGenerator::getPerViewUib() noexcept  {
             .add("reserved2",               1, UniformInterfaceBlock::Type::FLOAT)
             .add("reserved3",               1, UniformInterfaceBlock::Type::FLOAT)
 
-            .add("iblRotation",             1, UniformInterfaceBlock::Type::MAT4, Precision::HIGH)
+            // this is a mat3, but in struct PerViewUib is a mat4 for std140 compliance
+            .add("iblRotation",             1, UniformInterfaceBlock::Type::MAT3, Precision::HIGH)
 
             // bring PerViewUib to 2 KiB
             .add("padding3", 53, UniformInterfaceBlock::Type::FLOAT4)
