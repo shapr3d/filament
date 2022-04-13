@@ -105,13 +105,13 @@ vec3 TriplanarNormalMap(sampler2D normalMap, float scaler, highp vec3 pos, lowp 
 #if defined(IN_SHAPR_SHADER)
     // Shapr3D coordinates
     vec2 uvX = scaler * pos.yz * vec2(1, -1); // x facing plane
-    vec2 uvY = scaler * -pos.xz; // y facing plane
+    vec2 uvY = scaler *-pos.xz; // y facing plane
     vec2 uvZ = scaler * pos.yx; // z facing plane
 #else
     // Filament coordinates
-    vec2 uvX = scaler * -pos.zy; // x facing plane
-    vec2 uvY = scaler * pos.xz; // y facing plane
-    vec2 uvZ = scaler * pos.xy * vec2(1, -1); // z facing plane
+    vec2 uvX = scaler *-pos.zy * vec2(1, -1); // x facing plane
+    vec2 uvY = scaler * pos.xz * vec2(-1, 1); // y facing plane
+    vec2 uvZ = scaler * pos.xy * vec2(-1, 1); // z facing plane
 #endif // defined(IN_SHAPR_SHADER)
 
     // Tangent space normal maps
@@ -127,10 +127,17 @@ vec3 TriplanarNormalMap(sampler2D normalMap, float scaler, highp vec3 pos, lowp 
 
     // Compute blend weights
     vec3 blend = ComputeWeights(normal);
-    // Swizzle tangent normals to match world orientation and triblend
-    return normalize(tnormalX.zxy * blend.x * vec3(SignNoZero(normal.x), SignNoZero(normal.x), 1)
+    // Swizzle tangent normals to match world orientation and triblendű
+    vec3 r = normalize(tnormalX.zxy * blend.x * vec3(SignNoZero(normal.x), SignNoZero(normal.x), 1)
                      + tnormalY.xzy * blend.y * vec3(-SignNoZero(normal.y), SignNoZero(normal.y), 1)
                      + tnormalZ.yxz * blend.z * vec3(-1, SignNoZero(normal.z), SignNoZero(normal.z)));
+    //return r;
+    // And change handedness, if we are not in Shapr
+#if defined(IN_SHAPR_SHADER)
+    return r;
+#else
+    return vec3(-r.z, r.y, r.x);
+#endif // defined(IN_SHAPR_SHADER)
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
