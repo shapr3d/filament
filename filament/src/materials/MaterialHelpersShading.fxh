@@ -81,14 +81,12 @@ vec4 TriplanarTexture(sampler2D tex, float scaler, highp vec3 pos, lowp vec3 nor
            weights.z * texture(tex, queryPos.yx);
 }
 
-vec3 UnpackNormal(vec2 packedNormal) {
-    float x = packedNormal.x * 2.0 - 1.0;
-    float y = packedNormal.y * 2.0 - 1.0;
+vec3 UnpackNormal(vec2 packedNormal, vec2 scale) {
+    float x = (packedNormal.x * 2.0 - 1.0) * scale.x;
+    float y = (packedNormal.y * 2.0 - 1.0) * scale.y;
     return vec3(x, y, sqrt(clamp(1.0 - x * x - y * y, 0.0, 1.0)));
 }
-vec3 UnpackNormal(vec3 packedNormal) {
-    return packedNormal * 2.0 - 1.0;
-}
+
 // This is a whiteout blended tripalanar normal mapping, where each plane's tangent frame is
 // approximated by the appropriate sequence and flips of world space axes. For more details
 // Refer to https://bgolus.medium.com/normal-mapping-for-a-triplanar-shader-10bf39dca05a
@@ -103,9 +101,9 @@ vec3 TriplanarNormalMap(sampler2D normalMap, float scaler, highp vec3 pos, lowp 
 
     // Tangent space normal maps
     // 2-channel XY TS normal texture: this saves 33% on storage
-    lowp vec3 tnormalX = UnpackNormal(texture(normalMap, uvX).xy) * vec3(SignNoZero(normal.x) * normalIntensity, normalIntensity, 1);
-    lowp vec3 tnormalY = UnpackNormal(texture(normalMap, uvY).xy) * vec3(SignNoZero(normal.y) * normalIntensity, normalIntensity, 1);
-    lowp vec3 tnormalZ = UnpackNormal(texture(normalMap, uvZ).xy) * vec3(SignNoZero(normal.z) * normalIntensity, normalIntensity, 1);
+    lowp vec3 tnormalX = UnpackNormal(texture(normalMap, uvX).xy, vec2(SignNoZero(normal.x) * normalIntensity, normalIntensity));
+    lowp vec3 tnormalY = UnpackNormal(texture(normalMap, uvY).xy, vec2(SignNoZero(normal.y) * normalIntensity, normalIntensity));
+    lowp vec3 tnormalZ = UnpackNormal(texture(normalMap, uvZ).xy, vec2(SignNoZero(normal.z) * normalIntensity, normalIntensity));
 
     // Swizzle world normals into tangent space and apply Whiteout blend
     tnormalX = vec3(tnormalX.xy + normal.yz * vec2(SignNoZero(normal.x), 1), abs(tnormalX.z) * abs(normal.x));
