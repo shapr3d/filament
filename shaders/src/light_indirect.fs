@@ -171,11 +171,7 @@ vec3 diffuseIrradiance(const vec3 n) {
 vec3 zUpToIblDirection(vec3 r) {
     mat3 rotationMat = mat3(frameUniforms.iblRotation);
     r = rotationMat * r;
-#if defined(IN_SHAPR_SHADER)
-    return vec3(-r.x, r.z, r.y);
-#else
     return r;
-#endif
 }
 
 float perceptualRoughnessToLod(float perceptualRoughness) {

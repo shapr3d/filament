@@ -77,13 +77,8 @@ vec4 TriplanarTexture(sampler2D tex, float scaler, highp vec3 pos, lowp vec3 nor
     // Depending on the resolution of the texture, we may want to multiply the texture coordinates
     vec3 queryPos = scaler * pos;
     vec3 weights = ComputeWeights(normal);
-#if defined(IN_SHAPR_SHADER)
     return weights.x * texture(tex, queryPos.yz * vec2(1, -1)) + weights.y * texture(tex, -queryPos.xz) +
            weights.z * texture(tex, queryPos.yx);
-#else
-    return weights.x * texture(tex, -queryPos.zy) + weights.y * texture(tex, queryPos.xz) +
-           weights.z * texture(tex, queryPos.xy * vec2(1, -1));
-#endif // defined(IN_SHAPR_SHADER)
 }
 
 vec3 UnpackNormal(vec2 packedNormal) {
@@ -102,17 +97,9 @@ vec3 TriplanarNormalMap(sampler2D normalMap, float scaler, highp vec3 pos, lowp 
     // Triplanar uvs
     // We align with triplanarTexture(), and diverge from the article because we have a coordinate
     // system mismatch between Shapr3D and Filament (and the article).
-#if defined(IN_SHAPR_SHADER)
-    // Shapr3D coordinates
     vec2 uvX = scaler * pos.yz * vec2(1, -1); // x facing plane
     vec2 uvY = scaler *-pos.xz; // y facing plane
     vec2 uvZ = scaler * pos.yx; // z facing plane
-#else
-    // Filament coordinates
-    vec2 uvX = scaler *-pos.zy * vec2(1, -1); // x facing plane
-    vec2 uvY = scaler * pos.xz * vec2(-1, 1); // y facing plane
-    vec2 uvZ = scaler * pos.xy * vec2(-1, 1); // z facing plane
-#endif // defined(IN_SHAPR_SHADER)
 
     // Tangent space normal maps
     // 2-channel XY TS normal texture: this saves 33% on storage
@@ -127,17 +114,11 @@ vec3 TriplanarNormalMap(sampler2D normalMap, float scaler, highp vec3 pos, lowp 
 
     // Compute blend weights
     vec3 blend = ComputeWeights(normal);
-    // Swizzle tangent normals to match world orientation and triblendű
+    // Swizzle tangent normals to match world orientation and triblend
     vec3 r = normalize(tnormalX.zxy * blend.x * vec3(SignNoZero(normal.x), SignNoZero(normal.x), 1)
                      + tnormalY.xzy * blend.y * vec3(-SignNoZero(normal.y), SignNoZero(normal.y), 1)
                      + tnormalZ.yxz * blend.z * vec3(-1, SignNoZero(normal.z), SignNoZero(normal.z)));
-    //return r;
-    // And change handedness, if we are not in Shapr
-#if defined(IN_SHAPR_SHADER)
     return r;
-#else
-    return vec3(-r.z, r.y, r.x);
-#endif // defined(IN_SHAPR_SHADER)
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
