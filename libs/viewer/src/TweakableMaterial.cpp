@@ -247,7 +247,7 @@ void TweakableMaterial::drawUI(const std::string& header) {
         ImGui::SliderFloat("Tile: normal et al. textures", &mNormalTextureScale, 1.0f / 1024.0f, 32.0f);
         ImGui::Separator();
 
-        mNormalIntensity.addWidget("normal intensity", 0.0f, 32.0f);
+        mNormalIntensity.addWidget("normal intensity", 0.0f, 2.0f);
         
         mNormal.addWidget("normal");
         if (mNormal.isFile) enqueueTextureRequest(mNormal, false, false, 3);
