@@ -691,6 +691,8 @@ void applyRefraction(
     Fr *= material.specularIntensity * frameUniforms.iblLuminance;
     Fd *= frameUniforms.iblLuminance;
     color += Fr + mix(Fd, Ft, pixel.transmission);
+
+    at += (1.0 - at) * (1.0 - luminance(pixel.diffuseColor.rgb));
     alpha *= mix(1.0, at, pixel.transmission);
 }
 #endif
