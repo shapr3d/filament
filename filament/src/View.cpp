@@ -86,7 +86,7 @@ void FView::terminate(FEngine& engine) {
         pQuery->callback(pQuery->result, pQuery);
         FPickingQuery::put(pQuery);
     }
-
+    engine.destroy(mRenderTarget);
     mPerViewUniforms.terminate(engine);
 
     DriverApi& driver = engine.getDriverApi();
@@ -334,6 +334,25 @@ void FView::prepareLighting(FEngine& engine, FEngine::DriverApi& driver, ArenaSc
 void FView::prepare(FEngine& engine, DriverApi& driver, ArenaScope& arena,
         filament::Viewport const& viewport, float4 const& userTime) noexcept {
     JobSystem& js = engine.getJobSystem();
+
+    engine.destroy(mRenderTarget);
+    mRenderTarget = nullptr;
+
+    if (mLDRTexture || mHDRTexture || mDepthStencilTexture) {
+
+        RenderTarget::Builder builder;
+        if (mLDRTexture) {
+            builder.texture(RenderTarget::AttachmentPoint::COLOR0, mLDRTexture);
+        }
+        if (mHDRTexture) {
+            builder.texture(RenderTarget::AttachmentPoint::COLOR1, mHDRTexture);
+        }
+        if (mDepthStencilTexture) {
+            builder.texture(RenderTarget::AttachmentPoint::DEPTH , mDepthStencilTexture);
+        }
+        mRenderTarget = upcast(builder.build(engine));
+    }
+
 
     /*
      * Prepare the scene -- this is where we gather all the objects added to the scene,
@@ -891,6 +910,30 @@ void View::setRenderTarget(RenderTarget* renderTarget) noexcept {
 
 RenderTarget* View::getRenderTarget() const noexcept {
     return upcast(this)->getRenderTarget();
+}
+
+void View::setLDRColorTexture(Texture* texture) noexcept {
+    return upcast(this)->setLDRColorTexture(upcast(texture));
+}
+
+Texture* View::getLDRColorTexture() const noexcept {
+    return upcast(this)->getLDRColorTexture();
+}
+
+void View::setHDRColorTexture(Texture* texture) noexcept {
+    return upcast(this)->setHDRColorTexture(upcast(texture));
+}
+
+Texture* View::getHDRColorTexture() const noexcept {
+    return upcast(this)->getHDRColorTexture();
+}
+
+void View::setDepthStencilTexture(Texture* texture) noexcept {
+    return upcast(this)->setDepthStencilTexture(upcast(texture));
+}
+
+Texture* View::getDepthStencilTexture() const noexcept {
+    return upcast(this)->getDepthStencilTexture();
 }
 
 void View::setSampleCount(uint8_t count) noexcept {

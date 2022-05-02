@@ -349,16 +349,46 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
     Handle<HwRenderTarget> viewRenderTarget;
     TargetBufferFlags attachmentMask;
     getRenderTarget(view, attachmentMask, viewRenderTarget);
-    FrameGraphId<FrameGraphTexture> fgViewRenderTarget = fg.import("viewRenderTarget",
+    FrameGraphId<FrameGraphTexture> fgViewRenderTarget;
+    FrameGraphId<FrameGraphTexture> fgLDRTexture;
+    FrameGraphId<FrameGraphTexture> fgHDRTexture;
+    FrameGraphId<FrameGraphTexture> fgDepthTexture;
+
+    Texture::InternalFormat depthFormat = Texture::InternalFormat::DEPTH32F;
+
+    if (viewRenderTarget == mRenderTarget) {
+        fgViewRenderTarget = fg.import("viewRenderTarget",
             {
-                    .attachments = attachmentMask,
-                    .viewport = DEBUG_DYNAMIC_SCALING ? svp : vp,
-                    .clearColor = clearColor,
-                    .samples = 0,
-                    .clearFlags = clearFlags,
-                    .keepOverrideStart = keepOverrideStartFlags,
-                    .keepOverrideEnd = keepOverrideEndFlags
+                 .attachments = attachmentMask,
+                 .viewport = DEBUG_DYNAMIC_SCALING ? svp : vp,
+                 .clearColor = clearColor,
+                 .samples = 0,
+                 .clearFlags = clearFlags,
+                 .keepOverrideStart = keepOverrideStartFlags,
+                 .keepOverrideEnd = keepOverrideEndFlags
             }, viewRenderTarget);
+    } else {
+        auto* colorLDRTexture = upcast(view).getLDRColorTexture();
+        auto* colorHDRTexture = upcast(view).getHDRColorTexture();
+        auto* depthTexture = upcast(view).getDepthStencilTexture();
+
+        depthFormat = depthTexture->getFormat();
+
+        auto importTexture = [&](const FTexture* texture, const char* name) {
+            if (!texture) return FrameGraphId<FrameGraphTexture>{};
+            FrameGraphTexture frameGraphTexture{ .handle = texture->getHwHandle() };
+            return fg.import(name, {
+                 .width = (uint32_t)texture->getWidth(0u),
+                 .height = (uint32_t)texture->getHeight(0u),
+                 .format = texture->getFormat()
+            }, texture->getUsage(), frameGraphTexture);
+        };
+
+        fgLDRTexture = importTexture(colorLDRTexture, "colorLDRTexture");
+        fgHDRTexture = importTexture(colorHDRTexture, "colorHDRTexture");
+        fgDepthTexture = importTexture(depthTexture, "depthTexture");
+
+    }
 
     const bool blendModeTranslucent = view.getBlendMode() == BlendMode::TRANSLUCENT;
     const bool blending = blendModeTranslucent;
@@ -371,6 +401,7 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
             .vp = vp,
             .svp = svp,
             .scale = scale,
+            .depthFormat = depthFormat,
             .hdrFormat = hdrFormat,
             .msaa = msaaSampleCount,
             .clearFlags = clearFlags,
@@ -627,13 +658,25 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
 //    auto debug = fg.getBlackboard().get<FrameGraphTexture>("structure");
 //    fg.forwardResource(fgViewRenderTarget, debug ? debug : input);
 
-    fg.forwardResource(fgViewRenderTarget, input);
+     //fg.forwardResource(fgViewRenderTarget, input);
 
-    fg.present(fgViewRenderTarget);
-
+     //fg.present(fgViewRenderTarget);
+     if (viewRenderTarget == mRenderTarget) {
+         fg.forwardResource(fgViewRenderTarget, input);
+         fg.present(fgViewRenderTarget);
+     } else {
+         fg.forwardResource(fgLDRTexture, input);
+         fg.forwardResource(fgDepthTexture, depth);
+         if (fgHDRTexture) {
+             fg.forwardResource(fgHDRTexture, fg.getBlackboard().get<FrameGraphTexture>("hdr"));
+             fg.present(fgHDRTexture);
+         }
+         fg.present(fgLDRTexture);
+         fg.present(fgDepthTexture);
+     }
     fg.compile();
 
-    //fg.export_graphviz(slog.d, view.getName());
+    fg.export_graphviz(slog.d, view.getName());
 
     fg.execute(driver);
 
@@ -833,7 +876,7 @@ FrameGraphId<FrameGraphTexture> FRenderer::colorPass(FrameGraph& fg, const char*
                             // the tile depth buffer will be MS, but it'll be resolved to single
                             // sample automatically -- which is what we want.
                             .samples = colorBufferDesc.samples,
-                            .format = TextureFormat::DEPTH32F,
+                            .format = config.depthFormat,
                     });
                 }
 
@@ -850,10 +893,10 @@ FrameGraphId<FrameGraphTexture> FRenderer::colorPass(FrameGraph& fg, const char*
                 // We set a "read" constraint on these attachments here because we need to preserve them
                 // when the color pass happens in several passes (e.g. with SSR)
                 data.color = builder.read(data.color, FrameGraphTexture::Usage::COLOR_ATTACHMENT);
-                data.depth = builder.read(data.depth, FrameGraphTexture::Usage::DEPTH_ATTACHMENT);
+                data.depth = builder.read(data.depth, FrameGraphTexture::Usage::DEPTH_ATTACHMENT | FrameGraphTexture::Usage::STENCIL_ATTACHMENT);
 
                 data.color = builder.write(data.color, FrameGraphTexture::Usage::COLOR_ATTACHMENT);
-                data.depth = builder.write(data.depth, FrameGraphTexture::Usage::DEPTH_ATTACHMENT);
+                data.depth = builder.write(data.depth, FrameGraphTexture::Usage::DEPTH_ATTACHMENT | FrameGraphTexture::Usage::STENCIL_ATTACHMENT);
 
                 builder.declareRenderPass("Color Pass Target", {
                         .attachments = { .color = { data.color, data.output }, .depth = data.depth },
@@ -864,6 +907,7 @@ FrameGraphId<FrameGraphTexture> FRenderer::colorPass(FrameGraph& fg, const char*
                 data.clearFlags = clearColorFlags | clearDepthFlags;
 
                 blackboard["depth"] = data.depth;
+                blackboard["hdr"] = data.color;
             },
             [=, &view](FrameGraphResources const& resources,
                             ColorPassData const& data, DriverApi& driver) {
@@ -912,6 +956,7 @@ FrameGraphId<FrameGraphTexture> FRenderer::colorPass(FrameGraph& fg, const char*
             }
     );
 
+    
     // when color grading is done as a subpass, the output of the color-pass is the ldr buffer
     auto output = colorGradingConfig.asSubpass ? colorPass->output : colorPass->color;
 
@@ -1204,8 +1249,8 @@ void FRenderer::initializeClearFlags() {
                           TargetBufferFlags::COLOR : TargetBufferFlags::NONE)
                          | TargetBufferFlags::DEPTH_AND_STENCIL;
 
-    mClearFlags = (mClearOptions.clear ? TargetBufferFlags::COLOR : TargetBufferFlags::NONE)
-            | TargetBufferFlags::DEPTH_AND_STENCIL;
+    mClearFlags = (mClearOptions.clear ? (TargetBufferFlags::COLOR| TargetBufferFlags::DEPTH_AND_STENCIL) : TargetBufferFlags::NONE)
+            ;
 }
 
 // ------------------------------------------------------------------------------------------------
