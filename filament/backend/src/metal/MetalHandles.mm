@@ -849,6 +849,16 @@ void MetalRenderTarget::setUpRenderPassAttachments(MTLRenderPassDescriptor* desc
     descriptor.depthAttachment.storeAction = getStoreAction(params, TargetBufferFlags::DEPTH);
     descriptor.depthAttachment.clearDepth = params.clearDepth;
 
+    const auto hasStencil = (MTLPixelFormatDepth32Float_Stencil8 == depthAttachment.getPixelFormat()) || (MTLPixelFormatDepth24Unorm_Stencil8 == depthAttachment.getPixelFormat());
+    if (hasStencil) {
+        descriptor.stencilAttachment.texture = depthAttachment.getTexture();
+        descriptor.stencilAttachment.level = depthAttachment.level;
+        descriptor.stencilAttachment.slice = depthAttachment.layer;
+        descriptor.stencilAttachment.loadAction = getLoadAction(params, TargetBufferFlags::DEPTH);
+        descriptor.stencilAttachment.storeAction = getStoreAction(params, TargetBufferFlags::DEPTH);
+        descriptor.stencilAttachment.clearStencil = params.clearStencil;
+    }
+    
     const bool automaticResolve = samples > 1 && depthAttachment.getSampleCount() == 1;
     if (automaticResolve) {
         // We're rendering into our temporary MSAA texture and doing an automatic resolve.
@@ -868,6 +878,17 @@ void MetalRenderTarget::setUpRenderPassAttachments(MTLRenderPassDescriptor* desc
             descriptor.depthAttachment.resolveLevel = depthAttachment.level;
             descriptor.depthAttachment.resolveSlice = depthAttachment.layer;
             descriptor.depthAttachment.storeAction = MTLStoreActionMultisampleResolve;
+        }
+        if (hasStencil) {
+            descriptor.stencilAttachment.texture = sidecar;
+            descriptor.stencilAttachment.level = 0;
+            descriptor.stencilAttachment.slice = 0;
+            if (!discard) {
+                descriptor.stencilAttachment.resolveTexture = depthAttachment.getTexture();
+                descriptor.stencilAttachment.resolveLevel = depthAttachment.level;
+                descriptor.stencilAttachment.resolveSlice = depthAttachment.layer;
+                descriptor.stencilAttachment.storeAction = MTLStoreActionMultisampleResolve;
+            }
         }
     }
 }

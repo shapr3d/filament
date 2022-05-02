@@ -79,7 +79,10 @@ id<MTLRenderPipelineState> PipelineStateCreator::operator()(id<MTLDevice> device
 
     // Depth attachment
     descriptor.depthAttachmentPixelFormat = state.depthAttachmentPixelFormat;
-
+    const auto hasStencil = (MTLPixelFormatDepth32Float_Stencil8 == state.depthAttachmentPixelFormat) || (MTLPixelFormatDepth24Unorm_Stencil8 == state.depthAttachmentPixelFormat);
+    if (hasStencil) {
+        descriptor.stencilAttachmentPixelFormat = state.depthAttachmentPixelFormat;
+    }
     // MSAA
     descriptor.rasterSampleCount = state.sampleCount;
 
