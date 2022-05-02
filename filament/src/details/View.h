@@ -208,6 +208,30 @@ public:
     void setRenderTarget(FRenderTarget* renderTarget) noexcept {
         mRenderTarget = renderTarget;
     }
+    
+    void setLDRColorTexture(FTexture* texture) noexcept {
+        mLDRTexture = texture;
+    }
+
+    FTexture* getLDRColorTexture() const noexcept {
+        return mLDRTexture;
+    }
+
+    void setHDRColorTexture(FTexture* texture) noexcept {
+        mHDRTexture = texture;
+    }
+
+    FTexture* getHDRColorTexture() const noexcept {
+        return mHDRTexture;
+    }
+
+    void setDepthStencilTexture(FTexture* texture) noexcept {
+        mDepthStencilTexture = texture;
+    }
+
+    FTexture* getDepthStencilTexture() const noexcept {
+        return mDepthStencilTexture;
+    }
 
     FRenderTarget* getRenderTarget() const noexcept {
         return mRenderTarget;
@@ -521,6 +545,9 @@ private:
     bool mFrontFaceWindingInverted = false;
 
     FRenderTarget* mRenderTarget = nullptr;
+    FTexture* mLDRTexture = nullptr;
+    FTexture* mHDRTexture = nullptr;
+    FTexture* mDepthStencilTexture = nullptr;
 
     uint8_t mVisibleLayers = 0x1;
     uint8_t mSampleCount = 1;
