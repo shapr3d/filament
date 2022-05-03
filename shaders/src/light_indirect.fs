@@ -673,7 +673,11 @@ void applyRefraction(
 
     vec4 Fat = textureLod(light_ssr, p.xy, lod);
     float at = Fat.a;
+#if defined(BLEND_MODE_OPAQUE)
+    vec3 Ft = Fat.rgb;
+#else
     vec3 Ft = mix(Fat.rgb, vec3(1.0), at);
+#endif
 #endif
 
     // base color changes the amount of light passing through the boundary
