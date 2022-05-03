@@ -18,6 +18,10 @@
 
 #define IBL_INTEGRATION_IMPORTANCE_SAMPLING_COUNT   64
 
+#if ((defined(MATERIAL_HAS_TRANSMISSION) && defined(HAS_REFRACTION)) || !defined(BLEND_MODE_OPAQUE))
+#define IS_TRANSPARENT_OR_REFRACTIVE
+#endif
+
 //------------------------------------------------------------------------------
 // IBL utilities
 //------------------------------------------------------------------------------
@@ -673,11 +677,12 @@ void applyRefraction(
 
     vec4 Fat = textureLod(light_ssr, p.xy, lod);
     float at = Fat.a;
-#if defined(BLEND_MODE_OPAQUE)
-    vec3 Ft = Fat.rgb;
+#if defined(IS_TRANSPARENT_OR_REFRACTIVE)
+    vec3 Ft = mix(vec3(1.0), Fat.rgb, at);
 #else
-    vec3 Ft = mix(Fat.rgb, vec3(1.0), at);
+    vec3 Ft = Fat.rgb;
 #endif
+
 #endif
 
     // base color changes the amount of light passing through the boundary
