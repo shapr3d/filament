@@ -672,8 +672,8 @@ void applyRefraction(
     float lod = max(0.0, 2.0 * log2(tweakedPerceptualRoughness) + frameUniforms.refractionLodOffset);
 
     vec4 Fat = textureLod(light_ssr, p.xy, lod);
-    vec3 Ft = Fat.rgb;
     float at = Fat.a;
+    vec3 Ft = mix(Fat.rgb, vec3(1.0), at);
 #endif
 
     // base color changes the amount of light passing through the boundary
