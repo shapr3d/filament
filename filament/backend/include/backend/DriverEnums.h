@@ -298,6 +298,15 @@ enum class CullingMode : uint8_t {
     FRONT_AND_BACK      //!< Front and Back, geometry is not visible
 };
 
+//! Stencil depth fail and pass operation mode.
+enum class StencilOperation : uint8_t {
+    ZERO,
+    KEEP,
+    INVERT,
+    REPLACE,
+    DEFAULT = ZERO
+};
+
 //! Pixel Data Format
 enum class PixelDataFormat : uint8_t {
     R,                  //!< One Red channel, float
@@ -810,9 +819,10 @@ struct RasterState {
     using DepthFunc = SamplerCompareFunc;
     using BlendEquation = BlendEquation;
     using BlendFunction = BlendFunction;
+    using StencilOperation = StencilOperation;
 
     RasterState() noexcept { // NOLINT
-        static_assert(sizeof(RasterState) == sizeof(uint32_t),
+        static_assert(sizeof(RasterState) == sizeof(uint8_t[5]),
                 "RasterState size not what was intended");
         culling = CullingMode::BACK;
         blendEquationRGB = BlendEquation::ADD;
@@ -823,8 +833,15 @@ struct RasterState {
         blendFunctionDstAlpha = BlendFunction::ZERO;
     }
 
-    bool operator == (RasterState rhs) const noexcept { return u == rhs.u; }
-    bool operator != (RasterState rhs) const noexcept { return u != rhs.u; }
+    bool operator == (RasterState rhs) const noexcept { 
+        bool eq = true;
+        for (uint8_t i = 0; i < 5; ++i) eq = eq && (u[i] == rhs.u[i]);
+        return eq;
+    }
+
+    bool operator != (RasterState rhs) const noexcept { 
+        return !operator==(rhs);
+    }
 
     void disableBlending() noexcept {
         blendEquationRGB = BlendEquation::ADD;
@@ -879,10 +896,19 @@ struct RasterState {
             //! whether front face winding direction must be inverted
             bool inverseFrontFaces              : 1;        // 31
 
+            //! Whether stencil-buffer writes are enabled
+            bool stencilWrite                   : 1;        // 32
+
+            //! stencil operation for depth test failures
+            StencilOperation stencilDepthFail   : 2;        // 34
+
+            //! stencil operation for depth test passes
+            StencilOperation stencilDepthPass   : 2;        // 36
+
             //! padding, must be 0
-            uint8_t padding                     : 1;        // 32
+            uint8_t padding                     : 4;        // 40
         };
-        uint32_t u = 0;
+        uint8_t u[5] = {0};
     };
 };
 
