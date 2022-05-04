@@ -1250,7 +1250,10 @@ void MetalDriver::draw(backend::PipelineState ps, Handle<HwRenderPrimitive> rph)
     // Set the depth-stencil state, if a state change is needed.
     DepthStencilState depthState {
         .compareFunction = getMetalCompareFunction(rs.depthFunc),
+        .stencilDepthFail = getMetalStencilOperation(rs.stencilDepthFail),
+        .stencilDepthPass = getMetalStencilOperation(rs.stencilDepthPass),
         .depthWriteEnabled = rs.depthWrite,
+        .stencilWriteEnabled = rs.stencilWrite,
     };
     mContext->depthStencilState.updateState(depthState);
     if (mContext->depthStencilState.stateChanged()) {
@@ -1375,6 +1378,7 @@ void MetalDriver::draw(backend::PipelineState ps, Handle<HwRenderPrimitive> rph)
     id<MTLCommandBuffer> cmdBuffer = getPendingCommandBuffer(mContext);
     id<MTLBuffer> metalIndexBuffer = indexBuffer->buffer.getGpuBufferForDraw(cmdBuffer);
     size_t offset = indexBuffer->buffer.getGpuBufferStreamOffset();
+    [mContext->currentRenderPassEncoder setStencilReferenceValue:1];
     [mContext->currentRenderPassEncoder drawIndexedPrimitives:getMetalPrimitiveType(primitive->type)
                                                    indexCount:primitive->count
                                                     indexType:getIndexType(indexBuffer->elementSize)
