@@ -29,6 +29,7 @@
 #include <math/vec4.h>
 
 #include <array>    // FIXME: STL headers are not allowed in public headers
+#include <cstring>
 
 #include <stddef.h>
 #include <stdint.h>
@@ -300,11 +301,11 @@ enum class CullingMode : uint8_t {
 
 //! Stencil depth fail and pass operation mode.
 enum class StencilOperation : uint8_t {
-    ZERO,
     KEEP,
+    ZERO,
     INVERT,
     REPLACE,
-    DEFAULT = ZERO
+    DEFAULT = KEEP
 };
 
 //! Pixel Data Format
@@ -834,9 +835,7 @@ struct RasterState {
     }
 
     bool operator == (RasterState rhs) const noexcept { 
-        bool eq = true;
-        for (uint8_t i = 0; i < 5; ++i) eq = eq && (u[i] == rhs.u[i]);
-        return eq;
+        return std::memcmp(u, rhs.u, sizeof(u));
     }
 
     bool operator != (RasterState rhs) const noexcept { 

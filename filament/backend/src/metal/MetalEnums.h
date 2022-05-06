@@ -57,8 +57,8 @@ constexpr inline MTLStencilOperation getMetalStencilOperation(RasterState::Stenc
         noexcept {
     using StencilOperation = RasterState::StencilOperation;
     switch (operation) {
-        case StencilOperation::ZERO:    return MTLStencilOperationZero;
         case StencilOperation::KEEP:    return MTLStencilOperationKeep;
+        case StencilOperation::ZERO:    return MTLStencilOperationZero;
         case StencilOperation::REPLACE: return MTLStencilOperationReplace;
         case StencilOperation::INVERT:  return MTLStencilOperationInvert;
     }

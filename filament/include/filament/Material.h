@@ -53,7 +53,7 @@ public:
     using Interpolation = Interpolation;
     using VertexDomain = VertexDomain;
     using TransparencyMode = TransparencyMode;
-    
+
     using StencilOperation = backend::StencilOperation;
     using ParameterType = backend::UniformType;
     using Precision = backend::Precision;
