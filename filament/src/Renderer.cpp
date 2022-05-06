@@ -817,6 +817,7 @@ FrameGraphId<FrameGraphTexture> FRenderer::colorPass(FrameGraph& fg, const char*
                 Blackboard& blackboard = fg.getBlackboard();
                 TargetBufferFlags clearDepthFlags = config.clearFlags & TargetBufferFlags::DEPTH;
                 TargetBufferFlags clearColorFlags = config.clearFlags & TargetBufferFlags::COLOR;
+                TargetBufferFlags clearStencilFlags = config.clearFlags & TargetBufferFlags::STENCIL;
 
                 data.shadows = blackboard.get<FrameGraphTexture>("shadows");
                 data.ssr  = blackboard.get<FrameGraphTexture>("ssr");
@@ -854,6 +855,7 @@ FrameGraphId<FrameGraphTexture> FRenderer::colorPass(FrameGraph& fg, const char*
                 if (!data.depth) {
                     // clear newly allocated depth buffers, regardless of given clear flags
                     clearDepthFlags = TargetBufferFlags::DEPTH;
+                    clearStencilFlags = TargetBufferFlags::STENCIL;
                     data.depth = builder.createTexture("Depth Buffer", {
                             .width = colorBufferDesc.width,
                             .height = colorBufferDesc.height,
@@ -880,11 +882,16 @@ FrameGraphId<FrameGraphTexture> FRenderer::colorPass(FrameGraph& fg, const char*
 
                 // We set a "read" constraint on these attachments here because we need to preserve them
                 // when the color pass happens in several passes (e.g. with SSR)
+                auto depthAttachmentUsage = FrameGraphTexture::Usage::DEPTH_ATTACHMENT;
+                if (MTLPixelFormatDepth32Float_Stencil8 == config.depthFormat || MTLPixelFormatDepth24Unorm_Stencil8 == config.depthFormat) {
+                    depthAttachmentUsage |= FrameGraphTexture::Usage::STENCIL_ATTACHMENT;
+                }
+
                 data.color = builder.read(data.color, FrameGraphTexture::Usage::COLOR_ATTACHMENT);
-                data.depth = builder.read(data.depth, FrameGraphTexture::Usage::DEPTH_ATTACHMENT);
+                data.depth = builder.read(data.depth, depthAttachmentUsage | clearStencilFlags);
 
                 data.color = builder.write(data.color, FrameGraphTexture::Usage::COLOR_ATTACHMENT);
-                data.depth = builder.write(data.depth, FrameGraphTexture::Usage::DEPTH_ATTACHMENT);
+                data.depth = builder.write(data.depth, depthAttachmentUsage | clearStencilFlags);
 
                 builder.declareRenderPass("Color Pass Target", {
                         .attachments = { .color = { data.color, data.output }, .depth = data.depth },
