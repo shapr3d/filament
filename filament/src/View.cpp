@@ -86,6 +86,7 @@ void FView::terminate(FEngine& engine) {
         pQuery->callback(pQuery->result, pQuery);
         FPickingQuery::put(pQuery);
     }
+
     mPerViewUniforms.terminate(engine);
 
     DriverApi& driver = engine.getDriverApi();

@@ -655,8 +655,8 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
     fg.forwardResource(fgViewRenderTarget, input);
     fg.present(fgViewRenderTarget);
     if (fgHdrTexture) {
-            fg.forwardResource(fgHdrTexture, fg.getBlackboard().get<FrameGraphTexture>("hdr"));
-            fg.present(fgHdrTexture);
+        fg.forwardResource(fgHdrTexture, fg.getBlackboard().get<FrameGraphTexture>("hdr"));
+        fg.present(fgHdrTexture);
     }
     if (fgDepthTexture) {
         fg.forwardResource(fgDepthTexture, depth);
@@ -760,7 +760,7 @@ FrameGraphId<FrameGraphTexture> FRenderer::refractionPass(FrameGraph& fg,
         }
 
         const TextureFormat format = (view.getBlendMode() == BlendMode::TRANSLUCENT) ? mHdrTranslucent : mHdrQualityMedium;
-        
+
         input = ppm.opaqueBlit(fg, input, {
                 .width = w,
                 .height = h,
@@ -880,7 +880,6 @@ FrameGraphId<FrameGraphTexture> FRenderer::colorPass(FrameGraph& fg, const char*
 
                 // We set a "read" constraint on these attachments here because we need to preserve them
                 // when the color pass happens in several passes (e.g. with SSR)
-
                 data.color = builder.read(data.color, FrameGraphTexture::Usage::COLOR_ATTACHMENT);
                 data.depth = builder.read(data.depth, FrameGraphTexture::Usage::DEPTH_ATTACHMENT);
 
@@ -944,7 +943,7 @@ FrameGraphId<FrameGraphTexture> FRenderer::colorPass(FrameGraph& fg, const char*
                 driver.flush();
             }
     );
-    
+
     // when color grading is done as a subpass, the output of the color-pass is the ldr buffer
     auto output = colorGradingConfig.asSubpass ? colorPass->output : colorPass->color;
 
@@ -1231,14 +1230,20 @@ void FRenderer::getRenderTarget(FView const& view,
 }
 
 void FRenderer::initializeClearFlags() {
-    // clear implies discard
-    mDiscardStartFlags = ((mClearOptions.discard || mClearOptions.clearColor) ?
-                          TargetBufferFlags::COLOR : TargetBufferFlags::NONE) |
-                         ((mClearOptions.discard || mClearOptions.clearDepth) ?
-                          TargetBufferFlags::DEPTH_AND_STENCIL : TargetBufferFlags::NONE);
-
-    mClearFlags = mClearOptions.clearColor ? TargetBufferFlags::COLOR : TargetBufferFlags::NONE;
-    mClearFlags |= mClearOptions.clearDepth ? TargetBufferFlags::DEPTH_AND_STENCIL : TargetBufferFlags::NONE;
+    mClearFlags = TargetBufferFlags::NONE;
+    if (mClearOptions.clearColor) {
+        mClearFlags |= TargetBufferFlags::COLOR;
+    }
+    if (mClearOptions.clearDepth) {
+        mClearFlags |= TargetBufferFlags::DEPTH_AND_STENCIL;
+    }
+    mDiscardStartFlags = TargetBufferFlags::NONE;
+    if (mClearOptions.discard) {
+        mDiscardStartFlags = TargetBufferFlags::COLOR | TargetBufferFlags::DEPTH_AND_STENCIL;
+    } else {
+        // clear implies discard
+        mDiscardStartFlags = mClearFlags;
+    }
 }
 
 // ------------------------------------------------------------------------------------------------

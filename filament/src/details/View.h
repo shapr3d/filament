@@ -208,13 +208,13 @@ public:
     void setRenderTarget(FRenderTarget* renderTarget) noexcept {
         mRenderTarget = renderTarget;
     }
-    
+
     void setHdrColorTexture(FTexture* texture) noexcept {
-        mHDRTexture = texture;
+        mHdrTexture = texture;
     }
 
     FTexture* getHdrColorTexture() const noexcept {
-        return mHDRTexture;
+        return mHdrTexture;
     }
 
     void setDepthStencilTexture(FTexture* texture) noexcept {
@@ -537,7 +537,7 @@ private:
     bool mFrontFaceWindingInverted = false;
 
     FRenderTarget* mRenderTarget = nullptr;
-    FTexture* mHDRTexture = nullptr;
+    FTexture* mHdrTexture = nullptr;
     FTexture* mDepthStencilTexture = nullptr;
 
     uint8_t mVisibleLayers = 0x1;
