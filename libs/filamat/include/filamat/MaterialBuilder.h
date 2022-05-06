@@ -394,7 +394,7 @@ public:
     //! Set the stencil depth fail operation. Stencil value kept by default.
     MaterialBuilder& stencilDepthFail(StencilOperation operation) noexcept;
 
-    //! Set the stencil depth pass operation. Stencil value replaced with reference value by default.
+    //! Set the stencil depth pass operation. Stencil value kept by default.
     MaterialBuilder& stencilDepthPass(StencilOperation operation) noexcept;
 
     /**

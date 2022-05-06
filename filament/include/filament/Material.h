@@ -173,13 +173,13 @@ public:
     bool isStencilWriteEnabled() const noexcept;
 
     /** 
-     * Indicates whether instances of this material will, keep/replace/zero/invert 
+     * Indicates whether instances of this material will keep/replace/zero/invert 
      * the contents of the stencil buffer if the depth test fails.
      */
     StencilOperation getStencilDepthFail() const noexcept;
 
     /** 
-     * Indicates whether instances of this material will, keep/replace/zero/invert 
+     * Indicates whether instances of this material will keep/replace/zero/invert 
      * the contents of the stencil buffer if the depth test passes.
      */
     StencilOperation getStencilDepthPass() const noexcept;
