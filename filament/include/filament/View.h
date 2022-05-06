@@ -146,27 +146,11 @@ public:
     RenderTarget* getRenderTarget() const noexcept;
     
     /**
-     * Specifies an offscreen render target's LDR color output texture to render into.
-     *
-     * @param texture LDR color texture
-     */
-    void setLDRColorTexture(Texture* texture) noexcept;
-
-    /**
-     * Gets the offscreen render target's LDR color output texture.
-     *
-     * Returns nullptr if the render target is the swap chain (which is default).
-     *
-     * @see setLDRColorTexture
-     */
-    Texture* getLDRColorTexture() const noexcept;
-
-    /**
      * Specifies an offscreen render target's HDR color output texture to render into.
      *
      * @param texture HDR color texture
      */
-    void setHDRColorTexture(Texture* texture) noexcept;
+    void setHdrColorTexture(Texture* texture) noexcept;
     
     /**
      * Gets the offscreen render target's HDR color output texture.
@@ -175,7 +159,7 @@ public:
      *
      * @see setHDRColorTexture
      */
-    Texture* getHDRColorTexture() const noexcept;
+    Texture* getHdrColorTexture() const noexcept;
 
     /**
      * Specifies an offscreen render target's depth-stencil texture to render into.

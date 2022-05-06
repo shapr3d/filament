@@ -209,19 +209,11 @@ public:
         mRenderTarget = renderTarget;
     }
     
-    void setLDRColorTexture(FTexture* texture) noexcept {
-        mLDRTexture = texture;
-    }
-
-    FTexture* getLDRColorTexture() const noexcept {
-        return mLDRTexture;
-    }
-
-    void setHDRColorTexture(FTexture* texture) noexcept {
+    void setHdrColorTexture(FTexture* texture) noexcept {
         mHDRTexture = texture;
     }
 
-    FTexture* getHDRColorTexture() const noexcept {
+    FTexture* getHdrColorTexture() const noexcept {
         return mHDRTexture;
     }
 
@@ -545,7 +537,6 @@ private:
     bool mFrontFaceWindingInverted = false;
 
     FRenderTarget* mRenderTarget = nullptr;
-    FTexture* mLDRTexture = nullptr;
     FTexture* mHDRTexture = nullptr;
     FTexture* mDepthStencilTexture = nullptr;
 
