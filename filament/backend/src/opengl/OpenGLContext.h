@@ -240,7 +240,7 @@ private:
             GLenum stencilFunc          = GL_ALWAYS;
             GLenum stencilFail          = GL_KEEP;
             GLenum stencilDepthFail     = GL_KEEP;
-            GLenum stencilDepthPass     = GL_REPLACE;
+            GLenum stencilDepthPass     = GL_KEEP;
             GLuint stencilRef           = 0;
             GLuint stencilWriteMask     = 0xFF;
             GLuint stencilReadMask     = 0xFF;

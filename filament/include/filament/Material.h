@@ -169,7 +169,7 @@ public:
     //! Indicates whether instances of this material will, by default, use depth testing.
     bool isDepthCullingEnabled() const noexcept;
 
-    //! Indicates whether instances of this material will, write to the stencil buffer
+    //! Indicates whether instances of this material will write to the stencil buffer
     bool isStencilWriteEnabled() const noexcept;
 
     /** 

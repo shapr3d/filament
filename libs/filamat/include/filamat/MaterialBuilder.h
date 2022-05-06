@@ -733,7 +733,7 @@ private:
     bool mStencilWrite = false;
 
     StencilOperation mStencilDepthFail = StencilOperation::KEEP;
-    StencilOperation mStencilDepthPass = StencilOperation::REPLACE;
+    StencilOperation mStencilDepthPass = StencilOperation::KEEP;
 
     bool mSpecularAntiAliasing = false;
     bool mClearCoatIorChange = true;

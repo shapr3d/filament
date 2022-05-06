@@ -1261,6 +1261,7 @@ void MetalDriver::draw(backend::PipelineState ps, Handle<HwRenderPrimitive> rph)
                 mContext->depthStencilStateCache.getOrCreateState(depthState);
         assert_invariant(state != nil);
         [mContext->currentRenderPassEncoder setDepthStencilState:state];
+        [mContext->currentRenderPassEncoder setStencilReferenceValue:1];
     }
 
     if (ps.polygonOffset.constant != 0.0 || ps.polygonOffset.slope != 0.0) {
@@ -1378,7 +1379,6 @@ void MetalDriver::draw(backend::PipelineState ps, Handle<HwRenderPrimitive> rph)
     id<MTLCommandBuffer> cmdBuffer = getPendingCommandBuffer(mContext);
     id<MTLBuffer> metalIndexBuffer = indexBuffer->buffer.getGpuBufferForDraw(cmdBuffer);
     size_t offset = indexBuffer->buffer.getGpuBufferStreamOffset();
-    [mContext->currentRenderPassEncoder setStencilReferenceValue:1];
     [mContext->currentRenderPassEncoder drawIndexedPrimitives:getMetalPrimitiveType(primitive->type)
                                                    indexCount:primitive->count
                                                     indexType:getIndexType(indexBuffer->elementSize)

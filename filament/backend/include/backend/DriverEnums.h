@@ -835,7 +835,7 @@ struct RasterState {
     }
 
     bool operator == (RasterState rhs) const noexcept { 
-        return std::memcmp(u, rhs.u, sizeof(u));
+        return std::memcmp(u, rhs.u, sizeof(u)) == 0;
     }
 
     bool operator != (RasterState rhs) const noexcept { 
