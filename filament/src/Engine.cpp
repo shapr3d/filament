@@ -54,6 +54,15 @@
 
 #include "generated/resources/materials.h"
 
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <d3d11.h>
+
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
+
 using namespace filament::math;
 using namespace utils;
 
@@ -67,6 +76,55 @@ FEngine* FEngine::create(Backend backend, Platform* platform, void* sharedGLCont
     SYSTRACE_CALL();
 
     FEngine* instance = new FEngine(backend, platform, sharedGLContext, nativeDevice);
+
+    // create d3d11 device
+    auto D3D11Module = LoadLibrary(TEXT("d3d11.dll"));
+    if (D3D11Module == nullptr)
+    {
+        std::cout << "Unable to LoadLibrary D3D11" << std::endl;
+        std::exit(666);
+    }
+    auto D3D11CreateDevice = reinterpret_cast<PFN_D3D11_CREATE_DEVICE>(
+        GetProcAddress(D3D11Module, "D3D11CreateDevice"));
+    if (D3D11CreateDevice == nullptr)
+    {
+        std::cout << "Could not retrieve D3D11CreateDevice from d3d11.dll" << std::endl;
+        std::exit(666);
+    }
+
+    ID3D11Device* device;
+    ID3D11DeviceContext* deviceContext;
+    D3D_FEATURE_LEVEL  featureLevelsRequested = D3D_FEATURE_LEVEL_11_0;
+
+    HRESULT hr =
+        D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, 0, 0, nullptr, 0,
+            D3D11_SDK_VERSION, &device, &featureLevelsRequested, &deviceContext);
+    if (FAILED(hr)) std::exit(666);
+
+
+    // create EGL device
+    assert_invariant(device);
+    auto eglCreateDeviceANGLE = (PFNEGLCREATEDEVICEANGLEPROC)eglGetProcAddress("eglCreateDeviceANGLE");
+    assert_invariant(eglCreateDeviceANGLE);
+    auto eglDevice = eglCreateDeviceANGLE(EGL_D3D11_DEVICE_ANGLE, device, nullptr);
+
+
+    // create EGL display
+    const EGLint displayAttribs[] = {
+    EGL_PLATFORM_ANGLE_TYPE_ANGLE, EGL_PLATFORM_ANGLE_NATIVE_PLATFORM_TYPE_ANGLE,
+    EGL_EXPERIMENTAL_PRESENT_PATH_ANGLE, EGL_EXPERIMENTAL_PRESENT_PATH_FAST_ANGLE,
+    // automatically call the IDXGIDevice3::Trim method on behalf of the application when it gets suspended
+    // calling IDXGIDevice3::Trim when an application is suspended is a Windows Store application certification requirement
+    EGL_PLATFORM_ANGLE_ENABLE_AUTOMATIC_TRIM_ANGLE, EGL_TRUE,
+    EGL_NONE
+    };
+
+    auto eglGetPlatformDisplayEXT = (PFNEGLGETPLATFORMDISPLAYEXTPROC)eglGetProcAddress("eglGetPlatformDisplayEXT");
+    assert_invariant(eglGetPlatformDisplayEXT);
+    auto eglDisplay = eglGetPlatformDisplayEXT(EGL_PLATFORM_DEVICE_EXT, eglDevice, displayAttribs);
+    assert_invariant(eglDisplay != EGL_NO_DISPLAY);
+
+    instance->mNativeDevice = eglDisplay;
 
     // initialize all fields that need an instance of FEngine
     // (this cannot be done safely in the ctor)

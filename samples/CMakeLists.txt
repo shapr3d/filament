@@ -218,6 +218,13 @@ function(add_demo NAME)
     include_directories(${GENERATION_ROOT})
     add_executable(${NAME} ${NAME}.cpp)
     target_link_libraries(${NAME} PRIVATE sample-resources filamentapp)
+
+if (FILAMENT_USE_ANGLE)
+    target_link_libraries(${NAME} PRIVATE "c:\\git/shapr3d/libs/angle/lib/x64/libEGL.dll.lib")
+    target_link_libraries(${NAME} PRIVATE "c:\\git/shapr3d/libs/angle/lib/x64/libGLESv2.dll.lib")
+    target_link_libraries(${NAME} PRIVATE "c:\\git/shapr3d/libs/angle/lib/x64/zlib.dll.lib")
+endif()
+
     target_compile_options(${NAME} PRIVATE ${COMPILER_FLAGS})
 endfunction()
 
