@@ -883,23 +883,25 @@ FrameGraphId<FrameGraphTexture> FRenderer::colorPass(FrameGraph& fg, const char*
                 // We set a "read" constraint on these attachments here because we need to preserve them
                 // when the color pass happens in several passes (e.g. with SSR)
                 auto depthAttachmentUsage = FrameGraphTexture::Usage::DEPTH_ATTACHMENT;
-                if (MTLPixelFormatDepth32Float_Stencil8 == config.depthFormat || MTLPixelFormatDepth24Unorm_Stencil8 == config.depthFormat) {
+                const bool hasStencil = Texture::InternalFormat::DEPTH32F_STENCIL8 == config.depthFormat ||
+                                        Texture::InternalFormat::DEPTH24_STENCIL8 == config.depthFormat;
+                if (hasStencil) {
                     depthAttachmentUsage |= FrameGraphTexture::Usage::STENCIL_ATTACHMENT;
                 }
 
                 data.color = builder.read(data.color, FrameGraphTexture::Usage::COLOR_ATTACHMENT);
-                data.depth = builder.read(data.depth, depthAttachmentUsage | clearStencilFlags);
+                data.depth = builder.read(data.depth, depthAttachmentUsage);
 
                 data.color = builder.write(data.color, FrameGraphTexture::Usage::COLOR_ATTACHMENT);
-                data.depth = builder.write(data.depth, depthAttachmentUsage | clearStencilFlags);
+                data.depth = builder.write(data.depth, depthAttachmentUsage);
 
                 builder.declareRenderPass("Color Pass Target", {
                         .attachments = { .color = { data.color, data.output }, .depth = data.depth },
                         .samples = config.msaa,
-                        .clearFlags = clearColorFlags | clearDepthFlags });
+                        .clearFlags = clearColorFlags | clearDepthFlags | clearStencilFlags });
 
                 data.clearColor = config.clearColor;
-                data.clearFlags = clearColorFlags | clearDepthFlags;
+                data.clearFlags = clearColorFlags | clearDepthFlags | clearStencilFlags;
 
                 blackboard["depth"] = data.depth;
                 blackboard["hdr"] = data.color;
