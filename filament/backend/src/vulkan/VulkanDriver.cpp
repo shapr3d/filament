@@ -1944,6 +1944,14 @@ void VulkanDriver::debugCommandBegin(CommandStream* cmds, bool synchronous, cons
 #endif
 }
 
+bool VulkanDriver::hasDepthResolveSupport() {
+    return true;
+}
+
+bool VulkanDriver::hasStencilResolveSupport() {
+    return true;
+}
+
 // explicit instantiation of the Dispatcher
 template class ConcreteDispatcher<VulkanDriver>;
 

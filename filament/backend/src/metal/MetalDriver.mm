@@ -153,6 +153,18 @@ void MetalDriver::beginFrame(int64_t monotonic_clock_ns, uint32_t frameId) {
 #endif
 }
 
+bool MetalDriver::hasDepthResolveSupport() {
+    return mContext->highestSupportedGpuFamily.apple >= 3 ||
+           mContext->highestSupportedGpuFamily.mac   >= 2 ||
+           mContext->highestSupportedGpuFamily.macCatalyst >= 2;
+}
+
+bool MetalDriver::hasStencilResolveSupport() {
+    return mContext->highestSupportedGpuFamily.apple >= 5 ||
+           mContext->highestSupportedGpuFamily.mac   >= 2 ||
+           mContext->highestSupportedGpuFamily.macCatalyst >= 2;
+}
+
 void MetalDriver::setFrameScheduledCallback(Handle<HwSwapChain> sch,
         backend::FrameScheduledCallback callback, void* user) {
     auto* swapChain = handle_cast<MetalSwapChain>(sch);
@@ -840,9 +852,12 @@ void MetalDriver::beginRenderPass(Handle<HwRenderTarget> rth,
     auto renderTarget = handle_cast<MetalRenderTarget>(rth);
     mContext->currentRenderTarget = renderTarget;
     mContext->currentRenderPassFlags = params.flags;
+    
+    const bool supportsDepthResolve = hasDepthResolveSupport();
+    const bool supportsStencilResolve = hasStencilResolveSupport();
 
     MTLRenderPassDescriptor* descriptor = [MTLRenderPassDescriptor renderPassDescriptor];
-    renderTarget->setUpRenderPassAttachments(descriptor, params);
+    renderTarget->setUpRenderPassAttachments(descriptor, params, supportsDepthResolve, supportsStencilResolve);
 
     mContext->currentRenderPassEncoder =
             [getPendingCommandBuffer(mContext) renderCommandEncoderWithDescriptor:descriptor];

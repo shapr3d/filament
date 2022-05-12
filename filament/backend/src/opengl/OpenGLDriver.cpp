@@ -167,7 +167,7 @@ OpenGLDriver::OpenGLDriver(OpenGLPlatform* platform) noexcept
           mHandleAllocator("Handles", FILAMENT_OPENGL_HANDLE_ARENA_SIZE_IN_MB * 1024U * 1024U), // TODO: set the amount in configuration
           mSamplerMap(32),
           mPlatform(*platform) {
-  
+
     std::fill(mSamplerBindings.begin(), mSamplerBindings.end(), nullptr);
 
     // set a reasonable default value for our stream array
@@ -318,8 +318,8 @@ void OpenGLDriver::setRasterStateSlow(RasterState rs) noexcept {
         gl.stencilMask(0xFF);
         gl.stencilFunc(GL_ALWAYS, 1, 0xFF);
         gl.stencilOp(
-            GL_KEEP, 
-            getStencilOperation(rs.stencilDepthFail), 
+            GL_KEEP,
+            getStencilOperation(rs.stencilDepthFail),
             getStencilOperation(rs.stencilDepthPass)
         );
     }
@@ -421,7 +421,7 @@ void OpenGLDriver::createIndexBufferR(
         Handle<HwIndexBuffer> ibh,
         ElementType elementType,
         uint32_t indexCount,
-        BufferUsage usage, 
+        BufferUsage usage,
         bool wrapsExternalBuffer) {
     DEBUG_MARKER()
 
@@ -3232,6 +3232,14 @@ void OpenGLDriver::draw(PipelineState state, Handle<HwRenderPrimitive> rph) {
             rp->gl.indicesType, reinterpret_cast<const void*>(rp->offset));
 
     CHECK_GL_ERROR(utils::slog.e)
+}
+
+bool OpenGLDriver::hasDepthResolveSupport() {
+    return true;
+}
+
+bool OpenGLDriver::hasStencilResolveSupport() {
+    return true;
 }
 
 // explicit instantiation of the Dispatcher

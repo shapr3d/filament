@@ -799,7 +799,7 @@ MetalRenderTarget::MetalRenderTarget(MetalContext* context, uint32_t width, uint
 }
 
 void MetalRenderTarget::setUpRenderPassAttachments(MTLRenderPassDescriptor* descriptor,
-        const RenderPassParams& params) {
+        const RenderPassParams& params, bool supportsDepthResolve, bool supportsStencilResolve) {
 
     const auto discardFlags = params.flags.discardEnd;
 
@@ -860,7 +860,7 @@ void MetalRenderTarget::setUpRenderPassAttachments(MTLRenderPassDescriptor* desc
     }
 
     const bool automaticResolve = samples > 1 && depthStencilAttachment.getSampleCount() == 1;
-    if (automaticResolve) {
+    if (automaticResolve && supportsDepthResolve) {
         // We're rendering into our temporary MSAA texture and doing an automatic resolve.
         // We should not be attempting to load anything into the MSAA texture.
         assert_invariant(descriptor.depthAttachment.loadAction != MTLLoadActionLoad);
@@ -888,6 +888,9 @@ void MetalRenderTarget::setUpRenderPassAttachments(MTLRenderPassDescriptor* desc
                 descriptor.stencilAttachment.resolveLevel = depthStencilAttachment.level;
                 descriptor.stencilAttachment.resolveSlice = depthStencilAttachment.layer;
                 descriptor.stencilAttachment.storeAction = MTLStoreActionMultisampleResolve;
+                descriptor.stencilAttachment.stencilResolveFilter = (supportsStencilResolve)
+                    ? MTLMultisampleStencilResolveFilter::MTLMultisampleStencilResolveFilterDepthResolvedSample
+                    : MTLMultisampleStencilResolveFilter::MTLMultisampleStencilResolveFilterSample0;
             }
         }
     }

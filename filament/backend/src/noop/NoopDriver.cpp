@@ -48,6 +48,14 @@ void NoopDriver::terminate() {
 void NoopDriver::tick(int) {
 }
 
+bool NoopDriver::hasDepthResolveSupport() {
+    return true;
+}
+
+bool NoopDriver::hasStencilResolveSupport() {
+    return true;
+}
+
 void NoopDriver::beginFrame(int64_t monotonic_clock_ns, uint32_t frameId) {
 }
 
