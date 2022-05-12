@@ -570,8 +570,8 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
     // if the depth is not used below.
     auto& blackboard = fg.getBlackboard();
     auto depth = blackboard.get<FrameGraphTexture>("depth");
-    depth = ppm.resolve(fg, "Resolved Depth Buffer", depth);
-    blackboard.put("depth", depth);
+    auto resolvedDepth = ppm.resolve(fg, "Resolved Depth Buffer", depth);
+    blackboard.put("depth", resolvedDepth);
 
     // TODO: DoF should be applied here, before TAA -- but if we do this it'll result in a lot of
     //       fireflies due to the instability of the highlights. This can be fixed with a
@@ -853,6 +853,9 @@ FrameGraphId<FrameGraphTexture> FRenderer::colorPass(FrameGraph& fg, const char*
                 }
 
                 if (!data.depth) {
+                    auto& engine = getEngine();
+                    auto& driver = engine.getDriver();
+
                     // clear newly allocated depth buffers, regardless of given clear flags
                     clearDepthFlags = TargetBufferFlags::DEPTH;
                     clearStencilFlags = TargetBufferFlags::STENCIL;
@@ -865,7 +868,7 @@ FrameGraphId<FrameGraphTexture> FRenderer::colorPass(FrameGraph& fg, const char*
                             // MS, no need to allocate the depth buffer with MS, if the RT is MS,
                             // the tile depth buffer will be MS, but it'll be resolved to single
                             // sample automatically -- which is what we want.
-                            .samples = colorBufferDesc.samples,
+                            .samples = (driver.hasDepthResolveSupport() ? colorBufferDesc.samples : config.msaa),
                             .format = config.depthFormat,
                     });
                 }
