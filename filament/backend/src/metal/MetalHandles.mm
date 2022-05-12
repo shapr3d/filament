@@ -849,7 +849,8 @@ void MetalRenderTarget::setUpRenderPassAttachments(MTLRenderPassDescriptor* desc
     descriptor.depthAttachment.storeAction = getStoreAction(params, TargetBufferFlags::DEPTH);
     descriptor.depthAttachment.clearDepth = params.clearDepth;
 
-    const auto hasStencil = (MTLPixelFormatDepth32Float_Stencil8 == depthStencilAttachment.getPixelFormat()) || (MTLPixelFormatDepth24Unorm_Stencil8 == depthStencilAttachment.getPixelFormat());
+    const auto hasStencil = (MTLPixelFormatDepth32Float_Stencil8 == depthStencilAttachment.getPixelFormat()) ||
+                            (MTLPixelFormatDepth24Unorm_Stencil8 == depthStencilAttachment.getPixelFormat());
     if (hasStencil) {
         descriptor.stencilAttachment.texture = depthStencilAttachment.getTexture();
         descriptor.stencilAttachment.level = depthStencilAttachment.level;
@@ -858,7 +859,7 @@ void MetalRenderTarget::setUpRenderPassAttachments(MTLRenderPassDescriptor* desc
         descriptor.stencilAttachment.storeAction = getStoreAction(params, TargetBufferFlags::STENCIL);
         descriptor.stencilAttachment.clearStencil = params.clearStencil;
     }
-    
+
     const bool automaticResolve = samples > 1 && depthStencilAttachment.getSampleCount() == 1;
     if (automaticResolve) {
         // We're rendering into our temporary MSAA texture and doing an automatic resolve.
