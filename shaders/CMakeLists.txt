@@ -13,6 +13,7 @@ endif()
 set(SHADERS
         src/ambient_occlusion.fs
         src/brdf.fs
+        src/common_debug.fs
         src/common_getters.fs
         src/common_graphics.fs
         src/common_lighting.fs
