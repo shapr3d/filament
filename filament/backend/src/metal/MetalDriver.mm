@@ -88,6 +88,15 @@ MetalDriver::MetalDriver(backend::MetalPlatform* platform) noexcept
             mContext->highestSupportedGpuFamily.macCatalyst >= 2;   // newer Mac Catalyst GPUs
     }
 
+    mContext->supportsDepthResolve =
+        mContext->highestSupportedGpuFamily.apple >= 3 ||
+        mContext->highestSupportedGpuFamily.mac   >= 2 ||
+        mContext->highestSupportedGpuFamily.macCatalyst >= 2;
+    mContext->supportsStencilResolve =
+        mContext->highestSupportedGpuFamily.apple >= 5 ||
+        mContext->highestSupportedGpuFamily.mac   >= 2 ||
+        mContext->highestSupportedGpuFamily.macCatalyst >= 2;
+
     // In order to support memoryless render targets, an Apple GPU is needed.
     mContext->supportsMemorylessRenderTargets = mContext->highestSupportedGpuFamily.apple >= 1;
 
@@ -154,15 +163,11 @@ void MetalDriver::beginFrame(int64_t monotonic_clock_ns, uint32_t frameId) {
 }
 
 bool MetalDriver::hasDepthResolveSupport() {
-    return mContext->highestSupportedGpuFamily.apple >= 3 ||
-           mContext->highestSupportedGpuFamily.mac   >= 2 ||
-           mContext->highestSupportedGpuFamily.macCatalyst >= 2;
+    return mContext->supportsDepthResolve;
 }
 
 bool MetalDriver::hasStencilResolveSupport() {
-    return mContext->highestSupportedGpuFamily.apple >= 5 ||
-           mContext->highestSupportedGpuFamily.mac   >= 2 ||
-           mContext->highestSupportedGpuFamily.macCatalyst >= 2;
+    return mContext->supportsStencilResolve;
 }
 
 void MetalDriver::setFrameScheduledCallback(Handle<HwSwapChain> sch,
@@ -852,12 +857,9 @@ void MetalDriver::beginRenderPass(Handle<HwRenderTarget> rth,
     auto renderTarget = handle_cast<MetalRenderTarget>(rth);
     mContext->currentRenderTarget = renderTarget;
     mContext->currentRenderPassFlags = params.flags;
-    
-    const bool supportsDepthResolve = hasDepthResolveSupport();
-    const bool supportsStencilResolve = hasStencilResolveSupport();
 
     MTLRenderPassDescriptor* descriptor = [MTLRenderPassDescriptor renderPassDescriptor];
-    renderTarget->setUpRenderPassAttachments(descriptor, params, supportsDepthResolve, supportsStencilResolve);
+    renderTarget->setUpRenderPassAttachments(descriptor, params);
 
     mContext->currentRenderPassEncoder =
             [getPendingCommandBuffer(mContext) renderCommandEncoderWithDescriptor:descriptor];

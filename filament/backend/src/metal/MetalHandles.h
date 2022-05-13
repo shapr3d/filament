@@ -275,7 +275,7 @@ public:
     explicit MetalRenderTarget(MetalContext* context)
             : HwRenderTarget(0, 0), context(context), defaultRenderTarget(true) {}
 
-    void setUpRenderPassAttachments(MTLRenderPassDescriptor* descriptor, const RenderPassParams& params, bool supportsDepthResolve, bool supportsStencilResolve);
+    void setUpRenderPassAttachments(MTLRenderPassDescriptor* descriptor, const RenderPassParams& params);
 
     bool isDefaultRenderTarget() const { return defaultRenderTarget; }
     uint8_t getSamples() const { return samples; }

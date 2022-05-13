@@ -799,7 +799,7 @@ MetalRenderTarget::MetalRenderTarget(MetalContext* context, uint32_t width, uint
 }
 
 void MetalRenderTarget::setUpRenderPassAttachments(MTLRenderPassDescriptor* descriptor,
-        const RenderPassParams& params, bool supportsDepthResolve, bool supportsStencilResolve) {
+        const RenderPassParams& params) {
 
     const auto discardFlags = params.flags.discardEnd;
 
@@ -860,7 +860,7 @@ void MetalRenderTarget::setUpRenderPassAttachments(MTLRenderPassDescriptor* desc
     }
 
     const bool automaticResolve = samples > 1 && depthStencilAttachment.getSampleCount() == 1;
-    if (automaticResolve && supportsDepthResolve) {
+    if (automaticResolve) {
         // We're rendering into our temporary MSAA texture and doing an automatic resolve.
         // We should not be attempting to load anything into the MSAA texture.
         assert_invariant(descriptor.depthAttachment.loadAction != MTLLoadActionLoad);
@@ -874,6 +874,7 @@ void MetalRenderTarget::setUpRenderPassAttachments(MTLRenderPassDescriptor* desc
         descriptor.depthAttachment.slice = 0;
         const bool discard = any(discardFlags & TargetBufferFlags::DEPTH);
         if (!discard) {
+            assert_invariant(context->supportsDepthResolve);
             descriptor.depthAttachment.resolveTexture = depthStencilAttachment.getTexture();
             descriptor.depthAttachment.resolveLevel = depthStencilAttachment.level;
             descriptor.depthAttachment.resolveSlice = depthStencilAttachment.layer;
@@ -888,7 +889,7 @@ void MetalRenderTarget::setUpRenderPassAttachments(MTLRenderPassDescriptor* desc
                 descriptor.stencilAttachment.resolveLevel = depthStencilAttachment.level;
                 descriptor.stencilAttachment.resolveSlice = depthStencilAttachment.layer;
                 descriptor.stencilAttachment.storeAction = MTLStoreActionMultisampleResolve;
-                descriptor.stencilAttachment.stencilResolveFilter = (supportsStencilResolve)
+                descriptor.stencilAttachment.stencilResolveFilter = (context->supportsStencilResolve)
                     ? MTLMultisampleStencilResolveFilter::MTLMultisampleStencilResolveFilterDepthResolvedSample
                     : MTLMultisampleStencilResolveFilter::MTLMultisampleStencilResolveFilterSample0;
             }
