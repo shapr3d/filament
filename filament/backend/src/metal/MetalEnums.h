@@ -435,6 +435,17 @@ inline MTLTextureSwizzleChannels getSwizzleChannels(TextureSwizzle r, TextureSwi
             getSwizzle(a));
 }
 
+constexpr inline bool formatHasStencil(MTLPixelFormat format) {
+    switch (format) {
+        case MTLPixelFormatStencil8: return true;
+        case MTLPixelFormatDepth32Float_Stencil8: return true;
+#if (TARGET_OS_OSX || TARGET_OS_MACCATALYST)
+        case MTLPixelFormatDepth24Unorm_Stencil8: return true;
+#endif
+        default: return false;
+    }
+}
+
 } // namespace metal
 } // namespace backend
 } // namespace filament

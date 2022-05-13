@@ -79,8 +79,7 @@ id<MTLRenderPipelineState> PipelineStateCreator::operator()(id<MTLDevice> device
 
     // Depth attachment
     descriptor.depthAttachmentPixelFormat = state.depthStencilAttachmentPixelFormat;
-    const bool hasStencil = (MTLPixelFormatDepth32Float_Stencil8 == state.depthStencilAttachmentPixelFormat)
-                        || (MTLPixelFormatDepth24Unorm_Stencil8 == state.depthStencilAttachmentPixelFormat);
+    const bool hasStencil = formatHasStencil(state.depthStencilAttachmentPixelFormat);
     if (hasStencil) {
         descriptor.stencilAttachmentPixelFormat = state.depthStencilAttachmentPixelFormat;
     }

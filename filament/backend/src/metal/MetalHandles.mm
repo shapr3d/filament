@@ -849,8 +849,7 @@ void MetalRenderTarget::setUpRenderPassAttachments(MTLRenderPassDescriptor* desc
     descriptor.depthAttachment.storeAction = getStoreAction(params, TargetBufferFlags::DEPTH);
     descriptor.depthAttachment.clearDepth = params.clearDepth;
 
-    const auto hasStencil = (MTLPixelFormatDepth32Float_Stencil8 == depthStencilAttachment.getPixelFormat()) ||
-                            (MTLPixelFormatDepth24Unorm_Stencil8 == depthStencilAttachment.getPixelFormat());
+    const bool hasStencil = formatHasStencil(depthStencilAttachment.getPixelFormat());
     if (hasStencil) {
         descriptor.stencilAttachment.texture = depthStencilAttachment.getTexture();
         descriptor.stencilAttachment.level = depthStencilAttachment.level;
