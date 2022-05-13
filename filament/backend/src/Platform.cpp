@@ -144,7 +144,7 @@ DefaultPlatform* DefaultPlatform::create(Backend* backend, void* nativeDisplay) 
         #if defined(FILAMENT_USE_EXTERNAL_GLES3) || defined(FILAMENT_USE_SWIFTSHADER)
             return nullptr;
         #elif defined(FILAMENT_USE_ANGLE)
-            return new PlatformEGL();
+            return new PlatformEGL(nativeDisplay);
         #elif defined(ANDROID)
             return new PlatformEGLAndroid();
         #elif defined(IOS)
