@@ -75,7 +75,7 @@ static void clearGlError() noexcept {
 
 // ---------------------------------------------------------------------------------------------
 
-PlatformEGL::PlatformEGL(EGLDisplay display = EGL_NO_DISPLAY) noexcept {
+PlatformEGL::PlatformEGL(EGLDisplay display) noexcept {
     mEGLDisplay = display;
 }
 
