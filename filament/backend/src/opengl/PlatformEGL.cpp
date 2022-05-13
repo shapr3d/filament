@@ -75,8 +75,8 @@ static void clearGlError() noexcept {
 
 // ---------------------------------------------------------------------------------------------
 
-PlatformEGL::PlatformEGL(EGLDisplay display) noexcept {
-    mEGLDisplay = display;
+PlatformEGL::PlatformEGL(EGLDisplay display) noexcept
+    mEGLDisplay(display) {
 }
 
 Driver* PlatformEGL::createDriver(void* sharedContext) noexcept {
