@@ -883,8 +883,8 @@ FrameGraphId<FrameGraphTexture> FRenderer::colorPass(FrameGraph& fg, const char*
                 // We set a "read" constraint on these attachments here because we need to preserve them
                 // when the color pass happens in several passes (e.g. with SSR)
                 auto depthAttachmentUsage = FrameGraphTexture::Usage::DEPTH_ATTACHMENT;
-                const bool hasStencil = Texture::InternalFormat::DEPTH32F_STENCIL8 == config.depthFormat ||
-                                        Texture::InternalFormat::DEPTH24_STENCIL8 == config.depthFormat;
+                const bool hasStencil = TextureFormat::DEPTH32F_STENCIL8 == config.depthFormat ||
+                                        TextureFormat::DEPTH24_STENCIL8 == config.depthFormat;
                 if (hasStencil) {
                     depthAttachmentUsage |= FrameGraphTexture::Usage::STENCIL_ATTACHMENT;
                 }
