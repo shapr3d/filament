@@ -23,7 +23,6 @@
 #include <EGL/eglext.h>
 
 #include <backend/DriverEnums.h>
-#include <opengl/GLUtils.h>
 
 #include "private/backend/OpenGLPlatform.h"
 
@@ -74,7 +73,6 @@ protected:
 
     EGLBoolean makeCurrent(EGLSurface drawSurface, EGLSurface readSurface) noexcept;
     void initializeGlExtensions() noexcept;
-    GLUtils::unordered_string_set initializeExtensions() noexcept;
 
     EGLDisplay mEGLDisplay;
     EGLContext mEGLContext = EGL_NO_CONTEXT;
