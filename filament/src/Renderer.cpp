@@ -366,12 +366,13 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
                 .keepOverrideEnd = keepOverrideEndFlags
         }, viewRenderTarget);
 
-    auto importTexture = [&](const FTexture* texture, const char* name) {
+    auto importTexture = [&](const FTexture* texture, const char* name, uint8_t samples = 0) {
         FrameGraphTexture frameGraphTexture{ .handle = texture->getHwHandle() };
         return fg.import(name, {
                 .width = (uint32_t)texture->getWidth(0u),
                 .height = (uint32_t)texture->getHeight(0u),
-                .format = texture->getFormat()
+                .samples = samples,
+                .format = texture->getFormat(),
         }, texture->getUsage(), frameGraphTexture);
     };
 
@@ -382,7 +383,7 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
     auto* depthTexture = upcast(view).getDepthStencilTexture();
     if (depthTexture) {
         depthFormat = depthTexture->getFormat();
-        fgDepthTexture = importTexture(depthTexture, "depthStencil");
+        fgDepthTexture = importTexture(depthTexture, "depthStencil", driver.hasDepthResolveSupport() ? uint8_t{0} : msaaSampleCount);
     }
 
     const bool blendModeTranslucent = view.getBlendMode() == BlendMode::TRANSLUCENT;
