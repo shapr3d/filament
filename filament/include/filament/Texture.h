@@ -236,6 +236,14 @@ public:
          */
         Builder& import(intptr_t id) noexcept;
 
+        /**
+         * Specifies the sample count of the texture
+         *
+         * @param sampleCount sample count
+         * @return This Builder, for chaining calls.
+         */
+        Builder& samples(uint8_t sampleCount) noexcept;
+
     private:
         friend class FTexture;
     };
