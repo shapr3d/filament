@@ -1225,7 +1225,8 @@ void MetalDriver::draw(backend::PipelineState ps, Handle<HwRenderPrimitive> rph)
             .destinationRGBBlendFactor = getMetalBlendFactor(rs.blendFunctionDstRGB),
             .destinationAlphaBlendFactor = getMetalBlendFactor(rs.blendFunctionDstAlpha)
         },
-        .colorWrite = rs.colorWrite
+        .colorWrite = rs.colorWrite,
+        .stencilWrite = formatHasStencil(depthStencilPixelFormat)
     };
     mContext->pipelineState.updateState(pipelineState);
     if (mContext->pipelineState.stateChanged()) {

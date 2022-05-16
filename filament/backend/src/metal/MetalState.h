@@ -235,7 +235,8 @@ struct PipelineState {
                 this->stencilAttachmentPixelFormat == rhs.stencilAttachmentPixelFormat &&
                 this->sampleCount == rhs.sampleCount &&
                 this->blendState == rhs.blendState &&
-                this->colorWrite == rhs.colorWrite
+                this->colorWrite == rhs.colorWrite &&
+                this->stencilWrite == rhs.stencilWrite
         );
     }
 
