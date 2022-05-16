@@ -13,7 +13,7 @@ project(TNT)
 # ==================================================================================================
 option(FILAMENT_USE_EXTERNAL_GLES3 "Experimental: Compile Filament against OpenGL ES 3" OFF)
 
-option(FILAMENT_USE_ANGLE "Compile Filament against ANGLE" OFF)
+option(FILAMENT_USE_ANGLE "Compile Filament against ANGLE (Windows only!)" OFF)
 
 option(FILAMENT_USE_SWIFTSHADER "Compile Filament against SwiftShader" OFF)
 
