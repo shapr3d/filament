@@ -221,7 +221,8 @@ struct PipelineState {
     NSUInteger sampleCount = 1;                                                // 8 bytes
     BlendState blendState;                                                     // 56 bytes
     bool colorWrite = true;                                                    // 1 byte
-    char padding[7] = { 0 };                                                   // 7 bytes
+    bool stencilWrite = false;                                                 // 1 byte
+    char padding[6] = { 0 };                                                   // 6 bytes
 
     bool operator==(const PipelineState& rhs) const noexcept {
         return (
@@ -233,7 +234,8 @@ struct PipelineState {
                 this->depthStencilAttachmentPixelFormat == rhs.depthStencilAttachmentPixelFormat &&
                 this->sampleCount == rhs.sampleCount &&
                 this->blendState == rhs.blendState &&
-                this->colorWrite == rhs.colorWrite
+                this->colorWrite == rhs.colorWrite &&
+                this->stencilWrite == rhs.stencilWrite
         );
     }
 
