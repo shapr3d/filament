@@ -102,8 +102,10 @@ int main(int argc, char** argv) {
         scene->addEntity(app.light);
 
         // Hide skybox and add ground plane.
-        app.skybox = Skybox::Builder().color({0.5f,0.75f,1.0f,1.0f}).build(*engine);
-        scene->setSkybox(app.skybox);
+        app.skybox = Skybox::Builder()
+            .color({0.f,0.f,1.0f,1.0f})
+            .type(Skybox::SkyboxType::COLOR)
+            .build(*engine);
         app.plane = createGroundPlane(engine);
         scene->addEntity(app.plane.renderable);
     };

@@ -27,7 +27,7 @@
 */
 #ifndef SDL_WINRT_METADATA_FILE_AVAILABLE
 #ifndef __cplusplus_winrt
-#error SDL_winrt_main_NonXAML.cpp must be compiled with /ZW, otherwise build errors due to missing .winmd files can occur.
+//#error SDL_winrt_main_NonXAML.cpp must be compiled with /ZW, otherwise build errors due to missing .winmd files can occur.
 #endif
 #endif
 

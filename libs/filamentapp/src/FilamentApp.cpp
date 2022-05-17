@@ -165,7 +165,7 @@ void FilamentApp::run(const Config& config, SetupCallback setupCallback,
             SDL_SysWMinfo wmInfo;
             SDL_VERSION(&wmInfo.version);
             SDL_GetWindowWMInfo(window->getSDLWindow(), &wmInfo);
-            io.ImeWindowHandle = wmInfo.info.win.window;
+            io.ImeWindowHandle = wmInfo.info.winrt.window;
         #endif
         io.KeyMap[ImGuiKey_Tab] = SDL_SCANCODE_TAB;
         io.KeyMap[ImGuiKey_LeftArrow] = SDL_SCANCODE_LEFT;
@@ -468,7 +468,7 @@ void FilamentApp::setCameraFlightSpeedUpdateOnUICallback(std::function<void(floa
 #endif
 
 const utils::Path& FilamentApp::getRootAssetsPath() {
-    static const utils::Path root = utils::Path::getCurrentExecutable().getParent() + RELATIVE_ASSET_PATH;
+    static const utils::Path root = utils::Path::getCurrentExecutable().getParent();
     return root;
 }
 
