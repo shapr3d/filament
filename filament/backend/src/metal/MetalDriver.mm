@@ -1212,7 +1212,8 @@ void MetalDriver::draw(backend::PipelineState ps, Handle<HwRenderPrimitive> rph)
             colorPixelFormat[6],
             colorPixelFormat[7]
         },
-        .depthStencilAttachmentPixelFormat = depthStencilPixelFormat,
+        .depthAttachmentPixelFormat = depthStencilPixelFormat,
+        .stencilAttachmentPixelFormat = formatHasStencil(depthStencilPixelFormat) ? depthStencilPixelFormat : MTLPixelFormatInvalid,
         .sampleCount = mContext->currentRenderTarget->getSamples(),
         .blendState = BlendState {
             .blendingEnabled = rs.hasBlending(),
@@ -1223,8 +1224,7 @@ void MetalDriver::draw(backend::PipelineState ps, Handle<HwRenderPrimitive> rph)
             .destinationRGBBlendFactor = getMetalBlendFactor(rs.blendFunctionDstRGB),
             .destinationAlphaBlendFactor = getMetalBlendFactor(rs.blendFunctionDstAlpha)
         },
-        .colorWrite = rs.colorWrite,
-        .stencilWrite = formatHasStencil(depthStencilPixelFormat)
+        .colorWrite = rs.colorWrite
     };
     mContext->pipelineState.updateState(pipelineState);
     if (mContext->pipelineState.stateChanged()) {

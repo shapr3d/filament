@@ -217,11 +217,11 @@ struct PipelineState {
     id<MTLFunction> fragmentFunction = nil;                                    // 8 bytes
     VertexDescription vertexDescription;                                       // 528 bytes
     MTLPixelFormat colorAttachmentPixelFormat[MRT::MAX_SUPPORTED_RENDER_TARGET_COUNT] = { MTLPixelFormatInvalid };  // 64 bytes
-    MTLPixelFormat depthStencilAttachmentPixelFormat = MTLPixelFormatInvalid;         // 8 bytes
-    NSUInteger sampleCount = 1;                                                // 8 bytes
+    MTLPixelFormat depthAttachmentPixelFormat = MTLPixelFormatInvalid;         // 8 bytes
+    MTLPixelFormat stencilAttachmentPixelFormat = MTLPixelFormatInvalid;       // 8 bytes
     BlendState blendState;                                                     // 56 bytes
+    uint8_t sampleCount = 1;                                                   // 1 bytes
     bool colorWrite = true;                                                    // 1 byte
-    bool stencilWrite = false;                                                 // 1 byte
     char padding[6] = { 0 };                                                   // 6 bytes
 
     bool operator==(const PipelineState& rhs) const noexcept {
@@ -231,11 +231,11 @@ struct PipelineState {
                 this->vertexDescription == rhs.vertexDescription &&
                 std::equal(this->colorAttachmentPixelFormat, this->colorAttachmentPixelFormat + MRT::MAX_SUPPORTED_RENDER_TARGET_COUNT,
                         rhs.colorAttachmentPixelFormat) &&
-                this->depthStencilAttachmentPixelFormat == rhs.depthStencilAttachmentPixelFormat &&
+                this->depthAttachmentPixelFormat == rhs.depthAttachmentPixelFormat &&
+                this->stencilAttachmentPixelFormat == rhs.stencilAttachmentPixelFormat &&
                 this->sampleCount == rhs.sampleCount &&
                 this->blendState == rhs.blendState &&
-                this->colorWrite == rhs.colorWrite &&
-                this->stencilWrite == rhs.stencilWrite
+                this->colorWrite == rhs.colorWrite
         );
     }
 
@@ -271,8 +271,8 @@ struct DepthStencilState {
     bool operator==(const DepthStencilState& rhs) const noexcept {
         return this->compareFunction == rhs.compareFunction &&
                this->depthWriteEnabled == rhs.depthWriteEnabled &&
-               this->stencilWriteEnabled == rhs.stencilWriteEnabled && 
-               this->stencilDepthFail == rhs.stencilDepthFail && 
+               this->stencilWriteEnabled == rhs.stencilWriteEnabled &&
+               this->stencilDepthFail == rhs.stencilDepthFail &&
                this->stencilDepthPass == rhs.stencilDepthPass;
     }
 
