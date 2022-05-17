@@ -167,7 +167,7 @@ static std::ifstream::pos_type getFileSize(const char* filename) {
 }
 
 static std::optional<std::string> readEnvironmentVariable(std::string envVarName) {
-    char* var = std::getenv(envVarName.c_str());
+    char* var = getenv(envVarName.c_str());
     if (var == nullptr) {
         return std::nullopt;
     } else {
@@ -369,7 +369,7 @@ static float sGlobalScaleAnamorphism = 0.0f;
 static int sGlobalScaleQuality = 0;
 static float sGlobalScaleSharpness = 0.9f;
 
-int main(int argc, char** argv) {
+int main(int, char**) {
     App app;
 
     app.config.title = "Filament";
@@ -383,7 +383,9 @@ int main(int argc, char** argv) {
 #endif
     app.config.escapeKeyExitsApp = false;
 
-    int optionIndex = handleCommandLineArguments(argc, argv, &app);
+    int argc = 2;
+    const char* argv[] = { "gltf_viewer.exe", "motors.glb" };
+    int optionIndex = handleCommandLineArguments(argc, (char**)argv, &app);
 
     utils::Path filename;
     int num_args = argc - optionIndex;
