@@ -167,7 +167,12 @@ FVertexBuffer::FVertexBuffer(FEngine& engine, const VertexBuffer::Builder& build
     static_assert(sizeof(Attribute) == sizeof(AttributeData),
             "Attribute and Builder::Attribute must match");
 
-    size_t bufferSizes[MAX_VERTEX_BUFFER_COUNT] = {};
+    struct SlotBufferInfo {
+        size_t size = 0;
+        uint32_t maxStride = 0;
+    };
+
+    SlotBufferInfo slotBufferInfos[MAX_VERTEX_BUFFER_COUNT];
 
     auto const& declaredAttributes = mDeclaredAttributes;
     auto const& attributes = mAttributes;
@@ -184,8 +189,10 @@ FVertexBuffer::FVertexBuffer(FEngine& engine, const VertexBuffer::Builder& build
             attributeArray[i].type   = attributes[i].type;
             attributeArray[i].flags  = attributes[i].flags;
 
-            const size_t end = offset + mVertexCount * stride;
-            bufferSizes[slot] = math::max(bufferSizes[slot], end);
+            // if the current attribute's stride equals to the stride that the slot's buffersize calculation is based on
+            // then it means the data is interleaved so the offset aren't required
+            const size_t end = (slotBufferInfos[slot].maxStride != stride) * offset + mVertexCount * stride;
+            slotBufferInfos[slot] = (slotBufferInfos[slot].size < end) ? SlotBufferInfo{end, stride} : slotBufferInfos[slot];
         }
     }
 
@@ -203,8 +210,8 @@ FVertexBuffer::FVertexBuffer(FEngine& engine, const VertexBuffer::Builder& build
     if (!mBufferObjectsEnabled) {
         #pragma nounroll
         for (size_t i = 0; i < MAX_VERTEX_BUFFER_COUNT; ++i) {
-            if (bufferSizes[i] > 0) {
-                BufferObjectHandle bo = driver.createBufferObject(bufferSizes[i],
+            if (slotBufferInfos[i].size > 0) {
+                BufferObjectHandle bo = driver.createBufferObject(slotBufferInfos[i].size,
                         backend::BufferObjectBinding::VERTEX, backend::BufferUsage::STATIC,
                         mExternalBuffersEnabled);
                 driver.setVertexBufferObject(mHandle, i, bo);
