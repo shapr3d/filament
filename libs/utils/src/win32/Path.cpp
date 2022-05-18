@@ -17,7 +17,6 @@
 #include <utils/Path.h>
 
 #include <direct.h>
-#include <Strsafe.h>
 #include <sys/stat.h>
 #include <stdlib.h>
 #include <windows.h>
@@ -54,11 +53,8 @@ std::vector<Path> Path::listContents() const {
         return {};
     }
 
-    CHAR dirName[MAX_PATH];
-    StringCchCopyA(dirName, MAX_PATH, c_str());
-
     WIN32_FIND_DATAA findData;
-    HANDLE find = FindFirstFileA(dirName, &findData);
+    HANDLE find = FindFirstFileA(&c_str()[0], &findData);
 
     std::vector<Path> directory_contents;
     do
