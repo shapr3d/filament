@@ -302,7 +302,7 @@ inline MTLTextureType getMetalTypeMS(SamplerType target) {
         case SamplerType::SAMPLER_EXTERNAL:
             return MTLTextureType2DMultisample;
         case SamplerType::SAMPLER_2D_ARRAY: {
-            if (@available(iOS 14.0, macCatalyst 14.0, macOS 14.0, *)) {
+            if (@available(iOS 14.0, macCatalyst 14.0, *)) {
                 return MTLTextureType2DMultisampleArray;
             }
             else {

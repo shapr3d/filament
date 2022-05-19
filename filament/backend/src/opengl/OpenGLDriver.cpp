@@ -3234,11 +3234,11 @@ void OpenGLDriver::draw(PipelineState state, Handle<HwRenderPrimitive> rph) {
     CHECK_GL_ERROR(utils::slog.e)
 }
 
-bool OpenGLDriver::hasDepthResolveSupport() {
+bool OpenGLDriver::isDepthResolveSupported() {
     return true;
 }
 
-bool OpenGLDriver::hasStencilResolveSupport() {
+bool OpenGLDriver::isStencilResolveSupported() {
     return true;
 }
 

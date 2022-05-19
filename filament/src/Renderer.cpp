@@ -366,12 +366,12 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
                 .keepOverrideEnd = keepOverrideEndFlags
         }, viewRenderTarget);
 
-    auto importTexture = [&](const FTexture* texture, const char* name, uint8_t samples = 0) {
+    auto importTexture = [&](const FTexture* texture, const char* name) {
         FrameGraphTexture frameGraphTexture{ .handle = texture->getHwHandle() };
         return fg.import(name, {
                 .width = (uint32_t)texture->getWidth(0u),
                 .height = (uint32_t)texture->getHeight(0u),
-                .samples = samples,
+                .samples = (uint8_t)texture->getSampleCount(),
                 .format = texture->getFormat(),
         }, texture->getUsage(), frameGraphTexture);
     };
@@ -383,7 +383,8 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
     auto* depthTexture = upcast(view).getDepthStencilTexture();
     if (depthTexture) {
         depthFormat = depthTexture->getFormat();
-        fgDepthTexture = importTexture(depthTexture, "depthStencil", driver.hasDepthResolveSupport() ? uint8_t{0} : msaaSampleCount);
+        assert_invariant(driver.isDepthResolveSupported() || depthTexture->getSampleCount() == msaaSampleCount);
+        fgDepthTexture = importTexture(depthTexture, "depthStencil");
     }
 
     const bool blendModeTranslucent = view.getBlendMode() == BlendMode::TRANSLUCENT;
@@ -869,7 +870,7 @@ FrameGraphId<FrameGraphTexture> FRenderer::colorPass(FrameGraph& fg, const char*
                             // MS, no need to allocate the depth buffer with MS, if the RT is MS,
                             // the tile depth buffer will be MS, but it'll be resolved to single
                             // sample automatically -- which is what we want.
-                            .samples = (driver.hasDepthResolveSupport() ? colorBufferDesc.samples : config.msaa),
+                            .samples = (driver.isDepthResolveSupported() ? colorBufferDesc.samples : config.msaa),
                             .format = config.depthFormat,
                     });
                 }

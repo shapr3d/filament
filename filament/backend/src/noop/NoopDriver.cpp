@@ -48,11 +48,11 @@ void NoopDriver::terminate() {
 void NoopDriver::tick(int) {
 }
 
-bool NoopDriver::hasDepthResolveSupport() {
+bool NoopDriver::isDepthResolveSupported() {
     return true;
 }
 
-bool NoopDriver::hasStencilResolveSupport() {
+bool NoopDriver::isStencilResolveSupported() {
     return true;
 }
 

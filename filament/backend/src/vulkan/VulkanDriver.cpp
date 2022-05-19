@@ -1944,11 +1944,11 @@ void VulkanDriver::debugCommandBegin(CommandStream* cmds, bool synchronous, cons
 #endif
 }
 
-bool VulkanDriver::hasDepthResolveSupport() {
+bool VulkanDriver::isDepthResolveSupported() {
     return true;
 }
 
-bool VulkanDriver::hasStencilResolveSupport() {
+bool VulkanDriver::isStencilResolveSupported() {
     return true;
 }
 

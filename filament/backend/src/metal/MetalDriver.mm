@@ -162,11 +162,11 @@ void MetalDriver::beginFrame(int64_t monotonic_clock_ns, uint32_t frameId) {
 #endif
 }
 
-bool MetalDriver::hasDepthResolveSupport() {
+bool MetalDriver::isDepthResolveSupported() {
     return mContext->supportsDepthResolve;
 }
 
-bool MetalDriver::hasStencilResolveSupport() {
+bool MetalDriver::isStencilResolveSupported() {
     return mContext->supportsStencilResolve;
 }
 

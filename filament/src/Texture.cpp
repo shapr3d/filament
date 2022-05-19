@@ -91,8 +91,9 @@ Texture::Builder& Texture::Builder::sampler(Texture::Sampler target) noexcept {
 }
 
 Texture::Builder &Texture::Builder::samples(uint8_t sampleCount) noexcept {
-  mImpl->mSampleCount = sampleCount;
-  return *this;
+    assert_invariant(sampleCount); // sample count can't be zero
+    mImpl->mSampleCount = sampleCount;
+    return *this;
 }
 
 Texture::Builder& Texture::Builder::format(Texture::InternalFormat format) noexcept {
