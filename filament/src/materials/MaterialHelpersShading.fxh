@@ -77,23 +77,16 @@ vec4 TriplanarTexture(sampler2D tex, float scaler, highp vec3 pos, lowp vec3 nor
     // Depending on the resolution of the texture, we may want to multiply the texture coordinates
     vec3 queryPos = scaler * pos;
     vec3 weights = ComputeWeights(normal);
-#if defined(IN_SHAPR_SHADER)
     return weights.x * texture(tex, queryPos.yz * vec2(1, -1)) + weights.y * texture(tex, -queryPos.xz) +
            weights.z * texture(tex, queryPos.yx);
-#else
-    return weights.x * texture(tex, -queryPos.zy) + weights.y * texture(tex, queryPos.xz) +
-           weights.z * texture(tex, queryPos.xy * vec2(1, -1));
-#endif // defined(IN_SHAPR_SHADER)
 }
 
-vec3 UnpackNormal(vec2 packedNormal) {
-    float x = packedNormal.x * 2.0 - 1.0;
-    float y = packedNormal.y * 2.0 - 1.0;
+vec3 UnpackNormal(vec2 packedNormal, vec2 scale) {
+    float x = (packedNormal.x * 2.0 - 1.0) * scale.x;
+    float y = (packedNormal.y * 2.0 - 1.0) * scale.y;
     return vec3(x, y, sqrt(clamp(1.0 - x * x - y * y, 0.0, 1.0)));
 }
-vec3 UnpackNormal(vec3 packedNormal) {
-    return packedNormal * 2.0 - 1.0;
-}
+
 // This is a whiteout blended tripalanar normal mapping, where each plane's tangent frame is
 // approximated by the appropriate sequence and flips of world space axes. For more details
 // Refer to https://bgolus.medium.com/normal-mapping-for-a-triplanar-shader-10bf39dca05a
@@ -102,23 +95,15 @@ vec3 TriplanarNormalMap(sampler2D normalMap, float scaler, highp vec3 pos, lowp 
     // Triplanar uvs
     // We align with triplanarTexture(), and diverge from the article because we have a coordinate
     // system mismatch between Shapr3D and Filament (and the article).
-#if defined(IN_SHAPR_SHADER)
-    // Shapr3D coordinates
     vec2 uvX = scaler * pos.yz * vec2(1, -1); // x facing plane
-    vec2 uvY = scaler * -pos.xz; // y facing plane
+    vec2 uvY = scaler *-pos.xz; // y facing plane
     vec2 uvZ = scaler * pos.yx; // z facing plane
-#else
-    // Filament coordinates
-    vec2 uvX = scaler * -pos.zy; // x facing plane
-    vec2 uvY = scaler * pos.xz; // y facing plane
-    vec2 uvZ = scaler * pos.xy * vec2(1, -1); // z facing plane
-#endif // defined(IN_SHAPR_SHADER)
 
     // Tangent space normal maps
     // 2-channel XY TS normal texture: this saves 33% on storage
-    lowp vec3 tnormalX = UnpackNormal(texture(normalMap, uvX).xy) * vec3(SignNoZero(normal.x) * normalIntensity, normalIntensity, 1);
-    lowp vec3 tnormalY = UnpackNormal(texture(normalMap, uvY).xy) * vec3(SignNoZero(normal.y) * normalIntensity, normalIntensity, 1);
-    lowp vec3 tnormalZ = UnpackNormal(texture(normalMap, uvZ).xy) * vec3(SignNoZero(normal.z) * normalIntensity, normalIntensity, 1);
+    lowp vec3 tnormalX = UnpackNormal(texture(normalMap, uvX).xy, vec2(SignNoZero(normal.x) * normalIntensity, normalIntensity));
+    lowp vec3 tnormalY = UnpackNormal(texture(normalMap, uvY).xy, vec2(SignNoZero(normal.y) * normalIntensity, normalIntensity));
+    lowp vec3 tnormalZ = UnpackNormal(texture(normalMap, uvZ).xy, vec2(SignNoZero(normal.z) * normalIntensity, normalIntensity));
 
     // Swizzle world normals into tangent space and apply Whiteout blend
     tnormalX = vec3(tnormalX.xy + normal.yz * vec2(SignNoZero(normal.x), 1), abs(tnormalX.z) * abs(normal.x));
@@ -128,9 +113,10 @@ vec3 TriplanarNormalMap(sampler2D normalMap, float scaler, highp vec3 pos, lowp 
     // Compute blend weights
     vec3 blend = ComputeWeights(normal);
     // Swizzle tangent normals to match world orientation and triblend
-    return normalize(tnormalX.zxy * blend.x * vec3(SignNoZero(normal.x), SignNoZero(normal.x), 1)
+    vec3 r = normalize(tnormalX.zxy * blend.x * vec3(SignNoZero(normal.x), SignNoZero(normal.x), 1)
                      + tnormalY.xzy * blend.y * vec3(-SignNoZero(normal.y), SignNoZero(normal.y), 1)
                      + tnormalZ.yxz * blend.z * vec3(-1, SignNoZero(normal.z), SignNoZero(normal.z)));
+    return r;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
