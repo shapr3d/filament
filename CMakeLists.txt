@@ -708,7 +708,7 @@ if (IS_HOST_PLATFORM)
     add_subdirectory(${TOOLS}/specular-color)
 endif()
 
-# Generate exported executables for cross-compiled builds (Android, WebGL, and iOS)
+# Generate exported executables for cross-compiled builds (Android, WebGL, iOS and Windows)
 if (NOT CMAKE_CROSSCOMPILING)
     export(TARGETS matc cmgen filamesh mipgen resgen glslminifier FILE ${IMPORT_EXECUTABLES})
 endif()
