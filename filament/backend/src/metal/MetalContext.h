@@ -94,6 +94,8 @@ struct MetalContext {
     PipelineStateCache pipelineStateCache;
     SamplerStateCache samplerStateCache;
 
+    PolygonOffset currentPolygonOffset = {0.0f, 0.0f};
+
     MetalSamplerGroup* samplerBindings[SAMPLER_BINDING_COUNT] = {};
 
     // Keeps track of all alive sampler groups, textures.
