@@ -17,11 +17,12 @@
 #include <utils/Path.h>
 
 #include <direct.h>
-#include <Strsafe.h>
 #include <sys/stat.h>
 #include <stdlib.h>
 #include <windows.h>
 #include <shlwapi.h>
+
+#include <filesystem>
 
 namespace utils {
 
@@ -31,18 +32,18 @@ bool Path::mkdir() const {
 
 Path Path::getCurrentExecutable() {
     // First, need to establish resource path.
-    TCHAR path[MAX_PATH + 1];
+    CHAR path[MAX_PATH + 1];
     Path result;
 
-    GetModuleFileName(NULL, path, MAX_PATH + 1);
+    GetModuleFileNameA(NULL, path, MAX_PATH + 1);
     result.setPath(path);
 
     return result;
 }
 
 Path Path::getTemporaryDirectory() {
-    TCHAR lpTempPathBuffer[MAX_PATH];
-    DWORD dwRetVal = GetTempPath(MAX_PATH, lpTempPathBuffer);
+    CHAR lpTempPathBuffer[MAX_PATH];
+    DWORD dwRetVal = GetTempPathA(MAX_PATH, lpTempPathBuffer);
     return Path(lpTempPathBuffer);
 }
 
@@ -52,11 +53,8 @@ std::vector<Path> Path::listContents() const {
         return {};
     }
 
-    TCHAR dirName[MAX_PATH];
-    StringCchCopy(dirName, MAX_PATH, c_str());
-
-    WIN32_FIND_DATA findData;
-    HANDLE find = FindFirstFile(dirName, &findData);
+    WIN32_FIND_DATAA findData;
+    HANDLE find = FindFirstFileA(&c_str()[0], &findData);
 
     std::vector<Path> directory_contents;
     do
@@ -64,13 +62,13 @@ std::vector<Path> Path::listContents() const {
         if (findData.cFileName[0] != '.') {
             directory_contents.push_back(concat(findData.cFileName));
         }
-    } while (FindNextFile(find, &findData) != 0);
+    } while (FindNextFileA(find, &findData) != 0);
 
     return directory_contents;
 }
 
 bool Path::isAbsolute() const {
-    return !PathIsRelative(m_path.c_str());
+    return std::filesystem::path(m_path).is_absolute();
 }
 
 } // namespace utils
