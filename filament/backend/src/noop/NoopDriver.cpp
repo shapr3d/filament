@@ -52,10 +52,6 @@ bool NoopDriver::isDepthResolveSupported() {
     return true;
 }
 
-bool NoopDriver::isStencilResolveSupported() {
-    return true;
-}
-
 void NoopDriver::beginFrame(int64_t monotonic_clock_ns, uint32_t frameId) {
 }
 

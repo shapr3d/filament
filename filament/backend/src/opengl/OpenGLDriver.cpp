@@ -3238,10 +3238,6 @@ bool OpenGLDriver::isDepthResolveSupported() {
     return true;
 }
 
-bool OpenGLDriver::isStencilResolveSupported() {
-    return true;
-}
-
 // explicit instantiation of the Dispatcher
 template class backend::ConcreteDispatcher<OpenGLDriver>;
 

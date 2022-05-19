@@ -307,7 +307,6 @@ DECL_DRIVER_API_SYNCHRONOUS_N(bool, isWorkaroundNeeded, backend::Workaround, wor
 DECL_DRIVER_API_SYNCHRONOUS_N(void, setupExternalResource, intptr_t, externalResource)
 
 DECL_DRIVER_API_SYNCHRONOUS_0(bool, isDepthResolveSupported)
-DECL_DRIVER_API_SYNCHRONOUS_0(bool, isStencilResolveSupported)
 
 /*
  * Updating driver objects

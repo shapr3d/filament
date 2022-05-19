@@ -1948,10 +1948,6 @@ bool VulkanDriver::isDepthResolveSupported() {
     return true;
 }
 
-bool VulkanDriver::isStencilResolveSupported() {
-    return true;
-}
-
 // explicit instantiation of the Dispatcher
 template class ConcreteDispatcher<VulkanDriver>;
 

@@ -92,10 +92,6 @@ MetalDriver::MetalDriver(backend::MetalPlatform* platform) noexcept
         mContext->highestSupportedGpuFamily.apple >= 3 ||
         mContext->highestSupportedGpuFamily.mac   >= 2 ||
         mContext->highestSupportedGpuFamily.macCatalyst >= 2;
-    mContext->supportsStencilResolve =
-        mContext->highestSupportedGpuFamily.apple >= 5 ||
-        mContext->highestSupportedGpuFamily.mac   >= 2 ||
-        mContext->highestSupportedGpuFamily.macCatalyst >= 2;
 
     // In order to support memoryless render targets, an Apple GPU is needed.
     mContext->supportsMemorylessRenderTargets = mContext->highestSupportedGpuFamily.apple >= 1;
@@ -164,10 +160,6 @@ void MetalDriver::beginFrame(int64_t monotonic_clock_ns, uint32_t frameId) {
 
 bool MetalDriver::isDepthResolveSupported() {
     return mContext->supportsDepthResolve;
-}
-
-bool MetalDriver::isStencilResolveSupported() {
-    return mContext->supportsStencilResolve;
 }
 
 void MetalDriver::setFrameScheduledCallback(Handle<HwSwapChain> sch,

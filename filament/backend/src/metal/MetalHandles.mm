@@ -889,9 +889,7 @@ void MetalRenderTarget::setUpRenderPassAttachments(MTLRenderPassDescriptor* desc
                 descriptor.stencilAttachment.resolveLevel = depthStencilAttachment.level;
                 descriptor.stencilAttachment.resolveSlice = depthStencilAttachment.layer;
                 descriptor.stencilAttachment.storeAction = MTLStoreActionMultisampleResolve;
-                descriptor.stencilAttachment.stencilResolveFilter = (context->supportsStencilResolve)
-                    ? MTLMultisampleStencilResolveFilterDepthResolvedSample
-                    : MTLMultisampleStencilResolveFilterSample0;
+                descriptor.stencilAttachment.stencilResolveFilter = MTLMultisampleStencilResolveFilterSample0;
             }
         }
     }
