@@ -184,7 +184,7 @@ FVertexBuffer::FVertexBuffer(FEngine& engine, const VertexBuffer::Builder& build
             attributeArray[i].type   = attributes[i].type;
             attributeArray[i].flags  = attributes[i].flags;
 
-            const size_t end = offset + mVertexCount * stride;
+            const size_t end = offset + (mVertexCount - 1) * stride + Driver::getElementTypeSize(attributes[i].type);
             bufferSizes[slot] = math::max(bufferSizes[slot], end);
         }
     }
