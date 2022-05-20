@@ -47,4 +47,10 @@ void main() {
 #if defined(MATERIAL_HAS_POST_LIGHTING_COLOR)
     blendPostLightingColor(inputs, fragColor);
 #endif
+
+#if defined(DEBUG_OUTPUT)
+    if (WasDebugSet()) {
+        fragColor.rgb = GetDebugColor();
+    }
+#endif
 }
