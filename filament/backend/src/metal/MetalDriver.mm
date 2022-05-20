@@ -294,7 +294,7 @@ void MetalDriver::importTextureR(Handle<HwTexture> th, intptr_t i,
     ASSERT_PRECONDITION(metalFormatOrderInvariantEqual(metalTexture.pixelFormat, filamentMetalFormat),
             "Imported id<MTLTexture> format (%d) != Filament texture format (%d)",
             metalTexture.pixelFormat, filamentMetalFormat);
-    MTLTextureType filamentMetalType = (samples == 1) ? getMetalType(target) : getMetalTypeMS(target);
+    MTLTextureType filamentMetalType = (samples == 1) ? getMetalType(target) : getMetalTypeMultisample(target);
     ASSERT_PRECONDITION(metalTexture.textureType == filamentMetalType,
             "Imported id<MTLTexture> type (%d) != Filament texture type (%d)",
             metalTexture.textureType, filamentMetalType);

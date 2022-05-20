@@ -296,7 +296,7 @@ constexpr inline MTLTextureType getMetalType(SamplerType target) {
     }
 }
 
-inline MTLTextureType getMetalTypeMS(SamplerType target) {
+inline MTLTextureType getMetalTypeMultisample(SamplerType target) {
     switch (target) {
         case SamplerType::SAMPLER_2D:
         case SamplerType::SAMPLER_EXTERNAL:
@@ -311,7 +311,7 @@ inline MTLTextureType getMetalTypeMS(SamplerType target) {
             }
         }
         default: {
-            ASSERT_POSTCONDITION(false, "There are no multisample variant of this Metal texture type.");
+            ASSERT_POSTCONDITION(false, "There is no multisample variant of this Metal texture type.");
             return MTLTextureType2D;
         }
     }
