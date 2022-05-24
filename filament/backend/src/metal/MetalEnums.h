@@ -296,6 +296,27 @@ constexpr inline MTLTextureType getMetalType(SamplerType target) {
     }
 }
 
+inline MTLTextureType getMetalTypeMultisample(SamplerType target) {
+    switch (target) {
+        case SamplerType::SAMPLER_2D:
+        case SamplerType::SAMPLER_EXTERNAL:
+            return MTLTextureType2DMultisample;
+        case SamplerType::SAMPLER_2D_ARRAY: {
+            if (@available(iOS 14.0, macCatalyst 14.0, *)) {
+                return MTLTextureType2DMultisampleArray;
+            }
+            else {
+                ASSERT_POSTCONDITION(false, "MTLTextureType2DMultisampleArray not supported on this platform.");
+                return MTLTextureType2D;
+            }
+        }
+        default: {
+            ASSERT_POSTCONDITION(false, "There is no multisample variant of this Metal texture type.");
+            return MTLTextureType2D;
+        }
+    }
+}
+
 constexpr inline MTLBlendOperation getMetalBlendOperation(BlendEquation equation) noexcept {
     switch (equation) {
         case BlendEquation::ADD: return MTLBlendOperationAdd;

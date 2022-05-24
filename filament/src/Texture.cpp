@@ -46,6 +46,7 @@ struct Texture::BuilderDetails {
     uint32_t mHeight = 1;
     uint32_t mDepth = 1;
     uint8_t mLevels = 1;
+    uint8_t mSampleCount = 1;
     Sampler mTarget = Sampler::SAMPLER_2D;
     InternalFormat mFormat = InternalFormat::RGBA8;
     Usage mUsage = Usage::DEFAULT;
@@ -86,6 +87,12 @@ Texture::Builder& Texture::Builder::levels(uint8_t levels) noexcept {
 
 Texture::Builder& Texture::Builder::sampler(Texture::Sampler target) noexcept {
     mImpl->mTarget = target;
+    return *this;
+}
+
+Texture::Builder &Texture::Builder::samples(uint8_t sampleCount) noexcept {
+    assert_invariant(sampleCount); // sample count can't be zero
+    mImpl->mSampleCount = sampleCount;
     return *this;
 }
 
@@ -144,6 +151,7 @@ FTexture::FTexture(FEngine& engine, const Builder& builder) {
     mTarget = builder->mTarget;
     mDepth  = static_cast<uint32_t>(builder->mDepth);
     mLevelCount = std::min(builder->mLevels, FTexture::maxLevelCount(mWidth, mHeight));
+    mSampleCount = builder->mSampleCount;
 
     FEngine::DriverApi& driver = engine.getDriverApi();
     intptr_t importedId = builder->mImportedId;

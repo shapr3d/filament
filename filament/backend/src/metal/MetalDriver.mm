@@ -88,6 +88,11 @@ MetalDriver::MetalDriver(backend::MetalPlatform* platform) noexcept
             mContext->highestSupportedGpuFamily.macCatalyst >= 2;   // newer Mac Catalyst GPUs
     }
 
+    mContext->supportsDepthResolve =
+        mContext->highestSupportedGpuFamily.apple >= 3 ||
+        mContext->highestSupportedGpuFamily.mac   >= 2 ||
+        mContext->highestSupportedGpuFamily.macCatalyst >= 2;
+
     // In order to support memoryless render targets, an Apple GPU is needed.
     mContext->supportsMemorylessRenderTargets = mContext->highestSupportedGpuFamily.apple >= 1;
 
@@ -151,6 +156,10 @@ void MetalDriver::beginFrame(int64_t monotonic_clock_ns, uint32_t frameId) {
 #if defined(FILAMENT_METAL_PROFILING)
     os_signpost_interval_begin(mContext->log, mContext->signpostId, "Frame encoding", "%{public}d", frameId);
 #endif
+}
+
+bool MetalDriver::isDepthResolveSupported() {
+    return mContext->supportsDepthResolve;
 }
 
 void MetalDriver::setFrameScheduledCallback(Handle<HwSwapChain> sch,
@@ -285,7 +294,7 @@ void MetalDriver::importTextureR(Handle<HwTexture> th, intptr_t i,
     ASSERT_PRECONDITION(metalFormatOrderInvariantEqual(metalTexture.pixelFormat, filamentMetalFormat),
             "Imported id<MTLTexture> format (%d) != Filament texture format (%d)",
             metalTexture.pixelFormat, filamentMetalFormat);
-    MTLTextureType filamentMetalType = getMetalType(target);
+    MTLTextureType filamentMetalType = (samples == 1) ? getMetalType(target) : getMetalTypeMultisample(target);
     ASSERT_PRECONDITION(metalTexture.textureType == filamentMetalType,
             "Imported id<MTLTexture> type (%d) != Filament texture type (%d)",
             metalTexture.textureType, filamentMetalType);

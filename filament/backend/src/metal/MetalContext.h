@@ -63,6 +63,7 @@ struct MetalContext {
     std::atomic<bool> memorylessLimitsReached = false;
 
     // Supported features.
+    bool supportsDepthResolve = false;
     bool supportsTextureSwizzling = false;
     bool supportsMemorylessRenderTargets = false;
     uint8_t maxColorRenderTargets = 4;
