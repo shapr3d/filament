@@ -149,19 +149,22 @@ if (WIN32)
         )
     endif()
 
-    # TODO: Figure out why pdb generation messes with incremental compilaton.
-    # IN RELEASE_WITH_DEBUG_INFO, generate debug info in .obj, no in pdb.
-    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /Z7")
-    set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO} /Z7")
+    option(FILAMENT_INCLUDE_DEBUG_SYMBOLS "Include more verbose debug info - even in release builds." OFF)
+    if(FILAMENT_INCLUDE_DEBUG_SYMBOLS)
+        # TODO: Figure out why pdb generation messes with incremental compilaton.
+        # IN RELEASE_WITH_DEBUG_INFO, generate debug info in .obj, no in pdb.
+        set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /Z7")
+        set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO} /Z7")
 
-    # In RELEASE, also generate PDBs.
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Zi")
-    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /Zi")
+        # In RELEASE, also generate PDBs.
+        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Zi")
+        set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /Zi")
 
-    # In DEBUG, avoid generating a PDB file which seems to mess with incremental compilation.
-    # Instead generate debug info directly inside obj files.
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Z7")
-    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /Z7")
+        # In DEBUG, avoid generating a PDB file which seems to mess with incremental compilation.
+        # Instead generate debug info directly inside obj files.
+        set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Z7")
+        set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /Z7")
+    endif()
 
     # Special settings when building on CI.
     if (${FILAMENT_WINDOWS_CI_BUILD})
