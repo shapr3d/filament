@@ -237,7 +237,9 @@ void TweakableMaterial::drawUI(const std::string& header) {
 
         mBaseColor.addWidget("baseColor");
         if (mBaseColor.isFile) {
-            bool isAlpha = (mShaderType == MaterialType::Transparent || mShaderType == MaterialType::Refractive);
+            // TODO: for the alpha channeled basecolor textures, I'm allowing 4 channel RGBA for everything!
+            bool isAlpha = true;
+            //bool isAlpha = (mShaderType == MaterialType::Transparent || mShaderType == MaterialType::Refractive);
             enqueueTextureRequest(mBaseColor, true, isAlpha, isAlpha ? 4 : 3);
         }
 

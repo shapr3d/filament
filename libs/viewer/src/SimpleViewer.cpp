@@ -916,44 +916,57 @@ std::string SimpleViewer::validateTweaks(const TweakableMaterial& tweaks) {
             result += "ERROR: " + prompt + " cannot be found.\n";
             return;
         }
-        int expectedChannelCount = 0;
+
+        // Check if the channel and format of the loaded image file conform to our usage expectations
+        std::vector<std::pair<filament::Texture::InternalFormat, int>> expectedFormats{};
+
         // Infer the expected texture format if no explicit cue was given by the caller
         if (expectedFormat == filament::Texture::InternalFormat::UNUSED) {
             if (IsColor) {
-                if (tweaks.mShaderType == TweakableMaterial::MaterialType::Transparent || tweaks.mShaderType == TweakableMaterial::MaterialType::Refractive) {
-                    expectedFormat = filament::Texture::InternalFormat::SRGB8_A8;
-                    expectedChannelCount = 4;
-                }
-                else {
-                    expectedFormat = filament::Texture::InternalFormat::SRGB8;
-                    expectedChannelCount = 3;
-                }
+                // Basecolor textures may be 3 and 4 channel textures
+                expectedFormats.push_back(std::make_pair(filament::Texture::InternalFormat::SRGB8, 3));
+                expectedFormats.push_back(std::make_pair(filament::Texture::InternalFormat::SRGB8_A8, 4));
             }
             else {
-                expectedFormat = filament::Texture::InternalFormat::R8;
-                expectedChannelCount = 1;
+                expectedFormats.push_back(std::make_pair(filament::Texture::InternalFormat::R8, 1));
             }
         }
         else {
-            if (expectedFormat == filament::Texture::InternalFormat::SRGB8_A8) expectedChannelCount = 4;
-            else if (expectedFormat == filament::Texture::InternalFormat::SRGB8 || expectedFormat == filament::Texture::InternalFormat::RGB8) expectedChannelCount = 3;
-            else if (expectedFormat == filament::Texture::InternalFormat::R8) expectedChannelCount = 1;
+            if (expectedFormat == filament::Texture::InternalFormat::SRGB8_A8) expectedFormats.push_back(std::make_pair(expectedFormat, 4));
+            else if (expectedFormat == filament::Texture::InternalFormat::SRGB8 ) expectedFormats.push_back(std::make_pair(expectedFormat, 3));
+            else if (expectedFormat == filament::Texture::InternalFormat::RGB8) expectedFormats.push_back(std::make_pair(expectedFormat, 3));
+            else if (expectedFormat == filament::Texture::InternalFormat::R8) expectedFormats.push_back(std::make_pair(expectedFormat, 1));
+            result += "ERROR: texture for " + prompt + " uses unhandled format!\n";
         }
 
         if (textureEntry->second == nullptr) {
             result += "ERROR: texture for " + prompt + " could not be loaded!\n";
-        } else if (textureEntry->second->getFormat() != expectedFormat) {
-            result += "ERROR: " + prompt + " has incorrect format! Expected " + formatToName(expectedFormat) + ", got " + formatToName(textureEntry->second->getFormat()) + ".\n";
+        } else {
+            bool wasMatch = false;
+            for (const auto& allowedFormat : expectedFormats) {
+                if (textureEntry->second->getFormat() == allowedFormat.first) {
+                    wasMatch = true;
+                }
+            }
+            if (!wasMatch) {
+                result += "ERROR: " + prompt + " has incorrect format! Expected " + formatToName(expectedFormat) + ", got " + formatToName(textureEntry->second->getFormat()) + ".\n";
+            }
         }
 
         auto textureChannelCountEntry = mTextureFileChannels.find(prop.filename.asString());
         if (textureChannelCountEntry != mTextureFileChannels.end()) {
-            if (textureChannelCountEntry->second != expectedChannelCount) {
-                result += "ERROR: " + prompt + " has incorrect number of channels! Expected " + std::to_string(expectedChannelCount) + ", got " + std::to_string(textureChannelCountEntry->second) + ".\n";
+            bool wasMatch = false;
+            for (const auto& allowedFormat : expectedFormats) {
+                if (textureChannelCountEntry->second == allowedFormat.second) {
+                    wasMatch = true;
+                }
+            }
+            if (!wasMatch) {
+                result += "ERROR: " + prompt + " has incorrect number of channels! Got " + std::to_string(textureChannelCountEntry->second) + ".\n";
             }
         }
         else {
-            result += "ERROR: " + prompt + " has no channel numbers! Expected a " + std::to_string(expectedChannelCount) + " channel texture.\n";
+            result += "ERROR: " + prompt + " has no channel numbers!\n";
         }
     };
 
