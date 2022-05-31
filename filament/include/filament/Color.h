@@ -203,7 +203,6 @@ inline LinearColorA Color::toLinear(RgbaType type, math::float4 color) {
         case RgbaType::PREMULTIPLIED_LINEAR:
             return color;
     }
-    UTILS_UNREACHABLE();
 }
 
 } // namespace filament

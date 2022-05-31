@@ -104,13 +104,9 @@
 
 #if __has_builtin(__builtin_assume)
 #   define UTILS_ASSUME( exp ) (__builtin_assume(exp))
-#elif defined(_MSC_VER)
-#   define UTILS_ASSUME( exp ) (__assume(exp))
 #else
 #   define UTILS_ASSUME( exp )
 #endif
-
-#define UTILS_UNREACHABLE() assert(false); UTILS_ASSUME(false)
 
 #if (defined(__i386__) || defined(__x86_64__))
 #   define UTILS_HAS_HYPER_THREADING 1      // on x86 we assume we have hyper-threading.
