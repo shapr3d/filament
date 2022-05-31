@@ -161,49 +161,59 @@ void ApplyClearCoatNormalMap(inout MaterialInputs material, inout FragmentData f
         material.clearCoatNormal = clearCoatNormalWS;
 #else
         material.clearCoatNormal = clearCoatNormalWS * getWorldTangentFrame();
-#endif // SHAPR_USE_WORLD_NORMALS
+#endif // defined(SHAPR_USE_WORLD_NORMALS)
     } else {
 #if defined(SHAPR_USE_WORLD_NORMALS)
         // We need normals to be in world space
         material.clearCoatNormal = normalize(getWorldTangentFrame() * material.clearCoatNormal);
-#endif
+#endif // defined(SHAPR_USE_WORLD_NORMALS)
     }
-#endif
+#endif // defined(MATERIAL_HAS_CLEAR_COAT_NORMAL)
+}
+
+float GetApproximateLuminance(vec3 color) {
+    return max3(color);
+}
+
+float SafeRcp(float x) {
+    return (x != 0.0) ? 1.0 / x : 1.0; // Note: NaN returns 1.0
 }
 
 void ApplyBaseColor(inout MaterialInputs material, inout FragmentData fragmentData) {
 #if defined(MATERIAL_HAS_BASE_COLOR)
+    const mat3 RGBToYCoCgMatrix = mat3(0.25, 0.5, -0.25, 0.5, 0.0, 0.5, 0.25, -0.5, -0.25);
+    const mat3 YCoCgToRGBMatrix = mat3(1.0, 1.0, 1.0, 1.0, 0.0, -1.0, -1.0, 1.0, -1.0);
+
     if (materialParams.useBaseColorTexture == 1) {
-#if defined(BLENDING_ENABLED) || defined(HAS_REFRACTION)
         material.baseColor.rgba = TriplanarTexture(materialParams_baseColorTexture,
                                                    materialParams.textureScaler.x,
                                                    fragmentData.pos,
                                                    fragmentData.normal)
                                       .rgba;
-#else
-        material.baseColor.rgb = TriplanarTexture(materialParams_baseColorTexture,
-                                                  materialParams.textureScaler.x,
-                                                  fragmentData.pos,
-                                                  fragmentData.normal)
-                                     .rgb;
-#endif
     } else {
-#if defined(BLENDING_ENABLED) || defined(HAS_REFRACTION)
         material.baseColor.rgba = materialParams.baseColor.rgba;
-#else
-        material.baseColor.rgb = materialParams.baseColor.rgb;
-#endif
     }
 
-    // Naive multiplicative tinting seems to be fine enough for now
-    material.baseColor.rgb *= materialParams.tintColor.rgb;
+    // Naive multiplicative tinting seems to be fine enough for now - but do use alpha as tint weight for
+    // the interpolation between the chroma and hue. However, we exchange the luminance for the tint luminance!
+    float tintWeight = clamp(material.baseColor.a, 0.0, 1.0);
+
+    vec3 baseYCoCg = RGBToYCoCgMatrix * material.baseColor.rgb;
+    vec3 tintYCoCg = RGBToYCoCgMatrix * materialParams.tintColor.rgb;
+    vec3 weightedColorYCoCg = vec3( baseYCoCg.r * tintYCoCg.r, mix(baseYCoCg.gb, tintYCoCg.gb, tintWeight) );
+    material.baseColor.rgb = YCoCgToRGBMatrix * weightedColorYCoCg;
+
+    //material.baseColor.rgb *= SafeRcp(GetApproximateLuminance(material.baseColor.rgb));
+    //material.baseColor.rgb = mix( material.baseColor.rgb, material.baseColor.rgb * materialParams.tintColor.rgb * SafeRcp(GetApproximateLuminance(materialParams.tintColor.rgb)), tintWeight);
+    //material.baseColor.rgb *= GetApproximateLuminance(materialParams.tintColor.rgb);
+
 #if defined(BLENDING_ENABLED)
     material.baseColor.rgb *= material.baseColor.a;
     material.baseColor.a = 0.0;
 #else
     material.baseColor.a = 1.0;
-#endif
-#endif
+#endif // defined(BLENDING_ENABLED)
+#endif // defined(MATERIAL_HAS_BASE_COLOR)
 }
 
 void ApplyOcclusion(inout MaterialInputs material, inout FragmentData fragmentData) {
