@@ -211,15 +211,16 @@ void TweakableMaterial::resetWithType(MaterialType newType) {
     mUseWard = false;
 
     mDoRelease = false;
+    mValidateMaterial = false;
 
     mShaderType = newType;
 }
 
 void TweakableMaterial::drawUI(const std::string& header) {
     if (ImGui::CollapsingHeader("Integration")) {
-        if (ImGui::Checkbox("Release material", &mDoRelease)) {
+        if (ImGui::Checkbox("Validate material", &mValidateMaterial)) {
             // The button was pressed, so request validation if it turned from false to true
-            if (mDoRelease) {
+            if (mValidateMaterial) {
                 mDoesRequireValidation = true;
             }
         }
