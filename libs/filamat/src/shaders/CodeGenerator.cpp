@@ -111,7 +111,7 @@ io::sstream& CodeGenerator::generateProlog(io::sstream& out, ShaderType type,
     }
 
     out << SHADERS_COMMON_TYPES_FS_DATA;
-
+    out << "#define DEBUG_OUTPUT\n";
     out << SHADERS_COMMON_DEBUG_FS_DATA;
 
     out << "\n";
