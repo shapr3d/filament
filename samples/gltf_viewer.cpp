@@ -557,8 +557,8 @@ int main(int argc, char** argv) {
         app.mainCamera = &view->getCamera();
         if (filename.isEmpty()) {
             app.asset = app.assetLoader->createAssetFromBinary(
-                    GLTF_VIEWER_DAMAGEDHELMET_DATA,
-                    GLTF_VIEWER_DAMAGEDHELMET_SIZE);
+                    GLTF_VIEWER_SPHERE_DATA,
+                    GLTF_VIEWER_SPHERE_SIZE);
         } else {
             loadAsset(filename);
         }

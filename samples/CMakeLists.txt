@@ -180,6 +180,7 @@ add_library(gltf-resources ${DUMMY_SRC})
 
 set(GLTF_VIEWER_RESOURCE_FILES
     ${ROOT_DIR}/third_party/models/DamagedHelmet/DamagedHelmet.glb
+    ${ROOT_DIR}/third_party/models/Sphere/sphere.glb
     ${MATERIAL_DIR}/groundShadow.filamat
 )
 
