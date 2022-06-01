@@ -211,6 +211,7 @@ void TweakableMaterial::resetWithType(MaterialType newType) {
     mUseWard = false;
 
     mDoRelease = false;
+    mMipBias = 0.0f;
 
     mShaderType = newType;
 }
@@ -360,6 +361,7 @@ void TweakableMaterial::drawUI(const std::string& header) {
 
     if (ImGui::CollapsingHeader("Shader setup")) {
         ImGui::Checkbox("Use Ward specular normal distribution", &mUseWard);
+        ImGui::SliderFloat("Mip bias", &mMipBias, 0.0f, 2.0f);
     }
 }
 

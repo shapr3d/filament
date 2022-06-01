@@ -1272,6 +1272,7 @@ void SimpleViewer::updateUserInterface() {
                     matInstance->setParameter("roughness", tweaks.mRoughness.value);
                     matInstance->setParameter("clearCoat", tweaks.mClearCoat.value);
                     matInstance->setParameter("clearCoatRoughness", tweaks.mClearCoatRoughness.value);
+                    matInstance->setParameter("mipBias", tweaks.mMipBias);
                     
                     if (tweaks.mShaderType != TweakableMaterial::MaterialType::Cloth) {
                         setTextureIfPresent(tweaks.mMetallic.isFile, tweaks.mMetallic.filename, "metallic");

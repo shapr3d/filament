@@ -73,12 +73,34 @@ vec3 ComputeWeights(vec3 normal) {
     return blend;
 }
 
+float mip_map_level(in vec2 texture_coordinate) // in texel units
+{
+  vec2 dx_vtc  = dFdx(2048.0 * texture_coordinate);
+  vec2 dy_vtc  = dFdy(2048.0 * texture_coordinate);
+  float delta_max_sqr = max(dot(dx_vtc, dx_vtc), dot(dy_vtc, dy_vtc));
+  return 0.5 * log2(delta_max_sqr);
+}
+
 vec4 TriplanarTexture(sampler2D tex, float scaler, highp vec3 pos, lowp vec3 normal) {
     // Depending on the resolution of the texture, we may want to multiply the texture coordinates
     vec3 queryPos = scaler * pos;
     vec3 weights = ComputeWeights(normal);
-    return weights.x * texture(tex, queryPos.yz * vec2(1, -1)) + weights.y * texture(tex, -queryPos.xz) +
-           weights.z * texture(tex, queryPos.yx);
+
+    vec2 uvX = queryPos.yz * vec2(1, -1);
+    vec2 uvY = -queryPos.xz;
+    vec2 uvZ = queryPos.yx;
+
+    vec3 mipLevels = vec3(mip_map_level(uvX), mip_map_level(uvY), mip_map_level(uvZ));
+    //float maxMip = max3(mipLevels) + materialParams.mipBias;
+    float maxMip = materialParams.mipBias; //pow(max3(mipLevels), materialParams.mipBias);
+
+    // what needs to be done: compute mip level from distance to camera and take into account the cosAlpha
+    //float cosAlpha = dot(normal, shading_view);
+    //shading_view; // from fragment towards the camera position
+
+    //SetDebugColor(mipLevels / 12.0);
+
+    return weights.x * textureLod(tex, uvX, maxMip) + weights.y * textureLod(tex, uvY, maxMip) + weights.z * textureLod(tex, uvZ, maxMip);
 }
 
 vec3 UnpackNormal(vec2 packedNormal, vec2 scale) {
