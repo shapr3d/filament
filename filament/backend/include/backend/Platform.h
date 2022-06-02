@@ -81,7 +81,7 @@ public:
      *                      accordingly. Can't be nullptr.
      *
      * @param nativeDisplay Specify a display to connect to. Currently only meaningful for the EGL
-     *                      platform, on which you should pass in an initialized EGLDisplay
+     *                      platform, on which you should pass in an EGLDisplay to connect to,
      *                      if you want to use one different from the default.
      *
      * @return A pointer to the Plaform object.
