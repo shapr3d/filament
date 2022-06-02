@@ -49,6 +49,15 @@ public:
     virtual id<MTLCommandQueue> createCommandQueue(id<MTLDevice> device) noexcept;
 
     /**
+     * Create a render command encoder on the command buffer.
+     *
+     * @param commandBuffer A command buffer on the device which was returned from createDevice().
+     * @param renderPassDescriptor Description of the render pass which is started by the returned encoder.
+     */
+    virtual id<MTLRenderCommandEncoder> createRenderCommandEncoder(id<MTLCommandBuffer> commandBuffer,
+                                                                   MTLRenderPassDescriptor* renderPassDescriptor) noexcept;
+
+    /**
      * Obtain a MTLCommandBuffer enqueued on this Platform's MTLCommandQueue. The command buffer is
      * guaranteed to execute before all subsequent command buffers created either by Filament, or
      * further calls to this method.
