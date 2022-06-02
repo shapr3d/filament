@@ -1410,7 +1410,7 @@ static std::ostream& operator<<(std::ostream& out, const LightSettings& in) {
         << "\"sunlightColor\": " << (in.sunlightColor) << ",\n"
         << "\"iblIntensity\": " << (in.iblIntensity) << ",\n"
         << "\"skyIntensity\": " << (in.skyIntensity) << ",\n"
-        << "\"iblRotation\": " << (in.iblRotation) << "\n"
+        << "\"iblRotation\": " << (in.iblRotation) << "\n,"
         << "\"iblTechnique\": " << static_cast<uint32_t>(in.iblOptions.iblTechnique) << ",\n"
         << "\"iblCenterX\": " << in.iblOptions.iblCenter.x << ",\n"
         << "\"iblCenterY\": " << in.iblOptions.iblCenter.y << ",\n"
