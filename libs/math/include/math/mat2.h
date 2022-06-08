@@ -243,14 +243,13 @@ public:
         uint64_t result = 0;
         // For some reason clang is not able to vectoize this loop when the number of iteration
         // is known and constant (!?!?!). Still this is better than operator==.
-#pragma warning(push)
-#pragma warning(disable : 4068)
+#if defined(__clang__)
 #pragma clang loop vectorize_width(2)
+#endif
         for (size_t i = 0; i < sizeof(TMat22) / sizeof(uint64_t); i++) {
             result |= li[i] ^ ri[i];
         }
         return result != 0;
-#pragma warning(pop)
     }
 
     template<typename A>
