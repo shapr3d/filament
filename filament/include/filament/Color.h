@@ -87,7 +87,7 @@ public:
     static LinearColor toLinear(RgbType type, math::float3 color);
 
     //! converts an RGBA color to linear space, the conversion depends on the specified type
-    static constexpr LinearColorA toLinear(RgbaType type, math::float4 color);
+    static LinearColorA toLinear(RgbaType type, math::float4 color);
 
     //! converts an RGB color in sRGB space to an RGB color in linear space
     template<ColorConversion = ACCURATE>
@@ -192,7 +192,7 @@ inline LinearColor Color::toLinear(RgbType type, math::float3 color) {
 
 // converts an RGBA color to linear space
 // the conversion depends on the specified type
-inline constexpr LinearColorA Color::toLinear(RgbaType type, math::float4 color) {
+inline LinearColorA Color::toLinear(RgbaType type, math::float4 color) {
     switch (type) {
         case RgbaType::sRGB:
             return Color::toLinear<ACCURATE>(color) * math::float4{color.a, color.a, color.a, 1.0f};
