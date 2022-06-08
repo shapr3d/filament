@@ -47,15 +47,19 @@ constexpr inline T clz(T x) noexcept {
     x |= (x >> 4u);
     x |= (x >> 8u);
     x |= (x >> 16u);
+#if defined(_MSC_VER)
 #pragma warning(push)
 #pragma warning(disable : 4293)
+#endif
     if (sizeof(T) * CHAR_BIT >= 64) {   // just to silence compiler warning
         x |= (x >> 32u);
     }
     if (sizeof(T) * CHAR_BIT >= 128) {   // just to silence compiler warning
         x |= (x >> 64u);
     }
+#if defined(_MSC_VER)
 #pragma warning(pop)
+#endif
     return T(sizeof(T) * CHAR_BIT) - details::popcount(x);
 }
 
