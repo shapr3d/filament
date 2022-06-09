@@ -854,7 +854,7 @@ void MetalDriver::beginRenderPass(Handle<HwRenderTarget> rth,
     renderTarget->setUpRenderPassAttachments(descriptor, params);
 
     mContext->currentRenderPassEncoder =
-            [getPendingCommandBuffer(mContext) renderCommandEncoderWithDescriptor:descriptor];
+       mPlatform.createRenderCommandEncoder(getPendingCommandBuffer(mContext), descriptor);
     if (!mContext->groupMarkers.empty()) {
         mContext->currentRenderPassEncoder.label =
                 [NSString stringWithCString:mContext->groupMarkers.top()

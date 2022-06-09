@@ -69,6 +69,11 @@ id<MTLCommandQueue> MetalPlatform::createCommandQueue(id<MTLDevice> device) noex
     return mCommandQueue;
 }
 
+id<MTLRenderCommandEncoder> MetalPlatform::createRenderCommandEncoder(id<MTLCommandBuffer> commandBuffer,
+                                                                    MTLRenderPassDescriptor* renderPassDescriptor) noexcept {
+    return [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
+}
+
 id<MTLCommandBuffer> MetalPlatform::createAndEnqueueCommandBuffer() noexcept {
     id<MTLCommandBuffer> commandBuffer = [mCommandQueue commandBuffer];
     [commandBuffer enqueue];
