@@ -540,6 +540,12 @@ public:
      * getUserTime()
      */
     void resetUserTime();
+
+    /**
+     * Performs garbage collection on the Engine
+     *
+     */
+    void engineGC();
 };
 
 } // namespace filament
