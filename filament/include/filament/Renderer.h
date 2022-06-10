@@ -543,7 +543,6 @@ public:
 
     /**
      * Performs garbage collection on the Engine
-     *
      */
     void engineGC();
 };
