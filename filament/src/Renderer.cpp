@@ -215,6 +215,23 @@ void FRenderer::renderInternal(FView const* view) {
     js.runAndWait(rootJob);
 }
 
+void FRenderer::engineGC() {
+    // do this before engine.flush()
+    FEngine& engine = getEngine();
+    engine.getResourceAllocator().gc();
+
+    // Run the component managers' GC in parallel
+    // WARNING: while doing this we can't access any component manager
+    auto& js = engine.getJobSystem();
+
+    auto *job = js.runAndRetain(jobs::createJob(js, nullptr, &FEngine::gc, &engine)); // gc all managers
+
+    engine.flush();     // flush command stream
+
+    // make sure we're done with the gcs
+    js.waitAndRelease(job);
+}
+
 void FRenderer::renderJob(ArenaScope& arena, FView& view) {
     FEngine& engine = getEngine();
     JobSystem& js = engine.getJobSystem();
@@ -1170,19 +1187,7 @@ void FRenderer::endFrame() {
         engine.debug.renderer.doFrameCapture = false;
     }
 
-    // do this before engine.flush()
-    engine.getResourceAllocator().gc();
-
-    // Run the component managers' GC in parallel
-    // WARNING: while doing this we can't access any component manager
-    auto& js = engine.getJobSystem();
-
-    auto *job = js.runAndRetain(jobs::createJob(js, nullptr, &FEngine::gc, &engine)); // gc all managers
-
-    engine.flush();     // flush command stream
-
-    // make sure we're done with the gcs
-    js.waitAndRelease(job);
+    engineGC();
 }
 
 void FRenderer::readPixels(uint32_t xoffset, uint32_t yoffset, uint32_t width, uint32_t height,
@@ -1319,6 +1324,10 @@ void Renderer::setClearOptions(const ClearOptions& options) {
 
 void Renderer::renderStandaloneView(View const* view) {
     upcast(this)->renderStandaloneView(upcast(view));
+}
+
+void Renderer::engineGC() {
+    upcast(this)->engineGC();
 }
 
 } // namespace filament

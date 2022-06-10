@@ -99,6 +99,8 @@ public:
     // Clean-up everything, this is typically called when the client calls Engine::destroyRenderer()
     void terminate(FEngine& engine);
 
+    void engineGC();
+
     void setDisplayInfo(DisplayInfo const& info) noexcept {
         mDisplayInfo = info;
     }
