@@ -135,9 +135,6 @@ Texture* Texture::Builder::build(Engine& engine) {
     ASSERT_POSTCONDITION_NON_FATAL((swizzled && sampleable) || !swizzled,
             "Swizzled texture must be SAMPLEABLE");
 
-    ASSERT_POSTCONDITION_NON_FATAL((imported && sampleable) || !imported,
-            "Imported texture must be SAMPLEABLE");
-
     return upcast(engine).createTexture(*this);
 }
 
