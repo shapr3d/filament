@@ -1257,6 +1257,7 @@ void SimpleViewer::updateUserInterface() {
                     matInstance->setParameter("useWard", (tweaks.mUseWard) ? 1 : 0 );
 
                     setTextureIfPresent(tweaks.mBaseColor.isFile, tweaks.mBaseColor.filename, "baseColor");
+                    matInstance->setParameter("tweaks", tweaks.mTweaks.value);
 
                     matInstance->setParameter("tintColor", tweaks.mTintColor.value);
 

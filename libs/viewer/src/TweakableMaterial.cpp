@@ -11,6 +11,7 @@ TweakableMaterial::TweakableMaterial() {
     mNormalIntensity.value = 1.0f;
     mRoughnessScale.value = 1.0f;
     mOcclusionIntensity.value = 1.0f;
+    mTweaks.value = { 0.0f, 1.0f, 1.0f };
 }
 
 json TweakableMaterial::toJson() {
@@ -212,6 +213,7 @@ void TweakableMaterial::resetWithType(MaterialType newType) {
 
     mDoRelease = false;
     mValidateMaterial = false;
+    resetMemberToValue(mTweaks, { 0.0f, 1.0f, 1.0f });
 
     mShaderType = newType;
 }
@@ -242,6 +244,8 @@ void TweakableMaterial::drawUI(const std::string& header) {
             //bool isAlpha = (mShaderType == MaterialType::Transparent || mShaderType == MaterialType::Refractive);
             enqueueTextureRequest(mBaseColor, true, isAlpha, isAlpha ? 4 : 3);
         }
+
+        mTweaks.addWidget("Alpha sharpening");
 
         mTintColor.addWidget("tintColor");
     }

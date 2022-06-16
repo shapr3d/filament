@@ -129,7 +129,9 @@ public:
 
     bool mUseWard{};
     bool mDoRelease{}; // this notifies the material integrator tool that this material needs to be checked into the codebase
+
     bool mValidateMaterial{};
+    TweakablePropertyDerivable<filament::math::float3, false> mTweaks{}; // for sharpening
 
     enum MaterialType { Opaque, Transparent, Refractive, Cloth, Subsurface };
     MaterialType mShaderType{};

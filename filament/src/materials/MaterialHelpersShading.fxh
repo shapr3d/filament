@@ -179,6 +179,33 @@ float SafeRcp(float x) {
     return (x != 0.0) ? 1.0 / x : 1.0; // Note: NaN returns 1.0
 }
 
+float TweakMap(float x) {
+    float L = materialParams.tweaks.r;
+    float T = materialParams.tweaks.g;
+    float G = materialParams.tweaks.b;
+    float q1 = ( G <= 0.5) ? 2.0 * 90.0 / 99.0 * G : ( 2.0 * G - 1.0 ) * ( 1.0 - 90.0 / 99.0 ) + 90.0 / 99.0;
+    float q = 10.0 - 9.9 * min( 1.0, max( 0.0, q1 ) );
+    return ( x <= L ) ? 0.0 : ( x < T ) ? pow( ( x - L ) / ( T - L ), q ) : 1.0;
+}
+
+float rand(float n){return fract(sin(n) * 43758.5453123);}
+
+float rand(vec2 n) { 
+	return fract(sin(dot(n, vec2(12.9898, 4.1414))) * 43758.5453);
+}
+
+float noise(float p){
+	float fl = floor(p);
+    float fc = fract(p);
+	return mix(rand(fl), rand(fl + 1.0), fc);
+}
+	
+float noise(vec2 n) {
+	const vec2 d = vec2(0.0, 1.0);
+    vec2 b = floor(n), f = smoothstep(vec2(0.0), vec2(1.0), fract(n));
+	return mix(mix(rand(b), rand(b + d.yx), f.x), mix(rand(b + d.xy), rand(b + d.yy), f.x), f.y);
+}
+
 void ApplyBaseColor(inout MaterialInputs material, inout FragmentData fragmentData) {
 #if defined(MATERIAL_HAS_BASE_COLOR)
     const mat3 RGBToYCoCgMatrix = mat3(0.25, 0.5, -0.25, 0.5, 0.0, 0.5, 0.25, -0.5, -0.25);
@@ -197,10 +224,15 @@ void ApplyBaseColor(inout MaterialInputs material, inout FragmentData fragmentDa
     // Naive multiplicative tinting seems to be fine enough for now - but do use alpha as tint weight for
     // the interpolation between the chroma and hue. However, we exchange the luminance for the tint luminance!
     float tintWeight = clamp(material.baseColor.a, 0.0, 1.0);
+          tintWeight = TweakMap(tintWeight);
 
-    vec3 baseYCoCg = RGBToYCoCgMatrix * material.baseColor.rgb;
+    vec3 baseYCoCg = RGBToYCoCgMatrix * sqrt(material.baseColor.rgb);
     vec3 tintYCoCg = RGBToYCoCgMatrix * materialParams.tintColor.rgb;
-    vec3 weightedColorYCoCg = vec3( baseYCoCg.r * tintYCoCg.r, mix(baseYCoCg.gb, tintYCoCg.gb, tintWeight) );
+    //vec3 weightedColorYCoCg = vec3( baseYCoCg.r, mix(tintYCoCg.gb, baseYCoCg.gb, tintWeight) ); //mix(tintYCoCg, baseYCoCg, tintWeight); //vec3( baseYCoCg.r, mix(tintYCoCg.gb, baseYCoCg.gb, tintWeight) );
+    vec2 off = vec2( noise(16.0 * 128.0 * fragmentData.pos.xy), noise(16.0 * 128.0 * fragmentData.pos.zx) );
+
+    //vec3 weightedColorYCoCg = vec3( baseYCoCg.r * max(tintYCoCg.r, 0.25), mix(tintYCoCg.gb, 2.0 * off - 1.0, tintWeight) );
+    vec3 weightedColorYCoCg = vec3( baseYCoCg.r * max(tintYCoCg.r, 0.25), mix(tintYCoCg.gb, baseYCoCg.gb, tintWeight) );
     material.baseColor.rgb = YCoCgToRGBMatrix * weightedColorYCoCg;
 
     //material.baseColor.rgb *= SafeRcp(GetApproximateLuminance(material.baseColor.rgb));
