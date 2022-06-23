@@ -677,7 +677,6 @@ function build_ios {
 
             archive_ios "Release" "iphonesimulator"            
         fi
-        
         archive_ios "Release" "iphoneos"
     fi
 }
