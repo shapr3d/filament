@@ -579,7 +579,7 @@ function build_ios_target {
     if [[ "${platform}" == "macosx" ]]; then
         local install_dir="catalyst-${lc_target}"
     else
-        local install_dir="ios-${lc_target}"
+        local install_dir="${platform}-${lc_target}"
     fi
 
     echo "Building iOS ${lc_target} (${arch}) for ${platform}..."
@@ -636,40 +636,49 @@ function build_ios {
 
     if [[ "${ISSUE_DEBUG_BUILD}" == "true" ]]; then
         build_ios_target "Debug" "arm64" "iphoneos"
+        
         if [[ "${IOS_BUILD_SIMULATOR}" == "true" ]]; then
             build_ios_target "Debug" "x86_64" "iphonesimulator"
-        fi
+            build_ios_target "Debug" "arm64" "iphonesimulator"
 
-        if [[ "${BUILD_UNIVERSAL_LIBRARIES}" == "true" ]]; then
-            local installed_libs_dir="out/ios-debug/filament/lib"
-            build/ios/create-universal-libs.sh \
-                -o "${installed_libs_dir}/universal" \
-                "${installed_libs_dir}/arm64" \
-                "${installed_libs_dir}/x86_64"
-            rm -rf "${installed_libs_dir}/arm64"
-            rm -rf "${installed_libs_dir}/x86_64"
+            if [[ "${BUILD_UNIVERSAL_LIBRARIES}" == "true" ]]; then
+                local installed_libs_dir="out/iphonesimulator-debug/filament/lib"
+                build/ios/create-universal-libs.sh \
+                    -o "${installed_libs_dir}/universal" \
+                    "${installed_libs_dir}/arm64" \
+                    "${installed_libs_dir}/x86_64"
+                rm -rf "${installed_libs_dir}/arm64"
+                rm -rf "${installed_libs_dir}/x86_64"
+            fi
+                        
+            archive_ios "Debug" "iphonesimulator"
         fi
-
-        archive_ios "Debug" "ios"
+        
+        archive_ios "Debug" "iphoneos"
     fi
 
     if [[ "${ISSUE_RELEASE_BUILD}" == "true" ]]; then
         build_ios_target "Release" "arm64" "iphoneos"
+        
         if [[ "${IOS_BUILD_SIMULATOR}" == "true" ]]; then
             build_ios_target "Release" "x86_64" "iphonesimulator"
-        fi
+            build_ios_target "Release" "arm64" "iphonesimulator"
 
-        if [[ "${BUILD_UNIVERSAL_LIBRARIES}" == "true" ]]; then
-            local installed_libs_dir="out/ios-release/filament/lib"
-            build/ios/create-universal-libs.sh \
-                -o "${installed_libs_dir}/universal" \
-                "${installed_libs_dir}/arm64" \
-                "${installed_libs_dir}/x86_64"
-            rm -rf "${installed_libs_dir}/arm64"
-            rm -rf "${installed_libs_dir}/x86_64"
-        fi
+            if [[ "${BUILD_UNIVERSAL_LIBRARIES}" == "true" ]]; then
+                local installed_libs_dir="out/iphonesimulator-release/filament/lib"
+                build/ios/create-universal-libs.sh \
+                    -o "${installed_libs_dir}/universal" \
+                    "${installed_libs_dir}/arm64" \
+                    "${installed_libs_dir}/x86_64"
+                rm -rf "${installed_libs_dir}/arm64"
+                rm -rf "${installed_libs_dir}/x86_64"
+                
+            fi
 
-        archive_ios "Release" "ios"
+            archive_ios "Release" "iphonesimulator"            
+        fi
+        
+        archive_ios "Release" "iphoneos"
     fi
 }
 
