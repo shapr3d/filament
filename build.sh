@@ -672,11 +672,11 @@ function build_ios {
                     "${installed_libs_dir}/x86_64"
                 rm -rf "${installed_libs_dir}/arm64"
                 rm -rf "${installed_libs_dir}/x86_64"
-                
             fi
 
             archive_ios "Release" "iphonesimulator"            
         fi
+
         archive_ios "Release" "iphoneos"
     fi
 }
