@@ -395,17 +395,19 @@ void OpenGLContext::bindSampler(GLuint unit, GLuint sampler) noexcept {
     });
 }
 
+// see https://www.khronos.org/registry/OpenGL/extensions/ARB/ARB_clip_control.txt
 void OpenGLContext::setScissor(GLint left, GLint bottom, GLsizei width, GLsizei height) noexcept {
-    vec4gli scissor(left, bottom, width, height);
+    vec4gli scissor(left, height-(bottom+height), width, height);
     update_state(state.window.scissor, scissor, [&]() {
-        glScissor(left, bottom, width, height);
+        glScissor(left, height-(bottom+height), width, height);
     });
 }
 
+// see https://www.khronos.org/registry/OpenGL/extensions/ARB/ARB_clip_control.txt
 void OpenGLContext::viewport(GLint left, GLint bottom, GLsizei width, GLsizei height) noexcept {
-    vec4gli viewport(left, bottom, width, height);
+    vec4gli viewport(left, height-(bottom+height), width, height);
     update_state(state.window.viewport, viewport, [&]() {
-        glViewport(left, bottom, width, height);
+        glViewport(left, height-(bottom+height), width, height);
     });
 }
 

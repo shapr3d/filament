@@ -235,7 +235,12 @@ OpenGLContext::OpenGLContext() noexcept {
 
 #if defined(GL_EXT_clip_control) || defined(GL_ARB_clip_control) || defined(GL_VERSION_4_5)
     if (ext.EXT_clip_control) {
-        glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
+        // glcorearb.h:
+        // #define GL_UPPER_LEFT 0x8CA2
+        //
+        // somehow using the define (GL_UPPER_LEFT) results in an error when building Filament
+        // putting in just the hex (0x8CA2) does propagate the behavior to ANGLE correctly
+        glClipControl(0x8CA2, GL_ZERO_TO_ONE);
     }
 #endif
 }
