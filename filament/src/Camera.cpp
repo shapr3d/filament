@@ -157,7 +157,7 @@ math::mat4 FCamera::getProjectionMatrix() const noexcept {
     // getting back a lot of precision in the depth buffer.
     const mat4 m{ mat4::row_major_init{
             mScaling.x, 0.0, 0.0, mShiftCS.x,
-            0.0, mScaling.y, 0.0, mShiftCS.y,
+            0.0, -mScaling.y, 0.0, mShiftCS.y,
             0.0, 0.0, -0.5, 0.5,    // GL to inverted DX convention
             0.0, 0.0, 0.0, 1.0
     }};

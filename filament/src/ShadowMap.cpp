@@ -44,7 +44,7 @@ static constexpr bool ENABLE_LISPSM = true;
 ShadowMap::ShadowMap(FEngine& engine) noexcept :
         mEngine(engine),
         mClipSpaceFlipped(engine.getBackend() == Backend::VULKAN),
-        mTextureSpaceFlipped(engine.getBackend() == Backend::METAL) {
+        mTextureSpaceFlipped(engine.getBackend() == Backend::METAL || engine.getBackend() == Backend::OPENGL) {
     Entity entities[2];
     engine.getEntityManager().create(2, entities);
     mCamera = mEngine.createCamera(entities[0]);

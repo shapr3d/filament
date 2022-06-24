@@ -557,6 +557,8 @@ void RenderPass::Executor::recordDriverCommands(backend::DriverApi& driver,
             // per-renderable uniform
             const PrimitiveInfo info = first->primitive;
             pipeline.rasterState = info.rasterState;
+            pipeline.rasterState.culling = CullingMode::FRONT;
+
             if (UTILS_UNLIKELY(mi != info.mi)) {
                 // this is always taken the first time
                 mi = info.mi;
