@@ -45,7 +45,7 @@ struct GLXFunctions {
     PFNGLXDESTROYPBUFFERPROC destroyPbuffer;
     PFNGLXMAKECONTEXTCURRENTPROC setCurrentContext;
 
-    /*
+    /* 
        When creating a shared GL context, we query the used
        GLX_FBCONFIG_ID to make sure our display framebuffer
        attributes match; otherwise making our context current
@@ -54,7 +54,7 @@ struct GLXFunctions {
     */
     PFNGLXQUERYCONTEXTPROC queryContext;
 
-    /*
+    /* 
        When creating a shared GL context, we select the matching
        GLXFBConfig that is used by the shared GL context. `getFBConfigs`
        will return all the available GLXFBConfigs.
