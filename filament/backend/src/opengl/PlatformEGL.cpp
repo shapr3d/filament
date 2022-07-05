@@ -76,7 +76,7 @@ static void clearGlError() noexcept {
 // ---------------------------------------------------------------------------------------------
 
 PlatformEGL::PlatformEGL(EGLDisplay display) noexcept :
-        mEGLDisplay(display), mExternalEGLDisplay(display != EGL_NO_DISPLAY) {
+        mEGLDisplay(display), mIsEGLDisplayExternal(display != EGL_NO_DISPLAY) {
 }
 
 Driver* PlatformEGL::createDriver(void* sharedContext) noexcept {
@@ -235,7 +235,7 @@ error:
     mEGLDummySurface = EGL_NO_SURFACE;
     mEGLContext = EGL_NO_CONTEXT;
 
-    if (!mExternalEGLDisplay) {
+    if (!mIsEGLDisplayExternal) {
         eglTerminate(mEGLDisplay);
     }
     eglReleaseThread();
@@ -256,7 +256,7 @@ void PlatformEGL::terminate() noexcept {
     eglMakeCurrent(mEGLDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
     eglDestroySurface(mEGLDisplay, mEGLDummySurface);
     eglDestroyContext(mEGLDisplay, mEGLContext);
-    if (!mExternalEGLDisplay) {
+    if (!mIsEGLDisplayExternal) {
         eglTerminate(mEGLDisplay);
     }
     eglReleaseThread();

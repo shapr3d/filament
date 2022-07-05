@@ -83,7 +83,7 @@ protected:
     EGLConfig mEGLConfig = EGL_NO_CONFIG_KHR;
     EGLConfig mEGLTransparentConfig = EGL_NO_CONFIG_KHR;
 
-    bool mExternalEGLDisplay = false;
+    bool mIsEGLDisplayExternal = false;
     // supported extensions detected at runtime
     struct {
         bool OES_EGL_image_external_essl3 = false;
