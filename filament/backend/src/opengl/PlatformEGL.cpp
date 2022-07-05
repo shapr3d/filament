@@ -317,7 +317,7 @@ void PlatformEGL::makeCurrent(Platform::SwapChain* drawSwapChain,
     }
 }
 
-void PlatformEGL::makeCurrent() noexcept {
+void PlatformEGL::makeCurrentOffscreen() noexcept {
     makeCurrent(mEGLDummySurface, mEGLDummySurface);
 }
 

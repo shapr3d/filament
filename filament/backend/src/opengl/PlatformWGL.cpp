@@ -249,7 +249,7 @@ void PlatformWGL::makeCurrent(Platform::SwapChain* drawSwapChain,
     }
 }
 
-void PlatformWGL::makeCurrent() noexcept {
+void PlatformWGL::makeCurrentOffscreen() noexcept {
     assert_invariant(false);
 }
 

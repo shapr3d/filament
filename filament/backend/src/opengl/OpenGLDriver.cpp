@@ -1623,7 +1623,7 @@ void OpenGLDriver::makeCurrent(Handle<HwSwapChain> schDraw, Handle<HwSwapChain> 
 
 void OpenGLDriver::makeCurrentOffscreen(int) {
     DEBUG_MARKER()
-    mPlatform.makeCurrent();
+    mPlatform.makeCurrentOffscreen();
 }
 
 // ------------------------------------------------------------------------------------------------

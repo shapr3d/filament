@@ -154,7 +154,7 @@ void PlatformCocoaTouchGL::makeCurrent(SwapChain* drawSwapChain, SwapChain* read
     }
 }
 
-void PlatformCocoaTouchGL::makeCurrent() noexcept {
+void PlatformCocoaTouchGL::makeCurrentOffscreen() noexcept {
   [EAGLContext setCurrentContext:pImpl->mGLContext];
 }
 
