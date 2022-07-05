@@ -62,7 +62,7 @@ CocoaGLSwapChain::CocoaGLSwapChain( NSView* inView )
         , currentWindowFrame(NSZeroRect) {
     NSView* __weak weakView = view;
     NSMutableArray* __weak weakObservers = observers;
-    
+
     void (^notificationHandler)(NSNotification *notification) = ^(NSNotification *notification) {
         NSView* strongView = weakView;
         if ((weakView != nil) && (weakObservers != nil)) {
@@ -70,7 +70,7 @@ CocoaGLSwapChain::CocoaGLSwapChain( NSView* inView )
             this->currentWindowFrame = strongView.window.frame;
         }
     };
-    
+
     // Various methods below should only be called from the main thread:
     // -[NSView bounds], -[NSView convertRectToBacking:], -[NSView window],
     // -[NSWindow frame], -[NSView superview],
@@ -115,7 +115,7 @@ CocoaGLSwapChain::CocoaGLSwapChain( NSView* inView )
                     queue: nil
                     usingBlock: notificationHandler];
                 [strongObservers addObject: observer];
-                
+
                 aView = aView.superview;
             }
         }
@@ -253,6 +253,8 @@ void PlatformCocoaGL::makeCurrent(Platform::SwapChain* drawSwapChain,
     swapChain->previousBounds = currentBounds;
     swapChain->previousWindowFrame = currentWindowFrame;
 }
+
+void PlatformCocoaGL::makeCurrent() noexcept {}
 
 void PlatformCocoaGL::commit(Platform::SwapChain* swapChain) noexcept {
     [pImpl->mGLContext flushBuffer];

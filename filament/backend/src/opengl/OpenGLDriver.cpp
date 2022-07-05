@@ -1621,6 +1621,11 @@ void OpenGLDriver::makeCurrent(Handle<HwSwapChain> schDraw, Handle<HwSwapChain> 
     mPlatform.makeCurrent(scDraw->swapChain, scRead->swapChain);
 }
 
+void OpenGLDriver::makeCurrentOffscreen(int) {
+    DEBUG_MARKER()
+    mPlatform.makeCurrent();
+}
+
 // ------------------------------------------------------------------------------------------------
 // Updating driver objects
 // ------------------------------------------------------------------------------------------------

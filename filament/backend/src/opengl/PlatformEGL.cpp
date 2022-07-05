@@ -317,6 +317,10 @@ void PlatformEGL::makeCurrent(Platform::SwapChain* drawSwapChain,
     }
 }
 
+void PlatformEGL::makeCurrent() noexcept {
+    makeCurrent(mEGLDummySurface, mEGLDummySurface);
+}
+
 void PlatformEGL::commit(Platform::SwapChain* swapChain) noexcept {
     EGLSurface sur = (EGLSurface) swapChain;
     if (sur != EGL_NO_SURFACE) {

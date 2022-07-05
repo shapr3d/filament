@@ -21,8 +21,8 @@
 #include "OpenGLDriverFactory.h"
 
 #ifdef _MSC_VER
-    // this variable is checked in BlueGL.h (included from "gl_headers.h" right after this), 
-    // and prevents duplicate definition of OpenGL apis when building this file. 
+    // this variable is checked in BlueGL.h (included from "gl_headers.h" right after this),
+    // and prevents duplicate definition of OpenGL apis when building this file.
     // However, GL_GLEXT_PROTOTYPES need to be defined in BlueGL.h when included from other files.
     #define FILAMENT_PLATFORM_WGL
 #endif
@@ -247,6 +247,10 @@ void PlatformWGL::makeCurrent(Platform::SwapChain* drawSwapChain,
             wglMakeCurrent(0, NULL);
         }
     }
+}
+
+void PlatformWGL::makeCurrent() noexcept {
+    assert_invariant(false);
 }
 
 void PlatformWGL::commit(Platform::SwapChain* swapChain) noexcept {

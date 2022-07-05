@@ -172,6 +172,7 @@ void FRenderer::renderStandaloneView(FView const* view) {
         engine.prepare();
 
         FEngine::DriverApi& driver = engine.getDriverApi();
+        driver.makeCurrentOffscreen();
         driver.beginFrame(steady_clock::now().time_since_epoch().count(), mFrameId);
 
         renderInternal(view);

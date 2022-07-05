@@ -39,6 +39,7 @@ public:
     SwapChain* createSwapChain(uint32_t width, uint32_t height, uint64_t& flags) noexcept final;
     void destroySwapChain(SwapChain* swapChain) noexcept final;
     void makeCurrent(SwapChain* drawSwapChain, SwapChain* readSwapChain) noexcept final;
+    void makeCurrent() noexcept final;
     void commit(SwapChain* swapChain) noexcept final;
     void createDefaultRenderTarget(uint32_t& framebuffer, uint32_t& colorbuffer,
             uint32_t& depthbuffer) noexcept final;

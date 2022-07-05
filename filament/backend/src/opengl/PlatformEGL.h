@@ -40,6 +40,7 @@ public:
     SwapChain* createSwapChain(uint32_t width, uint32_t height, uint64_t& flags) noexcept override;
     void destroySwapChain(SwapChain* swapChain) noexcept override;
     void makeCurrent(SwapChain* drawSwapChain, SwapChain* readSwapChain) noexcept override;
+    void makeCurrent() noexcept override;
     void commit(SwapChain* swapChain) noexcept override;
 
     bool canCreateFence() noexcept override { return true; }
@@ -82,6 +83,7 @@ protected:
     EGLConfig mEGLConfig = EGL_NO_CONFIG_KHR;
     EGLConfig mEGLTransparentConfig = EGL_NO_CONFIG_KHR;
 
+    bool mExternalEGLDisplay = false;
     // supported extensions detected at runtime
     struct {
         bool OES_EGL_image_external_essl3 = false;
