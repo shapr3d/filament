@@ -81,6 +81,43 @@ vec4 TriplanarTexture(sampler2D tex, float scaler, highp vec3 pos, lowp vec3 nor
            weights.z * texture(tex, queryPos.yx);
 }
 
+vec4 BiplanarTexture(sampler2D tex, float scaler, highp vec3 pos, lowp vec3 normal) {
+    // Depending on the resolution of the texture, we may want to multiply the texture coordinates
+    vec3 queryPos = scaler * pos;
+
+    // Compute derivatives for grad sampling
+    vec3 dpdx = dFdx(queryPos);
+    vec3 dpdy = dFdy(queryPos);
+
+    // Select the two most fitting planes to do the bi- instead of the triplanar - we do this based on weights
+    vec3 weights = ComputeWeights(normal);
+
+    // This is from https://www.shadertoy.com/view/ws3Bzf. 'Major axis (in x; yz are following axis)'
+    ivec3 ma = (weights.x > weights.y && weights.x > weights.z) ? ivec3(0,1,2) :
+               (weights.y > weights.z)                          ? ivec3(1,2,0) :
+                                                                  ivec3(2,0,1);
+    // 'minor axis (in x; yz are following axis)'
+    ivec3 mi = (weights.x < weights.y && weights.x < weights.z) ? ivec3(0,1,2) :
+               (weights.y < weights.z)                          ? ivec3(1,2,0) :
+                                                                  ivec3(2,0,1);
+        
+    // 'median axis (in x;  yz are following axis)'
+    ivec3 me = ivec3(3) - mi - ma;    
+
+    // 'project+fetch'
+    vec4 mainPlaneSample = textureGrad( tex, vec2(queryPos[ma.y], queryPos[ma.z]), vec2(dpdx[ma.y], dpdx[ma.z]), vec2(dpdy[ma.y], dpdy[ma.z]) );
+    vec4 secondaryPlaneSample = textureGrad( tex, vec2(queryPos[me.y], queryPos[me.z]), vec2(dpdx[me.y], dpdx[me.z]), vec2(dpdy[me.y], dpdy[me.z]) );
+
+    // blend and return
+    vec2 m = vec2(weights[ma.x], weights[me.x]);
+    
+    // optional - add local support (prevents discontinuty)
+    const float kSupportThreshold = 0.25;
+    m = clamp( (m - kSupportThreshold) / (1.0 - kSupportThreshold), 0.0, 1.0 );
+
+	return (mainPlaneSample * m.x + secondaryPlaneSample * m.y) / (m.x + m.y);
+}
+
 vec3 UnpackNormal(vec2 packedNormal, vec2 scale) {
     float x = (packedNormal.x * 2.0 - 1.0) * scale.x;
     float y = (packedNormal.y * 2.0 - 1.0) * scale.y;
