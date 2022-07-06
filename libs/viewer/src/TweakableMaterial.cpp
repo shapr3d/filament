@@ -209,7 +209,7 @@ void TweakableMaterial::resetWithType(MaterialType newType) {
     mAbsorption.useDerivedQuantity = false;
     mSheenColor.useDerivedQuantity = false;
     mUseWard = false;
-
+    mDoBiplanar = true;
     mDoRelease = false;
 
     mShaderType = newType;
@@ -360,6 +360,7 @@ void TweakableMaterial::drawUI(const std::string& header) {
 
     if (ImGui::CollapsingHeader("Shader setup")) {
         ImGui::Checkbox("Use Ward specular normal distribution", &mUseWard);
+        ImGui::Checkbox("Use biplanar", &mDoBiplanar);
     }
 }
 

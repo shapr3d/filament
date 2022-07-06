@@ -216,6 +216,10 @@ material {
         {
             type : float4,
             name : ambientColor
+        },
+        {
+            type : int,
+            name : useBiplanar
         }
     ],
     variables: [

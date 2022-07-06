@@ -62,6 +62,76 @@ FragmentData GetPositionAndNormal() {
 //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+struct BiplanarAxes {
+    ivec3 maximum;
+    ivec3 median;
+};
+
+struct BiplanarData {
+    vec2 maxPos;
+    vec2 maxDpDx;
+    vec2 maxDpDy;
+    float mainWeight;
+
+    vec2 medPos;
+    vec2 medDpDx;
+    vec2 medDpDy;
+    float medianWeight;
+};
+const BiplanarData DEFAULT_BIPLANAR_DATA = BiplanarData(vec2(0.0), vec2(0.0), vec2(0.0), 0.0, vec2(0.0), vec2(0.0), vec2(0.0), 0.0);
+
+// Selects the two most relevant planes, i.e., where the projection of a plane with the supplied normal would be the largest. The .x integer
+// contains the index of the plane with the largest projection (X = 0, Y = 1, Z = 2), whereas .yz are used to project 3D entities to the plane
+// that has the normal corresponding (=the same or opposite) to the .x axis. 
+BiplanarAxes ComputeBiplanarPlanes(vec3 weights) {
+    // This is from https://www.shadertoy.com/view/ws3Bzf. 'Major axis (in x; yz are following axis)'
+    ivec3 ma = (weights.x > weights.y && weights.x > weights.z) ? ivec3(0,1,2) :
+               (weights.y > weights.z)                          ? ivec3(1,2,0) :
+                                                                  ivec3(2,0,1);
+    // 'minor axis (in x; yz are following axis)'
+    ivec3 mi = (weights.x < weights.y && weights.x < weights.z) ? ivec3(0,1,2) :
+               (weights.y < weights.z)                          ? ivec3(1,2,0) :
+                                                                  ivec3(2,0,1);
+        
+    // 'median axis (in x;  yz are following axis)'
+    ivec3 me = ivec3(3) - mi - ma;
+
+    BiplanarAxes result;
+    result.maximum = ma;
+    result.median = me;
+    return result;
+}
+
+BiplanarData GenerateBiplanarData(BiplanarAxes axes, float scaler, highp vec3 pos, lowp vec3 weights) {
+    // Depending on the resolution of the texture, we may want to multiply the texture coordinates
+    vec3 queryPos = scaler * pos;
+
+    // Store the query data
+    BiplanarData result = DEFAULT_BIPLANAR_DATA;
+
+    // Position needs some fixed flipping-fu so that textures are oriented as intended
+    vec2 uvQueries[3] = vec2[3](queryPos.yz * vec2(1, -1), -queryPos.xz, queryPos.yx);
+
+    result.maxPos = uvQueries[axes.maximum.x];
+    result.medPos = uvQueries[axes.median.x];
+
+    // Derivatives are based on the scaled pos, without the flipping shenanigans going on above 
+    vec3 dpdx = dFdx(queryPos);
+    vec3 dpdy = dFdy(queryPos);
+
+    result.maxDpDx = vec2(dpdx[axes.maximum.y], dpdx[axes.maximum.z]);
+    result.maxDpDy = vec2(dpdy[axes.maximum.y], dpdy[axes.maximum.z]);
+
+    result.medDpDx = vec2(dpdx[axes.median.y], dpdx[axes.median.z]);
+    result.medDpDy = vec2(dpdy[axes.median.y], dpdy[axes.median.z]);
+
+    // Weights are selected by most relevant axes
+    result.mainWeight = weights[axes.maximum.x];
+    result.medianWeight = weights[axes.median.x];
+
+    return result;
+}
+
 // A simple linear blend with normalization
 vec3 ComputeWeights(vec3 normal) {
     // This one has a region where there is no blend, creating more defined interpolations
@@ -82,40 +152,20 @@ vec4 TriplanarTexture(sampler2D tex, float scaler, highp vec3 pos, lowp vec3 nor
 }
 
 vec4 BiplanarTexture(sampler2D tex, float scaler, highp vec3 pos, lowp vec3 normal) {
-    // Depending on the resolution of the texture, we may want to multiply the texture coordinates
-    vec3 queryPos = scaler * pos;
-
-    // Compute derivatives for grad sampling
-    vec3 dpdx = dFdx(queryPos);
-    vec3 dpdy = dFdy(queryPos);
-
-    // Select the two most fitting planes to do the bi- instead of the triplanar - we do this based on weights
+    // We sort triplanar plane relevance by the relative ordering of the weights and not by the normal
     vec3 weights = ComputeWeights(normal);
+    BiplanarAxes axes = ComputeBiplanarPlanes(weights);
+    BiplanarData queryData = GenerateBiplanarData(axes, scaler, pos, weights);
 
-    // This is from https://www.shadertoy.com/view/ws3Bzf. 'Major axis (in x; yz are following axis)'
-    ivec3 ma = (weights.x > weights.y && weights.x > weights.z) ? ivec3(0,1,2) :
-               (weights.y > weights.z)                          ? ivec3(1,2,0) :
-                                                                  ivec3(2,0,1);
-    // 'minor axis (in x; yz are following axis)'
-    ivec3 mi = (weights.x < weights.y && weights.x < weights.z) ? ivec3(0,1,2) :
-               (weights.y < weights.z)                          ? ivec3(1,2,0) :
-                                                                  ivec3(2,0,1);
-        
-    // 'median axis (in x;  yz are following axis)'
-    ivec3 me = ivec3(3) - mi - ma;    
-
-    // 'project+fetch'
-    vec4 mainPlaneSample = textureGrad( tex, vec2(queryPos[ma.y], queryPos[ma.z]), vec2(dpdx[ma.y], dpdx[ma.z]), vec2(dpdy[ma.y], dpdy[ma.z]) );
-    vec4 secondaryPlaneSample = textureGrad( tex, vec2(queryPos[me.y], queryPos[me.z]), vec2(dpdx[me.y], dpdx[me.z]), vec2(dpdy[me.y], dpdy[me.z]) );
-
-    // blend and return
-    vec2 m = vec2(weights[ma.x], weights[me.x]);
+    vec4 mainPlaneSample = textureGrad( tex, queryData.maxPos, queryData.maxDpDx, queryData.maxDpDy );
+    vec4 secondaryPlaneSample = textureGrad( tex, queryData.medPos, queryData.medDpDx, queryData.medDpDy );
     
     // optional - add local support (prevents discontinuty)
     const float kSupportThreshold = 0.25;
-    m = clamp( (m - kSupportThreshold) / (1.0 - kSupportThreshold), 0.0, 1.0 );
+    queryData.mainWeight = clamp( (queryData.mainWeight - kSupportThreshold) / (1.0 - kSupportThreshold), 0.0, 1.0 );
+    queryData.medianWeight = clamp( (queryData.medianWeight - kSupportThreshold) / (1.0 - kSupportThreshold), 0.0, 1.0 );
 
-	return (mainPlaneSample * m.x + secondaryPlaneSample * m.y) / (m.x + m.y);
+	return (mainPlaneSample * queryData.mainWeight + secondaryPlaneSample * queryData.medianWeight) / (queryData.mainWeight + queryData.medianWeight);
 }
 
 vec3 UnpackNormal(vec2 packedNormal, vec2 scale) {
@@ -156,6 +206,46 @@ vec3 TriplanarNormalMap(sampler2D normalMap, float scaler, highp vec3 pos, lowp 
     return r;
 }
 
+vec2 swizzleIvec(vec3 x, ivec2 i) {
+    return vec2( x[i[0]], x[i[1]] );
+}
+
+vec3 swizzleIvec(vec3 x, ivec3 i) {
+    return vec3( x[i[0]], x[i[1]], x[i[2]] );
+}
+
+// This is a whiteout blended tripalanar normal mapping, where each plane's tangent frame is
+// approximated by the appropriate sequence and flips of world space axes. For more details
+// Refer to https://bgolus.medium.com/normal-mapping-for-a-triplanar-shader-10bf39dca05a
+vec3 BiplanarNormalMap(sampler2D normalMap, float scaler, highp vec3 pos, lowp vec3 normal, float normalIntensity) {
+    // We sort triplanar plane relevance by the relative ordering of the weights and not by the normal
+    vec3 weights = ComputeWeights(normal);
+    BiplanarAxes axes = ComputeBiplanarPlanes(weights);
+    BiplanarData queryData = GenerateBiplanarData(axes, scaler, pos, weights);
+
+    // Tangent space normal maps in a quasi world space. 2-channel XY TS normal texture: this saves 33% on storage (but we have to start using actual 2 channel textures for that)
+    int maxAxis = axes.maximum.x;
+    int medAxis = axes.median.x;
+    vec3 tNormalMax = UnpackNormal(textureGrad(normalMap, queryData.maxPos, queryData.maxDpDx, queryData.maxDpDy).xy, vec2(SignNoZero(normal[maxAxis]) * normalIntensity, normalIntensity) );
+    vec3 tNormalMed = UnpackNormal(textureGrad(normalMap, queryData.medPos, queryData.medDpDx, queryData.medDpDy).xy, vec2(SignNoZero(normal[medAxis]) * normalIntensity, normalIntensity) );
+
+    // Swizzle the above normals to tangent space and apply Whiteout blend
+    const ivec2 tangentSwizzles[3] = ivec2[3](ivec2(1, 2), ivec2(0, 2), ivec2(1, 0)); // YZ, XZ, YX
+    const vec2 tangentMultipliers[3] = vec2[3]( vec2(1, 1), vec2(-1, 1), vec2(1, -1) );
+    tNormalMax = vec3(tNormalMax.xy + swizzleIvec(normal, tangentSwizzles[maxAxis]) * tangentMultipliers[maxAxis] * vec2( SignNoZero(normal[maxAxis]),  1), abs(tNormalMax.z) * abs(normal[maxAxis]));
+    tNormalMed = vec3(tNormalMed.xy + swizzleIvec(normal, tangentSwizzles[medAxis]) * tangentMultipliers[medAxis] * vec2( SignNoZero(normal[medAxis]),  1), abs(tNormalMed.z) * abs(normal[medAxis]));
+
+    // Swizzle tangent normals to match world orientation
+    const ivec3 worldSwizzles[3] = ivec3[3](ivec3(2, 0, 1), ivec3(0, 2, 1), ivec3(1, 0, 2));
+    vec3 worldMultipliers[3] = vec3[3]( vec3(SignNoZero(normal.x), SignNoZero(normal.x), 1),
+                                          vec3(-SignNoZero(normal.y), SignNoZero(normal.y), 1),
+                                          vec3(-1, SignNoZero(normal.z), SignNoZero(normal.z)) );
+    // Blend and normalize
+    vec3 r = swizzleIvec(tNormalMax, worldSwizzles[maxAxis]) * queryData.mainWeight * worldMultipliers[maxAxis] +
+             swizzleIvec(tNormalMed, worldSwizzles[medAxis]) * queryData.medianWeight * worldMultipliers[medAxis];
+    return normalize(r);
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Custom code to evaluate the materials
@@ -167,11 +257,20 @@ void ApplyNormalMap(inout MaterialInputs material, inout FragmentData fragmentDa
     if (materialParams.useNormalTexture == 1) {
         // We combine the normals in world space, hence the transformation in the end from world to tangent, assuming an
         // orthonormal tangent frame (which may not hold actually but looks fine enough for now).
-        vec3 normalWS = TriplanarNormalMap(materialParams_normalTexture,
-                                           materialParams.textureScaler.y,
-                                           fragmentData.pos,
-                                           fragmentData.normal,
-                                           materialParams.normalIntensity);
+        vec3 normalWS = vec3(0.0);
+        if (materialParams.useBiplanar == 1) {
+            normalWS = BiplanarNormalMap(materialParams_normalTexture,
+                                         materialParams.textureScaler.y,
+                                         fragmentData.pos,
+                                         fragmentData.normal,
+                                         materialParams.normalIntensity);
+        } else {
+            normalWS = TriplanarNormalMap(materialParams_normalTexture,
+                                          materialParams.textureScaler.y,
+                                          fragmentData.pos,
+                                          fragmentData.normal,
+                                          materialParams.normalIntensity);
+        }
 #if defined(SHAPR_USE_WORLD_NORMALS)
         material.normal = normalWS;
 #else
@@ -189,11 +288,20 @@ void ApplyNormalMap(inout MaterialInputs material, inout FragmentData fragmentDa
 void ApplyClearCoatNormalMap(inout MaterialInputs material, inout FragmentData fragmentData) {
 #if defined(MATERIAL_HAS_CLEAR_COAT_NORMAL)
     if (materialParams.useClearCoatNormalTexture == 1) {
-        vec3 clearCoatNormalWS = TriplanarNormalMap(materialParams_clearCoatNormalTexture,
-                                                    materialParams.textureScaler.z,
-                                                    fragmentData.pos,
-                                                    fragmentData.normal,
-                                                    materialParams.clearCoatNormalIntensity);
+        vec3 clearCoatNormalWS = vec3(0.0);
+        if (materialParams.useBiplanar == 1) {
+            clearCoatNormalWS = BiplanarNormalMap(materialParams_clearCoatNormalTexture,
+                                         materialParams.textureScaler.z,
+                                         fragmentData.pos,
+                                         fragmentData.normal,
+                                         materialParams.clearCoatNormalIntensity);
+        } else {
+            clearCoatNormalWS = TriplanarNormalMap(materialParams_clearCoatNormalTexture,
+                                          materialParams.textureScaler.z,
+                                          fragmentData.pos,
+                                          fragmentData.normal,
+                                          materialParams.clearCoatNormalIntensity);
+        }
 #if defined(SHAPR_USE_WORLD_NORMALS)
         material.clearCoatNormal = clearCoatNormalWS;
 #else
@@ -212,17 +320,33 @@ void ApplyBaseColor(inout MaterialInputs material, inout FragmentData fragmentDa
 #if defined(MATERIAL_HAS_BASE_COLOR)
     if (materialParams.useBaseColorTexture == 1) {
 #if defined(BLENDING_ENABLED) || defined(HAS_REFRACTION)
-        material.baseColor.rgba = TriplanarTexture(materialParams_baseColorTexture,
-                                                   materialParams.textureScaler.x,
-                                                   fragmentData.pos,
-                                                   fragmentData.normal)
-                                      .rgba;
+        if (materialParams.useBiplanar == 1) {
+            material.baseColor.rgba = BiplanarTexture(materialParams_baseColorTexture,
+                                                    materialParams.textureScaler.x,
+                                                    fragmentData.pos,
+                                                    fragmentData.normal)
+                                        .rgba;
+        } else {
+            material.baseColor.rgba = TriplanarTexture(materialParams_baseColorTexture,
+                                                    materialParams.textureScaler.x,
+                                                    fragmentData.pos,
+                                                    fragmentData.normal)
+                                        .rgba;
+        }
 #else
-        material.baseColor.rgb = TriplanarTexture(materialParams_baseColorTexture,
-                                                  materialParams.textureScaler.x,
-                                                  fragmentData.pos,
-                                                  fragmentData.normal)
-                                     .rgb;
+        if (materialParams.useBiplanar == 1) {
+            material.baseColor.rgb = BiplanarTexture(materialParams_baseColorTexture,
+                                                    materialParams.textureScaler.x,
+                                                    fragmentData.pos,
+                                                    fragmentData.normal)
+                                        .rgb;
+        } else {
+            material.baseColor.rgb = TriplanarTexture(materialParams_baseColorTexture,
+                                                    materialParams.textureScaler.x,
+                                                    fragmentData.pos,
+                                                    fragmentData.normal)
+                                        .rgb;
+        }
 #endif
     } else {
 #if defined(BLENDING_ENABLED) || defined(HAS_REFRACTION)
