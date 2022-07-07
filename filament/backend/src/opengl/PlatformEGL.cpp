@@ -80,7 +80,7 @@ PlatformEGL::PlatformEGL(EGLDisplay display) noexcept :
 }
 
 Driver* PlatformEGL::createDriver(void* sharedContext) noexcept {
-    if (mEGLDisplay == EGL_NO_DISPLAY) {
+    if (!mIsEGLDisplayExternal) {
         mEGLDisplay = eglGetDisplay(EGL_DEFAULT_DISPLAY);
         assert_invariant(mEGLDisplay != EGL_NO_DISPLAY);
 
