@@ -37,6 +37,7 @@ public:
     }
     void destroySwapChain(SwapChain* swapChain) noexcept final override {}
     void makeCurrent(SwapChain* drawSwapChain, SwapChain* readSwapChain) noexcept final override {}
+    void makeCurrentOffscreen() noexcept final override {}
     void commit(SwapChain* swapChain) noexcept final override {}
 
     Fence* createFence() noexcept final override { return nullptr; }

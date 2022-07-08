@@ -926,6 +926,8 @@ void MetalDriver::makeCurrent(Handle<HwSwapChain> schDraw, Handle<HwSwapChain> s
     }
 }
 
+void MetalDriver::makeCurrentOffscreen(int) {}
+
 void MetalDriver::commit(Handle<HwSwapChain> sch) {
     auto* swapChain = handle_cast<MetalSwapChain>(sch);
     swapChain->present();

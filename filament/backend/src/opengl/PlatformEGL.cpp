@@ -75,21 +75,22 @@ static void clearGlError() noexcept {
 
 // ---------------------------------------------------------------------------------------------
 
-PlatformEGL::PlatformEGL(EGLDisplay display) noexcept : 
-        mEGLDisplay(display) {
+PlatformEGL::PlatformEGL(EGLDisplay display) noexcept :
+        mEGLDisplay(display), mIsEGLDisplayExternal(display != EGL_NO_DISPLAY) {
 }
 
 Driver* PlatformEGL::createDriver(void* sharedContext) noexcept {
-    if (mEGLDisplay == EGL_NO_DISPLAY) {
+    if (!mIsEGLDisplayExternal) {
         mEGLDisplay = eglGetDisplay(EGL_DEFAULT_DISPLAY);
         assert_invariant(mEGLDisplay != EGL_NO_DISPLAY);
-    }
 
-    EGLint major, minor;
-    EGLBoolean initialized = eglInitialize(mEGLDisplay, &major, &minor);
-    if (UTILS_UNLIKELY(!initialized)) {
-        slog.e << "eglInitialize failed" << io::endl;
-        return nullptr;
+        EGLint major, minor;
+        EGLBoolean initialized = eglInitialize(mEGLDisplay, &major, &minor);
+        if (UTILS_UNLIKELY(!initialized)) {
+            slog.e << "eglInitialize failed" << io::endl;
+            return nullptr;
+        }
+
     }
 
     importGLESExtensionsEntryPoints();
@@ -234,7 +235,9 @@ error:
     mEGLDummySurface = EGL_NO_SURFACE;
     mEGLContext = EGL_NO_CONTEXT;
 
-    eglTerminate(mEGLDisplay);
+    if (!mIsEGLDisplayExternal) {
+        eglTerminate(mEGLDisplay);
+    }
     eglReleaseThread();
 
     return nullptr;
@@ -253,7 +256,9 @@ void PlatformEGL::terminate() noexcept {
     eglMakeCurrent(mEGLDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
     eglDestroySurface(mEGLDisplay, mEGLDummySurface);
     eglDestroyContext(mEGLDisplay, mEGLContext);
-    eglTerminate(mEGLDisplay);
+    if (!mIsEGLDisplayExternal) {
+        eglTerminate(mEGLDisplay);
+    }
     eglReleaseThread();
 }
 
@@ -310,6 +315,10 @@ void PlatformEGL::makeCurrent(Platform::SwapChain* drawSwapChain,
     if (drawSur != EGL_NO_SURFACE || readSur != EGL_NO_SURFACE) {
         makeCurrent(drawSur, readSur);
     }
+}
+
+void PlatformEGL::makeCurrentOffscreen() noexcept {
+    makeCurrent(mEGLDummySurface, mEGLDummySurface);
 }
 
 void PlatformEGL::commit(Platform::SwapChain* swapChain) noexcept {

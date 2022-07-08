@@ -154,6 +154,10 @@ void PlatformCocoaTouchGL::makeCurrent(SwapChain* drawSwapChain, SwapChain* read
     }
 }
 
+void PlatformCocoaTouchGL::makeCurrentOffscreen() noexcept {
+  [EAGLContext setCurrentContext:pImpl->mGLContext];
+}
+
 void PlatformCocoaTouchGL::commit(Platform::SwapChain* swapChain) noexcept {
     glBindRenderbuffer(GL_RENDERBUFFER, pImpl->mDefaultColorbuffer);
     [pImpl->mGLContext presentRenderbuffer:GL_RENDERBUFFER];
