@@ -129,7 +129,6 @@ public:
 
     bool mUseWard{};
     bool mDoRelease{}; // this notifies the material integrator tool that this material needs to be checked into the codebase
-    bool mDoBiplanar{true};
 
     enum MaterialType { Opaque, Transparent, Refractive, Cloth, Subsurface };
     MaterialType mShaderType{};

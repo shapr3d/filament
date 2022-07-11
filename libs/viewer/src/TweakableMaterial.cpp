@@ -209,7 +209,6 @@ void TweakableMaterial::resetWithType(MaterialType newType) {
     mAbsorption.useDerivedQuantity = false;
     mSheenColor.useDerivedQuantity = false;
     mUseWard = false;
-    mDoBiplanar = true;
     mDoRelease = false;
 
     mShaderType = newType;
