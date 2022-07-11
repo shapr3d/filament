@@ -359,7 +359,6 @@ void TweakableMaterial::drawUI(const std::string& header) {
 
     if (ImGui::CollapsingHeader("Shader setup")) {
         ImGui::Checkbox("Use Ward specular normal distribution", &mUseWard);
-        ImGui::Checkbox("Use biplanar", &mDoBiplanar);
     }
 }
 
