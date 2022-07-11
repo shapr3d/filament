@@ -24,7 +24,6 @@ Should we propagate these changes to upstream? If so, reference the upstream PR
 or the ticket that should result in an upstream PR. If not, elaborate why.
 -->
 
-
 ## Testing
 
 ### Design review 🎨
