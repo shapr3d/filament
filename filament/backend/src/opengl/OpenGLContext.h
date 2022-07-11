@@ -196,6 +196,11 @@ public:
         // Some drivers incorrectly flatten the early exit condition in the EASU code, in which
         // case we need an alternative algorithm
         bool split_easu = false;
+
+        // GLES doesn't allow feedback loops even if writes are disabled. So take we the point of
+        // view that this is generally forbidden. However, this restriction is lifted on desktop
+        // GL and Vulkan and probably Metal.
+        bool allow_read_only_ancillary_feedback_loop = false;
     } bugs;
 
     // state getters -- as needed.
