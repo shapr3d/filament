@@ -18,6 +18,12 @@ Let's focus on the what? and how?.
 Don't duplicate what's in the Jira ticket. If it's outdated, let's update that.
 -->
 
+## Upstreaming scope
+<!---
+Should we propagate these changes to upstream? If so, reference the upstream PR
+or the ticket that should result in an upstream PR. If not, elaborate why.
+-->
+
 ## Testing
 
 ### Design review 🎨
