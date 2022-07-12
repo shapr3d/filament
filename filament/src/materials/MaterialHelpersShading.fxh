@@ -175,8 +175,9 @@ vec3 swizzleIvec(vec3 x, ivec3 i) {
 }
 
 // This is a whiteout blended tripalanar normal mapping, where each plane's tangent frame is
-// approximated by the appropriate sequence and flips of world space axes. For more details
-// Refer to https://bgolus.medium.com/normal-mapping-for-a-triplanar-shader-10bf39dca05a
+// approximated by the appropriate sequence of flips of world space axes. For more details
+// refer to https://bgolus.medium.com/normal-mapping-for-a-triplanar-shader-10bf39dca05a .
+// The only twist here is that we only ever select two planes to do the normal mapping.
 vec3 BiplanarNormalMap(sampler2D normalMap, float scaler, highp vec3 pos, lowp vec3 normal, float normalIntensity) {
     // We sort triplanar plane relevance by the relative ordering of the weights and not by the normal
     vec3 weights = ComputeWeights(normal);
