@@ -212,6 +212,12 @@ typedef SSIZE_T ssize_t;
 #ifdef _MSC_VER
 #   define UTILS_EMPTY_BASES __declspec(empty_bases)
 
+// The ISO C and C++ standard didn't include strdup function up until 6/2019.
+// However, it reserved function names that begin with 'str' and a lowercase latter.
+// Even though strdup is a valid POSIX function and even though MSVC implements it,
+// it issues a warning about the non-standard naming and suggests using their naming: _strdup
+#define strdup _strdup
+
 // MSVC does not support loop unrolling hints
 #   define UTILS_UNROLL
 #   define UTILS_NOUNROLL
