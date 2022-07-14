@@ -42,7 +42,7 @@ OpenGLProgram::OpenGLProgram(OpenGLDriver* gl, const Program& programBuilder) no
     OpenGLContext& context = gl->getContext();
 
     // build all shaders
-    #pragma nounroll
+    UTILS_NOUNROLL
     for (size_t i = 0; i < Program::SHADER_TYPE_COUNT; i++) {
         GLenum glShaderType;
         Shader type = (Shader)i;
@@ -166,7 +166,7 @@ highp uint packHalf2x16(vec2 v) {
 
         // Associate each UniformBlock in the program to a known binding.
         auto const& uniformBlockInfo = programBuilder.getUniformBlockInfo();
-        #pragma nounroll
+        UTILS_NOUNROLL
         for (GLuint binding = 0, n = uniformBlockInfo.size(); binding < n; binding++) {
             auto const& name = uniformBlockInfo[binding];
             if (!name.empty()) {
@@ -188,7 +188,7 @@ highp uint packHalf2x16(vec2 v) {
             uint8_t numUsedBindings = 0;
             uint8_t tmu = 0;
 
-            #pragma nounroll
+            UTILS_NOUNROLL
             for (size_t i = 0, c = samplerGroupInfo.size(); i < c; i++) {
                 auto const& groupInfo = samplerGroupInfo[i];
                 if (!groupInfo.empty()) {
@@ -233,7 +233,7 @@ OpenGLProgram::~OpenGLProgram() noexcept {
     const bool isValid = mIsValid;
     GLuint program = gl.program;
     if (validShaderSet) {
-        #pragma nounroll
+        UTILS_NOUNROLL
         for (size_t i = 0; i < Program::SHADER_TYPE_COUNT; i++) {
             if (validShaderSet & (1U << i)) {
                 const GLuint shader = gl.shaders[i];

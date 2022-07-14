@@ -374,7 +374,7 @@ void OpenGLContext::unbindTexture(GLenum target, GLuint texture_id) noexcept {
 
 void OpenGLContext::unbindSampler(GLuint sampler) noexcept {
     // unbind this sampler from all the units it might be bound to
-#pragma nounroll    // clang generates >800B of code!!!
+UTILS_NOUNROLL    // clang generates >800B of code!!!
     for (GLuint unit = 0; unit < MAX_TEXTURE_UNIT_COUNT; unit++) {
         if (state.textures.units[unit].sampler == sampler) {
             bindSampler(unit, 0);
@@ -387,7 +387,7 @@ void OpenGLContext::deleteBuffers(GLsizei n, const GLuint* buffers, GLenum targe
     // bindings of bound buffers are reset to 0
     const size_t targetIndex = getIndexForBufferTarget(target);
     auto& genericBuffer = state.buffers.genericBinding[targetIndex];
-    #pragma nounroll
+    UTILS_NOUNROLL
     for (GLsizei i = 0; i < n; ++i) {
         if (genericBuffer == buffers[i]) {
             genericBuffer = 0;
@@ -395,9 +395,9 @@ void OpenGLContext::deleteBuffers(GLsizei n, const GLuint* buffers, GLenum targe
     }
     if (target == GL_UNIFORM_BUFFER || target == GL_TRANSFORM_FEEDBACK_BUFFER) {
         auto& indexedBuffer = state.buffers.targets[targetIndex];
-        #pragma nounroll // clang generates >1 KiB of code!!
+        UTILS_NOUNROLL // clang generates >1 KiB of code!!
         for (GLsizei i = 0; i < n; ++i) {
-            #pragma nounroll
+            UTILS_NOUNROLL
             for (auto& buffer : indexedBuffer.buffers) {
                 if (buffer.name == buffers[i]) {
                     buffer.name = 0;

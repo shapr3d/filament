@@ -730,7 +730,7 @@ static float fresnel(const std::complex<float>& sample, float cosTheta) {
 
 static float3 linear_to_sRGB(float3 linear) noexcept {
     float3 sRGB{linear};
-#pragma nounroll
+UTILS_NOUNROLL
     for (size_t i = 0; i < sRGB.size(); i++) {
         sRGB[i] = (sRGB[i] <= 0.0031308f) ?
                 sRGB[i] * 12.92f : (powf(sRGB[i], 1.0f / 2.4f) * 1.055f) - 0.055f;

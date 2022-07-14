@@ -171,7 +171,7 @@ FVertexBuffer::FVertexBuffer(FEngine& engine, const VertexBuffer::Builder& build
 
     auto const& declaredAttributes = mDeclaredAttributes;
     auto const& attributes = mAttributes;
-    #pragma nounroll
+    UTILS_NOUNROLL
     for (size_t i = 0, n = attributeArray.size(); i < n; ++i) {
         if (declaredAttributes[i]) {
             const uint32_t offset = attributes[i].offset;
@@ -201,7 +201,7 @@ FVertexBuffer::FVertexBuffer(FEngine& engine, const VertexBuffer::Builder& build
 
     // If buffer objects are not enabled at the API level, then we create them internally.
     if (!mBufferObjectsEnabled) {
-        #pragma nounroll
+        UTILS_NOUNROLL
         for (size_t i = 0; i < MAX_VERTEX_BUFFER_COUNT; ++i) {
             if (bufferSizes[i] > 0) {
                 BufferObjectHandle bo = driver.createBufferObject(bufferSizes[i],

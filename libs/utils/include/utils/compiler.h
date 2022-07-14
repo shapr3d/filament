@@ -211,8 +211,13 @@ typedef SSIZE_T ssize_t;
 
 #ifdef _MSC_VER
 #   define UTILS_EMPTY_BASES __declspec(empty_bases)
+
+// MSVC does not support loop unrolling hints
+#   define UTILS_NOUNROLL
 #else
 #   define UTILS_EMPTY_BASES
+// C++11 allows pragmas to be specified as part of defines using the _Pragma syntax.
+#   define UTILS_NOUNROLL _Pragma("nounroll")
 #endif
 
 #if defined(WIN32) || defined(_WIN32)

@@ -692,7 +692,7 @@ float2 ShadowMap::computeNearFar(const mat4f& view,
 float2 ShadowMap::computeNearFarOfWarpSpace(mat4f const& lightView,
         float3 const* wsVertices, size_t count) noexcept {
     float2 nearFar = { std::numeric_limits<float>::max(), std::numeric_limits<float>::lowest() };
-    #pragma nounroll
+    UTILS_NOUNROLL
     for (size_t i = 0; i < count; i++) {
         // we're on the y axis in light space (looking down to +y)
         float c = mat4f::project(lightView, wsVertices[i]).y;
@@ -833,7 +833,7 @@ size_t ShadowMap::intersectFrustumWithBox(
     const Aabb::Corners wsSceneReceiversCorners = wsBox.getCorners();
 
     // a) Keep the frustum's vertices that are known to be inside the scene's box
-    #pragma nounroll
+    UTILS_NOUNROLL
     for (size_t i = 0; i < 8; i++) {
         float3 p = wsFrustumCorners[i];
         outVertices[vertexCount] = p;
@@ -856,7 +856,7 @@ size_t ShadowMap::intersectFrustumWithBox(
         // We need to handle the case where a corner of the box lies exactly on a plane of
         // the frustum. This actually happens often due to fitting light-space
         // We fudge the distance to the plane by a small amount.
-        #pragma nounroll
+        UTILS_NOUNROLL
         for (float3 p : wsSceneReceiversCorners) {
             outVertices[vertexCount] = p;
             float l = dot(wsFrustumPlanes[0].xyz, p) + wsFrustumPlanes[0].w;
@@ -919,7 +919,7 @@ size_t ShadowMap::intersectFrustum(
         float3 const* segmentsVertices,
         float3 const* quadsVertices) noexcept {
 
-    #pragma nounroll
+    UTILS_NOUNROLL
     for (const Segment segment : sBoxSegments) {
         const float3 s0{ segmentsVertices[segment.v0] };
         const float3 s1{ segmentsVertices[segment.v1] };

@@ -1974,7 +1974,7 @@ void OpenGLDriver::setTextureData(GLTexture* t,
             bindTexture(OpenGLContext::MAX_TEXTURE_UNIT_COUNT - 1, t);
             gl.activeTexture(OpenGLContext::MAX_TEXTURE_UNIT_COUNT - 1);
             FaceOffsets const& offsets = *faceOffsets;
-#pragma nounroll
+UTILS_NOUNROLL
             for (size_t face = 0; face < 6; face++) {
                 GLenum target = getCubemapTarget(TextureCubemapFace(face));
                 glTexSubImage2D(target, GLint(level), 0, 0,
@@ -2059,7 +2059,7 @@ void OpenGLDriver::setCompressedTextureData(GLTexture* t,  uint32_t level,
             bindTexture(OpenGLContext::MAX_TEXTURE_UNIT_COUNT - 1, t);
             gl.activeTexture(OpenGLContext::MAX_TEXTURE_UNIT_COUNT - 1);
             FaceOffsets const& offsets = *faceOffsets;
-#pragma nounroll
+UTILS_NOUNROLL
             for (size_t face = 0; face < 6; face++) {
                 GLenum target = getCubemapTarget(TextureCubemapFace(face));
                 glCompressedTexSubImage2D(target, GLint(level), 0, 0,
