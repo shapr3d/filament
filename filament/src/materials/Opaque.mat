@@ -1,6 +1,7 @@
 material {
     name : Opaque,
     specularAntiAliasing : true,
+    doubleSided: true,
     postLightingBlending : transparent,
     parameters : [
         //////////////////////////////////////////////////////////////////////////////////////////////////
