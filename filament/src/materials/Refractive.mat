@@ -2,6 +2,7 @@ material {
     name : Refractive,
     shadingModel : lit,
     specularAntiAliasing : true,
+    doubleSided: true,
     refractionType : solid,
     refractionMode : screenspace,
     postLightingBlending : transparent,

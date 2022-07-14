@@ -2,6 +2,7 @@ material {
     name : Cloth,
     shadingModel : cloth,
     specularAntiAliasing : true,
+    doubleSided: true,
     postLightingBlending : transparent,
     parameters : [
         //////////////////////////////////////////////////////////////////////////////////////////////////
