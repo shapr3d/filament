@@ -702,6 +702,8 @@ bool MetalDriver::isWorkaroundNeeded(Workaround workaround) {
     switch (workaround) {
         case Workaround::SPLIT_EASU:
             return false;
+        case Workaround::ALLOW_READ_ONLY_ANCILLARY_FEEDBACK_LOOP:
+            return true;
     }
     return false;
 }
@@ -925,6 +927,8 @@ void MetalDriver::makeCurrent(Handle<HwSwapChain> schDraw, Handle<HwSwapChain> s
         mContext->currentReadSwapChain = readSwapChain;
     }
 }
+
+void MetalDriver::makeCurrentOffscreen(int) {}
 
 void MetalDriver::commit(Handle<HwSwapChain> sch) {
     auto* swapChain = handle_cast<MetalSwapChain>(sch);

@@ -46,6 +46,8 @@ void PlatformWebGL::makeCurrent(Platform::SwapChain* drawSwapChain,
         Platform::SwapChain* readSwapChain) noexcept {
 }
 
+void PlatformWebGL::makeCurrentOffscreen() noexcept {}
+
 void PlatformWebGL::commit(Platform::SwapChain* swapChain) noexcept {
 }
 
