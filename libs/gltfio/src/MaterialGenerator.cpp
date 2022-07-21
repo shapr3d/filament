@@ -376,7 +376,7 @@ static Material* createMaterial(Engine* engine, const MaterialKey& config, const
     builder.parameter(MaterialBuilder::UniformType::FLOAT, "roughnessFactor");
 
     builder.parameter(MaterialBuilder::UniformType::FLOAT4, "scalingControl");
-    
+
     if (config.hasMetallicRoughnessTexture) {
         builder.parameter(MaterialBuilder::SamplerType::SAMPLER_2D, "metallicRoughnessMap");
         if (config.hasTextureTransforms) {

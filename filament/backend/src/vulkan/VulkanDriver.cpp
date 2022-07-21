@@ -1299,7 +1299,8 @@ void VulkanDriver::makeCurrent(Handle<HwSwapChain> drawSch, Handle<HwSwapChain> 
     surf.acquire();
 }
 
-void VulkanDriver::makeCurrentOffscreen(int) {}
+void VulkanDriver::makeCurrentOffscreen(int) {
+}
 
 void VulkanDriver::commit(Handle<HwSwapChain> sch) {
     VulkanSwapChain& surface = *handle_cast<VulkanSwapChain*>(sch);

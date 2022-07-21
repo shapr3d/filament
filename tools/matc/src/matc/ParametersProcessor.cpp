@@ -767,7 +767,7 @@ ParametersProcessor::ParametersProcessor() {
     mParameters["stencilWrite"]                  = { &processStencilWrite, Type::BOOL};
     mParameters["stencilDepthFail"]              = { &processStencilDepthFail, Type::STRING};
     mParameters["stencilDepthPass"]              = { &processStencilDepthPass, Type::STRING};
-    
+
     mParameters["doubleSided"]                   = { &processDoubleSided, Type::BOOL };
     mParameters["transparency"]                  = { &processTransparencyMode, Type::STRING };
     mParameters["maskThreshold"]                 = { &processMaskThreshold, Type::NUMBER };
