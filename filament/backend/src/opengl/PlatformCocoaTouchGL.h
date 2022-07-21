@@ -49,7 +49,6 @@ public:
         return backend::FenceStatus::ERROR;
     }
 
-    void setSwapInterval(int32_t interval) noexcept final override {}
     void setPresentationTime(int64_t time) noexcept final override {}
 
     Stream* createStream(void* nativeStream) noexcept final { return nullptr; }

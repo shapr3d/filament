@@ -65,9 +65,6 @@ void NoopDriver::setFrameCompletedCallback(Handle<HwSwapChain> sch,
 
 }
 
-void NoopDriver::setSwapInterval(Handle<HwSwapChain> sch, int32_t interval) {
-}
-
 void NoopDriver::setPresentationTime(int64_t monotonic_clock_ns) {
 }
 

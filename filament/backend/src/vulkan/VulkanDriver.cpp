@@ -380,9 +380,6 @@ void VulkanDriver::setFrameCompletedCallback(Handle<HwSwapChain> sch,
 
 }
 
-void VulkanDriver::setSwapInterval(Handle<HwSwapChain> sch, int32_t interval) {
-}
-
 void VulkanDriver::setPresentationTime(int64_t monotonic_clock_ns) {
 }
 

@@ -3015,10 +3015,6 @@ void OpenGLDriver::setFrameCompletedCallback(Handle<HwSwapChain> sch,
 
 }
 
-void OpenGLDriver::setSwapInterval(Handle<HwSwapChain> sch, int32_t interval) {
-    mPlatform.setSwapInterval(interval);
-}
-
 void OpenGLDriver::setPresentationTime(int64_t monotonic_clock_ns) {
     mPlatform.setPresentationTime(monotonic_clock_ns);
 }
