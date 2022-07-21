@@ -62,7 +62,7 @@ TEST_F(HalfTest, Basics) {
     EXPECT_EQ(0x8001, getBits(half(-5.96046e-8)));      // if handled, should be: 0x8001
 
     // test all exactly representable integers
-    #pragma nounroll
+    MATH_NOUNROLL
     for (int i = -2048; i <= 2048; ++i) {
         half h = float(i);
         EXPECT_EQ(i, float(h));
@@ -97,7 +97,7 @@ using fp11 = fp<0, 5, 6>;
 
 TEST_F(HalfTest, fp10) {
     // test all exactly representable integers
-    #pragma nounroll
+    MATH_NOUNROLL
     for (int i = 0; i <= 64; ++i) {
         fp10 h = fp10::fromf(float(i));
         EXPECT_EQ(i, fp10::tof(h));
@@ -106,7 +106,7 @@ TEST_F(HalfTest, fp10) {
 
 TEST_F(HalfTest, fp11) {
     // test all exactly representable integers
-    #pragma nounroll
+    MATH_NOUNROLL
     for (int i = 0; i <= 128; ++i) {
         fp11 h = fp11::fromf(float(i));
         EXPECT_EQ(i, fp11::tof(h));

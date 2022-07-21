@@ -247,7 +247,7 @@ void PostProcessManager::init() noexcept {
     mWorkaroundAllowReadOnlyAncillaryFeedbackLoop =
             driver.isWorkaroundNeeded(Workaround::ALLOW_READ_ONLY_ANCILLARY_FEEDBACK_LOOP);
 
-    #pragma nounroll
+    UTILS_NOUNROLL
     for (auto const& info : sMaterialList) {
         registerPostProcessMaterial(info.name, info.data, info.size);
     }
@@ -2243,7 +2243,7 @@ FrameGraphId<FrameGraphTexture> PostProcessManager::taa(FrameGraph& fg,
 
                 // this doesn't get vectorized (probably because of exp()), so don't bother
                 // unrolling it.
-                #pragma nounroll
+                UTILS_NOUNROLL
                 for (size_t i = 0; i < 9; i++) {
                     float2 d = sampleOffsets[i] - current.jitter;
                     d *= 1.0f / taaOptions.filterWidth;

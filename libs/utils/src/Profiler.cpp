@@ -62,7 +62,7 @@ Profiler::Profiler(uint32_t eventMask) noexcept : Profiler() {
 }
 
 Profiler::~Profiler() noexcept {
-    #pragma nounroll
+    UTILS_NOUNROLL
     for (int fd : mCountersFd) {
         if (fd >= 0) {
             close(fd);
@@ -72,7 +72,7 @@ Profiler::~Profiler() noexcept {
 
 uint32_t Profiler::resetEvents(uint32_t eventMask) noexcept {
     // close all counters
-    #pragma nounroll
+    UTILS_NOUNROLL
     for (int& fd : mCountersFd) {
         if (fd >= 0) {
             close(fd);

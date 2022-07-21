@@ -525,7 +525,7 @@ private:
         // hopefully most of this gets unrolled and inlined
         std::array<size_t, kArrayCount> offsets;
         offsets[0] = 0;
-        #pragma unroll
+        UTILS_UNROLL
         for (size_t i = 1; i < kArrayCount; i++) {
             size_t unalignment = sizes[i - 1] % align;
             size_t alignment = unalignment ? (align - unalignment) : 0;

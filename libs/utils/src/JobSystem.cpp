@@ -142,7 +142,7 @@ JobSystem::JobSystem(const size_t userThreadCount, const size_t adoptableThreads
     const size_t hardwareThreadCount = mThreadCount;
     auto& states = mThreadStates;
 
-    #pragma nounroll
+    UTILS_NOUNROLL
     for (size_t i = 0, n = states.size(); i < n; i++) {
         auto& state = states[i];
         state.rndGen = default_random_engine(rd());
@@ -158,7 +158,7 @@ JobSystem::JobSystem(const size_t userThreadCount, const size_t adoptableThreads
 JobSystem::~JobSystem() {
     requestExit();
 
-    #pragma nounroll
+    UTILS_NOUNROLL
     for (auto &state : mThreadStates) {
         // adopted threads are not joinable
         if (state.thread.joinable()) {
