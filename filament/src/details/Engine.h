@@ -130,12 +130,13 @@ public:
     static constexpr size_t CONFIG_COMMAND_BUFFERS_SIZE         = filament::CONFIG_COMMAND_BUFFERS_SIZE;
 
 public:
-    static FEngine* create(Backend backend = Backend::DEFAULT, Platform* platform = nullptr,
-            void* sharedGLContext = nullptr, void* nativeDevice = nullptr);
+    static FEngine* create(Backend backend = Backend::DEFAULT,
+            Platform* platform = nullptr, void* sharedGLContext = nullptr);
 
 #if UTILS_HAS_THREADING
-    static void createAsync(CreateCallback callback, void* user, Backend backend = Backend::DEFAULT,
-            Platform* platform = nullptr, void* sharedGLContext = nullptr, void* nativeDevice = nullptr);
+    static void createAsync(CreateCallback callback, void* user,
+            Backend backend = Backend::DEFAULT,
+            Platform* platform = nullptr, void* sharedGLContext = nullptr);
 
     static FEngine* getEngine(void* token);
 #endif
@@ -334,7 +335,7 @@ public:
     }
 
 private:
-    FEngine(Backend backend, Platform* platform, void* sharedGLContext, void* nativeDevice);
+    FEngine(Backend backend, Platform* platform, void* sharedGLContext);
     void init();
     void shutdown();
 
@@ -353,7 +354,6 @@ private:
     Platform* mPlatform = nullptr;
     bool mOwnPlatform = false;
     void* mSharedGLContext = nullptr;
-    void* mNativeDevice = nullptr;
     bool mTerminated = false;
     backend::Handle<backend::HwRenderPrimitive> mFullScreenTriangleRph;
     FVertexBuffer* mFullScreenTriangleVb = nullptr;
