@@ -125,7 +125,7 @@ static bool printMaterial(ostream& text, const ChunkContainer& container) {
     printChunk<bool, bool>(text, container, MaterialStencilWrite, "Stencil write: ");
     printChunk<backend::StencilOperation, uint8_t>(text, container, MaterialStencilDepthFail, "Stencil depth fail operation: ");
     printChunk<backend::StencilOperation, uint8_t>(text, container, MaterialStencilDepthPass, "Stencil depth pass operation: ");
-    
+
     printChunk<bool, bool>(text, container, MaterialDoubleSided, "Double sided: ");
     printChunk<CullingMode, uint8_t>(text, container, MaterialCullingMode, "Culling: ");
     printChunk<TransparencyMode, uint8_t>(text, container, MaterialTransparencyMode, "Transparency: ");

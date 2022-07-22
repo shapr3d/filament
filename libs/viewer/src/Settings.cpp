@@ -1045,7 +1045,6 @@ void applySettings(const LightSettings& settings, IndirectLight* ibl, utils::Ent
         ibl->setIntensity(settings.iblIntensity);
         ibl->setRotation(math::mat3f::rotation(settings.iblRotation, math::float3 { 0, 1, 0 }));
         ibl->setIblOptions(settings.iblOptions);
-
     }
     if (scene->getSkybox())
     {
@@ -1508,7 +1507,6 @@ static std::ostream& operator<<(std::ostream& out, const ViewSettings& in) {
         << "\"vsmShadowOptions\": " << (in.vsmShadowOptions) << ",\n"
         << "\"postProcessingEnabled\": " << to_string(in.postProcessingEnabled) << "\n"
         << "}";
-    
 }
 
 static std::ostream& operator<<(std::ostream& out, const Settings& in) {

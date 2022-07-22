@@ -174,9 +174,6 @@ void MetalDriver::setFrameCompletedCallback(Handle<HwSwapChain> sch,
     swapChain->setFrameCompletedCallback(callback, user);
 }
 
-void MetalDriver::setSwapInterval(Handle<HwSwapChain> sch, int32_t interval) {
-}
-
 void MetalDriver::execute(std::function<void(void)> fn) noexcept {
     @autoreleasepool {
         fn();
@@ -928,7 +925,8 @@ void MetalDriver::makeCurrent(Handle<HwSwapChain> schDraw, Handle<HwSwapChain> s
     }
 }
 
-void MetalDriver::makeCurrentOffscreen(int) {}
+void MetalDriver::makeCurrentOffscreen(int) {
+}
 
 void MetalDriver::commit(Handle<HwSwapChain> sch) {
     auto* swapChain = handle_cast<MetalSwapChain>(sch);

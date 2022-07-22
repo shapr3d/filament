@@ -113,7 +113,6 @@ id<MTLDepthStencilState> DepthStateCreator::operator()(id<MTLDevice> device,
 
         depthStencilDescriptor.backFaceStencil = stencilDescriptor;
         depthStencilDescriptor.frontFaceStencil = stencilDescriptor;
-
     }
 
     return [device newDepthStencilStateWithDescriptor:depthStencilDescriptor];

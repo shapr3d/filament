@@ -380,9 +380,6 @@ void VulkanDriver::setFrameCompletedCallback(Handle<HwSwapChain> sch,
 
 }
 
-void VulkanDriver::setSwapInterval(Handle<HwSwapChain> sch, int32_t interval) {
-}
-
 void VulkanDriver::setPresentationTime(int64_t monotonic_clock_ns) {
 }
 
@@ -1302,7 +1299,8 @@ void VulkanDriver::makeCurrent(Handle<HwSwapChain> drawSch, Handle<HwSwapChain> 
     surf.acquire();
 }
 
-void VulkanDriver::makeCurrentOffscreen(int) {}
+void VulkanDriver::makeCurrentOffscreen(int) {
+}
 
 void VulkanDriver::commit(Handle<HwSwapChain> sch) {
     VulkanSwapChain& surface = *handle_cast<VulkanSwapChain*>(sch);

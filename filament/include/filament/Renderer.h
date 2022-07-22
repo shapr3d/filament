@@ -130,13 +130,13 @@ public:
         bool clearColor = false;
         
         /**
-         * Whether the SwapChain should be clear the depth.
+         * Whether the depth buffer should be cleared.
          */
         bool clearDepth = true;
         
         /**
-         * Whether the SwapChain content should be discarded. clear implies discard. Set this
-         * to false (along with clear to false as well) if the SwapChain already has content that
+         * Whether the SwapChain content should be discarded. clearColor implies discard. Set this
+         * to false (along with clearColor to false as well) if the SwapChain already has content that
          * needs to be preserved
          */
         bool discard = true;

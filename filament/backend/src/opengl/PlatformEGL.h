@@ -55,7 +55,6 @@ public:
 
     int getOSVersion() const noexcept override { return 0; }
 
-    void setSwapInterval(int32_t interval) noexcept override;
     void setPresentationTime(int64_t presentationTimeInNanosecond) noexcept override {}
 
     Stream* createStream(void* nativeStream) noexcept override { return nullptr; }

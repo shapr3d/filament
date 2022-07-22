@@ -45,7 +45,6 @@ public:
     void destroyFence(Fence* fence) noexcept final override;
     backend::FenceStatus waitFence(Fence* fence, uint64_t timeout) noexcept final override;
 
-    void setSwapInterval(int32_t interval) noexcept final override {}
     void setPresentationTime(int64_t time) noexcept final override {}
 
     Stream* createStream(void* nativeStream) noexcept final override { return nullptr; }

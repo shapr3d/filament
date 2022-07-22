@@ -106,7 +106,7 @@ static bool printMaterial(ostream& json, const ChunkContainer& container) {
     printChunk<bool, bool>(json, container, MaterialStencilWrite, "stencil_write");
     printChunk<backend::StencilOperation, uint8_t>(json, container, MaterialStencilDepthFail, "stencil_depth_fail");
     printChunk<backend::StencilOperation, uint8_t>(json, container, MaterialStencilDepthPass, "stencil_depth_pass");
-    
+
     printChunk<bool, bool>(json, container, MaterialDoubleSided, "double_sided");
     printChunk<CullingMode, uint8_t>(json, container, MaterialCullingMode, "culling");
     printChunk<TransparencyMode, uint8_t>(json, container, MaterialTransparencyMode, "transparency");

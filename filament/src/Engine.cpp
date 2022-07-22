@@ -62,11 +62,11 @@ namespace filament {
 using namespace backend;
 using namespace filaflat;
 
-FEngine* FEngine::create(Backend backend, Platform* platform, void* sharedGLContext, void* nativeDevice) {
+FEngine* FEngine::create(Backend backend, Platform* platform, void* sharedGLContext) {
     SYSTRACE_ENABLE();
     SYSTRACE_CALL();
 
-    FEngine* instance = new FEngine(backend, platform, sharedGLContext, nativeDevice);
+    FEngine* instance = new FEngine(backend, platform, sharedGLContext);
 
     // initialize all fields that need an instance of FEngine
     // (this cannot be done safely in the ctor)
@@ -75,7 +75,7 @@ FEngine* FEngine::create(Backend backend, Platform* platform, void* sharedGLCont
     // In the single-threaded case, we do so in the here and now.
     if (!UTILS_HAS_THREADING) {
         if (platform == nullptr) {
-            platform = DefaultPlatform::create(&instance->mBackend, instance->mNativeDevice);
+            platform = DefaultPlatform::create(&instance->mBackend);
             instance->mPlatform = platform;
             instance->mOwnPlatform = true;
         }
@@ -115,11 +115,11 @@ const FMaterial* FEngine::getShaprMaterial(size_t index) const noexcept
 
 #if UTILS_HAS_THREADING
 
-void FEngine::createAsync(CreateCallback callback, void* user, Backend backend, 
-        Platform* platform, void* sharedGLContext, void* nativeDevice) {
+void FEngine::createAsync(CreateCallback callback, void* user,
+        Backend backend, Platform* platform, void* sharedGLContext) {
     SYSTRACE_ENABLE();
     SYSTRACE_CALL();
-    FEngine* instance = new FEngine(backend, platform, sharedGLContext, nativeDevice);
+    FEngine* instance = new FEngine(backend, platform, sharedGLContext);
 
     // start the driver thread
     instance->mDriverThread = std::thread(&FEngine::loop, instance);
@@ -170,11 +170,10 @@ static constexpr float4 sFullScreenTriangleVertices[3] = {
 // these must be static because only a pointer is copied to the render stream
 static const uint16_t sFullScreenTriangleIndices[3] = { 0, 1, 2 };
 
-FEngine::FEngine(Backend backend, Platform* platform, void* sharedGLContext, void* nativeDevice) :
+FEngine::FEngine(Backend backend, Platform* platform, void* sharedGLContext) :
         mBackend(backend),
         mPlatform(platform),
         mSharedGLContext(sharedGLContext),
-        mNativeDevice(nativeDevice),
         mPostProcessManager(*this),
         mEntityManager(EntityManager::get()),
         mRenderableManager(*this),
@@ -495,7 +494,7 @@ void FEngine::flushAndWait() {
 
 int FEngine::loop() {
     if (mPlatform == nullptr) {
-        mPlatform = DefaultPlatform::create(&mBackend, mNativeDevice);
+        mPlatform = DefaultPlatform::create(&mBackend);
         mOwnPlatform = true;
         const char* const backend = backendToString(mBackend);
         slog.d << "FEngine resolved backend: " << backend << io::endl;
@@ -907,8 +906,8 @@ void FEngine::destroy(FEngine* engine) {
 // Trampoline calling into private implementation
 // ------------------------------------------------------------------------------------------------
 
-Engine* Engine::create(Backend backend, Platform* platform, void* sharedGLContext, void* nativeDevice) {
-    return FEngine::create(backend, platform, sharedGLContext, nativeDevice);
+Engine* Engine::create(Backend backend, Platform* platform, void* sharedGLContext) {
+    return FEngine::create(backend, platform, sharedGLContext);
 }
 
 void Engine::destroy(Engine* engine) {
@@ -917,8 +916,8 @@ void Engine::destroy(Engine* engine) {
 
 #if UTILS_HAS_THREADING
 void Engine::createAsync(Engine::CreateCallback callback, void* user, Backend backend,
-        Platform* platform, void* sharedGLContext, void* nativeDevice) {
-    FEngine::createAsync(callback, user, backend, platform, sharedGLContext, nativeDevice);
+        Platform* platform, void* sharedGLContext) {
+    FEngine::createAsync(callback, user, backend, platform, sharedGLContext);
 }
 
 Engine* Engine::getEngine(void* token) {
@@ -933,7 +932,6 @@ void Engine::destroy(Engine** pEngine) {
         *pEngine = nullptr;
     }
 }
-
 
 // -----------------------------------------------------------------------------------------------
 // Resource management
