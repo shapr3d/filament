@@ -422,41 +422,46 @@ void OpenGLDriver::createIndexBufferR(
         ElementType elementType,
         uint32_t indexCount,
         BufferUsage usage,
-        bool wrapsExternalBuffer) {
+        intptr_t importedId) {
     DEBUG_MARKER()
 
     auto& gl = mContext;
     uint8_t elementSize = static_cast<uint8_t>(getElementTypeSize(elementType));
     GLIndexBuffer* ib = construct<GLIndexBuffer>(ibh, elementSize, indexCount);
     glGenBuffers(1, &ib->gl.id);
-    ib->gl.isExternal = wrapsExternalBuffer;
-    if (!wrapsExternalBuffer) {
+    ib->gl.isExternal = importedId > 0;
+    if (!ib->gl.isExternal) {
         GLsizeiptr size = elementSize * indexCount;
         gl.bindVertexArray(nullptr);
         gl.bindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib->gl.id);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, size, nullptr, getBufferUsage(usage));
         CHECK_GL_ERROR(utils::slog.e)
+    } else {
+        ib->gl.id = GLuint(importedId);
     }
 }
 
+
 void OpenGLDriver::createBufferObjectR(Handle<HwBufferObject> boh,
         uint32_t byteCount, BufferObjectBinding bindingType, BufferUsage usage,
-        bool wrapsExternalBuffer) {
+        intptr_t importedId) {
     DEBUG_MARKER()
     assert_invariant(byteCount > 0);
 
     auto& gl = mContext;
-    if (bindingType == BufferObjectBinding::VERTEX && !wrapsExternalBuffer) {
+    if (bindingType == BufferObjectBinding::VERTEX && importedId == 0) {
         gl.bindVertexArray(nullptr);
     }
 
     GLBufferObject* bo = construct<GLBufferObject>(boh, byteCount, bindingType, usage);
-    glGenBuffers(1, &bo->gl.id);
-    bo->gl.isExternal = wrapsExternalBuffer;
-    if (!wrapsExternalBuffer) {
+    bo->gl.isExternal = importedId > 0;
+    if (!bo->gl.isExternal) {
+        glGenBuffers(1, &bo->gl.id);
         gl.bindBuffer(bo->gl.binding, bo->gl.id);
         glBufferData(bo->gl.binding, byteCount, nullptr, getBufferUsage(usage));
         CHECK_GL_ERROR(utils::slog.e)
+    } else {
+        bo->gl.id = GLuint(importedId);
     }
 }
 
@@ -1636,44 +1641,6 @@ void OpenGLDriver::setupExternalResource(intptr_t externalResource) {
     mPlatform.retainExternalResource(externalResource);
 }
 
-void OpenGLDriver::setExternalIndexBuffer(Handle<HwIndexBuffer> ibh, intptr_t externalBuffer) {
-#ifdef GL_EXT_external_buffer
-    DEBUG_MARKER()
-
-    auto& gl = mContext;
-    GLIndexBuffer* ib = handle_cast<GLIndexBuffer*>(ibh);
-
-    assert_invariant(ib->gl.isExternal);
-
-    gl.bindVertexArray(nullptr);
-    gl.bindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib->gl.id);
-    glBufferStorageExternalEXT(GL_ELEMENT_ARRAY_BUFFER, 0, ib->count * ib->elementSize, (GLeglClientBufferEXT)externalBuffer, 0);
-
-    CHECK_GL_ERROR(utils::slog.e)
-#else
-    assert(false && "You need GL_EXT_external_buffer for setting external index buffers!");
-#endif
-}
-
-void OpenGLDriver::setExternalBuffer(Handle<HwBufferObject> boh, intptr_t externalBuffer) {
-#ifdef GL_EXT_external_buffer
-    DEBUG_MARKER()
-
-    auto& gl = mContext;
-    GLBufferObject* bo = handle_cast<GLBufferObject*>(boh);
-
-    assert_invariant(bo->gl.isExternal);
-
-    gl.bindVertexArray(nullptr);
-    gl.bindBuffer(GL_ARRAY_BUFFER, bo->gl.id);
-    glBufferStorageExternalEXT(GL_ARRAY_BUFFER, 0, bo->byteCount, (GLeglClientBufferEXT)externalBuffer, 0);
-
-    CHECK_GL_ERROR(utils::slog.e)
-#else
-    assert(false && "You need GL_EXT_external_buffer for setting external buffers!");
-#endif
-}
-
 void OpenGLDriver::setVertexBufferObject(Handle<HwVertexBuffer> vbh,
         uint32_t index, Handle<HwBufferObject> boh) {
    DEBUG_MARKER()
@@ -1723,6 +1690,7 @@ void OpenGLDriver::updateBufferObject(
     auto& gl = mContext;
     GLBufferObject* bo = handle_cast<GLBufferObject *>(boh);
 
+    assert_invariant(!bo->gl.isExternal);
     assert_invariant(bd.size + byteOffset <= bo->byteCount);
 
     if (bo->gl.binding == GL_UNIFORM_BUFFER) {

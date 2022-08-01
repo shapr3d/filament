@@ -239,14 +239,17 @@ void MetalDriver::createVertexBufferR(Handle<HwVertexBuffer> vbh, uint8_t buffer
 }
 
 void MetalDriver::createIndexBufferR(Handle<HwIndexBuffer> ibh, ElementType elementType,
-        uint32_t indexCount, BufferUsage usage, bool wrapsExternalBuffer) {
+        uint32_t indexCount, BufferUsage usage, intptr_t importedId) {
     auto elementSize = (uint8_t) getElementTypeSize(elementType);
-    construct_handle<MetalIndexBuffer>(ibh, *mContext, usage, elementSize, indexCount);
+    auto* ib = construct_handle<MetalIndexBuffer>(ibh, *mContext, usage, elementSize, indexCount);
+    ib->buffer.wrapExternalBuffer((id<MTLBuffer>) CFBridgingRelease((void*) importedId));
+    
 }
 
 void MetalDriver::createBufferObjectR(Handle<HwBufferObject> boh, uint32_t byteCount,
-        BufferObjectBinding bindingType, BufferUsage usage, bool wrapsExternalBuffer) {
-    construct_handle<MetalBufferObject>(boh, *mContext, usage, byteCount, wrapsExternalBuffer);
+        BufferObjectBinding bindingType, BufferUsage usage, intptr_t importedId) {
+    auto* bo = construct_handle<MetalBufferObject>(boh, *mContext, usage, byteCount, importedId > 0);
+    bo->getBuffer()->wrapExternalBuffer((id<MTLBuffer>) CFBridgingRelease((void*) importedId));
 }
 
 void MetalDriver::createTextureR(Handle<HwTexture> th, SamplerType target, uint8_t levels,
@@ -739,18 +742,6 @@ void MetalDriver::setupExternalResource(intptr_t externalResource) {
         CFTypeRef resourceRef = (CFTypeRef) externalResource;
         CFRetain(resourceRef);
     }
-}
-
-void MetalDriver::setExternalIndexBuffer(Handle<HwIndexBuffer> ibh, intptr_t externalBuffer) {
-    auto* ib = handle_cast<MetalIndexBuffer>(ibh);
-    ib->buffer.releaseExternalBuffer();
-    ib->buffer.wrapExternalBuffer((id<MTLBuffer>) CFBridgingRelease((void*) externalBuffer));
-}
-
-void MetalDriver::setExternalBuffer(Handle<HwBufferObject> boh, intptr_t externalBuffer) {
-    auto* bo = handle_cast<MetalBufferObject>(boh);
-    bo->getBuffer()->releaseExternalBuffer();
-    bo->getBuffer()->wrapExternalBuffer((id<MTLBuffer>) CFBridgingRelease((void*) externalBuffer));
 }
 
 void MetalDriver::setVertexBufferObject(Handle<HwVertexBuffer> vbh, uint32_t index,

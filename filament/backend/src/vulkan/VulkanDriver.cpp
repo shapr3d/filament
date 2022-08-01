@@ -428,7 +428,7 @@ void VulkanDriver::destroyVertexBuffer(Handle<HwVertexBuffer> vbh) {
 }
 
 void VulkanDriver::createIndexBufferR(Handle<HwIndexBuffer> ibh, ElementType elementType,
-        uint32_t indexCount, BufferUsage usage, bool wrapsExternalBuffer) {
+        uint32_t indexCount, BufferUsage usage, intptr_t importedId) {
     auto elementSize = (uint8_t) getElementTypeSize(elementType);
     auto indexBuffer = construct<VulkanIndexBuffer>(ibh, mContext, mStagePool,
             elementSize, indexCount);
@@ -445,7 +445,7 @@ void VulkanDriver::destroyIndexBuffer(Handle<HwIndexBuffer> ibh) {
 }
 
 void VulkanDriver::createBufferObjectR(Handle<HwBufferObject> boh, uint32_t byteCount,
-        BufferObjectBinding bindingType, BufferUsage usage, bool wrapsExternalBuffer) {
+        BufferObjectBinding bindingType, BufferUsage usage, intptr_t importedId) {
     auto bufferObject = construct<VulkanBufferObject>(boh, mContext, mStagePool, byteCount,
             bindingType, usage);
     mDisposer.createDisposable(bufferObject, [this, boh] () {
@@ -844,14 +844,6 @@ uint8_t VulkanDriver::getMaxDrawBuffers() {
 }
 
 void VulkanDriver::setupExternalResource(intptr_t externalResource) {
-}
-
-void VulkanDriver::setExternalIndexBuffer(Handle<HwIndexBuffer> ibh, intptr_t externalBuffer) {
-    ASSERT_PRECONDITION(false, "setExternalIndexBuffer() is not implemented for backend!");
-}
-
-void VulkanDriver::setExternalBuffer(Handle<HwBufferObject> boh, intptr_t externalBuffer) {
-    ASSERT_PRECONDITION(false, "setExternalBuffer() is not implemented for backend!");
 }
 
 void VulkanDriver::setVertexBufferObject(Handle<HwVertexBuffer> vbh, uint32_t index,
