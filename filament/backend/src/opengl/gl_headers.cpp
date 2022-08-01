@@ -48,11 +48,6 @@ PFNGLGETQUERYOBJECTUI64VEXTPROC glGetQueryObjectui64v;
 #ifdef GL_EXT_clip_control
 PFNGLCLIPCONTROLEXTPROC glClipControl;
 #endif
-#ifdef GL_EXT_external_buffer
-PFNGLBUFFERSTORAGEEXTERNALEXTPROC glBufferStorageExternalEXT;
-PFNGLNAMEDBUFFERSTORAGEEXTERNALEXTPROC glNamedBufferStorageExternalEXT;
-#endif
-
 static std::once_flag sGlExtInitialized;
 
 void importGLESExtensionsEntryPoints() {
@@ -114,12 +109,6 @@ void importGLESExtensionsEntryPoints() {
                     "glClipControlEXT");
 #endif
 
-#ifdef GL_EXT_external_buffer
-     glBufferStorageExternalEXT = (PFNGLBUFFERSTORAGEEXTERNALEXTPROC)eglGetProcAddress(
-        "glBufferStorageExternalEXT");
-     glNamedBufferStorageExternalEXT = (PFNGLNAMEDBUFFERSTORAGEEXTERNALEXTPROC)eglGetProcAddress(
-        "glNamedBufferStorageExternalEXT");
-#endif
 }
 
 } // namespace glext
