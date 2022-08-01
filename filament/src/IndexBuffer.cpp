@@ -23,9 +23,9 @@
 namespace filament {
 
 struct IndexBuffer::BuilderDetails {
+    intptr_t mImportedId = 0;
     uint32_t mIndexCount = 0;
     IndexType mIndexType = IndexType::UINT;
-    bool mExternalBuffersEnabled = false;
 };
 
 using BuilderType = IndexBuffer;
@@ -46,20 +46,21 @@ IndexBuffer::Builder& IndexBuffer::Builder::bufferType(IndexType indexType) noex
     return *this;
 }
 
-IndexBuffer::Builder& IndexBuffer::Builder::enableExternalBuffer(bool enabled) noexcept {
-    mImpl->mExternalBuffersEnabled = enabled;
-    return *this;
-}
-
 IndexBuffer* IndexBuffer::Builder::build(Engine& engine) {
     return upcast(engine).createIndexBuffer(*this);
+}
+
+IndexBuffer::Builder& IndexBuffer::Builder::import(intptr_t id) noexcept {
+    assert_invariant(id); // imported id can't be zero
+    mImpl->mImportedId = id;
+    return *this;
 }
 
 // ------------------------------------------------------------------------------------------------
 
 FIndexBuffer::FIndexBuffer(FEngine& engine, const IndexBuffer::Builder& builder)
         : mIndexCount(builder->mIndexCount),
-          mExternalBuffersEnabled(builder->mExternalBuffersEnabled) {
+          mImportedId(builder->mImportedId) {
     FEngine::DriverApi& driver = engine.getDriverApi();
     mHandle = driver.createIndexBuffer(
             (backend::ElementType)builder->mIndexType,
@@ -74,14 +75,8 @@ void FIndexBuffer::terminate(FEngine& engine) {
 }
 
 void FIndexBuffer::setBuffer(FEngine& engine, BufferDescriptor&& buffer, uint32_t byteOffset) {
-    ASSERT_PRECONDITION(!mExternalBuffersEnabled, "Please use setExternalBuffer()");
-    engine.getDriverApi().updateIndexBuffer(mHandle, std::move(buffer), byteOffset);
-}
-
-void FIndexBuffer::setExternalBuffer(FEngine& engine, intptr_t externalBuffer) {
-    ASSERT_PRECONDITION(mExternalBuffersEnabled, "Please use setBuffer()");
-    engine.getDriverApi().setupExternalResource(externalBuffer);
-    engine.getDriverApi().setExternalIndexBuffer(mHandle, externalBuffer);
+        ASSERT_PRECONDITION(mImportedId == 0, "Imported buffer can't be modified");
+        engine.getDriverApi().updateIndexBuffer(mHandle, std::move(buffer), byteOffset);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -95,10 +90,6 @@ void IndexBuffer::setBuffer(Engine& engine,
 
 size_t IndexBuffer::getIndexCount() const noexcept {
     return upcast(this)->getIndexCount();
-}
-
-void IndexBuffer::setExternalBuffer(Engine& engine, intptr_t externalBuffer) {
-    upcast(this)->setExternalBuffer(upcast(engine), externalBuffer);
 }
 
 } // namespace filament

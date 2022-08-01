@@ -42,11 +42,10 @@ public:
 
     void setBuffer(FEngine& engine, BufferDescriptor&& buffer, uint32_t byteOffset = 0);
 
-    void setExternalBuffer(FEngine& engine, intptr_t externalBuffer);
-
 private:
     friend class IndexBuffer;
     backend::Handle<backend::HwIndexBuffer> mHandle;
+    intptr_t mImportedId;
     uint32_t mIndexCount;
     bool mExternalBuffersEnabled = false;
 };
