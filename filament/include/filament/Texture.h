@@ -229,10 +229,9 @@ public:
          * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~{.cpp}
          *  id <MTLTexture> metalTexture = ...
          *  filamentTexture->import(intptr_t((__bridge void*) metalTexture));
-         *  // free to release metalTexture
          *
          *  // after using texture:
-         *  engine->destroy(filamentTexture);   // metalTexture is released
+         *  engine->destroy(filamentTexture);   // only filamentTexture handle is released
          * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
          *
          * @warning This method should be used as a last resort. This API is subject to change or
