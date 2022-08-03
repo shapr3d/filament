@@ -445,7 +445,7 @@ void OpenGLDriver::createBufferObjectR(Handle<HwBufferObject> boh,
     assert_invariant(byteCount > 0);
 
     auto& gl = mContext;
-    if (bindingType == BufferObjectBinding::VERTEX) {
+    if (bindingType == BufferObjectBinding::VERTEX || bindingType == BufferObjectBinding::INDEX) {
         gl.bindVertexArray(nullptr);
     }
 
@@ -461,7 +461,8 @@ void OpenGLDriver::importBufferObjectR(Handle<HwBufferObject> boh,
     DEBUG_MARKER()
 
     auto& gl = mContext;
-    if (bindingType == BufferObjectBinding::VERTEX && id == 0) {
+    if ((bindingType == BufferObjectBinding::VERTEX || bindingType == BufferObjectBinding::INDEX) &&
+        id == 0) {
         gl.bindVertexArray(nullptr);
     }
 
@@ -1648,6 +1649,21 @@ void OpenGLDriver::makeCurrentOffscreen(int) {
 
 void OpenGLDriver::setupExternalResource(intptr_t externalResource) {
     mPlatform.retainExternalResource(externalResource);
+}
+
+void OpenGLDriver::setIndexBufferObject(Handle<HwIndexBuffer> ibh, Handle<HwBufferObject> boh) {
+   DEBUG_MARKER()
+
+    GLIndexBuffer* ib = handle_cast<GLIndexBuffer *>(ibh);
+    GLBufferObject* bo = handle_cast<GLBufferObject *>(boh);
+
+    assert_invariant(bo->gl.binding == GL_ELEMENT_ARRAY_BUFFER);
+
+    if (ib->gl.buffer != bo->gl.id) {
+        ib->gl.buffer = bo->gl.id;
+    }
+
+    CHECK_GL_ERROR(utils::slog.e)
 }
 
 void OpenGLDriver::setVertexBufferObject(Handle<HwVertexBuffer> vbh,

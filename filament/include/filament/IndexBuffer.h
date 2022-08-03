@@ -33,6 +33,7 @@ namespace filament {
 
 class FIndexBuffer;
 
+class BufferObject;
 class Engine;
 
 /**
@@ -76,6 +77,17 @@ public:
         Builder& indexCount(uint32_t indexCount) noexcept;
 
         /**
+         * Allows buffer to be swapped out and shared using BufferObject.
+         *
+         * If buffer object mode is enabled, clients must call setBufferObject rather than
+         * setBuffer. This allows sharing of data between IndexBuffer objects, but it may
+         * slightly increase the memory footprint of Filament's internal bookkeeping.
+         *
+         * @param enabled If true, enables buffer object mode.  False by default.
+         */
+        Builder& enableBufferObject(bool enabled = true) noexcept;
+
+        /**
          * Type of the index buffer, 16-bit or 32-bit.
          * @param indexType Type of indices stored in the IndexBuffer.
          * @return A reference to this Builder for chaining calls.
@@ -112,6 +124,16 @@ public:
      * @param byteOffset Offset in *bytes* into the IndexBuffer
      */
     void setBuffer(Engine& engine, BufferDescriptor&& buffer, uint32_t byteOffset = 0);
+
+    /**
+     * Swaps in the given buffer object.
+     *
+     * To use this, you must first call enableBufferObject() on the Builder.
+     *
+     * @param engine Reference to the filament::Engine to associate this IndexBuffer with.
+     * @param bufferObject The handle to the GPU data that will be used in this buffer.
+     */
+    void setBufferObject(Engine& engine, BufferObject const* bufferObject);
 
     /**
      * Returns the size of this IndexBuffer in elements.

@@ -751,6 +751,12 @@ void MetalDriver::setupExternalResource(intptr_t externalResource) {
     }
 }
 
+void MetalDriver::setIndexBufferObject(Handle<HwIndexBuffer> ibh, Handle<HwBufferObject> boh) {
+    auto* indexBuffer = handle_cast<MetalIndexBuffer>(ibh);
+    auto* bufferObject = handle_cast<MetalBufferObject>(boh);
+    indexBuffer->buffer = bufferObject->getBuffer();
+}
+
 void MetalDriver::setVertexBufferObject(Handle<HwVertexBuffer> vbh, uint32_t index,
         Handle<HwBufferObject> boh) {
     auto* vertexBuffer = handle_cast<MetalVertexBuffer>(vbh);

@@ -312,6 +312,10 @@ DECL_DRIVER_API_SYNCHRONOUS_0(bool, isDepthResolveSupported)
  * -----------------------
  */
 
+DECL_DRIVER_API_N(setIndexBufferObject,
+        backend::IndexBufferHandle, ibh,
+        backend::BufferObjectHandle, bufferObject)
+
 DECL_DRIVER_API_N(setVertexBufferObject,
         backend::VertexBufferHandle, vbh,
         uint32_t, index,

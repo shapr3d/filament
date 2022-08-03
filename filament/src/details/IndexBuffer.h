@@ -27,6 +27,7 @@
 
 namespace filament {
 
+class FBufferObject;
 class FEngine;
 
 class FIndexBuffer : public IndexBuffer {
@@ -41,11 +42,13 @@ public:
     size_t getIndexCount() const noexcept { return mIndexCount; }
 
     void setBuffer(FEngine& engine, BufferDescriptor&& buffer, uint32_t byteOffset = 0);
+    void setBufferObject(FEngine& engine, FBufferObject const* bufferObject);
 
 private:
     friend class IndexBuffer;
     backend::Handle<backend::HwIndexBuffer> mHandle;
     uint32_t mIndexCount;
+    bool mBufferObjectEnabled = false;
 };
 
 FILAMENT_UPCAST(IndexBuffer)

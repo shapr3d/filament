@@ -855,6 +855,13 @@ uint8_t VulkanDriver::getMaxDrawBuffers() {
 void VulkanDriver::setupExternalResource(intptr_t externalResource) {
 }
 
+void VulkanDriver::setIndexBufferObject(Handle<HwIndexBuffer> ibh, Handle<HwBufferObject> boh) {
+    auto& ib = *handle_cast<VulkanIndexBuffer*>(ibh);
+    auto& bo = *handle_cast<VulkanBufferObject*>(boh);
+    assert_invariant(bo.bindingType == BufferObjectBinding::INDEX);
+    ub.buffer = &bo.buffer;
+}
+
 void VulkanDriver::setVertexBufferObject(Handle<HwVertexBuffer> vbh, uint32_t index,
         Handle<HwBufferObject> boh) {
     auto& vb = *handle_cast<VulkanVertexBuffer*>(vbh);
