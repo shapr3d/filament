@@ -48,6 +48,7 @@ PFNGLGETQUERYOBJECTUI64VEXTPROC glGetQueryObjectui64v;
 #ifdef GL_EXT_clip_control
 PFNGLCLIPCONTROLEXTPROC glClipControl;
 #endif
+
 static std::once_flag sGlExtInitialized;
 
 void importGLESExtensionsEntryPoints() {
@@ -108,7 +109,6 @@ void importGLESExtensionsEntryPoints() {
             (PFNGLCLIPCONTROLEXTPROC)eglGetProcAddress(
                     "glClipControlEXT");
 #endif
-
 }
 
 } // namespace glext

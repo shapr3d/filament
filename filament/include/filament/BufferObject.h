@@ -92,7 +92,6 @@ public:
          * @see IndexBuffer::setBuffer
          */
         BufferObject* build(Engine& engine);
-        
         /**
          * Specify a native buffer to import as a Filament buffer.
          *

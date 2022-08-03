@@ -254,7 +254,6 @@ public:
      * @param bufferObject The handle to the GPU data that will be used in this buffer slot.
      */
     void setBufferObjectAt(Engine& engine, uint8_t bufferIndex, BufferObject const* bufferObject);
-
 };
 
 } // namespace filament
