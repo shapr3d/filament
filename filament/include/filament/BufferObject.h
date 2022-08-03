@@ -77,25 +77,9 @@ public:
         Builder& bindingType(BindingType bindingType) noexcept;
 
         /**
-         * Creates the BufferObject and returns a pointer to it. After creation, the buffer
-         * object is uninitialized. Use BufferObject::setBuffer() to initialize it.
-         *
-         * @param engine Reference to the filament::Engine to associate this BufferObject with.
-         *
-         * @return pointer to the newly created object or nullptr if exceptions are disabled and
-         *         an error occurred.
-         *
-         * @exception utils::PostConditionPanic if a runtime error occurred, such as running out of
-         *            memory or other resources.
-         * @exception utils::PreConditionPanic if a parameter to a builder function was invalid.
-         *
-         * @see IndexBuffer::setBuffer
-         */
-        BufferObject* build(Engine& engine);
-        /**
          * Specify a native buffer to import as a Filament buffer.
          *
-         * The texture id is backend-specific:
+         * The buffer id is backend-specific:
          *   - OpenGL: GLuint buffer object ID
          *   - Metal: id<MTLBuffer>
          *
@@ -113,14 +97,29 @@ public:
          * @warning This method should be used as a last resort. This API is subject to change or
          * removal.
          *
-         * @param ids a backend specific buffer identifiers (should be the same amount of items as 
-         * bufferCount). If there are buffers among the ids which are not external, then
-         * it should marked with the value of NotExternal. 
+         * @param id a backend specific buffer identifier
          *
          * @return This Builder, for chaining calls.
          */
         Builder& import(intptr_t id) noexcept;
-        
+
+        /**
+         * Creates the BufferObject and returns a pointer to it. After creation, the buffer
+         * object is uninitialized. Use BufferObject::setBuffer() to initialize it.
+         *
+         * @param engine Reference to the filament::Engine to associate this BufferObject with.
+         *
+         * @return pointer to the newly created object or nullptr if exceptions are disabled and
+         *         an error occurred.
+         *
+         * @exception utils::PostConditionPanic if a runtime error occurred, such as running out of
+         *            memory or other resources.
+         * @exception utils::PreConditionPanic if a parameter to a builder function was invalid.
+         *
+         * @see IndexBuffer::setBuffer
+         */
+        BufferObject* build(Engine& engine);
+
     private:
         friend class FBufferObject;
     };
