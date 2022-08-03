@@ -180,6 +180,11 @@ DECL_DRIVER_API_R_N(backend::BufferObjectHandle, createBufferObject,
         backend::BufferObjectBinding, bindingType,
         backend::BufferUsage, usage)
 
+DECL_DRIVER_API_R_N(backend::BufferObjectHandle, importBufferObject,
+        intptr_t, id,
+        backend::BufferObjectBinding, bindingType,
+        backend::BufferUsage, usage)
+
 DECL_DRIVER_API_R_N(backend::TextureHandle, createTexture,
         backend::SamplerType, target,
         uint8_t, levels,

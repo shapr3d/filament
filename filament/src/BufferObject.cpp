@@ -51,6 +51,7 @@ BufferObject* BufferObject::Builder::build(Engine& engine) {
 }
 
 BufferObject::Builder& BufferObject::Builder::import(intptr_t id) noexcept {
+    assert_invariant(id); // imported id can't be zero
     mImpl->mImportedId = id;
     return *this;
 }
@@ -60,11 +61,14 @@ BufferObject::Builder& BufferObject::Builder::import(intptr_t id) noexcept {
 FBufferObject::FBufferObject(FEngine& engine, const BufferObject::Builder& builder)
         : mByteCount(builder->mByteCount), mBindingType(builder->mBindingType), mImportedId(builder->mImportedId) {
     FEngine::DriverApi& driver = engine.getDriverApi();
-    if (mImportedId > 0) {
+    if (UTILS_LIKELY(mImportedId == 0)) {
+        mHandle = driver.createBufferObject(builder->mByteCount, builder->mBindingType,
+                backend::BufferUsage::STATIC);
+    } else {
         driver.setupExternalResource(mImportedId);
+        mHandle = driver.importBufferObject(mImportedId, builder->mBindingType,
+                backend::BufferUsage::STATIC);
     }
-    mHandle = driver.createBufferObject(builder->mByteCount, builder->mBindingType,
-            backend::BufferUsage::STATIC);
 }
 
 void FBufferObject::terminate(FEngine& engine) {

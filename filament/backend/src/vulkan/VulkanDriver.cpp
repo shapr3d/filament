@@ -453,6 +453,11 @@ void VulkanDriver::createBufferObjectR(Handle<HwBufferObject> boh,
     });
 }
 
+void VulkanDriver::importBufferObjectR(Handle<HwBufferObject> boh,
+        intptr_t id, BufferObjectBinding bindingType, BufferUsage usage) {
+    // not supported in this backend
+}
+
 void VulkanDriver::destroyBufferObject(Handle<HwBufferObject> boh) {
     if (boh) {
        auto bufferObject = handle_cast<VulkanBufferObject*>(boh);
@@ -601,6 +606,10 @@ Handle<HwIndexBuffer> VulkanDriver::createIndexBufferS() noexcept {
 }
 
 Handle<HwBufferObject> VulkanDriver::createBufferObjectS() noexcept {
+    return allocHandle<VulkanBufferObject>();
+}
+
+Handle<HwBufferObject> VulkanDriver::importBufferObjectS() noexcept {
     return allocHandle<VulkanBufferObject>();
 }
 

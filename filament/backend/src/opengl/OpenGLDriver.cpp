@@ -351,6 +351,10 @@ Handle<HwBufferObject> OpenGLDriver::createBufferObjectS() noexcept {
     return initHandle<GLBufferObject>();
 }
 
+Handle<HwBufferObject> OpenGLDriver::importBufferObjectS() noexcept {
+    return initHandle<GLBufferObject>();
+}
+
 Handle<HwRenderPrimitive> OpenGLDriver::createRenderPrimitiveS() noexcept {
     return initHandle<GLRenderPrimitive>();
 }
@@ -455,6 +459,26 @@ void OpenGLDriver::createBufferObjectR(Handle<HwBufferObject> boh,
     glGenBuffers(1, &bo->gl.id);
     gl.bindBuffer(bo->gl.binding, bo->gl.id);
     glBufferData(bo->gl.binding, byteCount, nullptr, getBufferUsage(usage));
+    CHECK_GL_ERROR(utils::slog.e)
+}
+
+void OpenGLDriver::importBufferObjectR(Handle<HwBufferObject> boh,
+        intptr_t id, BufferObjectBinding bindingType, BufferUsage usage) {
+    DEBUG_MARKER()
+
+    auto& gl = mContext;
+    if (bindingType == BufferObjectBinding::VERTEX && id == 0) {
+        gl.bindVertexArray(nullptr);
+    }
+
+    GLBufferObject* bo = construct<GLBufferObject>(boh, 0, bindingType, usage);
+    bo->gl.isExternal = id > 0;
+    bo->gl.id = GLuint(id);
+    gl.bindBuffer(bo->gl.binding, bo->gl.id);
+    GLint bufferSize;
+    glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &bufferSize);
+    assert_invariant(bufferSize > 0);
+    bo->byteCount = bufferSize;
     CHECK_GL_ERROR(utils::slog.e)
 }
 
