@@ -425,24 +425,18 @@ void OpenGLDriver::createIndexBufferR(
         Handle<HwIndexBuffer> ibh,
         ElementType elementType,
         uint32_t indexCount,
-        BufferUsage usage,
-        intptr_t importedId) {
+        BufferUsage usage) {
     DEBUG_MARKER()
 
     auto& gl = mContext;
     uint8_t elementSize = static_cast<uint8_t>(getElementTypeSize(elementType));
     GLIndexBuffer* ib = construct<GLIndexBuffer>(ibh, elementSize, indexCount);
-    glGenBuffers(1, &ib->gl.id);
-    ib->gl.isExternal = importedId > 0;
-    if (!ib->gl.isExternal) {
-        GLsizeiptr size = elementSize * indexCount;
-        gl.bindVertexArray(nullptr);
-        gl.bindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib->gl.id);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, size, nullptr, getBufferUsage(usage));
-        CHECK_GL_ERROR(utils::slog.e)
-    } else {
-        ib->gl.id = GLuint(importedId);
-    }
+    glGenBuffers(1, &ib->gl.buffer);
+    GLsizeiptr size = elementSize * indexCount;
+    gl.bindVertexArray(nullptr);
+    gl.bindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib->gl.buffer);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, size, nullptr, getBufferUsage(usage));
+    CHECK_GL_ERROR(utils::slog.e)
 }
 
 void OpenGLDriver::createBufferObjectR(Handle<HwBufferObject> boh,
@@ -1229,9 +1223,7 @@ void OpenGLDriver::destroyIndexBuffer(Handle<HwIndexBuffer> ibh) {
     if (ibh) {
         auto& gl = mContext;
         GLIndexBuffer const* ib = handle_cast<const GLIndexBuffer*>(ibh);
-        if (!ib->gl.isExternal) {
-            gl.deleteBuffers(1, &ib->gl.id, GL_ELEMENT_ARRAY_BUFFER);
-        }
+        gl.deleteBuffers(1, &ib->gl.buffer, GL_ELEMENT_ARRAY_BUFFER);
         destruct(ibh, ib);
     }
 }
@@ -1690,9 +1682,7 @@ void OpenGLDriver::updateIndexBuffer(
     assert_invariant(ib->elementSize == 2 || ib->elementSize == 4);
 
     gl.bindVertexArray(nullptr);
-    gl.bindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib->gl.id);
-    assert_invariant(!ib->gl.isExternal);
-
+    gl.bindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib->gl.buffer);
     glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, byteOffset, p.size, p.buffer);
 
     scheduleDestroy(std::move(p));
@@ -2477,7 +2467,7 @@ void OpenGLDriver::setRenderPrimitiveBuffer(Handle<HwRenderPrimitive> rph,
         updateVertexArrayObject(rp, eb);
 
         // this records the index buffer into the currently bound VAO
-        gl.bindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib->gl.id);
+        gl.bindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib->gl.buffer);
 
         CHECK_GL_ERROR(utils::slog.e)
     }

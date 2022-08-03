@@ -172,8 +172,7 @@ DECL_DRIVER_API_R_N(backend::VertexBufferHandle, createVertexBuffer,
 DECL_DRIVER_API_R_N(backend::IndexBufferHandle, createIndexBuffer,
         backend::ElementType, elementType,
         uint32_t, indexCount,
-        backend::BufferUsage, usage,
-        intptr_t, importedId)
+        backend::BufferUsage, usage)
 
 DECL_DRIVER_API_R_N(backend::BufferObjectHandle, createBufferObject,
         uint32_t, byteCount,

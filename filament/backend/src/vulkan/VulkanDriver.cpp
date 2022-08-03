@@ -427,8 +427,8 @@ void VulkanDriver::destroyVertexBuffer(Handle<HwVertexBuffer> vbh) {
     }
 }
 
-void VulkanDriver::createIndexBufferR(Handle<HwIndexBuffer> ibh, ElementType elementType,
-        uint32_t indexCount, BufferUsage usage, intptr_t importedId) {
+void VulkanDriver::createIndexBufferR(Handle<HwIndexBuffer> ibh,
+        ElementType elementType, uint32_t indexCount, BufferUsage usage) {
     auto elementSize = (uint8_t) getElementTypeSize(elementType);
     auto indexBuffer = construct<VulkanIndexBuffer>(ibh, mContext, mStagePool,
             elementSize, indexCount);

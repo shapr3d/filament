@@ -239,11 +239,9 @@ void MetalDriver::createVertexBufferR(Handle<HwVertexBuffer> vbh, uint8_t buffer
 }
 
 void MetalDriver::createIndexBufferR(Handle<HwIndexBuffer> ibh, ElementType elementType,
-        uint32_t indexCount, BufferUsage usage, intptr_t importedId) {
+        uint32_t indexCount, BufferUsage usage) {
     auto elementSize = (uint8_t) getElementTypeSize(elementType);
-    auto* ib = construct_handle<MetalIndexBuffer>(ibh, *mContext, usage, elementSize, indexCount);
-    ib->buffer.wrapExternalBuffer((id<MTLBuffer>) CFBridgingRelease((void*) importedId));
-    
+    construct_handle<MetalIndexBuffer>(ibh, *mContext, usage, elementSize, indexCount);
 }
 
 void MetalDriver::createBufferObjectR(Handle<HwBufferObject> boh, uint32_t byteCount,

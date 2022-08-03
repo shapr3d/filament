@@ -32,7 +32,6 @@ using namespace filament::math;
 
 struct VertexBuffer::BuilderDetails {
     FVertexBuffer::AttributeData mAttributes[MAX_VERTEX_ATTRIBUTE_COUNT];
-    intptr_t mImportedId[MAX_VERTEX_BUFFER_COUNT] = {};
     AttributeBitset mDeclaredAttributes;
     uint32_t mVertexCount = 0;
     uint8_t mBufferCount = 0;
@@ -143,20 +142,6 @@ VertexBuffer* VertexBuffer::Builder::build(Engine& engine) {
     return upcast(engine).createVertexBuffer(*this);
 }
 
-VertexBuffer::Builder& VertexBuffer::Builder::import(intptr_t id) noexcept {
-    ASSERT_PRECONDITION(mImpl->mBufferCount > 0, "bufferCount cannot be 0");
-    mImpl->mImportedId[0] = id;
-    return *this;
-}
-
-VertexBuffer::Builder& VertexBuffer::Builder::import(intptr_t* ids) noexcept {
-    ASSERT_PRECONDITION(mImpl->mBufferCount > 0, "bufferCount cannot be 0");
-    for (uint8_t i = 0; i < mImpl->mBufferCount; ++i) {
-        mImpl->mImportedId[i] = ids[i];   
-    }
-    return *this;
-}
-
 // ------------------------------------------------------------------------------------------------
 
 FVertexBuffer::FVertexBuffer(FEngine& engine, const VertexBuffer::Builder& builder)
@@ -212,9 +197,6 @@ FVertexBuffer::FVertexBuffer(FEngine& engine, const VertexBuffer::Builder& build
         UTILS_NOUNROLL
         for (size_t i = 0; i < MAX_VERTEX_BUFFER_COUNT; ++i) {
             if (bufferSizes[i] > 0) {
-                if (builder->mImportedId[i] > 0) {
-                    driver.setupExternalResource(builder->mImportedId[i]);
-                }
                 BufferObjectHandle bo = driver.createBufferObject(bufferSizes[i],
                         backend::BufferObjectBinding::VERTEX, backend::BufferUsage::STATIC);
                 driver.setVertexBufferObject(mHandle, i, bo);
@@ -242,7 +224,6 @@ void FVertexBuffer::setBufferAt(FEngine& engine, uint8_t bufferIndex,
         backend::BufferDescriptor&& buffer, uint32_t byteOffset) {
     ASSERT_PRECONDITION(!mBufferObjectsEnabled, "Please use setBufferObjectAt()");
     if (bufferIndex < mBufferCount) {
-        ASSERT_PRECONDITION(mImportedId[bufferIndex] == 0, "Imported buffer can't be modified");
         assert_invariant(mBufferObjects[bufferIndex]);
         engine.getDriverApi().updateBufferObject(mBufferObjects[bufferIndex],
                std::move(buffer), byteOffset);

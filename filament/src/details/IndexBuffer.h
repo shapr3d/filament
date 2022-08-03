@@ -45,9 +45,7 @@ public:
 private:
     friend class IndexBuffer;
     backend::Handle<backend::HwIndexBuffer> mHandle;
-    intptr_t mImportedId;
     uint32_t mIndexCount;
-    bool mExternalBuffersEnabled = false;
 };
 
 FILAMENT_UPCAST(IndexBuffer)

@@ -67,12 +67,6 @@ public:
 
     // OpenGLDriver specific fields
 
-    struct GLBufferHandle {
-        GLuint id = 0;
-        GLenum binding = 0;
-        bool isExternal = false;
-    };
-
     struct GLBufferObject : public backend::HwBufferObject {
         using HwBufferObject::HwBufferObject;
         GLBufferObject(uint32_t size,
@@ -100,7 +94,9 @@ public:
 
     struct GLIndexBuffer : public backend::HwIndexBuffer {
         using HwIndexBuffer::HwIndexBuffer;
-        GLBufferHandle gl;
+        struct {
+            GLuint buffer{};
+        } gl;
     };
 
     struct GLSamplerGroup : public backend::HwSamplerGroup {

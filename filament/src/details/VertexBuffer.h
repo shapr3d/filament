@@ -70,12 +70,10 @@ private:
     VertexBufferHandle mHandle;
     std::array<AttributeData, backend::MAX_VERTEX_ATTRIBUTE_COUNT> mAttributes;
     std::array<BufferObjectHandle, backend::MAX_VERTEX_BUFFER_COUNT> mBufferObjects;
-    std::array<intptr_t, backend::MAX_VERTEX_BUFFER_COUNT> mImportedId = {0};
     AttributeBitset mDeclaredAttributes;
     uint32_t mVertexCount = 0;
     uint8_t mBufferCount = 0;
     bool mBufferObjectsEnabled = false;
-    bool mExternalBuffersEnabled = false;
 };
 
 FILAMENT_UPCAST(VertexBuffer)

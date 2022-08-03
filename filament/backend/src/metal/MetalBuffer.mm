@@ -44,8 +44,17 @@ MetalBuffer::MetalBuffer(MetalContext& context, BufferUsage usage, size_t size, 
     mUsage = usage;
 }
 
+MetalBuffer::MetalBuffer(MetalContext& context, BufferUsage usage, id<MTLBuffer> buffer)
+        : mBufferSize(buffer.length), mContext(context), mUsage(usage), mExternalBuffer(buffer) {
+    ASSERT_PRECONDITION(buffer, "External buffer cannot be nil");
+#if TARGET_OS_SIMULATOR
+    // TODO: must check if MTLBuffer.length or MTLBuffer.allocatedSize returns 0 on iOS simulator or not
+    static_assert(false, "TODO!!!");
+#endif
+}
+
 MetalBuffer::~MetalBuffer() {
-    releaseExternalBuffer();
+    mExternalBuffer = nil;
 
     if (mCpuBuffer) {
         free(mCpuBuffer);
@@ -55,22 +64,6 @@ MetalBuffer::~MetalBuffer() {
     if (mBufferPoolEntry) {
         mContext.bufferPool->releaseBuffer(mBufferPoolEntry);
     }
-}
-
-void MetalBuffer::wrapExternalBuffer(id<MTLBuffer> buffer) {
-    ASSERT_PRECONDITION(!mExternalBuffer, "A external buffer is already wrapped. Call releaseExternalBuffer()");
-    ASSERT_PRECONDITION(buffer, "External buffer cannot be nil");
-    ASSERT_PRECONDITION(!mCpuBuffer, "This buffer is backed by CPU memory");
-    mExternalBuffer = buffer;
-}
-
-bool MetalBuffer::releaseExternalBuffer() {
-    if (!mExternalBuffer) {
-        return false;
-    }
-
-    mExternalBuffer = nil;
-    return true;
 }
 
 void MetalBuffer::copyIntoBuffer(void* src, size_t size, size_t byteOffset) {

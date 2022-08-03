@@ -98,33 +98,6 @@ public:
          * @see IndexBuffer::setBuffer
          */
         IndexBuffer* build(Engine& engine);
-
-        /**
-         * Specify a native buffer to import as a Filament index buffer.
-         *
-         * The texture id is backend-specific:
-         *   - OpenGL: GLuint buffer object ID
-         *   - Metal: id<MTLBuffer>
-         *
-         * With Metal, the id<MTLBuffer> object should be cast to an intptr_t using
-         * __bridge cast to transfer to Filament. Management of ownership is done by Filament.
-         *
-         * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~{.cpp}
-         *  id<MTLBuffer> metalBuffer = ...
-         *  filamentBuffer->import(intptr_t((__bridge void*) metalBuffer));
-         *
-         *  // after using buffer:
-         *  engine->destroy(filamentBuffer);   // filamentBuffer is released
-         * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-         *
-         * @warning This method should be used as a last resort. This API is subject to change or
-         * removal.
-         *
-         * @param id a backend specific buffer identifier
-         *
-         * @return This Builder, for chaining calls.
-         */
-        Builder& import(intptr_t id) noexcept;
     private:
         friend class FIndexBuffer;
     };

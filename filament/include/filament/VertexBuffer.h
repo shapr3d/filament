@@ -55,9 +55,6 @@ class UTILS_PUBLIC VertexBuffer : public FilamentAPI {
     struct BuilderDetails;
 
 public:
-
-    constexpr static intptr_t NotExternal = 0; 
-
     using AttributeType = backend::ElementType;
     using BufferDescriptor = backend::BufferDescriptor;
 
@@ -158,63 +155,6 @@ public:
          * @exception utils::PreConditionPanic if a parameter to a builder function was invalid.
          */
         VertexBuffer* build(Engine& engine);
-
-        /**
-         * Specify a native buffer to import as a Filament vertex buffer.
-         *
-         * The texture id is backend-specific:
-         *   - OpenGL: GLuint buffer object ID
-         *   - Metal: id<MTLBuffer>
-         *
-         * With Metal, the id<MTLBuffer> object should be cast to an intptr_t using
-         * __bridge cast to transfer to Filament. Management of ownership is done by Filament.
-         *
-         * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~{.cpp}
-         *  id<MTLBuffer> metalBuffer = ...
-         *  filamentBuffer->import(intptr_t((__bridge void*) metalBuffer));
-         *
-         *  // after using buffer:
-         *  engine->destroy(filamentBuffer);   // only filamentBuffer handle is released
-         * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-         *
-         * @warning This method should be used as a last resort. This API is subject to change or
-         * removal.
-         *
-         * @param id a backend specific buffer identifier
-         *
-         * @return This Builder, for chaining calls.
-         */
-        
-        Builder& import(intptr_t id) noexcept;
-        /**
-         * Specify a native buffer to import as a Filament vertex buffer.
-         *
-         * The texture id is backend-specific:
-         *   - OpenGL: GLuint buffer object ID
-         *   - Metal: id<MTLBuffer>
-         *
-         * With Metal, the id<MTLBuffer> object should be cast to an intptr_t using
-         * __bridge cast to transfer to Filament. Management of ownership is done by Filament.
-         *
-         * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~{.cpp}
-         *  id<MTLBuffer> metalBuffer = ...
-         *  filamentBuffer->import(intptr_t((__bridge void*) metalBuffer));
-         *
-         *  // after using buffer:
-         *  engine->destroy(filamentBuffer);   // only filamentBuffer handle is released
-         * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-         *
-         * @warning This method should be used as a last resort. This API is subject to change or
-         * removal.
-         *
-         * @param ids a backend specific buffer identifiers (should be the same amount of items as 
-         * bufferCount). If there are buffers among the ids which are not external, then
-         * it should marked with the value of NotExternal. 
-         *
-         * @return This Builder, for chaining calls.
-         */
-        Builder& import(intptr_t* ids) noexcept;
-
 
     private:
         friend class FVertexBuffer;
