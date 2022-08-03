@@ -442,26 +442,20 @@ void OpenGLDriver::createIndexBufferR(
 }
 
 void OpenGLDriver::createBufferObjectR(Handle<HwBufferObject> boh,
-        uint32_t byteCount, BufferObjectBinding bindingType, BufferUsage usage,
-        intptr_t importedId) {
+        uint32_t byteCount, BufferObjectBinding bindingType, BufferUsage usage) {
     DEBUG_MARKER()
     assert_invariant(byteCount > 0);
 
     auto& gl = mContext;
-    if (bindingType == BufferObjectBinding::VERTEX && importedId == 0) {
+    if (bindingType == BufferObjectBinding::VERTEX) {
         gl.bindVertexArray(nullptr);
     }
 
     GLBufferObject* bo = construct<GLBufferObject>(boh, byteCount, bindingType, usage);
-    bo->gl.isExternal = importedId > 0;
-    if (!bo->gl.isExternal) {
-        glGenBuffers(1, &bo->gl.id);
-        gl.bindBuffer(bo->gl.binding, bo->gl.id);
-        glBufferData(bo->gl.binding, byteCount, nullptr, getBufferUsage(usage));
-        CHECK_GL_ERROR(utils::slog.e)
-    } else {
-        bo->gl.id = GLuint(importedId);
-    }
+    glGenBuffers(1, &bo->gl.id);
+    gl.bindBuffer(bo->gl.binding, bo->gl.id);
+    glBufferData(bo->gl.binding, byteCount, nullptr, getBufferUsage(usage));
+    CHECK_GL_ERROR(utils::slog.e)
 }
 
 void OpenGLDriver::createRenderPrimitiveR(Handle<HwRenderPrimitive> rph, int) {
@@ -1689,7 +1683,6 @@ void OpenGLDriver::updateBufferObject(
     auto& gl = mContext;
     GLBufferObject* bo = handle_cast<GLBufferObject *>(boh);
 
-    assert_invariant(!bo->gl.isExternal);
     assert_invariant(bd.size + byteOffset <= bo->byteCount);
 
     if (bo->gl.binding == GL_UNIFORM_BUFFER) {

@@ -263,8 +263,8 @@ void MetalSwapChain::scheduleFrameCompletedCallback() {
     }];
 }
 
-MetalBufferObject::MetalBufferObject(MetalContext& context, BufferUsage usage, uint32_t byteCount,bool wrapsExternalBuffer)
-        : HwBufferObject(byteCount), buffer(context, usage, byteCount, wrapsExternalBuffer) {}
+MetalBufferObject::MetalBufferObject(MetalContext& context, BufferUsage usage, uint32_t byteCount)
+        : HwBufferObject(byteCount), buffer(context, usage, byteCount) {}
 
 void MetalBufferObject::updateBuffer(void* data, size_t size, uint32_t byteOffset) {
     buffer.copyIntoBuffer(data, size, byteOffset);

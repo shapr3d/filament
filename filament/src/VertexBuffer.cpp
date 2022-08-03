@@ -216,8 +216,7 @@ FVertexBuffer::FVertexBuffer(FEngine& engine, const VertexBuffer::Builder& build
                     driver.setupExternalResource(builder->mImportedId[i]);
                 }
                 BufferObjectHandle bo = driver.createBufferObject(bufferSizes[i],
-                        backend::BufferObjectBinding::VERTEX, backend::BufferUsage::STATIC,
-                        builder->mImportedId[i]);
+                        backend::BufferObjectBinding::VERTEX, backend::BufferUsage::STATIC);
                 driver.setVertexBufferObject(mHandle, i, bo);
                 mBufferObjects[i] = bo;
             }

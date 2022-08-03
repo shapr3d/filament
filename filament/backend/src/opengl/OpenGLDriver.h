@@ -80,7 +80,11 @@ public:
                 : HwBufferObject(size), usage(usage) {
             gl.binding = GLUtils::getBufferBindingType(bindingType);
         }
-        GLBufferHandle gl;
+        struct {
+            GLuint id = 0;
+            GLenum binding = 0;
+            bool isExternal = false;
+        } gl;
         uint32_t base = 0;
         uint32_t size = 0;
         backend::BufferUsage usage = {};

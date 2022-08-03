@@ -247,9 +247,8 @@ void MetalDriver::createIndexBufferR(Handle<HwIndexBuffer> ibh, ElementType elem
 }
 
 void MetalDriver::createBufferObjectR(Handle<HwBufferObject> boh, uint32_t byteCount,
-        BufferObjectBinding bindingType, BufferUsage usage, intptr_t importedId) {
-    auto* bo = construct_handle<MetalBufferObject>(boh, *mContext, usage, byteCount, importedId > 0);
-    bo->getBuffer()->wrapExternalBuffer((id<MTLBuffer>) CFBridgingRelease((void*) importedId));
+        BufferObjectBinding bindingType, BufferUsage usage) {
+    construct_handle<MetalBufferObject>(boh, *mContext, usage, byteCount);
 }
 
 void MetalDriver::createTextureR(Handle<HwTexture> th, SamplerType target, uint8_t levels,
