@@ -32,12 +32,15 @@ class FEngine;
 
 class FIndexBuffer : public IndexBuffer {
 public:
+    using IndexBufferHandle = backend::IndexBufferHandle;
+    using BufferObjectHandle = backend::BufferObjectHandle;
+
     FIndexBuffer(FEngine& engine, const Builder& builder);
 
     // frees driver resources, object becomes invalid
     void terminate(FEngine& engine);
 
-    backend::Handle<backend::HwIndexBuffer> getHwHandle() const noexcept { return mHandle; }
+    IndexBufferHandle getHwHandle() const noexcept { return mHandle; }
 
     size_t getIndexCount() const noexcept { return mIndexCount; }
 
@@ -46,7 +49,8 @@ public:
 
 private:
     friend class IndexBuffer;
-    backend::Handle<backend::HwIndexBuffer> mHandle;
+    IndexBufferHandle mHandle;
+    BufferObjectHandle mObjectHandle;
     uint32_t mIndexCount;
     bool mBufferObjectEnabled = false;
 };

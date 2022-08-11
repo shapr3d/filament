@@ -433,7 +433,7 @@ void VulkanDriver::createIndexBufferR(Handle<HwIndexBuffer> ibh,
     auto indexBuffer = construct<VulkanIndexBuffer>(ibh, mContext, mStagePool,
             elementSize, indexCount);
     mDisposer.createDisposable(indexBuffer, [this, ibh] () {
-        destruct<VulkanIndexBuffer>(mContext, ibh);
+        destruct<VulkanIndexBuffer>(ibh);
     });
 }
 
@@ -859,7 +859,7 @@ void VulkanDriver::setIndexBufferObject(Handle<HwIndexBuffer> ibh, Handle<HwBuff
     auto& ib = *handle_cast<VulkanIndexBuffer*>(ibh);
     auto& bo = *handle_cast<VulkanBufferObject*>(boh);
     assert_invariant(bo.bindingType == BufferObjectBinding::INDEX);
-    ub.buffer = &bo.buffer;
+    ib.buffer = &bo.buffer;
 }
 
 void VulkanDriver::setVertexBufferObject(Handle<HwVertexBuffer> vbh, uint32_t index,
@@ -873,7 +873,7 @@ void VulkanDriver::setVertexBufferObject(Handle<HwVertexBuffer> vbh, uint32_t in
 void VulkanDriver::updateIndexBuffer(Handle<HwIndexBuffer> ibh, BufferDescriptor&& p,
         uint32_t byteOffset) {
     auto ib = handle_cast<VulkanIndexBuffer*>(ibh);
-    ib->buffer.loadFromCpu(mContext, mStagePool, p.buffer, byteOffset, p.size);
+    ib->buffer->loadFromCpu(mContext, mStagePool, p.buffer, byteOffset, p.size);
     mDisposer.acquire(ib);
     scheduleDestroy(std::move(p));
 }
@@ -1886,7 +1886,7 @@ void VulkanDriver::draw(PipelineState pipelineState, Handle<HwRenderPrimitive> r
     // avoid rebinding these if they are already bound, but since we do not (yet) support subranges
     // it would be rare for a client to make consecutive draw calls with the same render primitive.
     vkCmdBindVertexBuffers(cmdbuffer, 0, bufferCount, buffers, offsets);
-    vkCmdBindIndexBuffer(cmdbuffer, prim.indexBuffer->buffer.getGpuBuffer(), 0,
+    vkCmdBindIndexBuffer(cmdbuffer, prim.indexBuffer->buffer->getGpuBuffer(), 0,
             prim.indexBuffer->indexType);
 
     // Finally, make the actual draw call. TODO: support subranges

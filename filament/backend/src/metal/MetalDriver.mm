@@ -729,7 +729,7 @@ uint8_t MetalDriver::getMaxDrawBuffers() {
 void MetalDriver::updateIndexBuffer(Handle<HwIndexBuffer> ibh, BufferDescriptor&& data,
         uint32_t byteOffset) {
     auto* ib = handle_cast<MetalIndexBuffer>(ibh);
-    ib->buffer.copyIntoBuffer(data.buffer, data.size, byteOffset);
+    ib->buffer->copyIntoBuffer(data.buffer, data.size, byteOffset);
     scheduleDestroy(std::move(data));
 }
 
@@ -1396,8 +1396,8 @@ void MetalDriver::draw(backend::PipelineState ps, Handle<HwRenderPrimitive> rph)
     MetalIndexBuffer* indexBuffer = primitive->indexBuffer;
 
     id<MTLCommandBuffer> cmdBuffer = getPendingCommandBuffer(mContext);
-    id<MTLBuffer> metalIndexBuffer = indexBuffer->buffer.getGpuBufferForDraw(cmdBuffer);
-    size_t offset = indexBuffer->buffer.getGpuBufferStreamOffset();
+    id<MTLBuffer> metalIndexBuffer = indexBuffer->buffer->getGpuBufferForDraw(cmdBuffer);
+    size_t offset = indexBuffer->buffer->getGpuBufferStreamOffset();
     [mContext->currentRenderPassEncoder drawIndexedPrimitives:getMetalPrimitiveType(primitive->type)
                                                    indexCount:primitive->count
                                                     indexType:getIndexType(indexBuffer->elementSize)

@@ -45,7 +45,7 @@ MetalBuffer::MetalBuffer(MetalContext& context, BufferUsage usage, size_t size, 
 }
 
 MetalBuffer::MetalBuffer(MetalContext& context, BufferUsage usage, id<MTLBuffer> buffer)
-        : mBufferSize(buffer.length), mContext(context), mUsage(usage), mExternalBuffer(buffer) {
+        : mUsage(usage), mBufferSize(buffer.length), mExternalBuffer(buffer), mContext(context) {
     ASSERT_PRECONDITION(buffer, "External buffer cannot be nil");
 #if TARGET_OS_SIMULATOR
     // TODO: must check if MTLBuffer.length or MTLBuffer.allocatedSize returns 0 on iOS simulator or not

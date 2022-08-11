@@ -167,7 +167,7 @@ OpenGLDriver::OpenGLDriver(OpenGLPlatform* platform) noexcept
           mHandleAllocator("Handles", FILAMENT_OPENGL_HANDLE_ARENA_SIZE_IN_MB * 1024U * 1024U), // TODO: set the amount in configuration
           mSamplerMap(32),
           mPlatform(*platform) {
-  
+
     std::fill(mSamplerBindings.begin(), mSamplerBindings.end(), nullptr);
 
     // set a reasonable default value for our stream array
@@ -1724,7 +1724,7 @@ void OpenGLDriver::updateBufferObject(
         // TODO: use updateBuffer() for all types of buffer? Make sure GL supports that.
         updateBuffer(bo, bd, byteOffset, (uint32_t)gl.gets.uniform_buffer_offset_alignment);
     } else {
-        if (bo->gl.binding == GL_ARRAY_BUFFER) {
+        if (bo->gl.binding == GL_ARRAY_BUFFER || bo->gl.binding == GL_ELEMENT_ARRAY_BUFFER) {
             gl.bindVertexArray(nullptr);
         }
         gl.bindBuffer(bo->gl.binding, bo->gl.id);

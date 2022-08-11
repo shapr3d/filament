@@ -65,16 +65,28 @@ FIndexBuffer::FIndexBuffer(FEngine& engine, const IndexBuffer::Builder& builder)
             (backend::ElementType)builder->mIndexType,
             uint32_t(builder->mIndexCount),
             backend::BufferUsage::STATIC);
+
+    // If buffer objects are not enabled at the API level, then we create them internally.
+    if (!mBufferObjectEnabled) {
+        mObjectHandle = engine.getDriverApi().createBufferObject(
+            mIndexCount * ((builder->mIndexType == IndexType::UINT) ? 4U : 2U),
+            filament::backend::BufferObjectBinding::INDEX,
+            backend::BufferUsage::STATIC);
+            engine.getDriverApi().setIndexBufferObject(mHandle, mObjectHandle);
+    }
 }
 
 void FIndexBuffer::terminate(FEngine& engine) {
     FEngine::DriverApi& driver = engine.getDriverApi();
+    if (!mBufferObjectEnabled) {
+        driver.destroyBufferObject(mObjectHandle);
+    }
     driver.destroyIndexBuffer(mHandle);
 }
 
 void FIndexBuffer::setBuffer(FEngine& engine, BufferDescriptor&& buffer, uint32_t byteOffset) {
     ASSERT_PRECONDITION(!mBufferObjectEnabled, "Please use setBufferObject()");
-    engine.getDriverApi().updateIndexBuffer(mHandle, std::move(buffer), byteOffset);
+    engine.getDriverApi().updateBufferObject(mObjectHandle, std::move(buffer), byteOffset);
 }
 
 void FIndexBuffer::setBufferObject(FEngine& engine, FBufferObject const* bufferObject) {

@@ -59,7 +59,7 @@ BufferObject::Builder& BufferObject::Builder::import(intptr_t id) noexcept {
 // ------------------------------------------------------------------------------------------------
 
 FBufferObject::FBufferObject(FEngine& engine, const BufferObject::Builder& builder)
-        : mByteCount(builder->mByteCount), mBindingType(builder->mBindingType), mImportedId(builder->mImportedId) {
+        : mImportedId(builder->mImportedId), mByteCount(builder->mByteCount), mBindingType(builder->mBindingType) {
     FEngine::DriverApi& driver = engine.getDriverApi();
     if (UTILS_LIKELY(mImportedId == 0)) {
         mHandle = driver.createBufferObject(builder->mByteCount, builder->mBindingType,
