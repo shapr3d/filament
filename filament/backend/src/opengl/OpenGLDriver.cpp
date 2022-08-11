@@ -460,9 +460,10 @@ void OpenGLDriver::importBufferObjectR(Handle<HwBufferObject> boh,
         intptr_t id, BufferObjectBinding bindingType, BufferUsage usage) {
     DEBUG_MARKER()
 
+    assert_invariant(id);
+
     auto& gl = mContext;
-    if ((bindingType == BufferObjectBinding::VERTEX || bindingType == BufferObjectBinding::INDEX) &&
-        id == 0) {
+    if ((bindingType == BufferObjectBinding::VERTEX || bindingType == BufferObjectBinding::INDEX)) {
         gl.bindVertexArray(nullptr);
     }
 
@@ -1661,6 +1662,10 @@ void OpenGLDriver::setIndexBufferObject(Handle<HwIndexBuffer> ibh, Handle<HwBuff
 
     if (ib->gl.buffer != bo->gl.id) {
         ib->gl.buffer = bo->gl.id;
+        static constexpr uint32_t kMaxVersion =
+            std::numeric_limits<decltype(ib->bufferVersion)>::max();
+        const uint32_t version = ib->bufferVersion;
+        ib->bufferVersion = (version + 1) % kMaxVersion;
     }
 
     CHECK_GL_ERROR(utils::slog.e)
@@ -2478,10 +2483,12 @@ void OpenGLDriver::setRenderPrimitiveBuffer(Handle<HwRenderPrimitive> rph,
 
         rp->gl.indicesType = ib->elementSize == 4 ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
         rp->gl.vertexBufferWithObjects = vbh;
+        rp->gl.indexBuffer = ibh;
 
         // update the VBO bindings in the VAO
         updateVertexArrayObject(rp, eb);
 
+        rp->gl.indexBufferVersion = ib->bufferVersion;
         // this records the index buffer into the currently bound VAO
         gl.bindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib->gl.buffer);
 
@@ -3201,7 +3208,8 @@ void OpenGLDriver::draw(PipelineState state, Handle<HwRenderPrimitive> rph) {
 
     // Gracefully do nothing if the render primitive has not been set up.
     VertexBufferHandle vb = rp->gl.vertexBufferWithObjects;
-    if (UTILS_UNLIKELY(!vb)) {
+    IndexBufferHandle ib = rp->gl.indexBuffer;
+    if (UTILS_UNLIKELY(!vb || !ib)) {
         return;
     }
 
@@ -3209,8 +3217,15 @@ void OpenGLDriver::draw(PipelineState state, Handle<HwRenderPrimitive> rph) {
 
     // If necessary, mutate the bindings in the VAO.
     const GLVertexBuffer* glvb = handle_cast<GLVertexBuffer*>(vb);
+    const GLIndexBuffer* glib = handle_cast<GLIndexBuffer*>(ib);
+
     if (UTILS_UNLIKELY(rp->gl.vertexBufferVersion != glvb->bufferObjectsVersion)) {
         updateVertexArrayObject(rp, glvb);
+    }
+
+    if (UTILS_UNLIKELY(rp->gl.indexBufferVersion != glib->bufferVersion)) {
+        rp->gl.indexBufferVersion = glib->bufferVersion;
+        gl.bindBuffer(GL_ELEMENT_ARRAY_BUFFER, glib->gl.buffer);
     }
 
     setRasterState(state.rasterState);
