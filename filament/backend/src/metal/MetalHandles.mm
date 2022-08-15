@@ -266,8 +266,8 @@ void MetalSwapChain::scheduleFrameCompletedCallback() {
 MetalBufferObject::MetalBufferObject(MetalContext& context, BufferUsage usage, uint32_t byteCount)
         : HwBufferObject(byteCount), buffer(context, usage, byteCount) {}
 
-MetalBufferObject::MetalBufferObject(MetalContext& context, BufferUsage usage, id<MTLBuffer> buffer)
-        : HwBufferObject(buffer.length), buffer(context, usage, buffer) {}
+MetalBufferObject::MetalBufferObject(MetalContext& context, BufferUsage usage, uint32_t byteCount, id<MTLBuffer> buffer)
+        : HwBufferObject(byteCount), buffer(context, usage, byteCount, buffer) {}
 
 void MetalBufferObject::updateBuffer(void* data, size_t size, uint32_t byteOffset) {
     buffer.copyIntoBuffer(data, size, byteOffset);
