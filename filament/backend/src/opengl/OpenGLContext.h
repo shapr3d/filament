@@ -55,6 +55,9 @@ public:
         // If this version number does not match vertexBufferWithObjects->bufferObjectsVersion,
         // then the VAO needs to be updated.
         uint8_t vertexBufferVersion = 0;
+        
+        // If this version number does not match indexBuffer->bufferObjectVersion,
+        // then the VAO needs to be updated.
         uint8_t indexBufferVersion = 0;
     } gl;
 

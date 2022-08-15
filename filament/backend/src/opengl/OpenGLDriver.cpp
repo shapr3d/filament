@@ -1663,9 +1663,9 @@ void OpenGLDriver::setIndexBufferObject(Handle<HwIndexBuffer> ibh, Handle<HwBuff
     if (ib->gl.buffer != bo->gl.id) {
         ib->gl.buffer = bo->gl.id;
         static constexpr uint32_t kMaxVersion =
-            std::numeric_limits<decltype(ib->bufferVersion)>::max();
-        const uint32_t version = ib->bufferVersion;
-        ib->bufferVersion = (version + 1) % kMaxVersion;
+            std::numeric_limits<decltype(ib->bufferObjectVersion)>::max();
+        const uint32_t version = ib->bufferObjectVersion;
+        ib->bufferObjectVersion = (version + 1) % kMaxVersion;
     }
 
     CHECK_GL_ERROR(utils::slog.e)
@@ -2488,7 +2488,7 @@ void OpenGLDriver::setRenderPrimitiveBuffer(Handle<HwRenderPrimitive> rph,
         // update the VBO bindings in the VAO
         updateVertexArrayObject(rp, eb);
 
-        rp->gl.indexBufferVersion = ib->bufferVersion;
+        rp->gl.indexBufferVersion = ib->bufferObjectVersion;
         // this records the index buffer into the currently bound VAO
         gl.bindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib->gl.buffer);
 
@@ -3223,8 +3223,8 @@ void OpenGLDriver::draw(PipelineState state, Handle<HwRenderPrimitive> rph) {
         updateVertexArrayObject(rp, glvb);
     }
 
-    if (UTILS_UNLIKELY(rp->gl.indexBufferVersion != glib->bufferVersion)) {
-        rp->gl.indexBufferVersion = glib->bufferVersion;
+    if (UTILS_UNLIKELY(rp->gl.indexBufferVersion != glib->bufferObjectVersion)) {
+        rp->gl.indexBufferVersion = glib->bufferObjectVersion;
         gl.bindBuffer(GL_ELEMENT_ARRAY_BUFFER, glib->gl.buffer);
     }
 

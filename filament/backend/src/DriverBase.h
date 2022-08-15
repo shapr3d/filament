@@ -75,7 +75,7 @@ struct HwBufferObject : public HwBase {
 struct HwIndexBuffer : public HwBase {
     uint32_t count : 27;
     uint32_t elementSize : 5;
-    uint8_t bufferVersion{};      
+    uint8_t bufferObjectVersion{};      
 
     HwIndexBuffer() noexcept : count{}, elementSize{} { }
     HwIndexBuffer(uint8_t elementSize, uint32_t indexCount) noexcept :
