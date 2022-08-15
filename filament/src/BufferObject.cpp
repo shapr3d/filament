@@ -67,7 +67,7 @@ FBufferObject::FBufferObject(FEngine& engine, const BufferObject::Builder& build
     } else {
         driver.setupExternalResource(mImportedId);
         mHandle = driver.importBufferObject(mImportedId, builder->mBindingType,
-                backend::BufferUsage::STATIC);
+                backend::BufferUsage::STATIC, builder->mByteCount);
     }
 }
 

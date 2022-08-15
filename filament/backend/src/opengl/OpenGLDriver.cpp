@@ -425,18 +425,10 @@ void OpenGLDriver::createIndexBufferR(
         Handle<HwIndexBuffer> ibh,
         ElementType elementType,
         uint32_t indexCount,
-        BufferUsage usage) {
+        BufferUsage) {
     DEBUG_MARKER()
-
-    auto& gl = mContext;
-    uint8_t elementSize = static_cast<uint8_t>(getElementTypeSize(elementType));
-    GLIndexBuffer* ib = construct<GLIndexBuffer>(ibh, elementSize, indexCount);
-    glGenBuffers(1, &ib->gl.buffer);
-    GLsizeiptr size = elementSize * indexCount;
-    gl.bindVertexArray(nullptr);
-    gl.bindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib->gl.buffer);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, size, nullptr, getBufferUsage(usage));
-    CHECK_GL_ERROR(utils::slog.e)
+    const uint8_t elementSize = static_cast<uint8_t>(getElementTypeSize(elementType));
+    construct<GLIndexBuffer>(ibh, elementSize, indexCount);
 }
 
 void OpenGLDriver::createBufferObjectR(Handle<HwBufferObject> boh,
@@ -457,10 +449,11 @@ void OpenGLDriver::createBufferObjectR(Handle<HwBufferObject> boh,
 }
 
 void OpenGLDriver::importBufferObjectR(Handle<HwBufferObject> boh,
-        intptr_t id, BufferObjectBinding bindingType, BufferUsage usage) {
+        intptr_t id, BufferObjectBinding bindingType, BufferUsage usage, uint32_t byteCount) {
     DEBUG_MARKER()
 
     assert_invariant(id);
+    assert_invariant(byteCount > 0);
 
     auto& gl = mContext;
     if ((bindingType == BufferObjectBinding::VERTEX || bindingType == BufferObjectBinding::INDEX)) {
@@ -471,10 +464,7 @@ void OpenGLDriver::importBufferObjectR(Handle<HwBufferObject> boh,
     bo->gl.isExternal = id > 0;
     bo->gl.id = GLuint(id);
     gl.bindBuffer(bo->gl.binding, bo->gl.id);
-    GLint bufferSize;
-    glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &bufferSize);
-    assert_invariant(bufferSize > 0);
-    bo->byteCount = bufferSize;
+    bo->byteCount = byteCount;
     CHECK_GL_ERROR(utils::slog.e)
 }
 

@@ -34,7 +34,7 @@ public:
     MetalBuffer(MetalContext& context, BufferUsage usage, size_t size, bool forceGpuBuffer = false);
 
     // Constructor for importing an id<MTLBuffer> outside of Filament.
-    MetalBuffer(MetalContext& context, BufferUsage usage, id<MTLBuffer> buffer);
+    MetalBuffer(MetalContext& context, BufferUsage usage, size_t size, id<MTLBuffer> buffer);
 
     ~MetalBuffer();
 

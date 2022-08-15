@@ -428,7 +428,7 @@ void VulkanDriver::destroyVertexBuffer(Handle<HwVertexBuffer> vbh) {
 }
 
 void VulkanDriver::createIndexBufferR(Handle<HwIndexBuffer> ibh,
-        ElementType elementType, uint32_t indexCount, BufferUsage usage) {
+        ElementType elementType, uint32_t indexCount, BufferUsage) {
     auto elementSize = (uint8_t) getElementTypeSize(elementType);
     auto indexBuffer = construct<VulkanIndexBuffer>(ibh, mContext, mStagePool,
             elementSize, indexCount);
@@ -454,7 +454,7 @@ void VulkanDriver::createBufferObjectR(Handle<HwBufferObject> boh,
 }
 
 void VulkanDriver::importBufferObjectR(Handle<HwBufferObject> boh,
-        intptr_t id, BufferObjectBinding bindingType, BufferUsage usage) {
+        intptr_t id, BufferObjectBinding bindingType, BufferUsage usage, uint32_t byteCount) {
     // not supported in this backend
 }
 
