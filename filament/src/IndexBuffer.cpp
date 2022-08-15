@@ -69,7 +69,7 @@ FIndexBuffer::FIndexBuffer(FEngine& engine, const IndexBuffer::Builder& builder)
     // If buffer objects are not enabled at the API level, then we create them internally.
     if (!mBufferObjectEnabled) {
         mObjectHandle = engine.getDriverApi().createBufferObject(
-            mIndexCount * ((builder->mIndexType == IndexType::UINT) ? 4U : 2U),
+            mIndexCount * backend::Driver::getElementTypeSize((backend::ElementType)builder->mIndexType),
             filament::backend::BufferObjectBinding::INDEX,
             backend::BufferUsage::STATIC);
             engine.getDriverApi().setIndexBufferObject(mHandle, mObjectHandle);
