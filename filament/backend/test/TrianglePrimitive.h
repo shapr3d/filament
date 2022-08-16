@@ -52,7 +52,8 @@ private:
     filament::backend::DriverApi& mDriverApi;
 
     PrimitiveHandle mRenderPrimitive;
-    BufferObjectHandle mBufferObject;
+    BufferObjectHandle mVertexBufferObject;
+    BufferObjectHandle mIndexBufferObject;
     VertexHandle mVertexBuffer;
     IndexHandle mIndexBuffer;
 
