@@ -63,8 +63,7 @@ FIndexBuffer::FIndexBuffer(FEngine& engine, const IndexBuffer::Builder& builder)
     FEngine::DriverApi& driver = engine.getDriverApi();
     mHandle = driver.createIndexBuffer(
             (backend::ElementType)builder->mIndexType,
-            uint32_t(builder->mIndexCount),
-            backend::BufferUsage::STATIC);
+            uint32_t(builder->mIndexCount));
 
     // If buffer objects are not enabled at the API level, then we create them internally.
     if (!mBufferObjectEnabled) {
