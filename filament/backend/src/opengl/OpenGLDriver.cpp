@@ -424,8 +424,7 @@ void OpenGLDriver::createVertexBufferR(
 void OpenGLDriver::createIndexBufferR(
         Handle<HwIndexBuffer> ibh,
         ElementType elementType,
-        uint32_t indexCount,
-        BufferUsage) {
+        uint32_t indexCount) {
     DEBUG_MARKER()
     const uint8_t elementSize = static_cast<uint8_t>(getElementTypeSize(elementType));
     construct<GLIndexBuffer>(ibh, elementSize, indexCount);
@@ -1680,23 +1679,6 @@ void OpenGLDriver::setVertexBufferObject(Handle<HwVertexBuffer> vbh,
         const uint32_t version = vb->bufferObjectsVersion;
         vb->bufferObjectsVersion = (version + 1) % kMaxVersion;
     }
-
-    CHECK_GL_ERROR(utils::slog.e)
-}
-
-void OpenGLDriver::updateIndexBuffer(
-        Handle<HwIndexBuffer> ibh, BufferDescriptor&& p, uint32_t byteOffset) {
-    DEBUG_MARKER()
-
-    auto& gl = mContext;
-    GLIndexBuffer* ib = handle_cast<GLIndexBuffer *>(ibh);
-    assert_invariant(ib->elementSize == 2 || ib->elementSize == 4);
-
-    gl.bindVertexArray(nullptr);
-    gl.bindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib->gl.buffer);
-    glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, byteOffset, p.size, p.buffer);
-
-    scheduleDestroy(std::move(p));
 
     CHECK_GL_ERROR(utils::slog.e)
 }

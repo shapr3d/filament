@@ -139,7 +139,7 @@ struct MetalVertexBuffer : public HwVertexBuffer {
 };
 
 struct MetalIndexBuffer : public HwIndexBuffer {
-    MetalIndexBuffer(MetalContext& context, BufferUsage usage, uint8_t elementSize,
+    MetalIndexBuffer(MetalContext& context, uint8_t elementSize,
             uint32_t indexCount);
 
     MetalBuffer* buffer = nullptr;

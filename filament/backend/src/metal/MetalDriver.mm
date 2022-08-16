@@ -239,9 +239,9 @@ void MetalDriver::createVertexBufferR(Handle<HwVertexBuffer> vbh, uint8_t buffer
 }
 
 void MetalDriver::createIndexBufferR(Handle<HwIndexBuffer> ibh, ElementType elementType,
-        uint32_t indexCount, BufferUsage usage) {
+        uint32_t indexCount) {
     auto elementSize = (uint8_t) getElementTypeSize(elementType);
-    construct_handle<MetalIndexBuffer>(ibh, *mContext, usage, elementSize, indexCount);
+    construct_handle<MetalIndexBuffer>(ibh, *mContext, elementSize, indexCount);
 }
 
 void MetalDriver::createBufferObjectR(Handle<HwBufferObject> boh, uint32_t byteCount,
@@ -724,13 +724,6 @@ math::float2 MetalDriver::getClipSpaceParams() {
 
 uint8_t MetalDriver::getMaxDrawBuffers() {
     return std::min(mContext->maxColorRenderTargets, MRT::MAX_SUPPORTED_RENDER_TARGET_COUNT);
-}
-
-void MetalDriver::updateIndexBuffer(Handle<HwIndexBuffer> ibh, BufferDescriptor&& data,
-        uint32_t byteOffset) {
-    auto* ib = handle_cast<MetalIndexBuffer>(ibh);
-    ib->buffer->copyIntoBuffer(data.buffer, data.size, byteOffset);
-    scheduleDestroy(std::move(data));
 }
 
 void MetalDriver::updateBufferObject(Handle<HwBufferObject> boh, BufferDescriptor&& data,

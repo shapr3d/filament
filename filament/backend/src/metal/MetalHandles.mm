@@ -277,7 +277,7 @@ MetalVertexBuffer::MetalVertexBuffer(MetalContext& context, uint8_t bufferCount,
             uint8_t attributeCount, uint32_t vertexCount, AttributeArray const& attributes)
     : HwVertexBuffer(bufferCount, attributeCount, vertexCount, attributes), buffers(bufferCount, nullptr) {}
 
-MetalIndexBuffer::MetalIndexBuffer(MetalContext& context, BufferUsage usage, uint8_t elementSize,
+MetalIndexBuffer::MetalIndexBuffer(MetalContext& context, uint8_t elementSize,
         uint32_t indexCount) : HwIndexBuffer(elementSize, indexCount) { }
 
 void MetalRenderPrimitive::setBuffers(MetalVertexBuffer* vertexBuffer, MetalIndexBuffer*

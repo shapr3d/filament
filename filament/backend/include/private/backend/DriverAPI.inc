@@ -171,8 +171,7 @@ DECL_DRIVER_API_R_N(backend::VertexBufferHandle, createVertexBuffer,
 
 DECL_DRIVER_API_R_N(backend::IndexBufferHandle, createIndexBuffer,
         backend::ElementType, elementType,
-        uint32_t, indexCount,
-        backend::BufferUsage, usage)
+        uint32_t, indexCount)
 
 DECL_DRIVER_API_R_N(backend::BufferObjectHandle, createBufferObject,
         uint32_t, byteCount,
@@ -321,11 +320,6 @@ DECL_DRIVER_API_N(setVertexBufferObject,
         backend::VertexBufferHandle, vbh,
         uint32_t, index,
         backend::BufferObjectHandle, bufferObject)
-
-DECL_DRIVER_API_N(updateIndexBuffer,
-        backend::IndexBufferHandle, ibh,
-        backend::BufferDescriptor&&, data,
-        uint32_t, byteOffset)
 
 DECL_DRIVER_API_N(updateBufferObject,
         backend::BufferObjectHandle, ibh,

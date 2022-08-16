@@ -428,7 +428,7 @@ void VulkanDriver::destroyVertexBuffer(Handle<HwVertexBuffer> vbh) {
 }
 
 void VulkanDriver::createIndexBufferR(Handle<HwIndexBuffer> ibh,
-        ElementType elementType, uint32_t indexCount, BufferUsage) {
+        ElementType elementType, uint32_t indexCount) {
     auto elementSize = (uint8_t) getElementTypeSize(elementType);
     auto indexBuffer = construct<VulkanIndexBuffer>(ibh, mContext, mStagePool,
             elementSize, indexCount);
@@ -868,14 +868,6 @@ void VulkanDriver::setVertexBufferObject(Handle<HwVertexBuffer> vbh, uint32_t in
     auto& bo = *handle_cast<VulkanBufferObject*>(boh);
     assert_invariant(bo.bindingType == BufferObjectBinding::VERTEX);
     vb.buffers[index] = &bo.buffer;
-}
-
-void VulkanDriver::updateIndexBuffer(Handle<HwIndexBuffer> ibh, BufferDescriptor&& p,
-        uint32_t byteOffset) {
-    auto ib = handle_cast<VulkanIndexBuffer*>(ibh);
-    ib->buffer->loadFromCpu(mContext, mStagePool, p.buffer, byteOffset, p.size);
-    mDisposer.acquire(ib);
-    scheduleDestroy(std::move(p));
 }
 
 void VulkanDriver::updateBufferObject(Handle<HwBufferObject> boh, BufferDescriptor&& bd,
