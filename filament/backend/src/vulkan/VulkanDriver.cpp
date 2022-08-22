@@ -427,13 +427,13 @@ void VulkanDriver::destroyVertexBuffer(Handle<HwVertexBuffer> vbh) {
     }
 }
 
-void VulkanDriver::createIndexBufferR(Handle<HwIndexBuffer> ibh, ElementType elementType,
-        uint32_t indexCount, BufferUsage usage, bool wrapsExternalBuffer) {
+void VulkanDriver::createIndexBufferR(Handle<HwIndexBuffer> ibh,
+        ElementType elementType, uint32_t indexCount) {
     auto elementSize = (uint8_t) getElementTypeSize(elementType);
     auto indexBuffer = construct<VulkanIndexBuffer>(ibh, mContext, mStagePool,
             elementSize, indexCount);
     mDisposer.createDisposable(indexBuffer, [this, ibh] () {
-        destruct<VulkanIndexBuffer>(mContext, ibh);
+        destruct<VulkanIndexBuffer>(ibh);
     });
 }
 
@@ -444,13 +444,18 @@ void VulkanDriver::destroyIndexBuffer(Handle<HwIndexBuffer> ibh) {
     }
 }
 
-void VulkanDriver::createBufferObjectR(Handle<HwBufferObject> boh, uint32_t byteCount,
-        BufferObjectBinding bindingType, BufferUsage usage, bool wrapsExternalBuffer) {
+void VulkanDriver::createBufferObjectR(Handle<HwBufferObject> boh,
+        uint32_t byteCount, BufferObjectBinding bindingType, BufferUsage usage) {
     auto bufferObject = construct<VulkanBufferObject>(boh, mContext, mStagePool, byteCount,
             bindingType, usage);
     mDisposer.createDisposable(bufferObject, [this, boh] () {
        destruct<VulkanBufferObject>(mContext, boh);
     });
+}
+
+void VulkanDriver::importBufferObjectR(Handle<HwBufferObject> boh,
+        intptr_t id, BufferObjectBinding bindingType, BufferUsage usage, uint32_t byteCount) {
+    // not supported in this backend
 }
 
 void VulkanDriver::destroyBufferObject(Handle<HwBufferObject> boh) {
@@ -601,6 +606,10 @@ Handle<HwIndexBuffer> VulkanDriver::createIndexBufferS() noexcept {
 }
 
 Handle<HwBufferObject> VulkanDriver::createBufferObjectS() noexcept {
+    return allocHandle<VulkanBufferObject>();
+}
+
+Handle<HwBufferObject> VulkanDriver::importBufferObjectS() noexcept {
     return allocHandle<VulkanBufferObject>();
 }
 
@@ -846,12 +855,11 @@ uint8_t VulkanDriver::getMaxDrawBuffers() {
 void VulkanDriver::setupExternalResource(intptr_t externalResource) {
 }
 
-void VulkanDriver::setExternalIndexBuffer(Handle<HwIndexBuffer> ibh, intptr_t externalBuffer) {
-    ASSERT_PRECONDITION(false, "setExternalIndexBuffer() is not implemented for backend!");
-}
-
-void VulkanDriver::setExternalBuffer(Handle<HwBufferObject> boh, intptr_t externalBuffer) {
-    ASSERT_PRECONDITION(false, "setExternalBuffer() is not implemented for backend!");
+void VulkanDriver::setIndexBufferObject(Handle<HwIndexBuffer> ibh, Handle<HwBufferObject> boh) {
+    auto& ib = *handle_cast<VulkanIndexBuffer*>(ibh);
+    auto& bo = *handle_cast<VulkanBufferObject*>(boh);
+    assert_invariant(bo.bindingType == BufferObjectBinding::INDEX);
+    ib.buffer = &bo.buffer;
 }
 
 void VulkanDriver::setVertexBufferObject(Handle<HwVertexBuffer> vbh, uint32_t index,
@@ -860,14 +868,6 @@ void VulkanDriver::setVertexBufferObject(Handle<HwVertexBuffer> vbh, uint32_t in
     auto& bo = *handle_cast<VulkanBufferObject*>(boh);
     assert_invariant(bo.bindingType == BufferObjectBinding::VERTEX);
     vb.buffers[index] = &bo.buffer;
-}
-
-void VulkanDriver::updateIndexBuffer(Handle<HwIndexBuffer> ibh, BufferDescriptor&& p,
-        uint32_t byteOffset) {
-    auto ib = handle_cast<VulkanIndexBuffer*>(ibh);
-    ib->buffer.loadFromCpu(mContext, mStagePool, p.buffer, byteOffset, p.size);
-    mDisposer.acquire(ib);
-    scheduleDestroy(std::move(p));
 }
 
 void VulkanDriver::updateBufferObject(Handle<HwBufferObject> boh, BufferDescriptor&& bd,
@@ -1878,7 +1878,7 @@ void VulkanDriver::draw(PipelineState pipelineState, Handle<HwRenderPrimitive> r
     // avoid rebinding these if they are already bound, but since we do not (yet) support subranges
     // it would be rare for a client to make consecutive draw calls with the same render primitive.
     vkCmdBindVertexBuffers(cmdbuffer, 0, bufferCount, buffers, offsets);
-    vkCmdBindIndexBuffer(cmdbuffer, prim.indexBuffer->buffer.getGpuBuffer(), 0,
+    vkCmdBindIndexBuffer(cmdbuffer, prim.indexBuffer->buffer->getGpuBuffer(), 0,
             prim.indexBuffer->indexType);
 
     // Finally, make the actual draw call. TODO: support subranges

@@ -65,10 +65,10 @@ FView::FView(FEngine& engine)
 
     // allocate ubos
     mLightUbh = driver.createBufferObject(CONFIG_MAX_LIGHT_COUNT * sizeof(LightsUib),
-            BufferObjectBinding::UNIFORM, BufferUsage::DYNAMIC, false);
+            BufferObjectBinding::UNIFORM, BufferUsage::DYNAMIC);
 
     mShadowUbh = driver.createBufferObject(mShadowUb.getSize(),
-            BufferObjectBinding::UNIFORM, BufferUsage::DYNAMIC, false);
+            BufferObjectBinding::UNIFORM, BufferUsage::DYNAMIC);
 
     mIsDynamicResolutionSupported = driver.isFrameTimeSupported();
 
@@ -470,7 +470,7 @@ void FView::prepare(FEngine& engine, DriverApi& driver, ArenaScope& arena,
                 mRenderableUBOSize = uint32_t(count * sizeof(PerRenderableUib));
                 driver.destroyBufferObject(mRenderableUbh);
                 mRenderableUbh = driver.createBufferObject(mRenderableUBOSize,
-                        BufferObjectBinding::UNIFORM, BufferUsage::STREAM, false);
+                        BufferObjectBinding::UNIFORM, BufferUsage::STREAM);
             } else {
                 // TODO: should we shrink the underlying UBO at some point?
             }

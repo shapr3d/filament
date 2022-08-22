@@ -350,8 +350,7 @@ void FRenderableManager::create(
                         .handle = driver.createBufferObject(
                                 CONFIG_MAX_BONE_COUNT * sizeof(PerRenderableUibBone),
                                 BufferObjectBinding::UNIFORM,
-                                backend::BufferUsage::DYNAMIC,
-                                false),
+                                backend::BufferUsage::DYNAMIC),
                         .count = (uint16_t)count,
                         .offset = 0,
                         .skinningBufferMode = false };

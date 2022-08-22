@@ -47,6 +47,7 @@ public:
 private:
     friend class BufferObject;
     backend::Handle<backend::HwBufferObject> mHandle;
+    intptr_t mImportedId;
     uint32_t mByteCount;
     BindingType mBindingType;
 };

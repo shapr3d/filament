@@ -263,8 +263,11 @@ void MetalSwapChain::scheduleFrameCompletedCallback() {
     }];
 }
 
-MetalBufferObject::MetalBufferObject(MetalContext& context, BufferUsage usage, uint32_t byteCount,bool wrapsExternalBuffer)
-        : HwBufferObject(byteCount), buffer(context, usage, byteCount, wrapsExternalBuffer) {}
+MetalBufferObject::MetalBufferObject(MetalContext& context, BufferUsage usage, uint32_t byteCount)
+        : HwBufferObject(byteCount), buffer(context, usage, byteCount) {}
+
+MetalBufferObject::MetalBufferObject(MetalContext& context, BufferUsage usage, uint32_t byteCount, id<MTLBuffer> buffer)
+        : HwBufferObject(byteCount), buffer(context, usage, byteCount, buffer) {}
 
 void MetalBufferObject::updateBuffer(void* data, size_t size, uint32_t byteOffset) {
     buffer.copyIntoBuffer(data, size, byteOffset);
@@ -274,9 +277,8 @@ MetalVertexBuffer::MetalVertexBuffer(MetalContext& context, uint8_t bufferCount,
             uint8_t attributeCount, uint32_t vertexCount, AttributeArray const& attributes)
     : HwVertexBuffer(bufferCount, attributeCount, vertexCount, attributes), buffers(bufferCount, nullptr) {}
 
-MetalIndexBuffer::MetalIndexBuffer(MetalContext& context, BufferUsage usage, uint8_t elementSize,
-        uint32_t indexCount) : HwIndexBuffer(elementSize, indexCount),
-        buffer(context, usage, elementSize * indexCount, true) { }
+MetalIndexBuffer::MetalIndexBuffer(MetalContext& context, uint8_t elementSize,
+        uint32_t indexCount) : HwIndexBuffer(elementSize, indexCount) { }
 
 void MetalRenderPrimitive::setBuffers(MetalVertexBuffer* vertexBuffer, MetalIndexBuffer*
         indexBuffer) {

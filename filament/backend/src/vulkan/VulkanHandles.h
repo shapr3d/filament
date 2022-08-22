@@ -84,11 +84,8 @@ struct VulkanVertexBuffer : public HwVertexBuffer {
 struct VulkanIndexBuffer : public HwIndexBuffer {
     VulkanIndexBuffer(VulkanContext& context, VulkanStagePool& stagePool,
             uint8_t elementSize, uint32_t indexCount) : HwIndexBuffer(elementSize, indexCount),
-            buffer(context, stagePool,
-                    VK_BUFFER_USAGE_INDEX_BUFFER_BIT, elementSize * indexCount),
             indexType(elementSize == 2 ? VK_INDEX_TYPE_UINT16 : VK_INDEX_TYPE_UINT32) {}
-    void terminate(VulkanContext& context) { buffer.terminate(context); }
-    VulkanBuffer buffer;
+    VulkanBuffer* buffer;
     const VkIndexType indexType;
 };
 
@@ -137,6 +134,8 @@ inline constexpr VkBufferUsageFlagBits getBufferObjectUsage(
     switch(bindingType) {
         case BufferObjectBinding::VERTEX:
             return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+        case BufferObjectBinding::INDEX:
+            return VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
         case BufferObjectBinding::UNIFORM:
             return VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
         // when adding more buffer types here, make sure to update VulkanBuffer::loadFromCpu()

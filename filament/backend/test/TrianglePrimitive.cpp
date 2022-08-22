@@ -53,17 +53,19 @@ TrianglePrimitive::TrianglePrimitive(filament::backend::DriverApi& driverApi,
     AttributeBitset enabledAttributes;
     enabledAttributes.set(VertexAttribute::POSITION);
 
-    const size_t size = sizeof(math::float2) * 3;
-    mBufferObject = mDriverApi.createBufferObject(size, BufferObjectBinding::VERTEX, BufferUsage::STATIC, false);
+    const size_t vertexBufferSize = sizeof(math::float2) * 3;
+    mVertexBufferObject = mDriverApi.createBufferObject(vertexBufferSize, BufferObjectBinding::VERTEX, BufferUsage::STATIC);
     mVertexBuffer = mDriverApi.createVertexBuffer(1, 1, mVertexCount, attributes);
-    mDriverApi.setVertexBufferObject(mVertexBuffer, 0, mBufferObject);
-    BufferDescriptor vertexBufferDesc(gVertices, size, nullptr);
-    mDriverApi.updateBufferObject(mBufferObject, std::move(vertexBufferDesc), 0);
+    mDriverApi.setVertexBufferObject(mVertexBuffer, 0, mVertexBufferObject);
+    BufferDescriptor vertexBufferDesc(gVertices, vertexBufferSize, nullptr);
+    mDriverApi.updateBufferObject(mVertexBufferObject, std::move(vertexBufferDesc), 0);
 
-    mIndexBuffer = mDriverApi.createIndexBuffer(ElementType::SHORT, mIndexCount,
-            BufferUsage::STATIC, false);
-    BufferDescriptor indexBufferDesc(gIndices, sizeof(short) * 3, nullptr);
-    mDriverApi.updateIndexBuffer(mIndexBuffer, std::move(indexBufferDesc), 0);
+    const size_t indexBufferSize = sizeof(short) * 3;
+    mIndexBufferObject = mDriverApi.createBufferObject(indexBufferSize, BufferObjectBinding::INDEX, BufferUsage::STATIC);
+    mIndexBuffer = mDriverApi.createIndexBuffer(ElementType::SHORT, mIndexCount);
+    mDriverApi.setIndexBufferObject(mIndexBuffer, mIndexBufferObject);
+    BufferDescriptor indexBufferDesc(gIndices, indexBufferSize, nullptr);
+    mDriverApi.updateBufferObject(mIndexBufferObject, std::move(indexBufferDesc), 0);
 
     mRenderPrimitive = mDriverApi.createRenderPrimitive(0);
 
@@ -80,7 +82,7 @@ void TrianglePrimitive::updateVertices(const filament::math::float2 vertices[3])
             [] (void* buffer, size_t size, void* user) {
         free(buffer);
     });
-    mDriverApi.updateBufferObject(mBufferObject, std::move(vBuffer), 0);
+    mDriverApi.updateBufferObject(mVertexBufferObject, std::move(vBuffer), 0);
 }
 
 void TrianglePrimitive::updateIndices(const short indices[3]) noexcept {
@@ -92,7 +94,7 @@ void TrianglePrimitive::updateIndices(const short indices[3]) noexcept {
             [] (void* buffer, size_t size, void* user) {
         free(buffer);
     });
-    mDriverApi.updateIndexBuffer(mIndexBuffer, std::move(bufferDesc), 0);
+    mDriverApi.updateBufferObject(mIndexBufferObject, std::move(bufferDesc), 0);
 }
 
 void TrianglePrimitive::updateIndices(const short* indices, int count, int offset) noexcept {
@@ -104,11 +106,12 @@ void TrianglePrimitive::updateIndices(const short* indices, int count, int offse
             [] (void* buffer, size_t size, void* user) {
         free(buffer);
     });
-    mDriverApi.updateIndexBuffer(mIndexBuffer, std::move(bufferDesc), offset * sizeof(short));
+    mDriverApi.updateBufferObject(mIndexBufferObject, std::move(bufferDesc), offset * sizeof(short));
 }
 
 TrianglePrimitive::~TrianglePrimitive() {
-    mDriverApi.destroyBufferObject(mBufferObject);
+    mDriverApi.destroyBufferObject(mVertexBufferObject);
+    mDriverApi.destroyBufferObject(mIndexBufferObject);
     mDriverApi.destroyVertexBuffer(mVertexBuffer);
     mDriverApi.destroyIndexBuffer(mIndexBuffer);
     mDriverApi.destroyRenderPrimitive(mRenderPrimitive);

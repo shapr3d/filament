@@ -33,6 +33,7 @@ namespace filament {
 
 class FIndexBuffer;
 
+class BufferObject;
 class Engine;
 
 /**
@@ -76,21 +77,22 @@ public:
         Builder& indexCount(uint32_t indexCount) noexcept;
 
         /**
+         * Allows buffer to be swapped out and shared using BufferObject.
+         *
+         * If buffer object mode is enabled, clients must call setBufferObject rather than
+         * setBuffer. This allows sharing of data between IndexBuffer objects, but it may
+         * slightly increase the memory footprint of Filament's internal bookkeeping.
+         *
+         * @param enabled If true, enables buffer object mode.  False by default.
+         */
+        Builder& enableBufferObject(bool enabled = true) noexcept;
+
+        /**
          * Type of the index buffer, 16-bit or 32-bit.
          * @param indexType Type of indices stored in the IndexBuffer.
          * @return A reference to this Builder for chaining calls.
          */
         Builder& bufferType(IndexType indexType) noexcept;
-
-        /**
-        * Allows buffers to wrap external (backend-specific) buffers.
-        *
-        * If external buffer mode is enabled, clients must call setExternalBuffer rather than
-        * setBuffer.
-        *
-        * @param enabled If true, enables external buffer mode.  False by default.
-        */
-        Builder& enableExternalBuffer(bool enabled = true) noexcept;
 
         /**
          * Creates the IndexBuffer object and returns a pointer to it. After creation, the index
@@ -123,22 +125,15 @@ public:
      */
     void setBuffer(Engine& engine, BufferDescriptor&& buffer, uint32_t byteOffset = 0);
 
-
     /**
-     * Specify a native buffer to import as a Filament index buffer.
+     * Swaps in the given buffer object.
      *
-     * The externalBuffer pointer is backend-specific:
-     *   - Metal: id<MTLBuffer>
-     *
-     * With Metal, the id<MTLTexture> object should be cast to an intptr_t using
-     * __bridge cast to transfer to Filament. Management of ownership is done by Filament.
-     *
-     * To use this, you must first call enableExternalBuffer() on the Builder.
+     * To use this, you must first call enableBufferObject() on the Builder.
      *
      * @param engine Reference to the filament::Engine to associate this IndexBuffer with.
-     * @param externalBuffer Pointer to the external buffer that will be used.
+     * @param bufferObject The handle to the GPU data that will be used in this buffer.
      */
-    void setExternalBuffer(Engine& engine, intptr_t externalBuffer);
+    void setBufferObject(Engine& engine, BufferObject const* bufferObject);
 
     /**
      * Returns the size of this IndexBuffer in elements.
