@@ -180,6 +180,11 @@ uint8_t NoopDriver::getMaxDrawBuffers() {
     return backend::MRT::MAX_SUPPORTED_RENDER_TARGET_COUNT;
 }
 
+void NoopDriver::updateIndexBuffer(Handle<HwIndexBuffer> ibh, BufferDescriptor&& p,
+        uint32_t byteOffset) {
+    scheduleDestroy(std::move(p));
+}
+
 void NoopDriver::updateBufferObject(Handle<HwBufferObject> ibh, BufferDescriptor&& p,
         uint32_t byteOffset) {
     scheduleDestroy(std::move(p));
@@ -188,7 +193,10 @@ void NoopDriver::updateBufferObject(Handle<HwBufferObject> ibh, BufferDescriptor
 void NoopDriver::setupExternalResource(intptr_t externalResource) {
 }
 
-void NoopDriver::setIndexBufferObject(Handle<HwIndexBuffer> ibh, Handle<HwBufferObject> boh) {
+void NoopDriver::setExternalIndexBuffer(Handle<HwIndexBuffer> ibh, intptr_t externalBuffer) {
+}
+
+void NoopDriver::setExternalBuffer(Handle<HwBufferObject> boh, intptr_t externalBuffer) {
 }
 
 void NoopDriver::setVertexBufferObject(Handle<HwVertexBuffer> vbh, uint32_t index,

@@ -115,10 +115,8 @@ private:
 
 class MetalBufferObject : public HwBufferObject {
 public:
-    MetalBufferObject(MetalContext& context, BufferUsage usage, uint32_t byteCount);
-
-    // Constructor for importing an id<MTLBuffer> outside of Filament.
-    MetalBufferObject(MetalContext& context, BufferUsage usage, uint32_t byteCount, id<MTLBuffer> buffer);
+    MetalBufferObject(MetalContext& context, BufferUsage usage, uint32_t byteCount,
+            bool wrapsExternalBuffer);
 
     void updateBuffer(void* data, size_t size, uint32_t byteOffset);
     MetalBuffer* getBuffer() { return &buffer; }
@@ -139,10 +137,10 @@ struct MetalVertexBuffer : public HwVertexBuffer {
 };
 
 struct MetalIndexBuffer : public HwIndexBuffer {
-    MetalIndexBuffer(MetalContext& context, uint8_t elementSize,
+    MetalIndexBuffer(MetalContext& context, BufferUsage usage, uint8_t elementSize,
             uint32_t indexCount);
 
-    MetalBuffer* buffer = nullptr;
+    MetalBuffer buffer;
 };
 
 struct MetalRenderPrimitive : public HwRenderPrimitive {

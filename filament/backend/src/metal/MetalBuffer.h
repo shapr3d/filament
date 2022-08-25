@@ -32,16 +32,22 @@ class MetalBuffer {
 public:
 
     MetalBuffer(MetalContext& context, BufferUsage usage, size_t size, bool forceGpuBuffer = false);
-
-    // Constructor for importing an id<MTLBuffer> outside of Filament.
-    MetalBuffer(MetalContext& context, BufferUsage usage, size_t size, id<MTLBuffer> buffer);
-
     ~MetalBuffer();
 
     MetalBuffer(const MetalBuffer& rhs) = delete;
     MetalBuffer& operator=(const MetalBuffer& rhs) = delete;
 
     size_t getSize() const noexcept { return mBufferSize; }
+
+    /**
+     * Wrap an external Metal buffer. Stores a strong reference to it.
+     */
+    void wrapExternalBuffer(id<MTLBuffer> buffer);
+
+    /**
+     * Release the external Metal buffer, if wrapping any.
+     */
+    bool releaseExternalBuffer();
 
     /**
      * Update the buffer with data inside src. Potentially allocates a new buffer allocation to hold

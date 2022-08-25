@@ -126,6 +126,7 @@ Texture* Texture::Builder::build(Engine& engine) {
 
     const bool sampleable = bool(mImpl->mUsage & TextureUsage::SAMPLEABLE);
     const bool swizzled = mImpl->mTextureIsSwizzled;
+    const bool imported = mImpl->mImportedId;
 
     #if defined(__EMSCRIPTEN__)
     ASSERT_POSTCONDITION_NON_FATAL(!swizzled, "WebGL does not support texture swizzling.");

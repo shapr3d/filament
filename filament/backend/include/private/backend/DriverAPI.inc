@@ -171,18 +171,15 @@ DECL_DRIVER_API_R_N(backend::VertexBufferHandle, createVertexBuffer,
 
 DECL_DRIVER_API_R_N(backend::IndexBufferHandle, createIndexBuffer,
         backend::ElementType, elementType,
-        uint32_t, indexCount)
+        uint32_t, indexCount,
+        backend::BufferUsage, usage,
+        bool, wrapsExternalBuffer)
 
 DECL_DRIVER_API_R_N(backend::BufferObjectHandle, createBufferObject,
         uint32_t, byteCount,
         backend::BufferObjectBinding, bindingType,
-        backend::BufferUsage, usage)
-
-DECL_DRIVER_API_R_N(backend::BufferObjectHandle, importBufferObject,
-        intptr_t, id,
-        backend::BufferObjectBinding, bindingType,
         backend::BufferUsage, usage,
-        uint32_t, byteCount)
+        bool, wrapsExternalBuffer)
 
 DECL_DRIVER_API_R_N(backend::TextureHandle, createTexture,
         backend::SamplerType, target,
@@ -312,14 +309,23 @@ DECL_DRIVER_API_SYNCHRONOUS_0(bool, isDepthResolveSupported)
  * -----------------------
  */
 
-DECL_DRIVER_API_N(setIndexBufferObject,
+DECL_DRIVER_API_N(setExternalIndexBuffer,
         backend::IndexBufferHandle, ibh,
-        backend::BufferObjectHandle, bufferObject)
+        intptr_t, externalBuffer)
+
+DECL_DRIVER_API_N(setExternalBuffer,
+        backend::BufferObjectHandle, boh,
+        intptr_t, externalBuffer)
 
 DECL_DRIVER_API_N(setVertexBufferObject,
         backend::VertexBufferHandle, vbh,
         uint32_t, index,
         backend::BufferObjectHandle, bufferObject)
+
+DECL_DRIVER_API_N(updateIndexBuffer,
+        backend::IndexBufferHandle, ibh,
+        backend::BufferDescriptor&&, data,
+        uint32_t, byteOffset)
 
 DECL_DRIVER_API_N(updateBufferObject,
         backend::BufferObjectHandle, ibh,

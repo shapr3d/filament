@@ -44,13 +44,8 @@ MetalBuffer::MetalBuffer(MetalContext& context, BufferUsage usage, size_t size, 
     mUsage = usage;
 }
 
-MetalBuffer::MetalBuffer(MetalContext& context, BufferUsage usage, size_t size, id<MTLBuffer> buffer)
-        : mUsage(usage), mBufferSize(size), mExternalBuffer(buffer), mContext(context) {
-    ASSERT_PRECONDITION(buffer, "External buffer cannot be nil");
-}
-
 MetalBuffer::~MetalBuffer() {
-    mExternalBuffer = nil;
+    releaseExternalBuffer();
 
     if (mCpuBuffer) {
         free(mCpuBuffer);
@@ -60,6 +55,22 @@ MetalBuffer::~MetalBuffer() {
     if (mBufferPoolEntry) {
         mContext.bufferPool->releaseBuffer(mBufferPoolEntry);
     }
+}
+
+void MetalBuffer::wrapExternalBuffer(id<MTLBuffer> buffer) {
+    ASSERT_PRECONDITION(!mExternalBuffer, "A external buffer is already wrapped. Call releaseExternalBuffer()");
+    ASSERT_PRECONDITION(buffer, "External buffer cannot be nil");
+    ASSERT_PRECONDITION(!mCpuBuffer, "This buffer is backed by CPU memory");
+    mExternalBuffer = buffer;
+}
+
+bool MetalBuffer::releaseExternalBuffer() {
+    if (!mExternalBuffer) {
+        return false;
+    }
+
+    mExternalBuffer = nil;
+    return true;
 }
 
 void MetalBuffer::copyIntoBuffer(void* src, size_t size, size_t byteOffset) {
