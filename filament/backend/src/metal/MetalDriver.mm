@@ -239,20 +239,14 @@ void MetalDriver::createVertexBufferR(Handle<HwVertexBuffer> vbh, uint8_t buffer
 }
 
 void MetalDriver::createIndexBufferR(Handle<HwIndexBuffer> ibh, ElementType elementType,
-        uint32_t indexCount) {
+        uint32_t indexCount, BufferUsage usage, bool wrapsExternalBuffer) {
     auto elementSize = (uint8_t) getElementTypeSize(elementType);
-    construct_handle<MetalIndexBuffer>(ibh, *mContext, elementSize, indexCount);
+    construct_handle<MetalIndexBuffer>(ibh, *mContext, usage, elementSize, indexCount);
 }
 
 void MetalDriver::createBufferObjectR(Handle<HwBufferObject> boh, uint32_t byteCount,
-        BufferObjectBinding bindingType, BufferUsage usage) {
-    construct_handle<MetalBufferObject>(boh, *mContext, usage, byteCount);
-}
-
-void MetalDriver::importBufferObjectR(Handle<HwBufferObject> boh, intptr_t i,
-        BufferObjectBinding bindingType, BufferUsage usage, uint32_t byteCount) {
-    id<MTLBuffer> metalBuffer = (id<MTLBuffer>) CFBridgingRelease((void*) i);
-    construct_handle<MetalBufferObject>(boh, *mContext, usage, byteCount, metalBuffer);
+        BufferObjectBinding bindingType, BufferUsage usage, bool wrapsExternalBuffer) {
+    construct_handle<MetalBufferObject>(boh, *mContext, usage, byteCount, wrapsExternalBuffer);
 }
 
 void MetalDriver::createTextureR(Handle<HwTexture> th, SamplerType target, uint8_t levels,
@@ -407,10 +401,6 @@ Handle<HwIndexBuffer> MetalDriver::createIndexBufferS() noexcept {
 }
 
 Handle<HwBufferObject> MetalDriver::createBufferObjectS() noexcept {
-    return alloc_handle<MetalBufferObject>();
-}
-
-Handle<HwBufferObject> MetalDriver::importBufferObjectS() noexcept {
     return alloc_handle<MetalBufferObject>();
 }
 
@@ -726,6 +716,13 @@ uint8_t MetalDriver::getMaxDrawBuffers() {
     return std::min(mContext->maxColorRenderTargets, MRT::MAX_SUPPORTED_RENDER_TARGET_COUNT);
 }
 
+void MetalDriver::updateIndexBuffer(Handle<HwIndexBuffer> ibh, BufferDescriptor&& data,
+        uint32_t byteOffset) {
+    auto* ib = handle_cast<MetalIndexBuffer>(ibh);
+    ib->buffer.copyIntoBuffer(data.buffer, data.size, byteOffset);
+    scheduleDestroy(std::move(data));
+}
+
 void MetalDriver::updateBufferObject(Handle<HwBufferObject> boh, BufferDescriptor&& data,
         uint32_t byteOffset) {
     auto* bo = handle_cast<MetalBufferObject>(boh);
@@ -744,10 +741,16 @@ void MetalDriver::setupExternalResource(intptr_t externalResource) {
     }
 }
 
-void MetalDriver::setIndexBufferObject(Handle<HwIndexBuffer> ibh, Handle<HwBufferObject> boh) {
-    auto* indexBuffer = handle_cast<MetalIndexBuffer>(ibh);
-    auto* bufferObject = handle_cast<MetalBufferObject>(boh);
-    indexBuffer->buffer = bufferObject->getBuffer();
+void MetalDriver::setExternalIndexBuffer(Handle<HwIndexBuffer> ibh, intptr_t externalBuffer) {
+    auto* ib = handle_cast<MetalIndexBuffer>(ibh);
+    ib->buffer.releaseExternalBuffer();
+    ib->buffer.wrapExternalBuffer((id<MTLBuffer>) CFBridgingRelease((void*) externalBuffer));
+}
+
+void MetalDriver::setExternalBuffer(Handle<HwBufferObject> boh, intptr_t externalBuffer) {
+    auto* bo = handle_cast<MetalBufferObject>(boh);
+    bo->getBuffer()->releaseExternalBuffer();
+    bo->getBuffer()->wrapExternalBuffer((id<MTLBuffer>) CFBridgingRelease((void*) externalBuffer));
 }
 
 void MetalDriver::setVertexBufferObject(Handle<HwVertexBuffer> vbh, uint32_t index,
@@ -1389,8 +1392,8 @@ void MetalDriver::draw(backend::PipelineState ps, Handle<HwRenderPrimitive> rph)
     MetalIndexBuffer* indexBuffer = primitive->indexBuffer;
 
     id<MTLCommandBuffer> cmdBuffer = getPendingCommandBuffer(mContext);
-    id<MTLBuffer> metalIndexBuffer = indexBuffer->buffer->getGpuBufferForDraw(cmdBuffer);
-    size_t offset = indexBuffer->buffer->getGpuBufferStreamOffset();
+    id<MTLBuffer> metalIndexBuffer = indexBuffer->buffer.getGpuBufferForDraw(cmdBuffer);
+    size_t offset = indexBuffer->buffer.getGpuBufferStreamOffset();
     [mContext->currentRenderPassEncoder drawIndexedPrimitives:getMetalPrimitiveType(primitive->type)
                                                    indexCount:primitive->count
                                                     indexType:getIndexType(indexBuffer->elementSize)

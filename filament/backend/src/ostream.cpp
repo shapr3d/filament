@@ -365,7 +365,6 @@ io::ostream& operator<<(io::ostream& out, SamplerCompareFunc func) {
 io::ostream& operator<<(io::ostream& out, BufferObjectBinding binding) {
     switch (binding) {
         CASE(BufferObjectBinding, VERTEX)
-        CASE(BufferObjectBinding, INDEX)
         CASE(BufferObjectBinding, UNIFORM)
     }
     return out;

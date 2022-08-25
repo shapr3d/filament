@@ -449,7 +449,7 @@ TEST_F(BackendTest, DepthMinify) {
     state.rasterState.culling = RasterState::CullingMode::NONE;
     state.program = program;
     auto ubuffer = api.createBufferObject(sizeof(MaterialParams),
-            BufferObjectBinding::UNIFORM, BufferUsage::STATIC);
+            BufferObjectBinding::UNIFORM, BufferUsage::STATIC, false);
     api.makeCurrent(swapChain, swapChain);
     api.beginFrame(0, 0);
     api.bindUniformBuffer(0, ubuffer);
@@ -573,7 +573,7 @@ TEST_F(BackendTest, ColorResolve) {
     state.rasterState.culling = RasterState::CullingMode::NONE;
     state.program = program;
     auto ubuffer = api.createBufferObject(sizeof(MaterialParams),
-            BufferObjectBinding::UNIFORM, BufferUsage::STATIC);
+            BufferObjectBinding::UNIFORM, BufferUsage::STATIC, false);
     api.makeCurrent(swapChain, swapChain);
     api.beginFrame(0, 0);
     api.bindUniformBuffer(0, ubuffer);
@@ -695,7 +695,7 @@ TEST_F(BackendTest, DepthResolve) {
     state.rasterState.culling = RasterState::CullingMode::NONE;
     state.program = program;
     auto ubuffer = api.createBufferObject(sizeof(MaterialParams),
-            BufferObjectBinding::UNIFORM, BufferUsage::STATIC);
+            BufferObjectBinding::UNIFORM, BufferUsage::STATIC, false);
     api.makeCurrent(swapChain, swapChain);
     api.beginFrame(0, 0);
     api.bindUniformBuffer(0, ubuffer);

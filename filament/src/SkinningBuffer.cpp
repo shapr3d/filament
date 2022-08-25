@@ -73,7 +73,8 @@ FSkinningBuffer::FSkinningBuffer(FEngine& engine, const Builder& builder)
     mHandle = driver.createBufferObject(
             getPhysicalBoneCount(mBoneCount) * sizeof(PerRenderableUibBone),
             BufferObjectBinding::UNIFORM,
-            BufferUsage::DYNAMIC);
+            BufferUsage::DYNAMIC,
+            false);
 
     if (builder->mInitialize) {
         // initialize the bones to identity (before rounding up)
