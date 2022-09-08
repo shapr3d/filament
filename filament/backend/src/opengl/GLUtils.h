@@ -119,6 +119,8 @@ constexpr inline GLenum getBufferBindingType(backend::BufferObjectBinding bindin
     switch (bindingType) {
         case backend::BufferObjectBinding::VERTEX:
             return GL_ARRAY_BUFFER;
+        case backend::BufferObjectBinding::INDEX:
+            return GL_ELEMENT_ARRAY_BUFFER;
         case backend::BufferObjectBinding::UNIFORM:
             return GL_UNIFORM_BUFFER;
     }

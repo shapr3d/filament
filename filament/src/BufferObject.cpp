@@ -25,6 +25,7 @@ namespace filament {
 struct BufferObject::BuilderDetails {
     BindingType mBindingType = BindingType::VERTEX;
     uint32_t mByteCount = 0;
+    intptr_t mImportedId = 0;
 };
 
 using BuilderType = BufferObject;
@@ -49,13 +50,25 @@ BufferObject* BufferObject::Builder::build(Engine& engine) {
     return upcast(engine).createBufferObject(*this);
 }
 
+BufferObject::Builder& BufferObject::Builder::import(intptr_t id) noexcept {
+    assert_invariant(id); // imported id can't be zero
+    mImpl->mImportedId = id;
+    return *this;
+}
+
 // ------------------------------------------------------------------------------------------------
 
 FBufferObject::FBufferObject(FEngine& engine, const BufferObject::Builder& builder)
-        : mByteCount(builder->mByteCount), mBindingType(builder->mBindingType) {
+        : mImportedId(builder->mImportedId), mByteCount(builder->mByteCount), mBindingType(builder->mBindingType) {
     FEngine::DriverApi& driver = engine.getDriverApi();
-    mHandle = driver.createBufferObject(builder->mByteCount, builder->mBindingType,
-            backend::BufferUsage::STATIC, false);
+    if (UTILS_LIKELY(mImportedId == 0)) {
+        mHandle = driver.createBufferObject(builder->mByteCount, builder->mBindingType,
+                backend::BufferUsage::STATIC);
+    } else {
+        driver.setupExternalResource(mImportedId);
+        mHandle = driver.importBufferObject(mImportedId, builder->mBindingType,
+                backend::BufferUsage::STATIC, builder->mByteCount);
+    }
 }
 
 void FBufferObject::terminate(FEngine& engine) {
