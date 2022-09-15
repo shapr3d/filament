@@ -27,28 +27,32 @@
 
 namespace filament {
 
+class FBufferObject;
 class FEngine;
 
 class FIndexBuffer : public IndexBuffer {
 public:
+    using IndexBufferHandle = backend::IndexBufferHandle;
+    using BufferObjectHandle = backend::BufferObjectHandle;
+
     FIndexBuffer(FEngine& engine, const Builder& builder);
 
     // frees driver resources, object becomes invalid
     void terminate(FEngine& engine);
 
-    backend::Handle<backend::HwIndexBuffer> getHwHandle() const noexcept { return mHandle; }
+    IndexBufferHandle getHwHandle() const noexcept { return mHandle; }
 
     size_t getIndexCount() const noexcept { return mIndexCount; }
 
     void setBuffer(FEngine& engine, BufferDescriptor&& buffer, uint32_t byteOffset = 0);
-
-    void setExternalBuffer(FEngine& engine, intptr_t externalBuffer);
+    void setBufferObject(FEngine& engine, FBufferObject const* bufferObject);
 
 private:
     friend class IndexBuffer;
-    backend::Handle<backend::HwIndexBuffer> mHandle;
+    IndexBufferHandle mHandle;
+    BufferObjectHandle mObjectHandle;
     uint32_t mIndexCount;
-    bool mExternalBuffersEnabled = false;
+    bool mBufferObjectEnabled = false;
 };
 
 FILAMENT_UPCAST(IndexBuffer)

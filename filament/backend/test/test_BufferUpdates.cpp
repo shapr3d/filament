@@ -175,7 +175,7 @@ TEST_F(BackendTest, BufferObjectUpdateWithOffset) {
 
     // Create a uniform buffer.
     auto ubuffer = getDriverApi().createBufferObject(sizeof(MaterialParams) + 64,
-            BufferObjectBinding::UNIFORM, BufferUsage::STATIC, false);
+            BufferObjectBinding::UNIFORM, BufferUsage::STATIC);
     getDriverApi().bindUniformBuffer(0, ubuffer);
 
     // Upload uniforms.
