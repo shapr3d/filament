@@ -228,21 +228,22 @@ public:
          *
          * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~{.cpp}
          *  id <MTLTexture> metalTexture = ...
-         *  filamentTexture->import(intptr_t((__bridge void*) metalTexture));
+         *  filamentTexture->import(intptr_t((__bridge void*) metalTexture), true);
          *  // free to release metalTexture
          *
          *  // after using texture:
-         *  engine->destroy(filamentTexture);   // metalTexture is released
+         *  engine->destroy(filamentTexture);
          * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
          *
          * @warning This method should be used as a last resort. This API is subject to change or
          * removal.
          *
          * @param id a backend specific texture identifier
+         * @param takeOwnership signals that filament should take ownership of this texture
          *
          * @return This Builder, for chaining calls.
          */
-        Builder& import(intptr_t id) noexcept;
+        Builder& import(intptr_t id, bool takeOwnership) noexcept;
 
     private:
         friend class FTexture;

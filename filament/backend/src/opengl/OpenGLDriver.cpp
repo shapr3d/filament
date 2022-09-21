@@ -448,21 +448,15 @@ void OpenGLDriver::createBufferObjectR(Handle<HwBufferObject> boh,
 }
 
 void OpenGLDriver::importBufferObjectR(Handle<HwBufferObject> boh,
-        intptr_t id, BufferObjectBinding bindingType, BufferUsage usage, uint32_t byteCount) {
+        intptr_t id, BufferObjectBinding bindingType, BufferUsage usage, uint32_t byteCount, bool takeOwnership) {
     DEBUG_MARKER()
 
     assert_invariant(id);
     assert_invariant(byteCount > 0);
 
-    auto& gl = mContext;
-    if ((bindingType == BufferObjectBinding::VERTEX || bindingType == BufferObjectBinding::INDEX)) {
-        gl.bindVertexArray(nullptr);
-    }
-
     GLBufferObject* bo = construct<GLBufferObject>(boh, 0, bindingType, usage);
-    bo->gl.isExternal = id > 0;
+    bo->gl.isExternal = id > 0 && !takeOwnership;
     bo->gl.id = GLuint(id);
-    gl.bindBuffer(bo->gl.binding, bo->gl.id);
     bo->byteCount = byteCount;
     CHECK_GL_ERROR(utils::slog.e)
 }
@@ -635,7 +629,7 @@ void OpenGLDriver::createTextureSwizzledR(Handle<HwTexture> th,
 
 void OpenGLDriver::importTextureR(Handle<HwTexture> th, intptr_t id,
         SamplerType target, uint8_t levels, TextureFormat format, uint8_t samples,
-        uint32_t w, uint32_t h, uint32_t depth, TextureUsage usage) {
+        uint32_t w, uint32_t h, uint32_t depth, TextureUsage usage, bool takeOwnership) {
     DEBUG_MARKER()
 
     auto& gl = mContext;
@@ -643,48 +637,57 @@ void OpenGLDriver::importTextureR(Handle<HwTexture> th, intptr_t id,
     GLTexture* t = construct<GLTexture>(th, target, levels, samples, w, h, depth, format, usage);
 
     t->gl.id = (GLuint)id;
-    t->gl.imported = true;
+    t->gl.imported = !takeOwnership;
     t->gl.internalFormat = getInternalFormat(format);
     assert_invariant(t->gl.internalFormat);
 
-    // We DO NOT update targetIndex at function exit to take advantage of the fact that
-    // getIndexForTextureTarget() is constexpr -- so all of this disappears at compile time.
-    switch (target) {
-        case SamplerType::SAMPLER_EXTERNAL:
-            t->gl.target = GL_TEXTURE_EXTERNAL_OES;
-            t->gl.targetIndex = (uint8_t)gl.getIndexForTextureTarget(GL_TEXTURE_EXTERNAL_OES);
-            break;
-        case SamplerType::SAMPLER_2D:
-            t->gl.target = GL_TEXTURE_2D;
-            t->gl.targetIndex = (uint8_t)gl.getIndexForTextureTarget(GL_TEXTURE_2D);
-            break;
-        case SamplerType::SAMPLER_3D:
-            t->gl.target = GL_TEXTURE_3D;
-            t->gl.targetIndex = (uint8_t)gl.getIndexForTextureTarget(GL_TEXTURE_3D);
-            break;
-        case SamplerType::SAMPLER_2D_ARRAY:
-            t->gl.target = GL_TEXTURE_2D_ARRAY;
-            t->gl.targetIndex = (uint8_t)gl.getIndexForTextureTarget(GL_TEXTURE_2D_ARRAY);
-            break;
-        case SamplerType::SAMPLER_CUBEMAP:
-            t->gl.target = GL_TEXTURE_CUBE_MAP;
-            t->gl.targetIndex = (uint8_t)gl.getIndexForTextureTarget(GL_TEXTURE_CUBE_MAP);
-            break;
-    }
-
-    if (t->samples > 1) {
-        // Note: we can't be here in practice because filament's user API doesn't
-        // allow the creation of multi-sampled textures.
-        if (gl.features.multisample_texture) {
-            // multi-sample texture on GL 3.2 / GLES 3.1 and above
-            t->gl.target = GL_TEXTURE_2D_MULTISAMPLE;
-            t->gl.targetIndex = (uint8_t)gl.getIndexForTextureTarget(GL_TEXTURE_2D_MULTISAMPLE);
-        } else {
-            // Turn off multi-sampling for that texture. It's just not supported.
+    if (UTILS_LIKELY(usage & TextureUsage::SAMPLEABLE)) {
+        // We DO NOT update targetIndex at function exit to take advantage of the fact that
+        // getIndexForTextureTarget() is constexpr -- so all of this disappears at compile time.
+        switch (target) {
+            case SamplerType::SAMPLER_EXTERNAL:
+                t->gl.target = GL_TEXTURE_EXTERNAL_OES;
+                t->gl.targetIndex = (uint8_t)gl.getIndexForTextureTarget(GL_TEXTURE_EXTERNAL_OES);
+                break;
+            case SamplerType::SAMPLER_2D:
+                t->gl.target = GL_TEXTURE_2D;
+                t->gl.targetIndex = (uint8_t)gl.getIndexForTextureTarget(GL_TEXTURE_2D);
+                break;
+            case SamplerType::SAMPLER_3D:
+                t->gl.target = GL_TEXTURE_3D;
+                t->gl.targetIndex = (uint8_t)gl.getIndexForTextureTarget(GL_TEXTURE_3D);
+                break;
+            case SamplerType::SAMPLER_2D_ARRAY:
+                t->gl.target = GL_TEXTURE_2D_ARRAY;
+                t->gl.targetIndex = (uint8_t)gl.getIndexForTextureTarget(GL_TEXTURE_2D_ARRAY);
+                break;
+            case SamplerType::SAMPLER_CUBEMAP:
+                t->gl.target = GL_TEXTURE_CUBE_MAP;
+                t->gl.targetIndex = (uint8_t)gl.getIndexForTextureTarget(GL_TEXTURE_CUBE_MAP);
+                break;
         }
-    }
 
-    CHECK_GL_ERROR(utils::slog.e)
+        if (t->samples > 1) {
+            // Note: we can't be here in practice because filament's user API doesn't
+            // allow the creation of multi-sampled textures.
+            if (gl.features.multisample_texture) {
+                // multi-sample texture on GL 3.2 / GLES 3.1 and above
+                t->gl.target = GL_TEXTURE_2D_MULTISAMPLE;
+                t->gl.targetIndex = (uint8_t)gl.getIndexForTextureTarget(GL_TEXTURE_2D_MULTISAMPLE);
+            } else {
+                // Turn off multi-sampling for that texture. It's just not supported.
+            }
+        }
+    
+    } else {
+        assert_invariant(any(usage & (
+                TextureUsage::COLOR_ATTACHMENT |
+                TextureUsage::DEPTH_ATTACHMENT |
+                TextureUsage::STENCIL_ATTACHMENT)));
+        assert_invariant(levels == 1);
+        assert_invariant(target == SamplerType::SAMPLER_2D);
+        t->gl.target = GL_RENDERBUFFER;
+    }
 }
 
 void OpenGLDriver::updateVertexArrayObject(GLRenderPrimitive* rp, GLVertexBuffer const* vb) {

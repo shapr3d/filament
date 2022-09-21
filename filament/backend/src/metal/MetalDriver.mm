@@ -250,7 +250,7 @@ void MetalDriver::createBufferObjectR(Handle<HwBufferObject> boh, uint32_t byteC
 }
 
 void MetalDriver::importBufferObjectR(Handle<HwBufferObject> boh, intptr_t i,
-        BufferObjectBinding bindingType, BufferUsage usage, uint32_t byteCount) {
+        BufferObjectBinding bindingType, BufferUsage usage, uint32_t byteCount, bool takeOwnership) {
     id<MTLBuffer> metalBuffer = (id<MTLBuffer>) CFBridgingRelease((void*) i);
     construct_handle<MetalBufferObject>(boh, *mContext, usage, byteCount, metalBuffer);
 }
@@ -282,7 +282,7 @@ void MetalDriver::createTextureSwizzledR(Handle<HwTexture> th, SamplerType targe
 void MetalDriver::importTextureR(Handle<HwTexture> th, intptr_t i,
         SamplerType target, uint8_t levels,
         TextureFormat format, uint8_t samples, uint32_t width, uint32_t height,
-        uint32_t depth, TextureUsage usage) {
+        uint32_t depth, TextureUsage usage, bool takeOwnership) {
     id<MTLTexture> metalTexture = (id<MTLTexture>) CFBridgingRelease((void*) i);
     ASSERT_PRECONDITION(metalTexture.width == width,
             "Imported id<MTLTexture> width (%d) != Filament texture width (%d)",

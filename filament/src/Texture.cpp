@@ -51,6 +51,7 @@ struct Texture::BuilderDetails {
     InternalFormat mFormat = InternalFormat::RGBA8;
     Usage mUsage = Usage::DEFAULT;
     bool mTextureIsSwizzled = false;
+    bool mTakeOwnership = false;
     std::array<Swizzle, 4> mSwizzle = {
            Swizzle::CHANNEL_0, Swizzle::CHANNEL_1,
            Swizzle::CHANNEL_2, Swizzle::CHANNEL_3 };
@@ -106,9 +107,10 @@ Texture::Builder& Texture::Builder::usage(Texture::Usage usage) noexcept {
     return *this;
 }
 
-Texture::Builder& Texture::Builder::import(intptr_t id) noexcept {
+Texture::Builder& Texture::Builder::import(intptr_t id, bool takeOwnership) noexcept {
     assert_invariant(id); // imported id can't be zero
     mImpl->mImportedId = id;
+    mImpl->mTakeOwnership = takeOwnership;
     return *this;
 }
 
@@ -165,7 +167,7 @@ FTexture::FTexture(FEngine& engine, const Builder& builder) {
         driver.setupExternalResource(importedId);
         mHandle = driver.importTexture(
                 importedId, mTarget, mLevelCount, mFormat, mSampleCount,
-                mWidth, mHeight, mDepth, mUsage);
+                mWidth, mHeight, mDepth, mUsage, builder->mTakeOwnership);
     }
 }
 

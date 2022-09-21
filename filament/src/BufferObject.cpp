@@ -26,6 +26,7 @@ struct BufferObject::BuilderDetails {
     BindingType mBindingType = BindingType::VERTEX;
     uint32_t mByteCount = 0;
     intptr_t mImportedId = 0;
+    bool mTakeOwnership = false;
 };
 
 using BuilderType = BufferObject;
@@ -50,9 +51,10 @@ BufferObject* BufferObject::Builder::build(Engine& engine) {
     return upcast(engine).createBufferObject(*this);
 }
 
-BufferObject::Builder& BufferObject::Builder::import(intptr_t id) noexcept {
+BufferObject::Builder& BufferObject::Builder::import(intptr_t id, bool takeOwnership) noexcept {
     assert_invariant(id); // imported id can't be zero
     mImpl->mImportedId = id;
+    mImpl->mTakeOwnership = takeOwnership;
     return *this;
 }
 
@@ -67,7 +69,7 @@ FBufferObject::FBufferObject(FEngine& engine, const BufferObject::Builder& build
     } else {
         driver.setupExternalResource(mImportedId);
         mHandle = driver.importBufferObject(mImportedId, builder->mBindingType,
-                backend::BufferUsage::STATIC, builder->mByteCount);
+                backend::BufferUsage::STATIC, builder->mByteCount, builder->mTakeOwnership);
     }
 }
 

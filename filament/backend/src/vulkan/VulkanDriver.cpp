@@ -454,7 +454,7 @@ void VulkanDriver::createBufferObjectR(Handle<HwBufferObject> boh,
 }
 
 void VulkanDriver::importBufferObjectR(Handle<HwBufferObject> boh,
-        intptr_t id, BufferObjectBinding bindingType, BufferUsage usage, uint32_t byteCount) {
+        intptr_t id, BufferObjectBinding bindingType, BufferUsage usage, uint32_t byteCount, bool takeOwnership) {
     // not supported in this backend
 }
 
@@ -498,7 +498,7 @@ void VulkanDriver::createTextureSwizzledR(Handle<HwTexture> th, SamplerType targ
 void VulkanDriver::importTextureR(Handle<HwTexture> th, intptr_t id,
         SamplerType target, uint8_t levels,
         TextureFormat format, uint8_t samples, uint32_t w, uint32_t h, uint32_t depth,
-        TextureUsage usage) {
+        TextureUsage usage, bool takeOwnership) {
     // not supported in this backend
 }
 
