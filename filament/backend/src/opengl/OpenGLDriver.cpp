@@ -427,6 +427,7 @@ void OpenGLDriver::createIndexBufferR(
         uint32_t indexCount) {
     DEBUG_MARKER()
     const uint8_t elementSize = static_cast<uint8_t>(getElementTypeSize(elementType));
+    assert_invariant(elementSize == 2 || elementSize == 4);
     construct<GLIndexBuffer>(ibh, elementSize, indexCount);
 }
 
@@ -2450,12 +2451,9 @@ void OpenGLDriver::setRenderPrimitiveBuffer(Handle<HwRenderPrimitive> rph,
         GLVertexBuffer const* const eb = handle_cast<const GLVertexBuffer*>(vbh);
         GLIndexBuffer const* const ib = handle_cast<const GLIndexBuffer*>(ibh);
 
-        assert_invariant(ib->elementSize == 2 || ib->elementSize == 4);
-
         gl.bindVertexArray(&rp->gl);
         CHECK_GL_ERROR(utils::slog.e)
 
-        rp->gl.indicesType = ib->elementSize == 4 ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
         rp->gl.vertexBufferWithObjects = vbh;
         rp->gl.indexBuffer = ibh;
 
@@ -2477,7 +2475,7 @@ void OpenGLDriver::setRenderPrimitiveRange(Handle<HwRenderPrimitive> rph,
 
     GLRenderPrimitive* const rp = handle_cast<GLRenderPrimitive*>(rph);
     rp->type = pt;
-    rp->offset = offset * ((rp->gl.indicesType == GL_UNSIGNED_INT) ? 4 : 2);
+    rp->offset = offset;
     rp->count = count;
     rp->minIndex = minIndex;
     rp->maxIndex = maxIndex > minIndex ? maxIndex : rp->maxVertexCount - 1; // sanitize max index
@@ -3208,8 +3206,9 @@ void OpenGLDriver::draw(PipelineState state, Handle<HwRenderPrimitive> rph) {
 
     setViewportScissor(state.scissor);
 
-    glDrawRangeElements(GLenum(rp->type), rp->minIndex, rp->maxIndex, rp->count,
-            rp->gl.indicesType, reinterpret_cast<const void*>(rp->offset));
+    const GLenum indexType = glib->elementSize == 4 ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
+    const void* offset = reinterpret_cast<const void*>(rp->offset * glib->elementSize);
+    glDrawRangeElements(GLenum(rp->type), rp->minIndex, rp->maxIndex, rp->count, indexType, offset);
 
     CHECK_GL_ERROR(utils::slog.e)
 }

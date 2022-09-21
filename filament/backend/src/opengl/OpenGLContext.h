@@ -42,7 +42,6 @@ public:
     // this will require a corollary update in OpenGLDriver::setVertexBufferObject().
     struct RenderPrimitive {
         GLuint vao = 0;
-        GLenum indicesType = GL_UNSIGNED_INT;
         GLuint elementArray = 0;
         utils::bitset32 vertexAttribArray;
 
