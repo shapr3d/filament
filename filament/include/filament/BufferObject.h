@@ -91,7 +91,7 @@ public:
          *  filamentBuffer->import(intptr_t((__bridge void*) metalBuffer));
          *
          *  // after using buffer:
-         *  engine->destroy(filamentBuffer);   // only filamentBuffer handle is released
+         *  engine->destroy(filamentBuffer);
          * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
          *
          * @warning This method should be used as a last resort. This API is subject to change or

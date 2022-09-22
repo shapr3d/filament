@@ -77,7 +77,6 @@ public:
         struct {
             GLuint id = 0;
             GLenum binding = 0;
-            bool isExternal = false;
         } gl;
         uint32_t base = 0;
         uint32_t size = 0;
@@ -111,7 +110,7 @@ public:
     struct GLTexture : public backend::HwTexture {
         using HwTexture::HwTexture;
         struct GL {
-            GL() noexcept : imported(false), sidecarSamples(1), reserved(0) {}
+            GL() noexcept : sidecarSamples(1), reserved(0) {}
             GLuint id = 0;          // texture or renderbuffer id
             GLenum target = 0;
             GLenum internalFormat = 0;
@@ -123,9 +122,8 @@ public:
             int8_t baseLevel = 127;
             int8_t maxLevel = -1;
             uint8_t targetIndex = 0;    // optimization: index corresponding to target
-            bool imported           : 1;
             uint8_t sidecarSamples  : 4;
-            uint8_t reserved        : 3;
+            uint8_t reserved        : 4;
         } gl;
 
         void* platformPImpl = nullptr;

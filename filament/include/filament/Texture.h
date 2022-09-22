@@ -232,7 +232,7 @@ public:
          *  // free to release metalTexture
          *
          *  // after using texture:
-         *  engine->destroy(filamentTexture);   // metalTexture is released
+         *  engine->destroy(filamentTexture);
          * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
          *
          * @warning This method should be used as a last resort. This API is subject to change or
