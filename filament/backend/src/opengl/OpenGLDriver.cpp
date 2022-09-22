@@ -449,14 +449,13 @@ void OpenGLDriver::createBufferObjectR(Handle<HwBufferObject> boh,
 }
 
 void OpenGLDriver::importBufferObjectR(Handle<HwBufferObject> boh,
-        intptr_t id, BufferObjectBinding bindingType, BufferUsage usage, uint32_t byteCount, bool takeOwnership) {
+        intptr_t id, BufferObjectBinding bindingType, BufferUsage usage, uint32_t byteCount) {
     DEBUG_MARKER()
 
     assert_invariant(id);
     assert_invariant(byteCount > 0);
 
     GLBufferObject* bo = construct<GLBufferObject>(boh, 0, bindingType, usage);
-    bo->gl.isExternal = id > 0 && !takeOwnership;
     bo->gl.id = GLuint(id);
     bo->byteCount = byteCount;
     CHECK_GL_ERROR(utils::slog.e)
@@ -630,7 +629,7 @@ void OpenGLDriver::createTextureSwizzledR(Handle<HwTexture> th,
 
 void OpenGLDriver::importTextureR(Handle<HwTexture> th, intptr_t id,
         SamplerType target, uint8_t levels, TextureFormat format, uint8_t samples,
-        uint32_t w, uint32_t h, uint32_t depth, TextureUsage usage, bool takeOwnership) {
+        uint32_t w, uint32_t h, uint32_t depth, TextureUsage usage) {
     DEBUG_MARKER()
 
     auto& gl = mContext;
@@ -638,7 +637,6 @@ void OpenGLDriver::importTextureR(Handle<HwTexture> th, intptr_t id,
     GLTexture* t = construct<GLTexture>(th, target, levels, samples, w, h, depth, format, usage);
 
     t->gl.id = (GLuint)id;
-    t->gl.imported = !takeOwnership;
     t->gl.internalFormat = getInternalFormat(format);
     assert_invariant(t->gl.internalFormat);
 
@@ -681,6 +679,9 @@ void OpenGLDriver::importTextureR(Handle<HwTexture> th, intptr_t id,
         }
     
     } else {
+        // Here we follow the assumptions of createTextureR:
+        // If a texture is not sampleable, then it should be a renderbuffer 
+        // because Filament can only use this as a rendertarget
         assert_invariant(any(usage & (
                 TextureUsage::COLOR_ATTACHMENT |
                 TextureUsage::DEPTH_ATTACHMENT |
@@ -1227,9 +1228,7 @@ void OpenGLDriver::destroyBufferObject(Handle<HwBufferObject> boh) {
     if (boh) {
         auto& gl = mContext;
         GLBufferObject const* bo = handle_cast<const GLBufferObject*>(boh);
-        if (!bo->gl.isExternal) {
-            gl.deleteBuffers(1, &bo->gl.id, bo->gl.binding);
-        }
+        gl.deleteBuffers(1, &bo->gl.id, bo->gl.binding);
         destruct(boh, bo);
     }
 }
@@ -1266,28 +1265,26 @@ void OpenGLDriver::destroyTexture(Handle<HwTexture> th) {
 
     if (th) {
         GLTexture* t = handle_cast<GLTexture*>(th);
-        if (UTILS_LIKELY(!t->gl.imported)) {
-            auto& gl = mContext;
-            if (UTILS_LIKELY(t->usage & TextureUsage::SAMPLEABLE)) {
-                gl.unbindTexture(t->gl.target, t->gl.id);
-                if (UTILS_UNLIKELY(t->hwStream)) {
-                    detachStream(t);
-                }
-                if (UTILS_UNLIKELY(t->target == SamplerType::SAMPLER_EXTERNAL)) {
-                    mPlatform.destroyExternalImage(t);
-                } else {
-                    glDeleteTextures(1, &t->gl.id);
-                }
+        auto& gl = mContext;
+        if (UTILS_LIKELY(t->usage & TextureUsage::SAMPLEABLE)) {
+            gl.unbindTexture(t->gl.target, t->gl.id);
+            if (UTILS_UNLIKELY(t->hwStream)) {
+                detachStream(t);
+            }
+            if (UTILS_UNLIKELY(t->target == SamplerType::SAMPLER_EXTERNAL)) {
+                mPlatform.destroyExternalImage(t);
             } else {
-                assert_invariant(t->gl.target == GL_RENDERBUFFER);
-                glDeleteRenderbuffers(1, &t->gl.id);
+                glDeleteTextures(1, &t->gl.id);
             }
-            if (t->gl.fence) {
-                glDeleteSync(t->gl.fence);
-            }
-            if (t->gl.sidecarRenderBufferMS) {
-                glDeleteRenderbuffers(1, &t->gl.sidecarRenderBufferMS);
-            }
+        } else {
+            assert_invariant(t->gl.target == GL_RENDERBUFFER);
+            glDeleteRenderbuffers(1, &t->gl.id);
+        }
+        if (t->gl.fence) {
+            glDeleteSync(t->gl.fence);
+        }
+        if (t->gl.sidecarRenderBufferMS) {
+            glDeleteRenderbuffers(1, &t->gl.sidecarRenderBufferMS);
         }
         destruct(th, t);
     }

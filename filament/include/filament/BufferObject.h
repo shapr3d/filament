@@ -88,7 +88,7 @@ public:
          *
          * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~{.cpp}
          *  id<MTLBuffer> metalBuffer = ...
-         *  filamentBuffer->import(intptr_t((__bridge void*) metalBuffer), true);
+         *  filamentBuffer->import(intptr_t((__bridge void*) metalBuffer));
          *
          *  // after using buffer:
          *  engine->destroy(filamentBuffer);
@@ -98,11 +98,10 @@ public:
          * removal.
          *
          * @param id a backend specific buffer identifier
-         * @param takeOwnership signals that filament should take ownership of this buffer
          *
          * @return This Builder, for chaining calls.
          */
-        Builder& import(intptr_t id, bool takeOwnership) noexcept;
+        Builder& import(intptr_t id) noexcept;
 
         /**
          * Creates the BufferObject and returns a pointer to it. After creation, the buffer

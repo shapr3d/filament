@@ -228,7 +228,7 @@ public:
          *
          * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~{.cpp}
          *  id <MTLTexture> metalTexture = ...
-         *  filamentTexture->import(intptr_t((__bridge void*) metalTexture), true);
+         *  filamentTexture->import(intptr_t((__bridge void*) metalTexture));
          *  // free to release metalTexture
          *
          *  // after using texture:
@@ -239,11 +239,10 @@ public:
          * removal.
          *
          * @param id a backend specific texture identifier
-         * @param takeOwnership signals that filament should take ownership of this texture
          *
          * @return This Builder, for chaining calls.
          */
-        Builder& import(intptr_t id, bool takeOwnership) noexcept;
+        Builder& import(intptr_t id) noexcept;
 
     private:
         friend class FTexture;

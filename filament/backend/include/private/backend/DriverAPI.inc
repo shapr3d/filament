@@ -182,8 +182,7 @@ DECL_DRIVER_API_R_N(backend::BufferObjectHandle, importBufferObject,
         intptr_t, id,
         backend::BufferObjectBinding, bindingType,
         backend::BufferUsage, usage,
-        uint32_t, byteCount,
-        bool, takeOwnership)
+        uint32_t, byteCount)
 
 DECL_DRIVER_API_R_N(backend::TextureHandle, createTexture,
         backend::SamplerType, target,
@@ -218,8 +217,7 @@ DECL_DRIVER_API_R_N(backend::TextureHandle, importTexture,
         uint32_t, width,
         uint32_t, height,
         uint32_t, depth,
-        backend::TextureUsage, usage,
-        bool, takeOwnership)
+        backend::TextureUsage, usage)
 
 DECL_DRIVER_API_R_N(backend::SamplerGroupHandle, createSamplerGroup,
         uint32_t, size)
