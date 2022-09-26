@@ -456,7 +456,6 @@ void OpenGLDriver::importBufferObjectR(Handle<HwBufferObject> boh,
     assert_invariant(byteCount > 0);
 
     GLBufferObject* bo = construct<GLBufferObject>(boh, 0, bindingType, usage);
-
     bo->gl.id = GLuint(id);
     bo->byteCount = byteCount;
     CHECK_GL_ERROR(utils::slog.e)
