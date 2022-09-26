@@ -1660,9 +1660,9 @@ void OpenGLDriver::setIndexBufferObject(Handle<HwIndexBuffer> ibh, Handle<HwBuff
 
     if (ib->gl.buffer != bo->gl.id) {
         ib->gl.buffer = bo->gl.id;
-        static constexpr uint32_t kMaxVersion =
+        static constexpr uint64_t kMaxVersion =
             std::numeric_limits<decltype(ib->bufferObjectVersion)>::max();
-        const uint32_t version = ib->bufferObjectVersion;
+        const uint64_t version = ib->bufferObjectVersion;
         ib->bufferObjectVersion = (version + 1) % kMaxVersion;
     }
 
@@ -1683,9 +1683,9 @@ void OpenGLDriver::setVertexBufferObject(Handle<HwVertexBuffer> vbh,
     // when they should be updated.
     if (vb->gl.buffers[index] != bo->gl.id) {
         vb->gl.buffers[index] = bo->gl.id;
-        static constexpr uint32_t kMaxVersion =
+        static constexpr uint64_t kMaxVersion =
                 std::numeric_limits<decltype(vb->bufferObjectsVersion)>::max();
-        const uint32_t version = vb->bufferObjectsVersion;
+        const uint64_t version = vb->bufferObjectsVersion;
         vb->bufferObjectsVersion = (version + 1) % kMaxVersion;
     }
 
