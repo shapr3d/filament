@@ -70,7 +70,6 @@ public:
 
 protected:
     static void logEglError(const char* name) noexcept;
-    static void logEglWarning(const char* name) noexcept;
 
     EGLBoolean makeCurrent(EGLSurface drawSurface, EGLSurface readSurface) noexcept;
     void initializeGlExtensions() noexcept;

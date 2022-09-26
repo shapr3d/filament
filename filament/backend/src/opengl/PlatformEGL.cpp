@@ -42,35 +42,27 @@ using namespace glext;
 // ---------------------------------------------------------------------------------------------
 // Utilities
 // ---------------------------------------------------------------------------------------------
-namespace {
-    void logEgl(const char* name, io::ostream& out) noexcept {
-        const char* err;
-        switch (eglGetError()) {
-            case EGL_NOT_INITIALIZED:       err = "EGL_NOT_INITIALIZED";    break;
-            case EGL_BAD_ACCESS:            err = "EGL_BAD_ACCESS";         break;
-            case EGL_BAD_ALLOC:             err = "EGL_BAD_ALLOC";          break;
-            case EGL_BAD_ATTRIBUTE:         err = "EGL_BAD_ATTRIBUTE";      break;
-            case EGL_BAD_CONTEXT:           err = "EGL_BAD_CONTEXT";        break;
-            case EGL_BAD_CONFIG:            err = "EGL_BAD_CONFIG";         break;
-            case EGL_BAD_CURRENT_SURFACE:   err = "EGL_BAD_CURRENT_SURFACE";break;
-            case EGL_BAD_DISPLAY:           err = "EGL_BAD_DISPLAY";        break;
-            case EGL_BAD_SURFACE:           err = "EGL_BAD_SURFACE";        break;
-            case EGL_BAD_MATCH:             err = "EGL_BAD_MATCH";          break;
-            case EGL_BAD_PARAMETER:         err = "EGL_BAD_PARAMETER";      break;
-            case EGL_BAD_NATIVE_PIXMAP:     err = "EGL_BAD_NATIVE_PIXMAP";  break;
-            case EGL_BAD_NATIVE_WINDOW:     err = "EGL_BAD_NATIVE_WINDOW";  break;
-            case EGL_CONTEXT_LOST:          err = "EGL_CONTEXT_LOST";       break;
-            default:                        err = "unknown";                break;
-        }
-        out << name << " failed with " << err << io::endl;
-    }
-}
 
 void PlatformEGL::logEglError(const char* name) noexcept {
-    logEgl(name, slog.e);
-}
-void PlatformEGL::logEglWarning(const char* name) noexcept {
-    logEgl(name, slog.w);
+    const char* err;
+    switch (eglGetError()) {
+        case EGL_NOT_INITIALIZED:       err = "EGL_NOT_INITIALIZED";    break;
+        case EGL_BAD_ACCESS:            err = "EGL_BAD_ACCESS";         break;
+        case EGL_BAD_ALLOC:             err = "EGL_BAD_ALLOC";          break;
+        case EGL_BAD_ATTRIBUTE:         err = "EGL_BAD_ATTRIBUTE";      break;
+        case EGL_BAD_CONTEXT:           err = "EGL_BAD_CONTEXT";        break;
+        case EGL_BAD_CONFIG:            err = "EGL_BAD_CONFIG";         break;
+        case EGL_BAD_CURRENT_SURFACE:   err = "EGL_BAD_CURRENT_SURFACE";break;
+        case EGL_BAD_DISPLAY:           err = "EGL_BAD_DISPLAY";        break;
+        case EGL_BAD_SURFACE:           err = "EGL_BAD_SURFACE";        break;
+        case EGL_BAD_MATCH:             err = "EGL_BAD_MATCH";          break;
+        case EGL_BAD_PARAMETER:         err = "EGL_BAD_PARAMETER";      break;
+        case EGL_BAD_NATIVE_PIXMAP:     err = "EGL_BAD_NATIVE_PIXMAP";  break;
+        case EGL_BAD_NATIVE_WINDOW:     err = "EGL_BAD_NATIVE_WINDOW";  break;
+        case EGL_CONTEXT_LOST:          err = "EGL_CONTEXT_LOST";       break;
+        default:                        err = "unknown";                break;
+    }
+    slog.e << name << " failed with " << err << io::endl;
 }
 
 static void clearGlError() noexcept {
@@ -155,7 +147,7 @@ Driver* PlatformEGL::createDriver(void* sharedContext) noexcept {
 
     if (configsCount == 0) {
       // warn and retry without EGL_RECORDABLE_ANDROID
-      logEglWarning("eglChooseConfig(..., EGL_RECORDABLE_ANDROID) failed. Continuing without it.");
+      logEglError("eglChooseConfig(..., EGL_RECORDABLE_ANDROID) failed. Continuing without it.");
       configAttribs[12] = EGL_RECORDABLE_ANDROID;
       configAttribs[13] = EGL_DONT_CARE;
       if (!eglChooseConfig(mEGLDisplay, configAttribs, &mEGLConfig, 1, &configsCount) ||
@@ -176,7 +168,7 @@ Driver* PlatformEGL::createDriver(void* sharedContext) noexcept {
 
     if (configsCount == 0) {
       // warn and retry without EGL_RECORDABLE_ANDROID
-        logEglWarning("eglChooseConfig(..., EGL_RECORDABLE_ANDROID) failed. Continuing without it.");
+        logEglError("eglChooseConfig(..., EGL_RECORDABLE_ANDROID) failed. Continuing without it.");
       // this is not fatal
       configAttribs[12] = EGL_RECORDABLE_ANDROID;
       configAttribs[13] = EGL_DONT_CARE;
