@@ -456,8 +456,17 @@ void OpenGLDriver::importBufferObjectR(Handle<HwBufferObject> boh,
     assert_invariant(byteCount > 0);
 
     GLBufferObject* bo = construct<GLBufferObject>(boh, 0, bindingType, usage);
+    // WARNING: This code should be removable, because we bind the buffers later at setRenderPrimitiveBuffer, 
+    // but in that case with ANGLE somehow causes a crash: ANGLE thinks no index buffer bound at draw, therefore
+    // interprets the offset as a pointer to index data
+    auto& gl = mContext;
+    if ((bindingType == BufferObjectBinding::VERTEX || bindingType == BufferObjectBinding::INDEX)) {
+        gl.bindVertexArray(nullptr);
+    }
+
     bo->gl.id = GLuint(id);
     bo->byteCount = byteCount;
+    gl.bindBuffer(bo->gl.binding, bo->gl.id);
     CHECK_GL_ERROR(utils::slog.e)
 }
 
