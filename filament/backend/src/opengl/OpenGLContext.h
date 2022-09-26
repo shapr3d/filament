@@ -42,7 +42,6 @@ public:
     // this will require a corollary update in OpenGLDriver::setVertexBufferObject().
     struct RenderPrimitive {
         GLuint vao = 0;
-        GLuint elementArray = 0;
         utils::bitset32 vertexAttribArray;
 
         // The optional 32-bit handle to a GLVertexBuffer is necessary only if the referenced
@@ -429,14 +428,6 @@ void OpenGLContext::bindVertexArray(RenderPrimitive const* p) noexcept {
     RenderPrimitive* vao = p ? const_cast<RenderPrimitive *>(p) : &mDefaultVAO;
     update_state(state.vao.p, vao, [&]() {
         glBindVertexArray(vao->vao);
-        // update GL_ELEMENT_ARRAY_BUFFER, which is updated by glBindVertexArray
-        size_t targetIndex = getIndexForBufferTarget(GL_ELEMENT_ARRAY_BUFFER);
-        state.buffers.genericBinding[targetIndex] = vao->elementArray;
-        if (UTILS_UNLIKELY(bugs.vao_doesnt_store_element_array_buffer_binding)) {
-            // This shouldn't be needed, but it looks like some drivers don't do the implicit
-            // glBindBuffer().
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vao->elementArray);
-        }
     });
 }
 

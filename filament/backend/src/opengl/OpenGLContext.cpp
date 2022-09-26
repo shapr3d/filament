@@ -303,17 +303,7 @@ void OpenGLContext::initExtensionsGL(GLint major, GLint minor, ExtentionSet cons
 void OpenGLContext::bindBuffer(GLenum target, GLuint buffer) noexcept {
     size_t targetIndex = getIndexForBufferTarget(target);
     if (target == GL_ELEMENT_ARRAY_BUFFER) {
-        // GL_ELEMENT_ARRAY_BUFFER is a special case, where the currently bound VAO remembers
-        // the index buffer, unless there are no VAO bound (see: bindVertexArray)
-        assert_invariant(state.vao.p);
-        if (state.buffers.genericBinding[targetIndex] != buffer
-            || ((state.vao.p != &mDefaultVAO) && (state.vao.p->elementArray != buffer))) {
-            state.buffers.genericBinding[targetIndex] = buffer;
-            if (state.vao.p != &mDefaultVAO) {
-                state.vao.p->elementArray = buffer;
-            }
-            glBindBuffer(target, buffer);
-        }
+        glBindBuffer(target, buffer);
     } else {
         update_state(state.buffers.genericBinding[targetIndex], buffer, [&]() {
             glBindBuffer(target, buffer);
