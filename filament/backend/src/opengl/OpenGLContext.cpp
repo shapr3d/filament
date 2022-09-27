@@ -378,26 +378,28 @@ UTILS_NOUNROLL    // clang generates >800B of code!!!
 void OpenGLContext::deleteBuffers(GLsizei n, const GLuint* buffers, GLenum target) noexcept {
     glDeleteBuffers(n, buffers);
     // bindings of bound buffers are reset to 0
-    if (target != GL_ELEMENT_ARRAY_BUFFER) {
-        const size_t targetIndex = getIndexForBufferTarget(target);
-        auto& genericBuffer = state.buffers.genericBinding[targetIndex];
-        UTILS_NOUNROLL
-        for (GLsizei i = 0; i < n; ++i) {
-            if (genericBuffer == buffers[i]) {
-                genericBuffer = 0;
-            }
+    if (target == GL_ELEMENT_ARRAY_BUFFER) {
+        return;
+    }
+    
+    const size_t targetIndex = getIndexForBufferTarget(target);
+    auto& genericBuffer = state.buffers.genericBinding[targetIndex];
+    UTILS_NOUNROLL
+    for (GLsizei i = 0; i < n; ++i) {
+        if (genericBuffer == buffers[i]) {
+            genericBuffer = 0;
         }
-        if (target == GL_UNIFORM_BUFFER || target == GL_TRANSFORM_FEEDBACK_BUFFER) {
-            auto& indexedBuffer = state.buffers.targets[targetIndex];
-            UTILS_NOUNROLL // clang generates >1 KiB of code!!
-            for (GLsizei i = 0; i < n; ++i) {
-                UTILS_NOUNROLL
-                for (auto& buffer : indexedBuffer.buffers) {
-                    if (buffer.name == buffers[i]) {
-                        buffer.name = 0;
-                        buffer.offset = 0;
-                        buffer.size = 0;
-                    }
+    }
+    if (target == GL_UNIFORM_BUFFER || target == GL_TRANSFORM_FEEDBACK_BUFFER) {
+        auto& indexedBuffer = state.buffers.targets[targetIndex];
+        UTILS_NOUNROLL // clang generates >1 KiB of code!!
+        for (GLsizei i = 0; i < n; ++i) {
+            UTILS_NOUNROLL
+            for (auto& buffer : indexedBuffer.buffers) {
+                if (buffer.name == buffers[i]) {
+                    buffer.name = 0;
+                    buffer.offset = 0;
+                    buffer.size = 0;
                 }
             }
         }
