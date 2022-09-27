@@ -274,7 +274,7 @@ private:
                     GLsizeiptr size = 0;
                 } buffers[MAX_BUFFER_BINDINGS];
             } targets[2];   // there are only 2 indexed buffer target (uniform and transform feedback)
-            GLuint genericBinding[8] = { 0 };
+            GLuint genericBinding[7] = { 0 };
         } buffers;
 
         struct {
@@ -378,9 +378,8 @@ constexpr size_t OpenGLContext::getIndexForBufferTarget(GLenum target) noexcept 
         case GL_ARRAY_BUFFER:               index = 2; break;
         case GL_COPY_READ_BUFFER:           index = 3; break;
         case GL_COPY_WRITE_BUFFER:          index = 4; break;
-        case GL_ELEMENT_ARRAY_BUFFER:       index = 5; break;
-        case GL_PIXEL_PACK_BUFFER:          index = 6; break;
-        case GL_PIXEL_UNPACK_BUFFER:        index = 7; break;
+        case GL_PIXEL_PACK_BUFFER:          index = 5; break;
+        case GL_PIXEL_UNPACK_BUFFER:        index = 6; break;
         default: index = 8; break; // should never happen
     }
     assert_invariant(index < sizeof(state.buffers.genericBinding)/sizeof(state.buffers.genericBinding[0])); // NOLINT(misc-redundant-expression)
