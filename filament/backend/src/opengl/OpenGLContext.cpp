@@ -301,20 +301,13 @@ void OpenGLContext::initExtensionsGL(GLint major, GLint minor, ExtentionSet cons
 }
 
 void OpenGLContext::bindBuffer(GLenum target, GLuint buffer) noexcept {
-    size_t targetIndex = getIndexForBufferTarget(target);
     if (target == GL_ELEMENT_ARRAY_BUFFER) {
         // GL_ELEMENT_ARRAY_BUFFER is a special case, where the currently bound VAO remembers
-        // the index buffer, unless there are no VAO bound (see: bindVertexArray)
-        assert_invariant(state.vao.p);
-        if (state.buffers.genericBinding[targetIndex] != buffer
-            || ((state.vao.p != &mDefaultVAO) && (state.vao.p->elementArray != buffer))) {
-            state.buffers.genericBinding[targetIndex] = buffer;
-            if (state.vao.p != &mDefaultVAO) {
-                state.vao.p->elementArray = buffer;
-            }
-            glBindBuffer(target, buffer);
-        }
+        // the index buffer. We should update the cache, but that requires heavy bookkeeping so
+        // it's much easier and more performant to rebind the buffer
+        glBindBuffer(target, buffer);
     } else {
+        size_t targetIndex = getIndexForBufferTarget(target);
         update_state(state.buffers.genericBinding[targetIndex], buffer, [&]() {
             glBindBuffer(target, buffer);
         });
@@ -385,6 +378,10 @@ UTILS_NOUNROLL    // clang generates >800B of code!!!
 void OpenGLContext::deleteBuffers(GLsizei n, const GLuint* buffers, GLenum target) noexcept {
     glDeleteBuffers(n, buffers);
     // bindings of bound buffers are reset to 0
+    if (target == GL_ELEMENT_ARRAY_BUFFER) {
+        return;
+    }
+    
     const size_t targetIndex = getIndexForBufferTarget(target);
     auto& genericBuffer = state.buffers.genericBinding[targetIndex];
     UTILS_NOUNROLL

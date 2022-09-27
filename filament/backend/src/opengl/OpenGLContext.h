@@ -42,7 +42,6 @@ public:
     // this will require a corollary update in OpenGLDriver::setVertexBufferObject().
     struct RenderPrimitive {
         GLuint vao = 0;
-        GLuint elementArray = 0;
         utils::bitset32 vertexAttribArray;
 
         // The optional 32-bit handle to a GLVertexBuffer is necessary only if the referenced
@@ -53,11 +52,11 @@ public:
 
         // If this version number does not match vertexBufferWithObjects->bufferObjectsVersion,
         // then the VAO needs to be updated.
-        uint8_t vertexBufferVersion = 0;
+        uint32_t vertexBufferVersion = 0;
         
         // If this version number does not match indexBuffer->bufferObjectVersion,
         // then the VAO needs to be updated.
-        uint8_t indexBufferVersion = 0;
+        uint32_t indexBufferVersion = 0;
     } gl;
 
     OpenGLContext() noexcept;
@@ -275,7 +274,7 @@ private:
                     GLsizeiptr size = 0;
                 } buffers[MAX_BUFFER_BINDINGS];
             } targets[2];   // there are only 2 indexed buffer target (uniform and transform feedback)
-            GLuint genericBinding[8] = { 0 };
+            GLuint genericBinding[7] = { 0 };
         } buffers;
 
         struct {
@@ -379,9 +378,8 @@ constexpr size_t OpenGLContext::getIndexForBufferTarget(GLenum target) noexcept 
         case GL_ARRAY_BUFFER:               index = 2; break;
         case GL_COPY_READ_BUFFER:           index = 3; break;
         case GL_COPY_WRITE_BUFFER:          index = 4; break;
-        case GL_ELEMENT_ARRAY_BUFFER:       index = 5; break;
-        case GL_PIXEL_PACK_BUFFER:          index = 6; break;
-        case GL_PIXEL_UNPACK_BUFFER:        index = 7; break;
+        case GL_PIXEL_PACK_BUFFER:          index = 5; break;
+        case GL_PIXEL_UNPACK_BUFFER:        index = 6; break;
         default: index = 8; break; // should never happen
     }
     assert_invariant(index < sizeof(state.buffers.genericBinding)/sizeof(state.buffers.genericBinding[0])); // NOLINT(misc-redundant-expression)
@@ -429,14 +427,6 @@ void OpenGLContext::bindVertexArray(RenderPrimitive const* p) noexcept {
     RenderPrimitive* vao = p ? const_cast<RenderPrimitive *>(p) : &mDefaultVAO;
     update_state(state.vao.p, vao, [&]() {
         glBindVertexArray(vao->vao);
-        // update GL_ELEMENT_ARRAY_BUFFER, which is updated by glBindVertexArray
-        size_t targetIndex = getIndexForBufferTarget(GL_ELEMENT_ARRAY_BUFFER);
-        state.buffers.genericBinding[targetIndex] = vao->elementArray;
-        if (UTILS_UNLIKELY(bugs.vao_doesnt_store_element_array_buffer_binding)) {
-            // This shouldn't be needed, but it looks like some drivers don't do the implicit
-            // glBindBuffer().
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vao->elementArray);
-        }
     });
 }
 

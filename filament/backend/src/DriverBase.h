@@ -53,7 +53,7 @@ struct HwVertexBuffer : public HwBase {
     uint8_t bufferCount{};                //   1
     uint8_t attributeCount{};             //   1
     bool padding{};                       //   1
-    uint8_t bufferObjectsVersion{};       //   1 -> total struct is 136 bytes
+    uint32_t bufferObjectsVersion{};       //  4 -> total struct is 144 bytes
 
     HwVertexBuffer() noexcept = default;
     HwVertexBuffer(uint8_t bufferCount, uint8_t attributeCount, uint32_t elementCount,
@@ -75,7 +75,7 @@ struct HwBufferObject : public HwBase {
 struct HwIndexBuffer : public HwBase {
     uint32_t count : 27;
     uint32_t elementSize : 5;
-    uint8_t bufferObjectVersion{};      
+    uint32_t bufferObjectVersion{};      
 
     HwIndexBuffer() noexcept : count{}, elementSize{} { }
     HwIndexBuffer(uint8_t elementSize, uint32_t indexCount) noexcept :
