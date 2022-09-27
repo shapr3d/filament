@@ -301,13 +301,13 @@ void OpenGLContext::initExtensionsGL(GLint major, GLint minor, ExtentionSet cons
 }
 
 void OpenGLContext::bindBuffer(GLenum target, GLuint buffer) noexcept {
-    size_t targetIndex = getIndexForBufferTarget(target);
     if (target == GL_ELEMENT_ARRAY_BUFFER) {
         // GL_ELEMENT_ARRAY_BUFFER is a special case, where the currently bound VAO remembers
         // the index buffer. We should update the cache, but that requires heavy bookkeeping so
         // it's much easier and more performant to rebind the buffer
         glBindBuffer(target, buffer);
     } else {
+        size_t targetIndex = getIndexForBufferTarget(target);
         update_state(state.buffers.genericBinding[targetIndex], buffer, [&]() {
             glBindBuffer(target, buffer);
         });
