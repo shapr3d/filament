@@ -203,9 +203,7 @@ void RenderPass::setupColorCommand(Command& cmdDraw,
     cmdDraw.primitive.rasterState.colorWrite = mi->getColorWrite();
     cmdDraw.primitive.rasterState.depthWrite = mi->getDepthWrite();
     cmdDraw.primitive.rasterState.depthFunc = mi->getDepthFunc();
-    cmdDraw.primitive.rasterState.stencilWrite = mi->getStencilWrite();
-    cmdDraw.primitive.rasterState.stencilDepthFail = mi->getStencilDepthFail();
-    cmdDraw.primitive.rasterState.stencilDepthPass = mi->getStencilDepthPass();
+    cmdDraw.primitive.rasterState.stencilWrite = false;
     cmdDraw.primitive.mi = mi;
     cmdDraw.primitive.materialVariant.key = variant;
     // we keep "RasterState::colorWrite" to the value set by material (could be disabled)
@@ -473,6 +471,9 @@ void RenderPass::generateCommandsImpl(uint32_t extraFlags,
                 cmdDepth.primitive.primitiveHandle = primitive.getHwHandle();
                 cmdDepth.primitive.mi = mi;
                 cmdDepth.primitive.rasterState.culling = mi->getCullingMode();
+                cmdDepth.primitive.rasterState.stencilWrite = mi->getStencilWrite();
+                cmdDepth.primitive.rasterState.stencilDepthFail = mi->getStencilDepthFail();
+                cmdDepth.primitive.rasterState.stencilDepthPass = mi->getStencilDepthPass();
 
                 // FIXME: should writeDepthForShadowCasters take precedence over mi->getDepthWrite()?
                 cmdDepth.primitive.rasterState.depthWrite = (1 // only keep bit 0

@@ -55,8 +55,8 @@ public:
         bool dithering{};
         backend::TextureFormat ldrFormat{};
     };
-
     struct StructurePassConfig {
+        backend::TextureFormat format = backend::TextureFormat::DEPTH32F;
         float scale = 0.5f;
         bool picking{};
     };
