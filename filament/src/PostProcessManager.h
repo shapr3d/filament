@@ -57,6 +57,7 @@ public:
     };
 
     struct StructurePassConfig {
+        backend::TextureFormat format = backend::TextureFormat::DEPTH32F;
         float scale = 0.5f;
         bool picking{};
     };

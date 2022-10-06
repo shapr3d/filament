@@ -389,6 +389,7 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
         return fg.import(name, {
                 .width = (uint32_t)texture->getWidth(0u),
                 .height = (uint32_t)texture->getHeight(0u),
+                .levels = (uint8_t)texture->getLevels(),
                 .samples = (uint8_t)texture->getSampleCount(),
                 .format = texture->getFormat(),
         }, texture->getUsage(), frameGraphTexture);
@@ -398,11 +399,11 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
     if (colorHdrTexture) {
         fgHdrTexture = importTexture(colorHdrTexture, "colorHdrTexture");
     }
+    auto structurePassFormat = Texture::InternalFormat::DEPTH32F;
     auto* depthTexture = upcast(view).getDepthStencilTexture();
     if (depthTexture) {
-        depthFormat = depthTexture->getFormat();
-        assert_invariant(driver.isDepthResolveSupported() || depthTexture->getSampleCount() == msaaSampleCount);
         fgDepthTexture = importTexture(depthTexture, "depthStencil");
+        structurePassFormat = depthTexture->getFormat();
     }
 
     const bool blendModeTranslucent = view.getBlendMode() == BlendMode::TRANSLUCENT;
@@ -472,6 +473,7 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
 
     // TODO: the scaling should depends on all passes that need the structure pass
     ppm.structure(fg, structurePass, svp.width, svp.height, {
+            .format = structurePassFormat,
             .scale = aoOptions.resolution,
             .picking = view.hasPicking()
     });
@@ -679,7 +681,7 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
         fg.present(fgHdrTexture);
     }
     if (fgDepthTexture) {
-        fg.forwardResource(fgDepthTexture, depth);
+        fg.forwardResource(fgDepthTexture, fg.getBlackboard().get<FrameGraphTexture>("structure"));
         fg.present(fgDepthTexture);
     }
     fg.compile();

@@ -320,6 +320,8 @@ FrameGraphId<FrameGraphTexture> PostProcessManager::structure(FrameGraph& fg,
         StructurePassConfig const& config) noexcept {
 
     const float scale = config.scale;
+    const bool hasStencil = TextureFormat::DEPTH32F_STENCIL8 == config.format ||
+                            TextureFormat::DEPTH24_STENCIL8 == config.format;
 
     // structure pass -- automatically culled if not used, currently used by:
     //    - ssao
@@ -344,13 +346,19 @@ FrameGraphId<FrameGraphTexture> PostProcessManager::structure(FrameGraph& fg,
                 data.depth = builder.createTexture("Structure Buffer", {
                         .width = width, .height = height,
                         .levels = uint8_t(levelCount),
-                        .format = TextureFormat::DEPTH32F });
+                        .format = config.format });
 
                 // workaround: since we have levels, this implies SAMPLEABLE (because of the gl
                 // backend, which implements non-sampleables with renderbuffers, which don't have levels).
                 // (should the gl driver revert to textures, in that case?)
-                data.depth = builder.write(data.depth,
-                        FrameGraphTexture::Usage::DEPTH_ATTACHMENT | FrameGraphTexture::Usage::SAMPLEABLE);
+                auto clearFlags = TargetBufferFlags::COLOR0 | TargetBufferFlags::DEPTH;
+                auto depthAttachmentUsage = FrameGraphTexture::Usage::DEPTH_ATTACHMENT | FrameGraphTexture::Usage::SAMPLEABLE;
+
+                if (hasStencil) {
+                    depthAttachmentUsage |= FrameGraphTexture::Usage::STENCIL_ATTACHMENT;
+                    clearFlags |= TargetBufferFlags::STENCIL;
+                }
+                data.depth = builder.write(data.depth, depthAttachmentUsage);
 
                 if (config.picking) {
                     data.picking = builder.createTexture("Picking Buffer", {
@@ -362,13 +370,21 @@ FrameGraphId<FrameGraphTexture> PostProcessManager::structure(FrameGraph& fg,
                 }
 
                 builder.declareRenderPass("Structure Target", {
-                        .attachments = { .color = { data.picking }, .depth = data.depth },
-                        .clearFlags = TargetBufferFlags::COLOR0 | TargetBufferFlags::DEPTH
+                        .attachments = {
+                            .color = { data.picking }, 
+                            .depth = data.depth, 
+                            .stencil = (hasStencil) ? data.depth : FrameGraphId<FrameGraphTexture>{}
+                        },
+                        .clearFlags =  clearFlags
                 });
             },
             [=](FrameGraphResources const& resources,
                     auto const& data, DriverApi& driver) mutable {
                 auto out = resources.getRenderPassInfo();
+                if (hasStencil) {
+                    out.params.flags.clear |= TargetBufferFlags::STENCIL;
+                    out.params.flags.discardStart |= TargetBufferFlags::STENCIL;
+                }
                 pass.execute(resources.getPassName(), out.target, out.params);
             });
 

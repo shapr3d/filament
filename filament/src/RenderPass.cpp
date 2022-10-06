@@ -471,6 +471,9 @@ void RenderPass::generateCommandsImpl(uint32_t extraFlags,
                 cmdDepth.primitive.primitiveHandle = primitive.getHwHandle();
                 cmdDepth.primitive.mi = mi;
                 cmdDepth.primitive.rasterState.culling = mi->getCullingMode();
+                cmdDepth.primitive.rasterState.stencilWrite = mi->getStencilWrite();
+                cmdDepth.primitive.rasterState.stencilDepthFail = mi->getStencilDepthFail();
+                cmdDepth.primitive.rasterState.stencilDepthPass = mi->getStencilDepthPass();
 
                 // FIXME: should writeDepthForShadowCasters take precedence over mi->getDepthWrite()?
                 cmdDepth.primitive.rasterState.depthWrite = (1 // only keep bit 0
