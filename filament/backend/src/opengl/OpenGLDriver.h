@@ -293,6 +293,7 @@ private:
     void setRasterState(backend::RasterState rs) noexcept {
         mRenderPassColorWrite |= rs.colorWrite;
         mRenderPassDepthWrite |= rs.depthWrite;
+        mRenderPassStencilWrite |= rs.stencilWrite;
         if (UTILS_UNLIKELY(rs != mRasterState)) {
             setRasterStateSlow(rs);
         }
@@ -355,6 +356,7 @@ private:
     backend::RenderPassParams mRenderPassParams;
     GLboolean mRenderPassColorWrite{};
     GLboolean mRenderPassDepthWrite{};
+    GLboolean mRenderPassStencilWrite{};
 
     void clearWithRasterPipe(backend::TargetBufferFlags clearFlags,
             math::float4 const& linearColor, GLfloat depth, GLint stencil) noexcept;

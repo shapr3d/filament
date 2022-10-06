@@ -2296,6 +2296,7 @@ void OpenGLDriver::beginRenderPass(Handle<HwRenderTarget> rth,
     // we need to reset those after we call clearWithRasterPipe()
     mRenderPassColorWrite = any(clearFlags & TargetBufferFlags::COLOR_ALL);
     mRenderPassDepthWrite = any(clearFlags & TargetBufferFlags::DEPTH);
+    mRenderPassStencilWrite = any(clearFlags & TargetBufferFlags::STENCIL);
 
     gl.viewport(params.viewport.left, params.viewport.bottom,
             params.viewport.width, params.viewport.height);
@@ -2328,6 +2329,9 @@ void OpenGLDriver::endRenderPass(int) {
     }
     if (!mRenderPassDepthWrite) {
         discardFlags &= ~TargetBufferFlags::DEPTH;
+    }
+    if (!mRenderPassStencilWrite) {
+        discardFlags &= ~TargetBufferFlags::STENCIL;
     }
 
     // glInvalidateFramebuffer appeared on GLES 3.0 and GL4.3, for simplicity we just

@@ -321,6 +321,17 @@ constexpr inline GLenum getSwizzleChannel(backend::TextureSwizzle c) noexcept {
     }
 }
 
+constexpr inline bool formatHasStencil(backend::TextureFormat format) noexcept {
+    using TextureFormat = backend::TextureFormat;
+    switch (format) {
+        case TextureFormat::STENCIL8:
+        case TextureFormat::DEPTH24_STENCIL8:
+        case TextureFormat::DEPTH32F_STENCIL8:
+            return true;
+        default: return false;
+    }
+}
+
 // clang looses it on this one, and generates a huge jump table when
 // inlined. So we don't  mark it as inline (only constexpr) which solves the problem,
 // strangely, when not inlined, clang simply generates an array lookup.
