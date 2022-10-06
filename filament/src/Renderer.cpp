@@ -686,7 +686,7 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
     }
     fg.compile();
 
-    fg.export_graphviz(slog.d, view.getName());
+    //fg.export_graphviz(slog.d, view.getName());
 
     fg.execute(driver);
 
