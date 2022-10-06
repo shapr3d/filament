@@ -350,6 +350,7 @@ FrameGraphId<FrameGraphTexture> PostProcessManager::structure(FrameGraph& fg,
 
                 auto clearFlags = TargetBufferFlags::COLOR0 | TargetBufferFlags::DEPTH;
                 auto depthAttachmentUsage = FrameGraphTexture::Usage::DEPTH_ATTACHMENT | FrameGraphTexture::Usage::SAMPLEABLE;
+
                 if (hasStencil) {
                     depthAttachmentUsage |= FrameGraphTexture::Usage::STENCIL_ATTACHMENT;
                     clearFlags |= TargetBufferFlags::STENCIL;
@@ -358,6 +359,10 @@ FrameGraphId<FrameGraphTexture> PostProcessManager::structure(FrameGraph& fg,
                 // backend, which implements non-sampleables with renderbuffers, which don't have levels).
                 // (should the gl driver revert to textures, in that case?)
                 data.depth = builder.write(data.depth, depthAttachmentUsage);
+
+                if (hasStencil) {
+                    attachments.stencil = data.depth;
+                }
 
                 if (config.picking) {
                     data.picking = builder.createTexture("Picking Buffer", {
@@ -369,7 +374,9 @@ FrameGraphId<FrameGraphTexture> PostProcessManager::structure(FrameGraph& fg,
                 }
 
                 builder.declareRenderPass("Structure Target", {
-                        .attachments = { .color = { data.picking }, .depth = data.depth },
+                        .attachments = {
+                            .color = { data.picking }, .depth = data.depth, .stencil = (hasStencil) ? data.depth : FrameGraphId<FrameGraphTexture>{}
+                        },
                         .clearFlags =  clearFlags
                 });
             },
