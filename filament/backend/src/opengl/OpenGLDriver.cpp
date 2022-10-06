@@ -589,7 +589,6 @@ void OpenGLDriver::createTextureR(Handle<HwTexture> th, SamplerType target, uint
                 TextureUsage::COLOR_ATTACHMENT |
                 TextureUsage::DEPTH_ATTACHMENT |
                 TextureUsage::STENCIL_ATTACHMENT)));
-        assert_invariant(levels == 1);
         assert_invariant(target == SamplerType::SAMPLER_2D);
         t->gl.internalFormat = getInternalFormat(format);
         t->gl.target = GL_RENDERBUFFER;
@@ -686,7 +685,6 @@ void OpenGLDriver::importTextureR(Handle<HwTexture> th, intptr_t id,
                 TextureUsage::COLOR_ATTACHMENT |
                 TextureUsage::DEPTH_ATTACHMENT |
                 TextureUsage::STENCIL_ATTACHMENT)));
-        assert_invariant(levels == 1);
         assert_invariant(target == SamplerType::SAMPLER_2D);
         t->gl.target = GL_RENDERBUFFER;
     }
