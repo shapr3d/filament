@@ -1262,8 +1262,8 @@ void MetalDriver::draw(backend::PipelineState ps, Handle<HwRenderPrimitive> rph)
         .compareFunction = getMetalCompareFunction(rs.depthFunc),
         .stencilDepthFail = getMetalStencilOperation(rs.stencilDepthFail),
         .stencilDepthPass = getMetalStencilOperation(rs.stencilDepthPass),
-        .depthWriteEnabled = rs.depthWrite,
-        .stencilWriteEnabled = rs.stencilWrite,
+        .depthWriteEnabled = rs.depthWrite && depthStencilAttachment,
+        .stencilWriteEnabled = rs.stencilWrite && formatHasStencil(depthStencilPixelFormat),
     };
     mContext->depthStencilState.updateState(depthState);
     if (mContext->depthStencilState.stateChanged()) {
