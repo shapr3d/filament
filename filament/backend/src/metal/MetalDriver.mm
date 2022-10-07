@@ -359,10 +359,6 @@ void MetalDriver::createRenderTargetR(Handle<HwRenderTarget> rth,
     construct_handle<MetalRenderTarget>(rth, mContext, width, height, samples,
             colorAttachments, depthAttachment);
 
-    ASSERT_POSTCONDITION(
-            !stencil.handle &&
-            !(targetBufferFlags & TargetBufferFlags::STENCIL),
-            "Stencil buffer not supported.");
 }
 
 void MetalDriver::createFenceR(Handle<HwFence> fh, int dummy) {
