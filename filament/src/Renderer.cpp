@@ -403,7 +403,8 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
     auto* depthTexture = upcast(view).getDepthStencilTexture();
     if (depthTexture) {
         fgDepthTexture = importTexture(depthTexture, "depthStencil");
-        structurePassFormat = depthTexture->getFormat();
+        fg.getBlackboard().put("importedDepthStencil", fgDepthTexture);
+        structurePassFormat = depthTexture->getFormat();        
     }
 
     const bool blendModeTranslucent = view.getBlendMode() == BlendMode::TRANSLUCENT;
@@ -681,12 +682,14 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
         fg.present(fgHdrTexture);
     }
     if (fgDepthTexture) {
-        fg.forwardResource(fgDepthTexture, fg.getBlackboard().get<FrameGraphTexture>("structure"));
+        //fg.forwardResource(fgDepthTexture, fg.getBlackboard().get<FrameGraphTexture>("structure"));
         fg.present(fgDepthTexture);
+        //fg.forwardResource(h, fg.getBlackboard().get<FrameGraphTexture>("structure-mipmap"));
+        //fg.present(h);
     }
     fg.compile();
 
-    //fg.export_graphviz(slog.d, view.getName());
+    fg.export_graphviz(slog.d, view.getName());
 
     fg.execute(driver);
 

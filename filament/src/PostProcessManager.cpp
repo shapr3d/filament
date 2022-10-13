@@ -340,10 +340,17 @@ FrameGraphId<FrameGraphTexture> PostProcessManager::structure(FrameGraph& fg,
     const size_t levelCount = std::min(8, FTexture::maxLevelCount(width, height) - 5);
     assert_invariant(levelCount >= 1);
 
+
+    auto importedDepthStencil = fg.getBlackboard().get<FrameGraphTexture>("importedDepthStencil");
+    auto depthAttachmentUsage = FrameGraphTexture::Usage::DEPTH_ATTACHMENT | FrameGraphTexture::Usage::SAMPLEABLE;
+    if (hasStencil) {
+        depthAttachmentUsage |= FrameGraphTexture::Usage::STENCIL_ATTACHMENT;
+    }
+
     // generate depth pass at the requested resolution
     auto& structurePass = fg.addPass<StructurePassData>("Structure Pass",
             [&](FrameGraph::Builder& builder, auto& data) {
-                data.depth = builder.createTexture("Structure Buffer", {
+                data.depth = (importedDepthStencil) ? importedDepthStencil : builder.createTexture("Structure Buffer", {
                         .width = width, .height = height,
                         .levels = uint8_t(levelCount),
                         .format = config.format });
@@ -351,13 +358,7 @@ FrameGraphId<FrameGraphTexture> PostProcessManager::structure(FrameGraph& fg,
                 // workaround: since we have levels, this implies SAMPLEABLE (because of the gl
                 // backend, which implements non-sampleables with renderbuffers, which don't have levels).
                 // (should the gl driver revert to textures, in that case?)
-                auto clearFlags = TargetBufferFlags::COLOR0 | TargetBufferFlags::DEPTH;
-                auto depthAttachmentUsage = FrameGraphTexture::Usage::DEPTH_ATTACHMENT | FrameGraphTexture::Usage::SAMPLEABLE;
-
-                if (hasStencil) {
-                    depthAttachmentUsage |= FrameGraphTexture::Usage::STENCIL_ATTACHMENT;
-                    clearFlags |= TargetBufferFlags::STENCIL;
-                }
+                
                 data.depth = builder.write(data.depth, depthAttachmentUsage);
 
                 if (config.picking) {
@@ -375,7 +376,7 @@ FrameGraphId<FrameGraphTexture> PostProcessManager::structure(FrameGraph& fg,
                             .depth = data.depth, 
                             .stencil = (hasStencil) ? data.depth : FrameGraphId<FrameGraphTexture>{}
                         },
-                        .clearFlags =  clearFlags
+                        .clearFlags =  TargetBufferFlags::COLOR0 | TargetBufferFlags::DEPTH | TargetBufferFlags::STENCIL
                 });
             },
             [=](FrameGraphResources const& resources,
@@ -406,9 +407,12 @@ FrameGraphId<FrameGraphTexture> PostProcessManager::structure(FrameGraph& fg,
                     auto out = builder.createSubresource(data.depth, "Structure mip", {
                             .level = uint8_t(i)
                     });
-                    out = builder.write(out, FrameGraphTexture::Usage::DEPTH_ATTACHMENT);
+                    out = builder.write(out, depthAttachmentUsage);
                     data.rt[i - 1] = builder.declareRenderPass("Structure mip target", {
-                            .attachments = { .depth = out }
+                            .attachments = { 
+                                .depth = out, 
+                                .stencil = (hasStencil) ? out : FrameGraphId<FrameGraphTexture>{}
+                            }
                     });
                 }
             },

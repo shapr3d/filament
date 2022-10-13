@@ -883,6 +883,7 @@ void OpenGLDriver::framebufferTexture(backend::TargetBufferInfo const& binfo,
                 // we shouldn't be here
                 break;
         }
+        CHECK_GL_FRAMEBUFFER_STATUS(utils::slog.e, GL_FRAMEBUFFER)
         CHECK_GL_ERROR(utils::slog.e)
     } else
 #ifdef GL_EXT_multisampled_render_to_texture
@@ -993,6 +994,8 @@ void OpenGLDriver::framebufferTexture(backend::TargetBufferInfo const& binfo,
         updateTextureLodRange(t, binfo.level);
     }
 
+    CHECK_GL_ERROR(utils::slog.e)
+    CHECK_GL_FRAMEBUFFER_STATUS(utils::slog.e, GL_FRAMEBUFFER)
     CHECK_GL_ERROR(utils::slog.e)
     CHECK_GL_FRAMEBUFFER_STATUS(utils::slog.e, GL_FRAMEBUFFER)
 }
