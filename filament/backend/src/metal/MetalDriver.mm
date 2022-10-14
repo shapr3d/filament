@@ -360,9 +360,9 @@ void MetalDriver::createRenderTargetR(Handle<HwRenderTarget> rth,
             colorAttachments, depthAttachment);
 
     ASSERT_POSTCONDITION(
-            !stencil.handle &&
-            !(targetBufferFlags & TargetBufferFlags::STENCIL),
-            "Stencil buffer not supported.");
+            (!stencil.handle &&
+            !(targetBufferFlags & TargetBufferFlags::STENCIL)) || (stencil.handle == depth.handle),
+            "Separate stencil buffer not supported.");
 }
 
 void MetalDriver::createFenceR(Handle<HwFence> fh, int dummy) {

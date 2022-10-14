@@ -407,11 +407,10 @@ FrameGraphId<FrameGraphTexture> PostProcessManager::structure(FrameGraph& fg,
                     auto out = builder.createSubresource(data.depth, "Structure mip", {
                             .level = uint8_t(i)
                     });
-                    out = builder.write(out, depthAttachmentUsage);
+                    out = builder.write(out, FrameGraphTexture::Usage::DEPTH_ATTACHMENT | FrameGraphTexture::Usage::SAMPLEABLE);
                     data.rt[i - 1] = builder.declareRenderPass("Structure mip target", {
                             .attachments = { 
-                                .depth = out, 
-                                .stencil = (hasStencil) ? out : FrameGraphId<FrameGraphTexture>{}
+                                .depth = out
                             }
                     });
                 }
