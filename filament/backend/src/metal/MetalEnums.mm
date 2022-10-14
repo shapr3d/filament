@@ -124,7 +124,7 @@ MTLPixelFormat getMetalFormat(MetalContext* context, TextureFormat format) noexc
     }
 #endif
 
-#if !defined(FILAMENT_IOS_SIMULATOR)
+#if !defined(FILAMENT_IOS_SIMULATOR) || TARGET_CPU_ARM64
     if (context->highestSupportedGpuFamily.apple >= 2) {
         if (@available(macOS 11.0, macCatalyst 14.0, *)) {
             if (@available(iOS 13.0, *)) {
