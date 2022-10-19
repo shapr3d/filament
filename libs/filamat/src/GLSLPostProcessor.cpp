@@ -58,17 +58,11 @@ public:
             auto &var = get<SPIRVariable>(varId);
             if (var.storage == spv::StorageClassPrivate || var.storage == spv::StorageClassWorkgroup)
             {
-                const auto varName = get_name(varId);
                 if (!variable_is_lut(var)) {
+                    const auto varName = get_name(varId);
                     if (std::find(std::begin(unusedGlobals), std::end(unusedGlobals), varName) != std::end(unusedGlobals)) {
                         variableUsed[varId] = false;
                     }
-                }
-            }
-            else {
-                const auto varName = get_name(varId);
-                if (std::find(std::begin(unusedGlobals), std::end(unusedGlobals), varName) != std::end(unusedGlobals)) {
-                    variableUsed[varId] = false;
                 }
             }
         }
