@@ -32,11 +32,183 @@
 #include <utils/Log.h>
 #include <filament/MaterialEnums.h>
 
+#include <unordered_map>
+
 using namespace glslang;
 using namespace spirv_cross;
 using namespace spvtools;
 
 namespace filamat {
+
+using namespace utils;
+
+namespace msl {  // this is only used for MSL
+
+
+class MSLCompiler: public spirv_cross::CompilerMSL {
+public:
+
+    using CompilerMSL::CompilerMSL;
+
+    void removeUnusedGlobals(const std::vector<std::string>& unusedGlobals) {
+
+        std::unordered_map<uint32_t, bool> variableUsed;
+        for (uint32_t varId : global_variables)
+        {
+            auto &var = get<SPIRVariable>(varId);
+            if (var.storage == spv::StorageClassPrivate || var.storage == spv::StorageClassWorkgroup)
+            {
+                const auto varName = get_name(varId);
+                if (!variable_is_lut(var)) {
+                    if (std::find(std::begin(unusedGlobals), std::end(unusedGlobals), varName) != std::end(unusedGlobals)) {
+                        variableUsed[varId] = false;
+                    }
+                }
+            }
+            else {
+                const auto varName = get_name(varId);
+                if (std::find(std::begin(unusedGlobals), std::end(unusedGlobals), varName) != std::end(unusedGlobals)) {
+                    variableUsed[varId] = false;
+                }
+            }
+        }
+
+        std::unordered_set<uint32_t> processedFunctionIds;
+        collectVariableUsage<true>(ir.default_entry_point, variableUsed, processedFunctionIds);
+
+        auto* iter = global_variables.begin();
+        while (iter != global_variables.end()) {
+            auto var = variableUsed.find(*iter);
+            if (var != std::end(variableUsed) && !var->second) {
+                iter = global_variables.erase(iter);
+            } else {
+                ++iter;
+            }
+        }
+
+    }
+
+
+protected:
+
+    template <bool TraverseRecursive>
+    void collectVariableUsage(uint32_t funcId,
+                                    std::unordered_map<uint32_t, bool>& variableUsed,
+                                    std::unordered_set<uint32_t> &processedFunctionIds) {
+
+        if (processedFunctionIds.find(funcId) != processedFunctionIds.end())
+        {
+            return;
+        }
+
+        processedFunctionIds.insert(funcId);
+
+        auto &func = get<SPIRFunction>(funcId);
+
+        // Recursively establish global args added to functions on which we depend.
+        for (auto block : func.blocks)
+        {
+            using namespace spv;
+            auto &b = get<SPIRBlock>(block);
+            for (auto &i : b.ops)
+            {
+                auto ops = stream(i);
+                auto op = static_cast<Op>(i.op);
+
+                switch (op)
+                {
+                case OpLoad:
+                case OpInBoundsAccessChain:
+                case OpAccessChain:
+                case OpPtrAccessChain:
+                case OpArrayLength:
+                {
+                    uint32_t base_id = ops[2];
+                    if (variableUsed.find(base_id) != variableUsed.end()) {
+                        variableUsed[base_id] = true;
+                    }
+                    break;
+                }
+
+                case OpFunctionCall:
+                {
+                    // First see if any of the function call args are globals
+                    for (uint32_t arg_idx = 3; arg_idx < i.length; arg_idx++)
+                    {
+                        uint32_t arg_id = ops[arg_idx];
+                        if (variableUsed.find(arg_id) != variableUsed.end())
+                            variableUsed[arg_id] = true;
+                    }
+
+                    // Then recurse into the function itself
+                    uint32_t innerFuncId = ops[2];
+                    if constexpr (TraverseRecursive) {
+                        this->template collectVariableUsage<TraverseRecursive>(innerFuncId, variableUsed, processedFunctionIds);
+                    }
+                    break;
+                }
+                case OpSpecConstantOp:
+                {
+                    uint32_t base_id = ops[0];
+                    if (variableUsed.find(base_id) != variableUsed.end())
+                        variableUsed[base_id] = true;
+                    break;
+                }
+
+                case OpStore:
+                {
+                    uint32_t base_id = ops[0];
+                    if (variableUsed.find(base_id) != variableUsed.end())
+                        variableUsed[base_id] = true;
+
+                    uint32_t rvalue_id = ops[1];
+                    if (variableUsed.find(rvalue_id) != variableUsed.end())
+                        variableUsed[rvalue_id] = true;
+
+                    break;
+                }
+
+                case OpSelect:
+                {
+                    uint32_t base_id = ops[3];
+                    if (variableUsed.find(base_id) != variableUsed.end())
+                        variableUsed[base_id] = true;
+                    base_id = ops[4];
+                    if (variableUsed.find(base_id) != variableUsed.end())
+                        variableUsed[base_id] = true;
+                    break;
+                }
+
+                // Emulate texture2D atomic operations
+                case OpImageTexelPointer:
+                {
+                    // When using the pointer, we need to know which variable it is actually loaded from.
+                    uint32_t base_id = ops[2];
+                    auto *var = maybe_get_backing_variable(base_id);
+                    if (var && atomic_image_vars.count(var->self))
+                    {
+                        if (variableUsed.find(base_id) != variableUsed.end())
+                            variableUsed[base_id] = true;
+                    }
+                    break;
+                }
+
+                default:
+                    break;
+                }
+
+                // TODO: Add all other operations which can affect memory.
+                // We should consider a more unified system here to reduce boiler-plate.
+                // This kind of analysis is done in several places ...
+            }
+        }
+
+
+    }
+
+};
+
+}; // namespace msl
 
 GLSLPostProcessor::GLSLPostProcessor(MaterialBuilder::Optimization optimization, uint32_t flags)
         : mOptimization(optimization),
@@ -111,7 +283,7 @@ static std::string stringifySpvOptimizerMessage(spv_message_level_t level, const
 void GLSLPostProcessor::spirvToToMsl(const SpirvBlob *spirv, std::string *outMsl,
         const Config &config, ShaderMinifier& minifier) const {
 
-    CompilerMSL mslCompiler(*spirv);
+    msl::MSLCompiler mslCompiler(*spirv);
     CompilerGLSL::Options options;
     mslCompiler.set_common_options(options);
 
@@ -151,6 +323,20 @@ void GLSLPostProcessor::spirvToToMsl(const SpirvBlob *spirv, std::string *outMsl
     for (const auto& resource : resources.uniform_buffers) {
         duplicateResourceBinding(resource);
     }
+
+    // Descriptor set 0 is uniforms. The add_discrete_descriptor_set call here prevents the uniforms
+    // from becoming argument buffers.
+    mslCompiler.add_discrete_descriptor_set(0);
+    mslCompiler.removeUnusedGlobals({
+        "shading_tangentToWorld",
+        "shading_position",
+        "shading_view",
+        "shading_normal",
+        "shading_geometricNormal",
+        "shading_reflected",
+        "shading_NoV",
+        "shading_normalizedViewportCoord",
+    });
 
     *outMsl = mslCompiler.compile();
     *outMsl = minifier.removeWhitespace(*outMsl);
