@@ -54,7 +54,6 @@ namespace {
             "float2 shading_normalizedViewportCoord;",
             "float3 shading_clearCoatNormal;",
             "float filament_lodBias = frameUniforms.lodBias;",
-            "float level0 = fast::clamp(floor(log2(ssSliceRadius)) - 3.0, 0.0, setup.maxLevel);",
             "float3 bentNormal = param_8;"
         };
 
