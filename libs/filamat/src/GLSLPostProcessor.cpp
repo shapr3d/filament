@@ -63,12 +63,10 @@ namespace {
         patchedMslShader.reserve(std::size(maybeUnused) * std::size(unusedVariables) + std::size(mslShader));
         patchedMslShader = mslShader;
         for (const auto& variable : unusedVariables) {
-
-            auto it = std::search(std::begin(patchedMslShader), std::end(patchedMslShader), std::begin(variable), std::end(variable));
-            if (it != std::end(patchedMslShader)) {
-                patchedMslShader.insert(it, std::begin(maybeUnused), std::end(maybeUnused));
+            auto pos = patchedMslShader.find(variable);
+            if (pos != std::string::npos) {
+                patchedMslShader.insert(pos, maybeUnused);
             }
-
         }
         return patchedMslShader;
     }
