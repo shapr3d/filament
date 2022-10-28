@@ -18,6 +18,8 @@
 
 #include <sstream>
 #include <vector>
+#include <string>
+#include <string_view>
 
 #include <GlslangToSpv.h>
 #include <SPVRemapper.h>
@@ -37,6 +39,39 @@ using namespace spirv_cross;
 using namespace spvtools;
 
 namespace filamat {
+
+namespace {
+
+    std::string addMaybeUnusedToVariables(const std::string& mslShader) {
+        constexpr std::string_view unusedVariables[] = {
+            "float3x3 shading_tangentToWorld;",
+            "float3 shading_position;",
+            "float3 shading_view;",
+            "float3 shading_normal;",
+            "float3 shading_geometricNormal;",
+            "float3 shading_reflected;",
+            "float shading_NoV;",
+            "float2 shading_normalizedViewportCoord;",
+            "float3 shading_clearCoatNormal;",
+            "float filament_lodBias = frameUniforms.lodBias;",
+            "float3 bentNormal = param_8;"
+        };
+
+        constexpr std::string_view maybeUnused = "[[maybe_unused]] ";
+
+        std::string patchedMslShader;
+        patchedMslShader.reserve(std::size(maybeUnused) * std::size(unusedVariables) + std::size(mslShader));
+        patchedMslShader = mslShader;
+        for (const auto& variable : unusedVariables) {
+            auto pos = patchedMslShader.find(variable);
+            if (pos != std::string::npos) {
+                patchedMslShader.insert(pos, maybeUnused);
+            }
+        }
+        return patchedMslShader;
+    }
+
+}
 
 GLSLPostProcessor::GLSLPostProcessor(MaterialBuilder::Optimization optimization, uint32_t flags)
         : mOptimization(optimization),
@@ -153,6 +188,7 @@ void GLSLPostProcessor::spirvToToMsl(const SpirvBlob *spirv, std::string *outMsl
     }
 
     *outMsl = mslCompiler.compile();
+    *outMsl = addMaybeUnusedToVariables(*outMsl);
     *outMsl = minifier.removeWhitespace(*outMsl);
 }
 

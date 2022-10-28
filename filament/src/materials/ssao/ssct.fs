@@ -24,8 +24,6 @@
 
 #include "ssaoUtils.fs"
 
-const float kSSCTLog2LodRate = 3.0;
-
 struct ConeTraceSetup {
     // fragment info
     highp vec2 ssStartPos;
@@ -109,8 +107,6 @@ float coneTraceOcclusion(in ConeTraceSetup setup, const highp sampler2D depthTex
         float ssTracedDistance = ssConeLength * t;
         float ssSliceRadius = setup.jitterOffset.x * (setup.coneAngleTangeant * ssTracedDistance);
         highp vec2 ssSamplePos = perpConeDir * ssSliceRadius + ssConeVector * t + ssStartPos;
-
-        float level = clamp(floor(log2(ssSliceRadius)) - kSSCTLog2LodRate, 0.0, float(setup.maxLevel));
         float vsSampleDepthLinear = -sampleDepthLinear(depthTexture, ssSamplePos * setup.resolution.zw, 0.0);
 
         // calculate depth range of cone slice
