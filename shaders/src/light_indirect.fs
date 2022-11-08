@@ -18,10 +18,6 @@
 
 #define IBL_INTEGRATION_IMPORTANCE_SAMPLING_COUNT   64
 
-#if ((defined(MATERIAL_HAS_TRANSMISSION) && defined(HAS_REFRACTION)) || !defined(BLEND_MODE_OPAQUE))
-#define IS_TRANSPARENT_OR_REFRACTIVE
-#endif
-
 //------------------------------------------------------------------------------
 // IBL utilities
 //------------------------------------------------------------------------------
