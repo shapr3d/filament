@@ -274,6 +274,7 @@ void OpenGLContext::initExtensionsGLES(GLint major, GLint minor, ExtentionSet co
     ext.EXT_texture_compression_s3tc = hasExtension(exts, "GL_EXT_texture_compression_s3tc");
     ext.EXT_texture_compression_s3tc_srgb = hasExtension(exts, "GL_EXT_texture_compression_s3tc_srgb");
     ext.EXT_texture_compression_rgtc = hasExtension(exts, "GL_EXT_texture_compression_rgtc");
+    ext.EXT_texture_compression_bptc = hasExtension(exts, "GL_EXT_texture_compression_bptc");
     ext.WEBGL_compressed_texture_s3tc = hasExtension(exts, "WEBGL_compressed_texture_s3tc");
     ext.WEBGL_compressed_texture_s3tc_srgb = hasExtension(exts, "WEBGL_compressed_texture_s3tc_srgb");
     ext.WEBGL_compressed_texture_etc = hasExtension(exts, "WEBGL_compressed_texture_etc");
@@ -300,6 +301,7 @@ void OpenGLContext::initExtensionsGL(GLint major, GLint minor, ExtentionSet cons
     ext.EXT_texture_compression_s3tc = hasExtension(exts, "GL_EXT_texture_compression_s3tc");
     ext.EXT_texture_compression_s3tc_srgb = hasExtension(exts, "GL_EXT_texture_compression_s3tc_srgb");
     ext.EXT_texture_compression_rgtc = hasExtension(exts, "GL_EXT_texture_compression_rgtc");
+    ext.EXT_texture_compression_bptc = hasExtension(exts, "GL_EXT_texture_compression_bptc");
 }
 
 void OpenGLContext::bindBuffer(GLenum target, GLuint buffer) noexcept {

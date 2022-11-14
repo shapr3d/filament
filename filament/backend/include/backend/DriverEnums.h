@@ -359,6 +359,12 @@ enum class CompressedPixelDataType : uint16_t {
     RED_GREEN_RGTC2,        // BC5 unsigned
     SIGNED_RED_GREEN_RGTC2, // BC5 signed
 
+    // BPTC formats available with a GLES extension
+    RGB_BPTC_SIGNED_FLOAT,  // BC6H signed
+    RGB_BPTC_UNSIGNED_FLOAT,// BC6H unsigned
+    RGBA_BPTC_UNORM,        // BC7
+    SRGB_ALPHA_BPTC_UNORM,  // BC7 sRGB
+
     // ASTC formats are available with a GLES extension
     RGBA_ASTC_4x4,
     RGBA_ASTC_5x4,
@@ -519,6 +525,12 @@ enum class TextureFormat : uint16_t {
     RED_GREEN_RGTC2,        // BC5 unsigned
     SIGNED_RED_GREEN_RGTC2, // BC5 signed
 
+    // BPTC formats available with a GLES extension
+    RGB_BPTC_SIGNED_FLOAT,  // BC6H signed
+    RGB_BPTC_UNSIGNED_FLOAT,// BC6H unsigned
+    RGBA_BPTC_UNORM,        // BC7
+    SRGB_ALPHA_BPTC_UNORM,  // BC7 sRGB
+
     // ASTC formats are available with a GLES extension
     RGBA_ASTC_4x4,
     RGBA_ASTC_5x4,
@@ -650,6 +662,11 @@ static constexpr bool isS3TCSRGBCompression(TextureFormat format) noexcept {
 //! returns whether this format is an RGTC compressed format
 static constexpr bool isRGTCCompression(TextureFormat format) noexcept {
     return format >= TextureFormat::RED_RGTC1 && format <= TextureFormat::SIGNED_RED_GREEN_RGTC2;
+}
+
+//! returns whether this format is an BPTC compressed format
+static constexpr bool isBPTCCompression(TextureFormat format) noexcept {
+    return format >= TextureFormat::RGB_BPTC_SIGNED_FLOAT && format <= TextureFormat::SRGB_ALPHA_BPTC_UNORM;
 }
 
 //! Texture Cubemap Face
