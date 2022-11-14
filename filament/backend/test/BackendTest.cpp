@@ -64,7 +64,7 @@ void BackendTest::initializeDriver() {
 
 void BackendTest::executeCommands() {
     commandBufferQueue.flush();
-    auto buffers = commandBufferQueue.waitForCommands();
+    auto buffers = commandBufferQueue.waitForCommands(true);
     for (auto& item : buffers) {
         if (UTILS_LIKELY(item.begin)) {
             commandStream.execute(item.begin);
@@ -240,4 +240,3 @@ void getPixelInfo(PixelDataFormat format, PixelDataType type, size_t& outCompone
 
 
 } // namespace test
-
