@@ -6,6 +6,7 @@
 #define IBL_TECHNIQUE_INFINITE      0u
 #define IBL_TECHNIQUE_FINITE_SPHERE 1u
 #define IBL_TECHNIQUE_FINITE_BOX    2u
+#define IBL_TECHNIQUE_FINITE_SPHERE_NEW 3u
 
 // Number of spherical harmonics bands (1, 2 or 3)
 #define SPHERICAL_HARMONICS_BANDS           3
@@ -236,6 +237,17 @@ vec3 GetAdjustedReflectedDirection(const vec3 baseDir, const vec3 normal) {
     else if (frameUniforms.iblTechnique == IBL_TECHNIQUE_FINITE_BOX) {
         vec2 roots = IntersectAABB(rayPos, rayDir, -frameUniforms.iblHalfExtents, frameUniforms.iblHalfExtents);
         t0 = GetSmallestPositive(roots.x, roots.y);
+    }
+    else if (frameUniforms.iblTechnique == IBL_TECHNIQUE_FINITE_SPHERE_NEW) {
+        // Normalize sphere-space by scaling down positions by radius. We don't scale down ray direction to preserve 
+        // the convenient A = 1 in the quadratic formula. iblHalfExtents.y contains the reciprocal of the IBL sphere radius.
+        vec3 rayPosNormalized = rayPos * frameUniforms.iblHalfExtents.y;
+
+        float B = 2.0 * dot(rayPosNormalized, rayDir);
+        float C = dot(rayPosNormalized, rayPosNormalized) - 1.0; // 1.0 = r^2, as we are in normalized space
+
+        t0 = 0.5 * (-B + sqrt(B*B - 4.0 * C));
+        t0 *= frameUniforms.iblHalfExtents.x;
     }
 
     // translate results back to world space

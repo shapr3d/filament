@@ -359,7 +359,7 @@ struct VsmShadowOptions {
 
 struct IblOptions {    
     enum class IblTechnique : uint32_t {
-        IBL_INFINITE, IBL_FINITE_SPHERE, IBL_FINITE_BOX
+        IBL_INFINITE, IBL_FINITE_SPHERE, IBL_FINITE_BOX, IBL_FINITE_SPHERE_NEW
     };
 
     IblTechnique iblTechnique = IblTechnique::IBL_INFINITE;

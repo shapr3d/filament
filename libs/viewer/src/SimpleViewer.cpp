@@ -1463,6 +1463,10 @@ void SimpleViewer::updateUserInterface() {
                 iblOptions.iblTechnique = IblOptions::IblTechnique::IBL_FINITE_SPHERE;
             }
             ImGui::SameLine();
+            if (ImGui::RadioButton("New sphere", iblOptions.iblTechnique == IblOptions::IblTechnique::IBL_FINITE_SPHERE_NEW)) {
+                iblOptions.iblTechnique = IblOptions::IblTechnique::IBL_FINITE_SPHERE_NEW;
+            }
+            ImGui::SameLine();
             if (ImGui::RadioButton("Box", iblOptions.iblTechnique == IblOptions::IblTechnique::IBL_FINITE_BOX)) {
                 iblOptions.iblTechnique = IblOptions::IblTechnique::IBL_FINITE_BOX;
             }
@@ -1482,6 +1486,15 @@ void SimpleViewer::updateUserInterface() {
                 ImGui::SliderFloat3("Box half extents", iblHalfExtents.v, -100.0f, 100.0f);
 
                 iblOptions.iblHalfExtents = iblHalfExtents;
+            }
+            else if (iblOptions.iblTechnique == IblOptions::IblTechnique::IBL_FINITE_SPHERE_NEW) {
+                static float radius = std::sqrt(iblOptions.iblHalfExtents.x);
+
+                ImGui::SliderFloat3("Sphere center", iblOptions.iblCenter.v, -10.0f, 10.0f);
+                ImGui::SliderFloat("Sphere radius", &radius, 0.0f, 256.0f);
+
+                iblOptions.iblHalfExtents.x = radius;
+                iblOptions.iblHalfExtents.y = (radius != 0.0f) ? 1.0f / radius : 1.0f;
             }
         }
         if (ImGui::CollapsingHeader("Sunlight")) {
