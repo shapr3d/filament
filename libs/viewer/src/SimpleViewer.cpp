@@ -1478,8 +1478,8 @@ void SimpleViewer::updateUserInterface() {
             else if (iblOptions.iblTechnique == IblOptions::IblTechnique::IBL_FINITE_BOX) {
                 static filament::math::float3 iblHalfExtents = iblOptions.iblHalfExtents;
 
-                ImGui::SliderFloat3("Box center", iblOptions.iblCenter.v, -10.0f, 10.0f);
-                ImGui::SliderFloat3("Box half extents", iblHalfExtents.v, -10.0f, 10.0f);
+                ImGui::SliderFloat3("Box center", iblOptions.iblCenter.v, -100.0f, 100.0f);
+                ImGui::SliderFloat3("Box half extents", iblHalfExtents.v, -100.0f, 100.0f);
 
                 iblOptions.iblHalfExtents = iblHalfExtents;
             }
