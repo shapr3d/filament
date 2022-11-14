@@ -115,6 +115,36 @@ const FMaterial* FEngine::getShaprMaterial(size_t index) const noexcept
 
 #if UTILS_HAS_THREADING
 
+FEngine* FEngine::createWithoutDriverThread(Backend backend, Platform* platform, void* sharedGLContext) {
+    SYSTRACE_ENABLE();
+    SYSTRACE_CALL();
+
+    FEngine* instance = new FEngine(backend, platform, sharedGLContext);
+
+    // initialize all fields that need an instance of FEngine
+    // (this cannot be done safely in the ctor)
+
+    // Normally we launch a thread and create the context and Driver from there (see FEngine::loop).
+    // In the single-threaded case, we do so in the here and now.
+
+    if (platform == nullptr) {
+        platform = DefaultPlatform::create(&instance->mBackend);
+        instance->mPlatform = platform;
+        instance->mOwnPlatform = true;
+    }
+    if (platform == nullptr) {
+        slog.e << "Selected backend not supported in this build." << io::endl;
+        return nullptr;
+    }
+    instance->mDriver = platform->createDriver(sharedGLContext);
+
+    // now we can initialize the largest part of the engine
+    instance->init();
+    instance->execute();
+
+    return instance;
+}
+
 void FEngine::createAsync(CreateCallback callback, void* user,
         Backend backend, Platform* platform, void* sharedGLContext) {
     SYSTRACE_ENABLE();
@@ -879,7 +909,7 @@ void* FEngine::streamAlloc(size_t size, size_t alignment) noexcept {
 bool FEngine::execute() {
 
     // wait until we get command buffers to be executed (or thread exit requested)
-    auto buffers = mCommandBufferQueue.waitForCommands();
+    auto buffers = mCommandBufferQueue.waitForCommands(mDriverThread.joinable());
     if (UTILS_UNLIKELY(buffers.empty())) {
         return false;
     }
@@ -918,6 +948,9 @@ void Engine::destroy(Engine* engine) {
 void Engine::createAsync(Engine::CreateCallback callback, void* user, Backend backend,
         Platform* platform, void* sharedGLContext) {
     FEngine::createAsync(callback, user, backend, platform, sharedGLContext);
+}
+Engine* Engine::createWithoutDriverThread(Backend backend, Platform* platform, void* sharedGLContext) {
+    return FEngine::createWithoutDriverThread(backend, platform, sharedGLContext);
 }
 
 Engine* Engine::getEngine(void* token) {
@@ -1092,7 +1125,7 @@ void* Engine::streamAlloc(size_t size, size_t alignment) noexcept {
 // The external-facing execute does a flush, and is meant only for single-threaded environments.
 // It also discards the boolean return value, which would otherwise indicate a thread exit.
 void Engine::execute() {
-    ASSERT_PRECONDITION(!UTILS_HAS_THREADING, "Execute is meant for single-threaded platforms.");
+    //ASSERT_PRECONDITION(!UTILS_HAS_THREADING, "Execute is meant for single-threaded platforms.");
     upcast(this)->flush();
     upcast(this)->execute();
 }

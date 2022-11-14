@@ -134,6 +134,9 @@ public:
             Platform* platform = nullptr, void* sharedGLContext = nullptr);
 
 #if UTILS_HAS_THREADING
+    static FEngine* createWithoutDriverThread(Backend backend = Backend::DEFAULT,
+            Platform* platform = nullptr, void* sharedGLContext = nullptr);
+
     static void createAsync(CreateCallback callback, void* user,
             Backend backend = Backend::DEFAULT,
             Platform* platform = nullptr, void* sharedGLContext = nullptr);

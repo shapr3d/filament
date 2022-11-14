@@ -234,6 +234,44 @@ public:
             Backend backend = Backend::DEFAULT,
             Platform* platform = nullptr, void* sharedGLContext = nullptr);
 
+
+    /**
+     * Creates an instance of Engine
+     *
+     * @param backend           Which driver backend to use.
+     *
+     * @param platform          A pointer to an object that implements Platform. If this is
+     *                          provided, then this object is used to create the hardware context
+     *                          and expose platform features to it.
+     *
+     *                          If not provided (or nullptr is used), an appropriate Platform
+     *                          is created automatically.
+     *
+     *                          All methods of this interface are called from filament's
+     *                          render thread, which is different from the main thread.
+     *
+     *                          The lifetime of \p platform must exceed the lifetime of
+     *                          the Engine object.
+     *
+     *  @param sharedGLContext  A platform-dependant OpenGL context used as a shared context
+     *                          when creating filament's internal context.
+     *                          Setting this parameter will force filament to use the OpenGL
+     *                          implementation (instead of Vulkan for instance).
+     *
+     *
+     * @return A pointer to the newly created Engine, or nullptr if the Engine couldn't be created.
+     *
+     * nullptr if the GPU driver couldn't be initialized, for instance if it doesn't
+     * support the right version of OpenGL or OpenGL ES.
+     *
+     * @exception utils::PostConditionPanic can be thrown if there isn't enough memory to
+     * allocate the command buffer. If exceptions are disabled, this condition if fatal and
+     * this function will abort.
+     *
+     */
+    static Engine* createWithoutDriverThread(Backend backend = Backend::DEFAULT,
+            Platform* platform = nullptr, void* sharedGLContext = nullptr);
+
     /**
      * Retrieve an Engine* from createAsync(). This must be called from the same thread than
      * Engine::createAsync() was called from.

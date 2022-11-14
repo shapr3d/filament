@@ -62,7 +62,7 @@ public:
     size_t getHighWatermark() const noexcept { return mHighWatermark; }
 
     // wait for commands to be available and returns an array containing these commands
-    std::vector<Slice> waitForCommands() const;
+    std::vector<Slice> waitForCommands(bool hasDedicatedDriverThread) const;
 
     // return the memory used by this command buffer to the circular buffer
     // WARNING: releaseBuffer() must be called in sequence of the Slices returned by
