@@ -159,6 +159,10 @@ namespace ktx {
             case KtxBundle::RGBA_S3TC_DXT1: return T::DXT1_RGBA;
             case KtxBundle::RGBA_S3TC_DXT3: return T::DXT3_RGBA;
             case KtxBundle::RGBA_S3TC_DXT5: return T::DXT5_RGBA;
+            case KtxBundle::R_RGTC_BC4_UNORM: return T::RED_RGTC1;
+            case KtxBundle::R_RGTC_BC4_SNORM: return T::SIGNED_RED_RGTC1;
+            case KtxBundle::RG_RGTC_BC5_UNORM: return T::RED_GREEN_RGTC2;
+            case KtxBundle::RG_RGTC_BC5_SNORM: return T::SIGNED_RED_GREEN_RGTC2;
             case KtxBundle::RGBA_ASTC_4x4: return T::RGBA_ASTC_4x4;
             case KtxBundle::RGBA_ASTC_5x4: return T::RGBA_ASTC_5x4;
             case KtxBundle::RGBA_ASTC_5x5: return T::RGBA_ASTC_5x5;

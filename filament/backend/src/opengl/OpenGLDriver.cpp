@@ -1479,6 +1479,9 @@ bool OpenGLDriver::isTextureFormatSupported(TextureFormat format) {
         return  ext.EXT_texture_compression_s3tc || // this is ES specific
                 ext.WEBGL_compressed_texture_s3tc; // this is WEBGL specific
     }
+    if (isRGTCCompression(format)) {
+        return  ext.EXT_texture_compression_rgtc;
+    }
     return getInternalFormat(format) != 0;
 }
 

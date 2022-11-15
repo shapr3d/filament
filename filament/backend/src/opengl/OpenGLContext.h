@@ -149,6 +149,7 @@ public:
         bool EXT_texture_compression_etc2 = false;
         bool EXT_texture_compression_s3tc = false;
         bool EXT_texture_compression_s3tc_srgb = false;
+        bool EXT_texture_compression_rgtc = false;
         bool EXT_texture_filter_anisotropic = false;
         bool EXT_texture_sRGB = false;
         bool GOOGLE_cpp_style_line_directive = false;
