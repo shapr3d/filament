@@ -26,24 +26,6 @@
 // IBL utilities
 //------------------------------------------------------------------------------
 
-void Swap(inout float a, inout float b)
-{
-    float tmp = a;
-    a = b;
-    b = tmp;
-}
-
-// Returns the two roots of Ax^2 + Bx + C = 0, assuming that A != 0
-// The returned roots (if finite) satisfy roots.x <= roots.y
-vec2 SolveQuadratic(float A, float B, float C)
-{
-    // From Numerical Recipes in C
-    float q = -0.5 * (B + sign(B) * sqrt(B * B - 4.0 * A * C));
-    vec2 roots = vec2(q / A, C / q);
-    if (roots.x > roots.y) Swap(roots.x, roots.y);
-    return roots;
-}
-
 vec2 IntersectAABB(vec3 rayOrigin, vec3 rayDir, vec3 boxMin, vec3 boxMax) {
     vec3 tMin = (boxMin - rayOrigin) / rayDir;
     vec3 tMax = (boxMax - rayOrigin) / rayDir;
@@ -226,12 +208,15 @@ vec3 GetAdjustedReflectedDirection(const vec3 baseDir, const vec3 normal) {
     float t0 = -1.0f;     // intersection parameter between ray and finite IBL geometry
     
     if (frameUniforms.iblTechnique == IBL_TECHNIQUE_FINITE_SPHERE) {
-        float R2 = frameUniforms.iblHalfExtents.r; // we store the squared radius to shave off a multiplication here
-        float A = 1.0; // in general, this should be dot(rayDir, rayDir) but we have just normalized it a couple of lines ago
-        float B = 2.0 * dot(rayPos, rayDir);
-        float C = dot(rayPos, rayPos) - R2;
-        vec2 roots = SolveQuadratic(A, B, C);
-        t0 = GetSmallestPositive(roots.x, roots.y);
+        // Normalize sphere-space by scaling down positions by radius. We don't scale down ray direction to preserve 
+        // the convenient A = 1 in the quadratic formula. iblHalfExtents.y contains the reciprocal of the IBL sphere radius.
+        vec3 rayPosNormalized = rayPos * frameUniforms.iblHalfExtents.y;
+
+        float B = 2.0 * dot(rayPosNormalized, rayDir);
+        float C = dot(rayPosNormalized, rayPosNormalized) - 1.0; // 1.0 = r^2, as we are in normalized space
+
+        t0 = 0.5 * (-B + sqrt(B*B - 4.0 * C));
+        t0 *= frameUniforms.iblHalfExtents.x;
     }
     else if (frameUniforms.iblTechnique == IBL_TECHNIQUE_FINITE_BOX) {
         vec2 roots = IntersectAABB(rayPos, rayDir, -frameUniforms.iblHalfExtents, frameUniforms.iblHalfExtents);
