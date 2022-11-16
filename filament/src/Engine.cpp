@@ -1126,7 +1126,6 @@ void* Engine::streamAlloc(size_t size, size_t alignment) noexcept {
 // The external-facing execute does a flush, and is meant only for single-threaded environments.
 // It also discards the boolean return value, which would otherwise indicate a thread exit.
 void Engine::execute() {
-    //ASSERT_PRECONDITION(!UTILS_HAS_THREADING, "Execute is meant for single-threaded platforms.");
     upcast(this)->flush();
     upcast(this)->execute();
 }
