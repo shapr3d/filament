@@ -125,7 +125,7 @@ FEngine* FEngine::createWithoutDriverThread(Backend backend, Platform* platform,
     // (this cannot be done safely in the ctor)
 
     // Normally we launch a thread and create the context and Driver from there (see FEngine::loop).
-    // In the single-threaded case, we do so in the here and now.
+    // In this case, we do so in the here and now.
 
     if (platform == nullptr) {
         platform = DefaultPlatform::create(&instance->mBackend);
