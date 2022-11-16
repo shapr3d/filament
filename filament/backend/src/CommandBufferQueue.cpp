@@ -110,13 +110,10 @@ void CommandBufferQueue::flush() noexcept {
 }
 
 std::vector<CommandBufferQueue::Slice> CommandBufferQueue::waitForCommands(bool hasDedicatedDriverThread) const {
-    if (!UTILS_HAS_THREADING) {
+    if (!UTILS_HAS_THREADING || !hasDedicatedDriverThread) {
         return std::move(mCommandBuffersToExecute);
     }
     std::unique_lock<utils::Mutex> lock(mLock);
-    if (!hasDedicatedDriverThread) {
-        return std::move(mCommandBuffersToExecute);
-    }
     while (mCommandBuffersToExecute.empty() && !mExitRequested) {
         mCondition.wait(lock);
     }
