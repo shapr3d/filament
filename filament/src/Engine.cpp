@@ -140,8 +140,9 @@ FEngine* FEngine::createWithoutDriverThread(Backend backend, Platform* platform,
 
     // now we can initialize the largest part of the engine
     instance->init();
+    instance->flush();
     instance->execute();
-
+    
     return instance;
 }
 
