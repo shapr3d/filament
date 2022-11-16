@@ -90,7 +90,6 @@ Driver* PlatformEGL::createDriver(void* sharedContext) noexcept {
             slog.e << "eglInitialize failed" << io::endl;
             return nullptr;
         }
-
     }
 
     importGLESExtensionsEntryPoints();
@@ -315,10 +314,6 @@ void PlatformEGL::makeCurrent(Platform::SwapChain* drawSwapChain,
     if (drawSur != EGL_NO_SURFACE || readSur != EGL_NO_SURFACE) {
         makeCurrent(drawSur, readSur);
     }
-}
-
-void PlatformEGL::makeCurrentOffscreen() noexcept {
-    makeCurrent(mEGLDummySurface, mEGLDummySurface);
 }
 
 void PlatformEGL::commit(Platform::SwapChain* swapChain) noexcept {

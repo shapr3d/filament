@@ -249,10 +249,6 @@ void PlatformWGL::makeCurrent(Platform::SwapChain* drawSwapChain,
     }
 }
 
-void PlatformWGL::makeCurrentOffscreen() noexcept {
-    assert_invariant(false);
-}
-
 void PlatformWGL::commit(Platform::SwapChain* swapChain) noexcept {
     auto* wglSwapChain = (WGLSwapChain*) swapChain;
     HDC hdc = wglSwapChain->hDc;

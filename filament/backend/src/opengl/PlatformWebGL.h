@@ -38,7 +38,6 @@ public:
     SwapChain* createSwapChain(uint32_t width, uint32_t height, uint64_t& flags) noexcept final override;
     void destroySwapChain(SwapChain* swapChain) noexcept final override;
     void makeCurrent(SwapChain* drawSwapChain, SwapChain* readSwapChain) noexcept final override;
-    void makeCurrentOffscreen() noexcept final override;
     void commit(SwapChain* swapChain) noexcept final override;
 
     Fence* createFence() noexcept final override;

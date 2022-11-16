@@ -418,12 +418,6 @@ DECL_DRIVER_API_N(commit,
         backend::SwapChainHandle, sch)
 
 /*
- * Offscreen
- */
-
-DECL_DRIVER_API_0(makeCurrentOffscreen)
-
-/*
  * Setting rendering state
  * -----------------------
  */
