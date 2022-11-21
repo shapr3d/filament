@@ -90,6 +90,7 @@ Driver* PlatformEGL::createDriver(void* sharedContext) noexcept {
             slog.e << "eglInitialize failed" << io::endl;
             return nullptr;
         }
+
     }
 
     importGLESExtensionsEntryPoints();
