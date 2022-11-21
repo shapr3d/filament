@@ -614,7 +614,6 @@ void SimpleViewer::updateIndirectLight() {
     if (mIndirectLight) {
         mIndirectLight->setIntensity(mSettings.lighting.iblIntensity);
         mIndirectLight->setRotation(mat3f::rotation(mSettings.lighting.iblRotation, float3{ 0, 1, 0 }));
-        mIndirectLight->setIblOptions(mSettings.lighting.iblOptions);
     }
     if (mScene->getSkybox()) {
         mScene->getSkybox()->setIntensity(mSettings.lighting.skyIntensity);
@@ -1481,14 +1480,13 @@ void SimpleViewer::updateUserInterface() {
                 ImGui::SliderFloat3("Sphere center", iblOptions.iblCenter.v, -10.0f, 10.0f);
                 ImGui::SliderFloat("Sphere radius", &radius, 0.0f, 256.0f);
 
-                iblOptions.iblHalfExtents.x = radius;
-                iblOptions.iblHalfExtents.y = (radius != 0.0f) ? 1.0f / radius : 1.0f;
+                iblOptions.iblHalfExtents.x = radius * radius;
             }
             else if (iblOptions.iblTechnique == IblOptions::IblTechnique::IBL_FINITE_BOX) {
                 static filament::math::float3 iblHalfExtents = iblOptions.iblHalfExtents;
 
-                ImGui::SliderFloat3("Box center", iblOptions.iblCenter.v, -100.0f, 100.0f);
-                ImGui::SliderFloat3("Box half extents", iblHalfExtents.v, -100.0f, 100.0f);
+                ImGui::SliderFloat3("Box center", iblOptions.iblCenter.v, -10.0f, 10.0f);
+                ImGui::SliderFloat3("Box half extents", iblHalfExtents.v, -10.0f, 10.0f);
 
                 iblOptions.iblHalfExtents = iblHalfExtents;
             }
