@@ -126,7 +126,7 @@ int main(int argc, char *argv[]) {
     const Uint64 kCounterFrequency = SDL_GetPerformanceFrequency();
 
     while (nClosed < windows.size()) {
-        if (!UTILS_HAS_THREADING) {
+        if (FILAMENT_THREADING_MODE != FILAMENT_THREADING_MODE_ASYNCHRONOUS_DRIVER) {
             engine->execute();
         }
 
