@@ -819,6 +819,14 @@ bool FTexture::validatePixelFormatAndType(TextureFormat internalFormat,
         case TextureFormat::DXT1_SRGBA:
         case TextureFormat::DXT3_SRGBA:
         case TextureFormat::DXT5_SRGBA:
+        case TextureFormat::RED_RGTC1:
+        case TextureFormat::SIGNED_RED_RGTC1:
+        case TextureFormat::RED_GREEN_RGTC2:
+        case TextureFormat::SIGNED_RED_GREEN_RGTC2:
+        case TextureFormat::RGB_BPTC_SIGNED_FLOAT:
+        case TextureFormat::RGB_BPTC_UNSIGNED_FLOAT:
+        case TextureFormat::RGBA_BPTC_UNORM:
+        case TextureFormat::SRGB_ALPHA_BPTC_UNORM:
         case TextureFormat::RGBA_ASTC_4x4:
         case TextureFormat::RGBA_ASTC_5x4:
         case TextureFormat::RGBA_ASTC_5x5:
@@ -1019,6 +1027,14 @@ bool FTexture::validatePixelFormatAndType(TextureFormat internalFormat,
         case TextureFormat::DXT1_SRGBA:
         case TextureFormat::DXT3_SRGBA:
         case TextureFormat::DXT5_SRGBA:
+        case TextureFormat::RED_RGTC1:
+        case TextureFormat::SIGNED_RED_RGTC1:
+        case TextureFormat::RED_GREEN_RGTC2:
+        case TextureFormat::SIGNED_RED_GREEN_RGTC2:
+        case TextureFormat::RGB_BPTC_SIGNED_FLOAT:
+        case TextureFormat::RGB_BPTC_UNSIGNED_FLOAT:
+        case TextureFormat::RGBA_BPTC_UNORM:
+        case TextureFormat::SRGB_ALPHA_BPTC_UNORM:
         case TextureFormat::RGBA_ASTC_4x4:
         case TextureFormat::RGBA_ASTC_5x4:
         case TextureFormat::RGBA_ASTC_5x5:
