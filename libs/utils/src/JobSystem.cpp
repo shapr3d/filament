@@ -140,7 +140,7 @@ JobSystem::JobSystem(const size_t userThreadCount, const size_t adoptableThreads
     // make sure we have at least one thread in the thread pool
     threadPoolCount = std::max(1, threadPoolCount);
     // and also limit the pool to 32 threads
-    threadPoolCount = std::min(UTILS_HAS_THREADING ? 32 : 0, threadPoolCount);
+    threadPoolCount = std::min((FILAMENT_THREADING_MODE != FILAMENT_THREADING_MODE_SINGLE_THREADED) ? 32 : 0, threadPoolCount);
 
     mThreadStates = aligned_vector<ThreadState>(threadPoolCount + adoptableThreadsCount);
     mThreadCount = uint16_t(threadPoolCount);
