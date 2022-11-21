@@ -240,3 +240,4 @@ void getPixelInfo(PixelDataFormat format, PixelDataType type, size_t& outCompone
 
 
 } // namespace test
+
