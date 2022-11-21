@@ -64,7 +64,7 @@ void BackendTest::initializeDriver() {
 
 void BackendTest::executeCommands() {
     commandBufferQueue.flush();
-    auto buffers = commandBufferQueue.waitForCommands(true);
+    auto buffers = commandBufferQueue.waitForCommands();
     for (auto& item : buffers) {
         if (UTILS_LIKELY(item.begin)) {
             commandStream.execute(item.begin);

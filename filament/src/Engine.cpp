@@ -886,7 +886,7 @@ void* FEngine::streamAlloc(size_t size, size_t alignment) noexcept {
 bool FEngine::execute() {
 
     // wait until we get command buffers to be executed (or thread exit requested)
-    auto buffers = mCommandBufferQueue.waitForCommands(mDriverThread.joinable());
+    auto buffers = mCommandBufferQueue.waitForCommands();
     if (UTILS_UNLIKELY(buffers.empty())) {
         return false;
     }
