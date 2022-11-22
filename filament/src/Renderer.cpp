@@ -125,7 +125,7 @@ void FRenderer::terminate(FEngine& engine) {
     if (FILAMENT_THREADING_MODE == FILAMENT_THREADING_MODE_ASYNCHRONOUS_DRIVER) {
         Fence::waitAndDestroy(engine.createFence(FFence::Type::SOFT));
     } else {
-        // In single threaded mode, allow recently-created objects (e.g. no-op fences in Skipper)
+        // In single threaded/synchronous mode, allow recently-created objects (e.g. no-op fences in Skipper)
         // to initialize themselves, otherwise the engine tries to destroy invalid handles.
         engine.execute();
     }

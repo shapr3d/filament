@@ -72,7 +72,7 @@ FEngine* FEngine::create(Backend backend, Platform* platform, void* sharedGLCont
     // (this cannot be done safely in the ctor)
 
     // Normally we launch a thread and create the context and Driver from there (see FEngine::loop).
-    // In the single-threaded case, we do so in the here and now.
+    // In the single-threaded/synchronous case, we do so in the here and now.
     if (FILAMENT_THREADING_MODE != FILAMENT_THREADING_MODE_ASYNCHRONOUS_DRIVER) {
         if (platform == nullptr) {
             platform = DefaultPlatform::create(&instance->mBackend);
