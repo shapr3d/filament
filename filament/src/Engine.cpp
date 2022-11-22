@@ -193,9 +193,9 @@ FEngine::FEngine(Backend backend, Platform* platform, void* sharedGLContext) :
     mJobSystem.adopt();
 
     slog.i << "FEngine (" << sizeof(void*) * 8 << " bits) created at " << this << " ";
-    #if FILAMENT_THREADING_MODE == FILAMENT_THREADING_MODE_SINGLE_THREADED:
+    #if FILAMENT_THREADING_MODE == FILAMENT_THREADING_MODE_SINGLE_THREADED
             slog.i << "(threading mode: single-threaded)" << io::endl;
-    #elif FILAMENT_THREADING_MODE == FILAMENT_THREADING_MODE_SYNCHRONOUS_DRIVER:
+    #elif FILAMENT_THREADING_MODE == FILAMENT_THREADING_MODE_SYNCHRONOUS_DRIVER
             slog.i << "(threading mode: multi-threaded with synchronous driver)" << io::endl;
     #else
             slog.i << "(threading mode: multi-threaded with asynchronous driver)" << io::endl;
