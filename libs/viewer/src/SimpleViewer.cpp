@@ -867,6 +867,14 @@ const char* SimpleViewer::formatToName(filament::Texture::InternalFormat format)
     case filament::Texture::InternalFormat::DXT1_SRGBA: return "DXT1_SRGBA";
     case filament::Texture::InternalFormat::DXT3_SRGBA: return "DXT3_SRGBA";
     case filament::Texture::InternalFormat::DXT5_SRGBA: return "DXT5_SRGBA";
+    case filament::Texture::InternalFormat::RED_RGTC1: return "RED_RGTC1";
+    case filament::Texture::InternalFormat::SIGNED_RED_RGTC1: return "SIGNED_RED_RGTC1";
+    case filament::Texture::InternalFormat::RED_GREEN_RGTC2: return "RED_GREEN_RGTC2";
+    case filament::Texture::InternalFormat::SIGNED_RED_GREEN_RGTC2: return "SIGNED_RED_GREEN_RGTC2";
+    case filament::Texture::InternalFormat::RGB_BPTC_SIGNED_FLOAT: return "RGB_BPTC_SIGNED_FLOAT";
+    case filament::Texture::InternalFormat::RGB_BPTC_UNSIGNED_FLOAT: return "RGB_BPTC_UNSIGNED_FLOAT";
+    case filament::Texture::InternalFormat::RGBA_BPTC_UNORM: return "RGBA_BPTC_UNORM";
+    case filament::Texture::InternalFormat::SRGB_ALPHA_BPTC_UNORM: return "SRGB_ALPHA_BPTC_UNORM";
     case filament::Texture::InternalFormat::RGBA_ASTC_4x4: return "RGBA_ASTC_4x4";
     case filament::Texture::InternalFormat::RGBA_ASTC_5x4: return "RGBA_ASTC_5x4";
     case filament::Texture::InternalFormat::RGBA_ASTC_5x5: return "RGBA_ASTC_5x5";

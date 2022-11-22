@@ -159,6 +159,14 @@ namespace ktx {
             case KtxBundle::RGBA_S3TC_DXT1: return T::DXT1_RGBA;
             case KtxBundle::RGBA_S3TC_DXT3: return T::DXT3_RGBA;
             case KtxBundle::RGBA_S3TC_DXT5: return T::DXT5_RGBA;
+            case KtxBundle::R_RGTC_BC4_UNORM: return T::RED_RGTC1;
+            case KtxBundle::R_RGTC_BC4_SNORM: return T::SIGNED_RED_RGTC1;
+            case KtxBundle::RG_RGTC_BC5_UNORM: return T::RED_GREEN_RGTC2;
+            case KtxBundle::RG_RGTC_BC5_SNORM: return T::SIGNED_RED_GREEN_RGTC2;
+            case KtxBundle::RGBA_BPTC_BC7: return T::RGBA_BPTC_UNORM;
+            case KtxBundle::SRGB8_ALPHA8_BPTC_BC7: return T::SRGB_ALPHA_BPTC_UNORM;
+            case KtxBundle::RGB_BPTC_BC6H_SNORM: return T::RGB_BPTC_SIGNED_FLOAT;
+            case KtxBundle::RGB_BPTC_BC6H_UNORM: return T::RGB_BPTC_UNSIGNED_FLOAT;
             case KtxBundle::RGBA_ASTC_4x4: return T::RGBA_ASTC_4x4;
             case KtxBundle::RGBA_ASTC_5x4: return T::RGBA_ASTC_5x4;
             case KtxBundle::RGBA_ASTC_5x5: return T::RGBA_ASTC_5x5;
@@ -290,6 +298,10 @@ namespace ktx {
                 return Texture::InternalFormat::DXT3_SRGBA;
             case Texture::InternalFormat::DXT5_RGBA:
                 return Texture::InternalFormat::DXT5_SRGBA;
+
+            // BC7
+            case Texture::InternalFormat::RGBA_BPTC_UNORM:
+                return Texture::InternalFormat::SRGB_ALPHA_BPTC_UNORM;
 
             default:
                 return format;

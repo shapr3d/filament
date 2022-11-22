@@ -124,7 +124,6 @@ MTLPixelFormat getMetalFormat(MetalContext* context, TextureFormat format) noexc
     }
 #endif
 
-#if !defined(FILAMENT_IOS_SIMULATOR) || TARGET_CPU_ARM64
     if (context->highestSupportedGpuFamily.apple >= 2) {
         if (@available(macOS 11.0, macCatalyst 14.0, *)) {
             if (@available(iOS 13.0, *)) {
@@ -204,7 +203,6 @@ MTLPixelFormat getMetalFormat(MetalContext* context, TextureFormat format) noexc
             }
         }
     }
-#endif
 
     // DXT (BC) formats are only available on macOS desktop and Mac Catalyst.
     // See https://developer.apple.com/metal/Metal-Feature-Set-Tables.pdf
@@ -220,6 +218,16 @@ MTLPixelFormat getMetalFormat(MetalContext* context, TextureFormat format) noexc
 
             case TextureFormat::DXT1_RGB: return MTLPixelFormatInvalid;
             case TextureFormat::DXT1_SRGB: return MTLPixelFormatInvalid;
+
+            case TextureFormat::RED_RGTC1:              return MTLPixelFormatBC4_RUnorm;
+            case TextureFormat::SIGNED_RED_RGTC1:       return MTLPixelFormatBC4_RSnorm;
+            case TextureFormat::RED_GREEN_RGTC2:        return MTLPixelFormatBC5_RGUnorm;
+            case TextureFormat::SIGNED_RED_GREEN_RGTC2: return MTLPixelFormatBC5_RGSnorm;
+
+            case TextureFormat::RGB_BPTC_SIGNED_FLOAT:      return MTLPixelFormatBC6H_RGBFloat;
+            case TextureFormat::RGB_BPTC_UNSIGNED_FLOAT:    return MTLPixelFormatBC6H_RGBUfloat;
+            case TextureFormat::RGBA_BPTC_UNORM:            return MTLPixelFormatBC7_RGBAUnorm;
+            case TextureFormat::SRGB_ALPHA_BPTC_UNORM:      return MTLPixelFormatBC7_RGBAUnorm_sRGB;
             default: break;
         }
     }
