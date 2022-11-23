@@ -216,7 +216,7 @@ void FilamentApp::run(const Config& config, SetupCallback setupCallback,
             cameraFocalLength = mCameraFocalLength;
         }
 
-        if (!UTILS_HAS_THREADING) {
+        if (FILAMENT_THREADING_MODE != FILAMENT_THREADING_MODE_ASYNCHRONOUS_DRIVER) {
             mEngine->execute();
         }
 

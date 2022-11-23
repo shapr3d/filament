@@ -321,7 +321,7 @@ void ImGuiHelper::populateVertexData(size_t bufferIndex, size_t vbSizeInBytes, v
 }
 
 void ImGuiHelper::syncThreads() {
-#if UTILS_HAS_THREADING
+#if FILAMENT_THREADING_MODE == FILAMENT_THREADING_MODE_ASYNCHRONOUS_DRIVER
     if (!mHasSynced) {
         // This is called only when ImGui needs to grow a vertex buffer, which occurs a few times
         // after launching and rarely (if ever) after that.

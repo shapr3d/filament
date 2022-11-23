@@ -276,11 +276,6 @@ void PlatformGLX::makeCurrent(
             (GLXDrawable)drawSwapChain, (GLXDrawable)readSwapChain, mGLXContext);
 }
 
-void PlatformGLX::makeCurrentOffscreen() noexcept {
-    g_glx.setCurrentContext(mGLXDisplay,
-            (GLXDrawable)mDummySurface, (GLXDrawable)mDummySurface, mGLXContext);
-}
-
 void PlatformGLX::commit(Platform::SwapChain* swapChain) noexcept {
     g_glx.swapBuffers(mGLXDisplay, (GLXDrawable)swapChain);
 }

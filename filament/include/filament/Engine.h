@@ -189,7 +189,7 @@ public:
     static Engine* create(Backend backend = Backend::DEFAULT,
             Platform* platform = nullptr, void* sharedGLContext = nullptr);
 
-#if UTILS_HAS_THREADING
+#if FILAMENT_THREADING_MODE == FILAMENT_THREADING_MODE_ASYNCHRONOUS_DRIVER
     /**
      * A callback used with Engine::createAsync() called once the engine is initialized and it is
      * safe to call Engine::getEngine(token). This callback is invoked from an arbitrary worker

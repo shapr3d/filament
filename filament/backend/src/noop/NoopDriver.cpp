@@ -264,9 +264,6 @@ void NoopDriver::setRenderPrimitiveRange(Handle<HwRenderPrimitive> rph,
 void NoopDriver::makeCurrent(Handle<HwSwapChain> drawSch, Handle<HwSwapChain> readSch) {
 }
 
-void NoopDriver::makeCurrentOffscreen(int) {
-}
-
 void NoopDriver::commit(Handle<HwSwapChain> sch) {
 }
 

@@ -536,14 +536,14 @@ float ResourceLoader::asyncGetLoadProgress() const {
 }
 
 void ResourceLoader::asyncUpdateLoad() {
-    if (!UTILS_HAS_THREADING) {
+    if (FILAMENT_THREADING_MODE == FILAMENT_THREADING_MODE_SINGLE_THREADED) {
         pImpl->decodeSingleTexture();
     }
     pImpl->uploadPendingTextures();
 }
 
 void ResourceLoader::Impl::decodeSingleTexture() {
-    assert(!UTILS_HAS_THREADING);
+    assert(FILAMENT_THREADING_MODE == FILAMENT_THREADING_MODE_SINGLE_THREADED);
     int w, h, c;
 
     // Check if any buffer-based textures haven't been decoded yet.
@@ -784,7 +784,7 @@ bool ResourceLoader::Impl::createTextures(bool async) {
     // threaded systems, it is usually fine to create jobs because the job system will simply
     // execute serially. However if the client requests async behavior, then we need to wait
     // until subsequent calls to asyncUpdateLoad().
-    if (!UTILS_HAS_THREADING && async) {
+    if (FILAMENT_THREADING_MODE == FILAMENT_THREADING_MODE_SINGLE_THREADED && async) {
         return true;
     }
 

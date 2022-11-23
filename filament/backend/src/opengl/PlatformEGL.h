@@ -40,7 +40,6 @@ public:
     SwapChain* createSwapChain(uint32_t width, uint32_t height, uint64_t& flags) noexcept override;
     void destroySwapChain(SwapChain* swapChain) noexcept override;
     void makeCurrent(SwapChain* drawSwapChain, SwapChain* readSwapChain) noexcept override;
-    void makeCurrentOffscreen() noexcept override;
     void commit(SwapChain* swapChain) noexcept override;
 
     bool canCreateFence() noexcept override { return true; }

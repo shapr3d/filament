@@ -110,10 +110,14 @@ void CommandBufferQueue::flush() noexcept {
 }
 
 std::vector<CommandBufferQueue::Slice> CommandBufferQueue::waitForCommands() const {
-    if (!UTILS_HAS_THREADING) {
+    if (FILAMENT_THREADING_MODE == FILAMENT_THREADING_MODE_SINGLE_THREADED) {
         return std::move(mCommandBuffersToExecute);
     }
     std::unique_lock<utils::Mutex> lock(mLock);
+    if (FILAMENT_THREADING_MODE == FILAMENT_THREADING_MODE_SYNCHRONOUS_DRIVER) {
+        // The circular buffer should only be written and read from the driver thread, but just to be sure we lock the mutex here
+        return std::move(mCommandBuffersToExecute);
+    }
     while (mCommandBuffersToExecute.empty() && !mExitRequested) {
         mCondition.wait(lock);
     }

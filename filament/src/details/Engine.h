@@ -133,7 +133,7 @@ public:
     static FEngine* create(Backend backend = Backend::DEFAULT,
             Platform* platform = nullptr, void* sharedGLContext = nullptr);
 
-#if UTILS_HAS_THREADING
+#if FILAMENT_THREADING_MODE == FILAMENT_THREADING_MODE_ASYNCHRONOUS_DRIVER
     static void createAsync(CreateCallback callback, void* user,
             Backend backend = Backend::DEFAULT,
             Platform* platform = nullptr, void* sharedGLContext = nullptr);

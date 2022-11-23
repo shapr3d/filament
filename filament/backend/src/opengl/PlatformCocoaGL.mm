@@ -254,8 +254,6 @@ void PlatformCocoaGL::makeCurrent(Platform::SwapChain* drawSwapChain,
     swapChain->previousWindowFrame = currentWindowFrame;
 }
 
-void PlatformCocoaGL::makeCurrentOffscreen() noexcept {}
-
 void PlatformCocoaGL::commit(Platform::SwapChain* swapChain) noexcept {
     [pImpl->mGLContext flushBuffer];
 }

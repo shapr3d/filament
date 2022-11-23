@@ -17,6 +17,8 @@ option(FILAMENT_USE_ANGLE "Compile Filament against ANGLE (Windows only!)" OFF)
 
 option(FILAMENT_USE_SWIFTSHADER "Compile Filament against SwiftShader" OFF)
 
+option(FILAMENT_NO_DRIVER_THREAD "Compile Filament without asynchronous driver thread." OFF)
+
 option(FILAMENT_ENABLE_LTO "Enable link-time optimizations if supported by the compiler" OFF)
 
 option(FILAMENT_SKIP_SAMPLES "Don't build samples" OFF)
@@ -266,6 +268,10 @@ endif()
 
 if (FILAMENT_USE_SWIFTSHADER)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DFILAMENT_USE_SWIFTSHADER")
+endif()
+ 
+if (FILAMENT_NO_DRIVER_THREAD)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DFILAMENT_NO_DRIVER_THREAD")
 endif()
 
 if (WIN32)

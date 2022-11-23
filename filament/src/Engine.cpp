@@ -72,8 +72,8 @@ FEngine* FEngine::create(Backend backend, Platform* platform, void* sharedGLCont
     // (this cannot be done safely in the ctor)
 
     // Normally we launch a thread and create the context and Driver from there (see FEngine::loop).
-    // In the single-threaded case, we do so in the here and now.
-    if (!UTILS_HAS_THREADING) {
+    // In the single-threaded/synchronous case, we do so in the here and now.
+    if (FILAMENT_THREADING_MODE != FILAMENT_THREADING_MODE_ASYNCHRONOUS_DRIVER) {
         if (platform == nullptr) {
             platform = DefaultPlatform::create(&instance->mBackend);
             instance->mPlatform = platform;
@@ -101,7 +101,7 @@ FEngine* FEngine::create(Backend backend, Platform* platform, void* sharedGLCont
     // now we can initialize the largest part of the engine
     instance->init();
 
-    if (!UTILS_HAS_THREADING) {
+    if (FILAMENT_THREADING_MODE != FILAMENT_THREADING_MODE_ASYNCHRONOUS_DRIVER) {
         instance->execute();
     }
 
@@ -113,7 +113,7 @@ const FMaterial* FEngine::getShaprMaterial(size_t index) const noexcept
     return mShaprGeneralMaterials[index];
 }
 
-#if UTILS_HAS_THREADING
+#if FILAMENT_THREADING_MODE == FILAMENT_THREADING_MODE_ASYNCHRONOUS_DRIVER
 
 void FEngine::createAsync(CreateCallback callback, void* user,
         Backend backend, Platform* platform, void* sharedGLContext) {
@@ -191,8 +191,14 @@ FEngine::FEngine(Backend backend, Platform* platform, void* sharedGLContext) :
     // (it may not be the case)
     mJobSystem.adopt();
 
-    slog.i << "FEngine (" << sizeof(void*) * 8 << " bits) created at " << this << " "
-           << "(threading is " << (UTILS_HAS_THREADING ? "enabled)" : "disabled)") << io::endl;
+    slog.i << "FEngine (" << sizeof(void*) * 8 << " bits) created at " << this << " ";
+    #if FILAMENT_THREADING_MODE == FILAMENT_THREADING_MODE_SINGLE_THREADED
+            slog.i << "(threading mode: single-threaded)" << io::endl;
+    #elif FILAMENT_THREADING_MODE == FILAMENT_THREADING_MODE_SYNCHRONOUS_DRIVER
+            slog.i << "(threading mode: multi-threaded with synchronous driver)" << io::endl;
+    #else
+            slog.i << "(threading mode: multi-threaded with asynchronous driver)" << io::endl;
+    #endif
 }
 
 uint32_t FEngine::getJobSystemThreadPoolSize() noexcept {
@@ -389,7 +395,7 @@ void FEngine::shutdown() {
 
     // now wait for all pending commands to be executed and the thread to exit
     mCommandBufferQueue.requestExit();
-    if (!UTILS_HAS_THREADING) {
+    if (FILAMENT_THREADING_MODE != FILAMENT_THREADING_MODE_ASYNCHRONOUS_DRIVER) {
         execute();
         getDriverApi().terminate();
     } else {
@@ -914,7 +920,7 @@ void Engine::destroy(Engine* engine) {
     FEngine::destroy(upcast(engine));
 }
 
-#if UTILS_HAS_THREADING
+#if FILAMENT_THREADING_MODE == FILAMENT_THREADING_MODE_ASYNCHRONOUS_DRIVER
 void Engine::createAsync(Engine::CreateCallback callback, void* user, Backend backend,
         Platform* platform, void* sharedGLContext) {
     FEngine::createAsync(callback, user, backend, platform, sharedGLContext);
@@ -1092,7 +1098,7 @@ void* Engine::streamAlloc(size_t size, size_t alignment) noexcept {
 // The external-facing execute does a flush, and is meant only for single-threaded environments.
 // It also discards the boolean return value, which would otherwise indicate a thread exit.
 void Engine::execute() {
-    ASSERT_PRECONDITION(!UTILS_HAS_THREADING, "Execute is meant for single-threaded platforms.");
+    ASSERT_PRECONDITION(FILAMENT_THREADING_MODE != FILAMENT_THREADING_MODE_ASYNCHRONOUS_DRIVER, "Execute isn't meant for asynchronous driver.");
     upcast(this)->flush();
     upcast(this)->execute();
 }

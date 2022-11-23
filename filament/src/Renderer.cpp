@@ -122,10 +122,10 @@ void FRenderer::terminate(FEngine& engine) {
     // before we can destroy this Renderer's resources, we must make sure
     // that all pending commands have been executed (as they could reference data in this
     // instance, e.g. Fences, Callbacks, etc...)
-    if (UTILS_HAS_THREADING) {
+    if (FILAMENT_THREADING_MODE == FILAMENT_THREADING_MODE_ASYNCHRONOUS_DRIVER) {
         Fence::waitAndDestroy(engine.createFence(FFence::Type::SOFT));
     } else {
-        // In single threaded mode, allow recently-created objects (e.g. no-op fences in Skipper)
+        // In single threaded/synchronous mode, allow recently-created objects (e.g. no-op fences in Skipper)
         // to initialize themselves, otherwise the engine tries to destroy invalid handles.
         engine.execute();
     }
@@ -172,7 +172,6 @@ void FRenderer::renderStandaloneView(FView const* view) {
         engine.prepare();
 
         FEngine::DriverApi& driver = engine.getDriverApi();
-        driver.makeCurrentOffscreen();
         driver.beginFrame(steady_clock::now().time_since_epoch().count(), mFrameId);
 
         renderInternal(view);
@@ -1163,7 +1162,7 @@ void FRenderer::endFrame() {
     FEngine& engine = getEngine();
     FEngine::DriverApi& driver = engine.getDriverApi();
 
-    if (UTILS_HAS_THREADING) {
+    if (FILAMENT_THREADING_MODE != FILAMENT_THREADING_MODE_SINGLE_THREADED) {
         // on debug builds this helps catching cases where we're writing to
         // the buffer form another thread, which is currently not allowed.
         driver.debugThreading();
