@@ -102,7 +102,6 @@ FEngine* FEngine::create(Backend backend, Platform* platform, void* sharedGLCont
     instance->init();
 
     if (FILAMENT_THREADING_MODE != FILAMENT_THREADING_MODE_ASYNCHRONOUS_DRIVER) {
-        instance->flush();
         instance->execute();
     }
 
