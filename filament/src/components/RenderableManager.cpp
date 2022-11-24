@@ -373,6 +373,7 @@ void FRenderableManager::create(
             }
         }
     }
+    engine.flushIfNeeded();
 }
 
 // this destroys a single component from an entity
