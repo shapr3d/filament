@@ -112,6 +112,6 @@ vec3 uintToColorDebug(uint v) {
         return vec3(0.0, 1.0, 1.0);     // cyan
     }
 
-    // fallback to handle no all code-paths return warnings
+    // fallback to handle "not all code-paths return" warnings
     return vec3(0.0, 0.0, 0.0);
 }
