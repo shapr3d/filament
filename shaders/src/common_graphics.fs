@@ -111,4 +111,7 @@ vec3 uintToColorDebug(uint v) {
     } else if (v == 5u) {
         return vec3(0.0, 1.0, 1.0);     // cyan
     }
+
+    // fallback to handle no all code-paths return warnings
+    return vec3(0.0, 0.0, 0.0);
 }
