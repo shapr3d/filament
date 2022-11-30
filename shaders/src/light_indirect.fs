@@ -18,10 +18,6 @@
 
 #define IBL_INTEGRATION_IMPORTANCE_SAMPLING_COUNT   64
 
-#if ((defined(MATERIAL_HAS_TRANSMISSION) && defined(HAS_REFRACTION)) || !defined(BLEND_MODE_OPAQUE))
-#define IS_TRANSPARENT_OR_REFRACTIVE
-#endif
-
 //------------------------------------------------------------------------------
 // IBL utilities
 //------------------------------------------------------------------------------
@@ -659,8 +655,7 @@ void applyRefraction(
 #if REFRACTION_MODE == REFRACTION_MODE_CUBEMAP
     // when reading from the cubemap, we are not pre-exposed so we apply iblLuminance
     // which is not the case when we'll read from the screen-space buffer
-    vec3 Ft = prefilteredRadiance(ray.direction, perceptualRoughness) * frameUniforms.iblLuminance;
-    float at = 1.0;
+    vec4 Fat = vec4(prefilteredRadiance(ray.direction, perceptualRoughness) * frameUniforms.iblLuminance, 1.0);
 #else
     // compute the point where the ray exits the medium, if needed
     vec4 p = vec4(frameUniforms.clipFromWorldMatrix * vec4(ray.position, 1.0));
@@ -676,14 +671,26 @@ void applyRefraction(
     float lod = max(0.0, 2.0 * log2(tweakedPerceptualRoughness) + frameUniforms.refractionLodOffset);
 
     vec4 Fat = textureLod(light_ssr, p.xy, lod);
-    float at = Fat.a;
-#if defined(IS_TRANSPARENT_OR_REFRACTIVE)
-    vec3 Ft = mix(vec3(1.0), Fat.rgb, at);
-#else
-    vec3 Ft = Fat.rgb;
 #endif
 
-#endif
+    vec3 Ft;
+    float at;
+    if (frameUniforms.needsAlphaChannel == 1.0) {
+        // Bias transparent view using the following formula:
+        // https://twitter.com/garrettkjohnson/status/1526645080525705216
+        const vec4 backgroundColor = vec4(1.0);
+        const float opacity = 0.4;
+        float invOpacity = 1.0 - opacity;
+        float totalAlpha = Fat.a * invOpacity + backgroundColor.a * opacity;
+
+        Ft =
+            Fat.rgb * (invOpacity * Fat.a / totalAlpha) +
+            backgroundColor.rgb * (opacity    * backgroundColor.a / totalAlpha);
+        at = totalAlpha;
+    } else {
+        Ft = Fat.rgb;
+        at = Fat.a;
+    }
 
     // base color changes the amount of light passing through the boundary
     Ft *= pixel.diffuseColor;
@@ -700,8 +707,6 @@ void applyRefraction(
     Fr *= material.specularIntensity * frameUniforms.iblLuminance;
     Fd *= frameUniforms.iblLuminance;
     color += Fr + mix(Fd, Ft, pixel.transmission);
-
-    at += (1.0 - at) * (1.0 - luminance(pixel.diffuseColor.rgb));
     alpha *= mix(1.0, at, pixel.transmission);
 }
 #endif
