@@ -267,13 +267,19 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
         scale = 1.0f;
     }
 
+    const bool blendModeTranslucent = view.getBlendMode() == BlendMode::TRANSLUCENT;
+    // If the swapchain is transparent or if we blend into it, we need to allocate our intermediate
+    // buffers with an alpha channel.
+    const bool needsAlphaChannel =
+            (mSwapChain ? mSwapChain->isTransparent() : false) || blendModeTranslucent;
+
     const bool scaled = any(notEqual(scale, float2(1.0f)));
     filament::Viewport svp = vp.scale(scale);
     if (svp.empty()) {
         return;
     }
 
-    view.prepare(engine, driver, arena, svp, getShaderUserTime());
+    view.prepare(engine, driver, arena, svp, getShaderUserTime(), needsAlphaChannel);
 
     view.prepareUpscaler(scale);
 
@@ -404,11 +410,7 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
         fgDepthTexture = importTexture(depthTexture, "depthStencil");
     }
 
-    const bool blendModeTranslucent = view.getBlendMode() == BlendMode::TRANSLUCENT;
     const bool blending = blendModeTranslucent;
-    // If the swapchain is transparent or if we blend into it, we need to allocate our intermediate
-    // buffers with an alpha channel.
-    const bool needsAlphaChannel = (mSwapChain ? mSwapChain->isTransparent() : false) || blendModeTranslucent;
     const TextureFormat hdrFormat = getHdrFormat(view, needsAlphaChannel);
 
     const ColorPassConfig config{

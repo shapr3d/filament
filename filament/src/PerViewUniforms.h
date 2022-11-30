@@ -62,6 +62,8 @@ public:
     void prepareFog(const CameraInfo& camera, FogOptions const& options) noexcept;
     void prepareStructure(TextureHandle structure) noexcept;
     void prepareSSAO(TextureHandle ssao, AmbientOcclusionOptions const& options) noexcept;
+    void prepareBlending(bool needsAlphaChannel) noexcept;
+
     void prepareSSR(TextureHandle ssr, float refractionLodOffset) noexcept;
     void prepareShadowMapping(ShadowMappingUniforms const& shadowMappingUniforms,
             VsmShadowOptions const& options) noexcept;

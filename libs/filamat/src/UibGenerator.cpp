@@ -71,6 +71,7 @@ UniformInterfaceBlock const& UibGenerator::getPerViewUib() noexcept  {
             // camera
             .add("exposure",                1, UniformInterfaceBlock::Type::FLOAT, Precision::HIGH) // high precision to work around #3602 (qualcomm)
             .add("ev100",                   1, UniformInterfaceBlock::Type::FLOAT)
+            .add("needsAlphaChannel",       1, UniformInterfaceBlock::Type::FLOAT)
             // ibl
             .add("iblSH",                   9, UniformInterfaceBlock::Type::FLOAT3)
             // user time
@@ -123,7 +124,7 @@ UniformInterfaceBlock const& UibGenerator::getPerViewUib() noexcept  {
             .add("iblRotation",             1, UniformInterfaceBlock::Type::MAT4, Precision::HIGH)
 
             // bring PerViewUib to 2 KiB
-            .add("arrayPadding", 51, UniformInterfaceBlock::Type::FLOAT4)
+            .add("arrayPadding", 50, UniformInterfaceBlock::Type::FLOAT4)
             .build();
     return uib;
 }

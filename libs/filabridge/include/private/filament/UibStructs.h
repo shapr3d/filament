@@ -84,6 +84,7 @@ struct PerViewUib { // NOLINT(cppcoreguidelines-pro-type-member-init)
     float iblLuminance;
     float exposure;
     float ev100;
+    float needsAlphaChannel;
 
     alignas(16) math::float4 iblSH[9]; // actually float3 entries (std140 requires float4 alignment)
 
@@ -141,7 +142,7 @@ struct PerViewUib { // NOLINT(cppcoreguidelines-pro-type-member-init)
     math::mat4f iblRotation; // contains the IBL's rotation
 
     // bring PerViewUib to 2 KiB
-    math::float4 arrayPadding[51];
+    math::float4 arrayPadding[50];
 };
 
 // 2 KiB == 128 float4s

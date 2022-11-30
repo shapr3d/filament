@@ -162,6 +162,10 @@ void PerViewUniforms::prepareSSAO(Handle<HwTexture> ssao, AmbientOcclusionOption
     s.aoBentNormals = options.enabled && options.bentNormals ? 1.0f : 0.0f;
 }
 
+void PerViewUniforms::prepareBlending(bool needsAlphaChannel) noexcept {
+    mPerViewUb.edit().needsAlphaChannel = needsAlphaChannel ? 1.0f : 0.0f;
+}
+
 void PerViewUniforms::prepareSSR(Handle<HwTexture> ssr, float refractionLodOffset) noexcept {
     mPerViewSb.setSampler(PerViewSib::SSR, ssr, {
         .filterMag = SamplerMagFilter::LINEAR,
