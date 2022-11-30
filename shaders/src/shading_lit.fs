@@ -4,7 +4,7 @@
 
 float computeDiffuseAlpha(float a) {
 #if defined(BLEND_MODE_TRANSPARENT) || defined(BLEND_MODE_FADE) || defined(BLEND_MODE_MASKED)
-    return a;
+    return (frameUniforms.needsAlphaChannel == 1.0) ? min(1.0, a + 0.125) : a;
 #else
     return 1.0;
 #endif
