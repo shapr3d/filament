@@ -472,7 +472,7 @@ void refractionThinSphere(const PixelParams pixel,
     ray.d = d;
 }
 
-vec3 evaluateRefraction(
+vec4 evaluateRefraction(
     const PixelParams pixel,
     const vec3 n0, vec3 E) {
 
@@ -514,9 +514,9 @@ vec3 evaluateRefraction(
 #if REFRACTION_MODE == REFRACTION_MODE_CUBEMAP
     // when reading from the cubemap, we are not pre-exposed so we apply iblLuminance
     // which is not the case when we'll read from the screen-space buffer
-    vec3 Ft = prefilteredRadiance(ray.direction, perceptualRoughness) * frameUniforms.iblLuminance;
+    vec4 Fat = vec4(prefilteredRadiance(ray.direction, perceptualRoughness) * frameUniforms.iblLuminance, 1.0);
 #else
-    vec3 Ft;
+    vec4 Fat;
 
     // compute the point where the ray exits the medium, if needed
     vec4 p = vec4(getClipFromWorldMatrix() * vec4(ray.position, 1.0));
@@ -525,7 +525,7 @@ vec3 evaluateRefraction(
     // distance to camera plane
     const float invLog2sqrt5 = 0.8614;
     float lod = max(0.0, (2.0f * log2(perceptualRoughness) + frameUniforms.refractionLodOffset) * invLog2sqrt5);
-    Ft = textureLod(light_ssr, vec3(p.xy, 0.0), lod).rgb;
+    Fat = textureLod(light_ssr, vec3(p.xy, 0.0), lod);
 #endif
 
     // base color changes the amount of light passing through the boundary
