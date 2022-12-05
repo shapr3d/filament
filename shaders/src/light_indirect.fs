@@ -537,6 +537,7 @@ vec4 evaluateRefraction(
 
     // fresnel from the first interface
     Ft *= 1.0 - E;
+    at += (1.0 - at) * max3(E);
 
     // apply absorption
 #if defined(MATERIAL_HAS_ABSORPTION)
