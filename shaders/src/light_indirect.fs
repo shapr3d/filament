@@ -544,6 +544,9 @@ vec4 evaluateRefraction(
     Ft *= T;
 #endif
 
+    // bias at according to luminance
+    at += (1.0 - at) * (1.0 - luminance(pixel.diffuseColor.rgb));
+
     return vec4(Ft, at);
 }
 #endif
