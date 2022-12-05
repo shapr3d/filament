@@ -528,6 +528,10 @@ vec4 evaluateRefraction(
     Fat = textureLod(light_ssr, vec3(p.xy, 0.0), lod);
 #endif
 
+    float at = Fat.a;
+    // bias Ft towards a white background
+    vec3 Ft = mix(vec3(1.0), Fat.rgb, at);
+
     // base color changes the amount of light passing through the boundary
     Ft *= pixel.diffuseColor;
 
@@ -539,7 +543,7 @@ vec4 evaluateRefraction(
     Ft *= T;
 #endif
 
-    return Ft;
+    return vec4(Ft, at);
 }
 #endif
 
