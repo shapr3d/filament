@@ -551,7 +551,7 @@ vec4 evaluateRefraction(
 }
 #endif
 
-void evaluateIBL(const MaterialInputs material, const PixelParams pixel, inout vec3 color) {
+void evaluateIBL(const MaterialInputs material, const PixelParams pixel, inout vec3 color, inout float alpha) {
     // specular layer
     vec3 Fr = vec3(0.0f);
 
@@ -646,8 +646,8 @@ void evaluateIBL(const MaterialInputs material, const PixelParams pixel, inout v
     Fd *= frameUniforms.iblLuminance;
 
 #if defined(MATERIAL_HAS_REFRACTION)
-    vec3 Ft = evaluateRefraction(pixel, shading_normal, E);
-    Ft *= pixel.transmission;
+    vec4 Fat = evaluateRefraction(pixel, shading_normal, E);
+    vec3 Ft = Fat.rgb * pixel.transmission;
     Fd *= (1.0 - pixel.transmission);
 #endif
 
@@ -661,5 +661,6 @@ void evaluateIBL(const MaterialInputs material, const PixelParams pixel, inout v
     color.rgb += Fr + Fd;
 #if defined(MATERIAL_HAS_REFRACTION)
     color.rgb += Ft;
+    alpha *= mix(1.0, Fat.a, pixel.transmission);
 #endif
 }
