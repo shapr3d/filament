@@ -756,7 +756,7 @@ FrameGraphId<FrameGraphTexture> FRenderer::refractionPass(FrameGraph& fg,
         // In the end we get: lod = 2 * log2(perceptualRoughness) - log2(sigma0 * s * sqrt2)
         const float refractionLodOffset = -std::log2(sigma0 * s * f::SQRT2);
         const float maxPerceptualRoughness = 0.5f;
-        const uint8_t maxLod = std::ceil(2.0f * std::log2(maxPerceptualRoughness) + refractionLodOffset);
+        const uint8_t maxLod = std::max(1.0f, std::ceil(2.0f * std::log2(maxPerceptualRoughness) + refractionLodOffset));
 
         // Number of roughness levels we want.
         // TODO: If we want to limit the number of mip levels, we must reduce the initial
