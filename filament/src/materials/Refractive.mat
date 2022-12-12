@@ -217,6 +217,14 @@ material {
         {
             type : float4,
             name : ambientColor
+        },
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        // Our ASTC compressor lays out the coordinates as XXXY but our BC5 compressor lays them out as XY.
+        // This flag indicates if data is stored as XY or XXXY (so we can sample the normal map accordingly)
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        {
+            type : int,
+            name : useSwizzledNormalMaps
         }
     ],
     variables: [
