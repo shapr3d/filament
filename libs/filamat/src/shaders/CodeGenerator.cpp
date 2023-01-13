@@ -37,7 +37,7 @@ io::sstream& CodeGenerator::generateSeparator(io::sstream& out) const {
     return out;
 }
 
-io::sstream& CodeGenerator::generateProlog(io::sstream& out, ShaderType type,
+io::sstream& CodeGenerator::generateProlog(const std::string& pre, io::sstream& out, ShaderType type,
         bool hasExternalSamplers) const {
     assert(mShaderModel != ShaderModel::UNKNOWN);
     switch (mShaderModel) {
@@ -68,6 +68,7 @@ io::sstream& CodeGenerator::generateProlog(io::sstream& out, ShaderType type,
             }
             break;
     }
+    out << pre << "\n";
 
     // This allows our includer system to use the #line directive to denote the source file for
     // #included code. This way, glslang reports errors more accurately.

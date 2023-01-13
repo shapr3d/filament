@@ -59,7 +59,7 @@ public:
     utils::io::sstream& generateSeparator(utils::io::sstream& out) const;
 
     // generate prolog for the given shader
-    utils::io::sstream& generateProlog(utils::io::sstream& out, ShaderType type, bool hasExternalSamplers) const;
+    utils::io::sstream& generateProlog(const std::string& pre, utils::io::sstream& out, ShaderType type, bool hasExternalSamplers) const;
 
     utils::io::sstream& generateEpilog(utils::io::sstream& out) const;
 

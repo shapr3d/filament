@@ -26,6 +26,8 @@
 #include <sstream>
 #include <string>
 
+#include <iostream>
+
 using namespace utils;
 
 namespace matc {

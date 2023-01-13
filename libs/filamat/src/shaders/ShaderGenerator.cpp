@@ -28,6 +28,8 @@
 #include "CodeGenerator.h"
 #include "../UibGenerator.h"
 
+#include <string>
+
 using namespace filament;
 using namespace filament::backend;
 
@@ -164,6 +166,22 @@ ShaderGenerator::ShaderGenerator(
     }
 }
 
+static std::string variantToString(uint8_t variantKey) {
+    std::string result = "";
+
+    if (variantKey & filament::Variant::DIRECTIONAL_LIGHTING) result += " DIRECTIONAL_LIGHTING";
+    if (variantKey & filament::Variant::DYNAMIC_LIGHTING) result += " DYNAMIC_LIGHTING";
+    if (variantKey & filament::Variant::SHADOW_RECEIVER) result += " SHADOW_RECEIVER";
+    if (variantKey & filament::Variant::SKINNING_OR_MORPHING) result += " SKINNING_OR_MORPHING";
+    if (variantKey & filament::Variant::DEPTH) result += " DEPTH";
+    if (variantKey & filament::Variant::FOG) result += " FOG";
+    if (variantKey & filament::Variant::PICKING) result += " PICKING";
+    if (variantKey & filament::Variant::VSM) result += " VSM";
+    result += "\n";
+
+    return result;
+}
+
 std::string ShaderGenerator::createVertexProgram(filament::backend::ShaderModel shaderModel,
         MaterialBuilder::TargetApi targetApi, MaterialBuilder::TargetLanguage targetLanguage,
         MaterialInfo const& material, uint8_t variantKey, filament::Interpolation interpolation,
@@ -179,7 +197,8 @@ std::string ShaderGenerator::createVertexProgram(filament::backend::ShaderModel 
     const bool lit = material.isLit;
     const filament::Variant variant(variantKey);
 
-    cg.generateProlog(vs, ShaderType::VERTEX, material.hasExternalSamplers);
+    std::string pre = "// vertex shader variant =" + variantToString(variantKey) + "\n";
+    cg.generateProlog(pre, vs, ShaderType::VERTEX, material.hasExternalSamplers);
 
     cg.generateQualityDefine(vs, material.quality);
 
@@ -296,7 +315,8 @@ std::string ShaderGenerator::createFragmentProgram(filament::backend::ShaderMode
     const filament::Variant variant(variantKey);
 
     utils::io::sstream fs;
-    cg.generateProlog(fs, ShaderType::FRAGMENT, material.hasExternalSamplers);
+    std::string pre = "// fragment shader variant =" + variantToString(variantKey) + "\n";
+    cg.generateProlog(pre, fs, ShaderType::FRAGMENT, material.hasExternalSamplers);
 
     cg.generateQualityDefine(fs, material.quality);
 
@@ -484,7 +504,8 @@ std::string ShaderGenerator::createPostProcessVertexProgram(
         uint8_t variant, const filament::SamplerBindingMap& samplerBindingMap) const noexcept {
     const CodeGenerator cg(sm, targetApi, targetLanguage);
     utils::io::sstream vs;
-    cg.generateProlog(vs, ShaderType::VERTEX, false);
+    std::string pre = "// post process vertex shader\n";
+    cg.generateProlog(pre, vs, ShaderType::VERTEX, false);
 
     cg.generateQualityDefine(vs, material.quality);
 
@@ -528,7 +549,8 @@ std::string ShaderGenerator::createPostProcessFragmentProgram(
         uint8_t variant, const filament::SamplerBindingMap& samplerBindingMap) const noexcept {
     const CodeGenerator cg(sm, targetApi, targetLanguage);
     utils::io::sstream fs;
-    cg.generateProlog(fs, ShaderType::FRAGMENT, false);
+    std::string pre = "// post process fragment shader variant\n";
+    cg.generateProlog(pre, fs, ShaderType::FRAGMENT, false);
 
     cg.generateQualityDefine(fs, material.quality);
 

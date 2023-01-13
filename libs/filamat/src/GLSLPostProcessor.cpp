@@ -34,6 +34,9 @@
 #include <utils/Log.h>
 #include <filament/MaterialEnums.h>
 
+#include <fstream>
+#include <iostream>
+
 using namespace glslang;
 using namespace spirv_cross;
 using namespace spvtools;
@@ -204,7 +207,33 @@ bool GLSLPostProcessor::process(const std::string& inputShader, Config const& co
     if (targetApi == TargetApi::OPENGL && mOptimization == MaterialBuilder::Optimization::NONE) {
         *outputGlsl = inputShader;
         if (mPrintShaders) {
-            utils::slog.i << *outputGlsl << utils::io::endl;
+            static int number = 0;
+            ++number;
+
+            std::string extension = (config.shaderType == 0) ? ".vert" : ".frag";
+            std::string name = ".//dump//" + std::to_string(number);
+            std::ofstream myFile;
+
+            size_t dataLoc = outputGlsl->find("variant = ");
+            if (dataLoc != std::string::npos) {
+                size_t nextNewLine = outputGlsl->find('\n', dataLoc);
+                if (nextNewLine != std::string::npos) {
+                    std::cout << outputGlsl->substr(dataLoc + 10, nextNewLine - dataLoc - 10) << "\n";
+                    if (dataLoc + 10 < nextNewLine && nextNewLine > dataLoc) {
+                        name = ".//dump//" + outputGlsl->substr(dataLoc + 10, nextNewLine - dataLoc - 10);
+                        name += "_" + std::to_string(number);
+                    }
+                }
+            }
+
+            myFile.open(name + extension);
+            myFile << *outputGlsl;
+            myFile.close();
+            myFile.flush();
+
+            //utils::slog.i << *outputGlsl << utils::io::endl;
+            //utils::io::flush(utils::slog.i);
+            //std::cout.flush();
         }
         return true;
     }
@@ -291,7 +320,19 @@ bool GLSLPostProcessor::process(const std::string& inputShader, Config const& co
         }
 
         if (mPrintShaders) {
+            static int number = 0;
+            ++number;
+
+            std::ofstream myFile;
+            
+            myFile.open(std::to_string(number) + ".txt");
+            myFile << *internalConfig.glslOutput;
+            myFile.close();
+            myFile.flush();
+
             utils::slog.i << *internalConfig.glslOutput << utils::io::endl;
+            utils::io::flush(utils::slog.i);
+            std::cout.flush();
         }
     }
     return true;
