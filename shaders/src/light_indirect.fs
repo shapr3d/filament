@@ -18,10 +18,6 @@
 
 #define IBL_INTEGRATION_IMPORTANCE_SAMPLING_COUNT   64
 
-#if ((defined(MATERIAL_HAS_TRANSMISSION) && defined(HAS_REFRACTION)) || !defined(BLEND_MODE_OPAQUE))
-#define IS_TRANSPARENT_OR_REFRACTIVE
-#endif
-
 //------------------------------------------------------------------------------
 // IBL utilities
 //------------------------------------------------------------------------------
@@ -676,32 +672,30 @@ void applyRefraction(
     float lod = max(0.0, 2.0 * log2(tweakedPerceptualRoughness) + frameUniforms.refractionLodOffset);
 
     vec4 Fat = textureLod(light_ssr, p.xy, lod);
-    float at = Fat.a;
-#if defined(IS_TRANSPARENT_OR_REFRACTIVE)
-    vec3 Ft = mix(vec3(1.0), Fat.rgb, at);
-#else
-    vec3 Ft = Fat.rgb;
-#endif
 
+    // if it's a transparent background, shift color components towards white
+    vec3 Ft = mix(vec3(1.0), Fat.rgb, Fat.a);
+    float at = Fat.a;
 #endif
 
     // base color changes the amount of light passing through the boundary
     Ft *= pixel.diffuseColor;
+    at += (1.0 - at) * (1.0 - luminance(pixel.diffuseColor.rgb));
 
     // fresnel from the first interface
     Ft *= 1.0 - E;
-    at += (1.0 - at) * max3(E);
+    at += (1.0 - at) * luminance(E);
 
     // apply absorption
 #if defined(MATERIAL_HAS_ABSORPTION)
     Ft *= T;
+    at += (1.0 - at) * (1.0 - luminance(T));
 #endif
 
     Fr *= material.specularIntensity * frameUniforms.iblLuminance;
     Fd *= frameUniforms.iblLuminance;
     color += Fr + mix(Fd, Ft, pixel.transmission);
 
-    at += (1.0 - at) * (1.0 - luminance(pixel.diffuseColor.rgb));
     alpha *= mix(1.0, at, pixel.transmission);
 }
 #endif
