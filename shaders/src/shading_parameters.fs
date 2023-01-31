@@ -33,10 +33,7 @@ void computeShadingParams() {
 #endif
 
     shading_position = vertex_worldPosition;
-    
-    // Perspective or orthographic:
-    shading_view = (frameUniforms.clipFromViewMatrix[2].w != 0.0) ? frameUniforms.cameraPosition - shading_position : -frameUniforms.cameraForward;
-    shading_view = normalize(shading_view);
+    shading_view = normalize(frameUniforms.cameraPosition - shading_position);
 
     // we do this so we avoid doing (matrix multiply), but we burn 4 varyings:
     //    p = clipFromWorldMatrix * shading_position;
