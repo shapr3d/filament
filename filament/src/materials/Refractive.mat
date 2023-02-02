@@ -12,10 +12,6 @@ material {
         // no texture is selected is optional but always named as the material, if present.
         //////////////////////////////////////////////////////////////////////////////////////////////////
         {
-            type : int,
-            name : useBaseColorTexture
-        },
-        {
             type : sampler2d,
             name : baseColorTexture
         },
@@ -30,18 +26,10 @@ material {
         },
 
         {
-            type : int,
-            name : useNormalTexture
-        },
-        {
             type : sampler2d,
             name : normalTexture
         },
 
-        {
-            type : int,
-            name : useRoughnessTexture
-        },
         {
             type : sampler2d,
             name : roughnessTexture
@@ -52,18 +40,10 @@ material {
         },
 
         {
-            type : int,
-            name : useClearCoatNormalTexture
-        },
-        {
             type : sampler2d,
             name : clearCoatNormalTexture
         },
 
-        {
-            type : int,
-            name : useClearCoatRoughnessTexture
-        },
         {
             type : sampler2d,
             name : clearCoatRoughnessTexture
@@ -74,10 +54,6 @@ material {
         },
 
         {
-            type : int,
-            name : useMetallicTexture
-        },
-        {
             type : sampler2d,
             name : metallicTexture
         },
@@ -86,10 +62,6 @@ material {
             name : metallic
         },
 
-        {
-            type : int,
-            name : useTransmissionTexture
-        },
         {
             type : sampler2d,
             name : transmissionTexture
@@ -103,11 +75,6 @@ material {
             type : float,
             name : ior
         },
-        // this is somewhat special because the value here will be assigned to both material.thickness and material.microThickness
-        {
-            type : int,
-            name : useThicknessTexture
-        },
         {
             type : sampler2d,
             name : thicknessTexture
@@ -117,10 +84,6 @@ material {
             name : thickness
         },
 
-        {
-            type : int,
-            name : useOcclusionTexture
-        },
         {
             type : sampler2d,
             name : occlusionTexture
@@ -187,10 +150,6 @@ material {
             name : anisotropyDirection
         },
         {
-            type : int,
-            name : doDeriveSheenColor
-        },
-        {
             type : float3,
             name : sheenColor
         },
@@ -203,28 +162,23 @@ material {
             name : maxThickness
         },
         {
-            type : int,
-            name : doDeriveAbsorption
-        },
-        {
             type : float3,
             name : absorption
-        },
-        {
-            type : int,
-            name : useWard
         },
         {
             type : float4,
             name : ambientColor
         },
-        ////////////////////////////////////////////////////////////////////////////////////////////////////
-        // Our ASTC compressor lays out the coordinates as XXXY but our BC5 compressor lays them out as XY.
-        // This flag indicates if data is stored as XY or XXXY (so we can sample the normal map accordingly)
-        ////////////////////////////////////////////////////////////////////////////////////////////////////
         {
-            type : int,
-            name : useSwizzledNormalMaps
+            type : float2,
+            name : emissiveControl
+        },
+        //////////////////////////////////////////////////////////////////////////////////////////////////
+        // Material texture usage and various other control flags
+        //////////////////////////////////////////////////////////////////////////////////////////////////
+        {
+            type : uint,
+            name : usageFlags
         }
     ],
     variables: [
