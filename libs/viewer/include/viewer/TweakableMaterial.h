@@ -94,6 +94,7 @@ public:
     TweakablePropertyTextured<float> mOcclusion{1.0f};
     TweakableProperty<float> mRoughnessScale{};
     TweakablePropertyTextured<float> mRoughness;
+    TweakableProperty<float> mRoughnessUvScaler{ 1.0f };
     TweakablePropertyTextured<float> mMetallic{};
 
     TweakableProperty<float> mClearCoat{};

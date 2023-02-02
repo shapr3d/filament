@@ -431,7 +431,7 @@ void ApplyRoughness(inout MaterialInputs material, inout FragmentData fragmentDa
 #if defined(MATERIAL_HAS_ROUGHNESS)
     if (IsRoughnessTextured()) {
         material.roughness = BiplanarTexture(materialParams_roughnessTexture,
-                                             materialParams.textureScaler.y,
+                                             materialParams.textureScaler.y * materialParams.roughnessUvScaler,
                                              fragmentData.pos,
                                              fragmentData.normal).r;
     } else {

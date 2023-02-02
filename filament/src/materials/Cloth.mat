@@ -63,6 +63,10 @@ material {
             type : float,
             name : occlusionIntensity
         },
+        {
+            type : float,
+            name : roughnessUvScaler
+        },
 
         //////////////////////////////////////////////////////////////////////////////////////////////////
         // Texture lookup scaling that transforms world coordinates to triplanar coordinates

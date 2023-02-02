@@ -59,7 +59,10 @@ material {
             type : float,
             name : metallic
         },
-
+        {
+            type : float,
+            name : roughnessUvScaler
+        },
         {
             type : float2,
             name : emissiveControl
