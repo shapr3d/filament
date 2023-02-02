@@ -23,6 +23,8 @@ json TweakableMaterial::toJson() {
 
     writeTexturedToJson(result, "baseColor", mBaseColor);
     result["tintColor"] = mTintColor.value;
+    result["emissiveIntensity"] = mEmissiveIntensity.value;
+    result["emissiveExposureWeight"] = mEmissiveExposureWeight.value;
 
     result["normalIntensity"] = mNormalIntensity.value;
 
@@ -89,6 +91,8 @@ void TweakableMaterial::fromJson(const json& source) {
 
     readTexturedFromJson(source, "baseColor", mBaseColor, true, isAlpha, isAlpha ? 4 : 3);
     readValueFromJson(source, "tintColor", mTintColor, { 1.0f, 1.0f, 1.0f });
+    readValueFromJson(source, "emissiveIntensity", mEmissiveIntensity, { 0.0f });
+    readValueFromJson(source, "emissiveExposureWeight", mEmissiveExposureWeight, { 0.0f });
 
     readValueFromJson(source, "normalIntensity", mNormalIntensity, 1.0f);
     readTexturedFromJson(source, "normalTexture", mNormal, false, false, 3);
@@ -180,6 +184,9 @@ void TweakableMaterial::resetWithType(MaterialType newType) {
     mRequestedTextures = {};
 
     resetMemberToValue(mTintColor, { 1.0f, 1.0f, 1.0f });
+    resetMemberToValue(mEmissiveExposureWeight, 0.0f);
+    resetMemberToValue(mEmissiveIntensity, 0.0f);
+
     mBaseTextureScale = 1.0f;
     mNormalTextureScale = 1.0f;
     mClearCoatTextureScale = 1.0f;
@@ -240,6 +247,9 @@ void TweakableMaterial::drawUI(const std::string& header) {
         }
 
         mTintColor.addWidget("tintColor");
+
+        mEmissiveIntensity.addWidget("emissive intensity", 0.0f, 1000.0f);
+        mEmissiveExposureWeight.addWidget("exposure weight on emissive");
     }
 
     if (ImGui::CollapsingHeader("Normal, roughness, specular, metallic")) {

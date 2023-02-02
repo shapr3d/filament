@@ -1254,6 +1254,13 @@ void SimpleViewer::updateUserInterface() {
                     setTextureIfPresent(tweaks.mBaseColor.isFile, tweaks.mBaseColor.filename, "baseColor");
 
                     matInstance->setParameter("tintColor", tweaks.mTintColor.value);
+                    if (tweaks.mShaderType == TweakableMaterial::MaterialType::Opaque) {
+                        filament::math::float2 emissiveData = {
+                            tweaks.mEmissiveIntensity.value,
+                            tweaks.mEmissiveExposureWeight.value
+                        };
+                        matInstance->setParameter("emissive", emissiveData);
+                    }
 
                     matInstance->setParameter("normalIntensity", tweaks.mNormalIntensity.value);
                     setTextureIfPresent(tweaks.mNormal.isFile, tweaks.mNormal.filename, "normal");

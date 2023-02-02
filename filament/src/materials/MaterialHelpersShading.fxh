@@ -320,6 +320,12 @@ void ApplyBaseColor(inout MaterialInputs material, inout FragmentData fragmentDa
 #endif
 }
 
+void ApplyEmissive(inout MaterialInputs material, inout FragmentData fragmentData) {
+#if defined(MATERIAL_HAS_EMISSIVE)
+    material.emissive = float4( material.baseColor.rgb *  materialParams.emissive.x, materialParams.emissive.y);
+#endif
+}
+
 void ApplyOcclusion(inout MaterialInputs material, inout FragmentData fragmentData) {
 #if defined(MATERIAL_HAS_AMBIENT_OCCLUSION) && defined(BLENDING_DISABLED)
     if (materialParams.useOcclusionTexture != 0) {
@@ -516,6 +522,7 @@ void ApplyAllPrePrepare(inout MaterialInputs material, inout FragmentData fragme
 void ApplyAllPostPrepare(inout MaterialInputs material, inout FragmentData fragmentData) {
     ApplyOcclusion(material, fragmentData);
     ApplyBaseColor(material, fragmentData);
+    ApplyEmissive(material, fragmentData);
     ApplyRoughness(material, fragmentData);
     ApplyReflectance(material, fragmentData);
     ApplyMetallic(material, fragmentData);
