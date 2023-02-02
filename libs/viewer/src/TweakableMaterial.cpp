@@ -252,10 +252,8 @@ void TweakableMaterial::drawUI(const std::string& header) {
 
         mTintColor.addWidget("tintColor");
 
-        if (mShaderType == MaterialType::Opaque) {
-            mEmissiveIntensity.addWidget("emissive intensity", 0.0f, 1000.0f);
-            mEmissiveExposureWeight.addWidget("exposure weight on emissive");
-        }
+        mEmissiveIntensity.addWidget("emissive intensity", 0.0f, 1000.0f);
+        mEmissiveExposureWeight.addWidget("exposure weight on emissive");
     }
 
     if (ImGui::CollapsingHeader("Normal, roughness, specular, metallic")) {
