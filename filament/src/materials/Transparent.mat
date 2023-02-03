@@ -59,11 +59,6 @@ material {
             type : float,
             name : metallic
         },
-
-        {
-            type : float2,
-            name : emissiveControl
-        },
         //////////////////////////////////////////////////////////////////////////////////////////////////
         // Texture lookup scaling that transforms world coordinates to triplanar coordinates
         //////////////////////////////////////////////////////////////////////////////////////////////////
