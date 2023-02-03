@@ -1233,23 +1233,33 @@ void SimpleViewer::updateUserInterface() {
                     const auto& matInstance = rm.getMaterialInstanceAt(instance, prim);
 
                     auto setTextureIfPresent ([&](bool useTexture, const auto& filename, const std::string& propertyName) {
-                        std::string useTextureName = "use" + propertyName + "Texture";
                         std::string samplerName = propertyName + "Texture";
 
-                        useTextureName[3] = std::toupper(useTextureName[3]);
 
                         auto textureEntry = mTextures.find(filename.asString());
                         if (useTexture && textureEntry != mTextures.end() && textureEntry->second != nullptr) {
-                            matInstance->setParameter(useTextureName.c_str(), 1);
                             matInstance->setParameter(samplerName.c_str(), textureEntry->second, trilinSampler);
-                        }
-                        else {
-                            matInstance->setParameter(useTextureName.c_str(), 0);
                         }
 
                     });
 
-                    matInstance->setParameter("useWard", (tweaks.mUseWard) ? 1 : 0 );
+                    std::uint32_t usageFlags = 0u;
+                    usageFlags |= (tweaks.mBaseColor.isFile) * 1u;
+                    usageFlags |= (tweaks.mClearCoatNormal.isFile) * 2u;
+                    usageFlags |= (tweaks.mClearCoatRoughness.isFile) * 4u;
+                    usageFlags |= (tweaks.mMetallic.isFile) * 8u;
+                    usageFlags |= (tweaks.mNormal.isFile) * 16u;
+                    usageFlags |= (tweaks.mOcclusion.isFile) * 32u;
+                    usageFlags |= (tweaks.mRoughness.isFile) * 64u;
+                    usageFlags |= (tweaks.mSheenRoughness.isFile) * 128u;
+                    //usageFlags |= 0; // this would be the useSwizzledNormalMaps case
+                    usageFlags |= (tweaks.mThickness.isFile) * 512u;
+                    usageFlags |= (tweaks.mTransmission.isFile) * 1024u;
+                    usageFlags |= (tweaks.mUseWard) * 2048u;
+                    usageFlags |= (tweaks.mAbsorption.useDerivedQuantity) * 4096u;
+                    usageFlags |= (tweaks.mSheenColor.useDerivedQuantity) * 8192u;
+                    usageFlags |= (tweaks.mSubsurfaceColor.useDerivedQuantity) * 16384u;
+                    matInstance->setParameter("usageFlags", usageFlags);
 
                     setTextureIfPresent(tweaks.mBaseColor.isFile, tweaks.mBaseColor.filename, "baseColor");
 
@@ -1288,21 +1298,17 @@ void SimpleViewer::updateUserInterface() {
 
                     if (tweaks.mShaderType == TweakableMaterial::MaterialType::Cloth) {
                         if (tweaks.mSheenColor.useDerivedQuantity) {
-                            matInstance->setParameter("doDeriveSheenColor", 1);
                             matInstance->setParameter("sheenIntensity", tweaks.mSheenIntensity.value);
                         } else {
                             matInstance->setParameter("sheenColor", tweaks.mSheenColor.value);
                             matInstance->setParameter("sheenIntensity", 1.0f);
-                            matInstance->setParameter("doDeriveSheenColor", 0);
                         }
                         matInstance->setParameter("subsurfaceColor", tweaks.mSubsurfaceColor.value);
-                        matInstance->setParameter("doDeriveSubsurfaceColor", tweaks.mSubsurfaceColor.useDerivedQuantity ? 1 : 0);
                         matInstance->setParameter("subsurfaceTint", tweaks.mSubsurfaceTint.value * tweaks.mSubsurfaceIntensity.value);
                     } else if (tweaks.mShaderType == TweakableMaterial::MaterialType::Subsurface) {
                         matInstance->setParameter("thickness", tweaks.mThickness.value);
                         setTextureIfPresent(tweaks.mThickness.isFile, tweaks.mThickness.filename, "thickness");
                         matInstance->setParameter("subsurfaceColor", tweaks.mSubsurfaceColor.value);
-                        matInstance->setParameter("doDeriveSubsurfaceColor", tweaks.mSubsurfaceColor.useDerivedQuantity ? 1 : 0);
                         matInstance->setParameter("subsurfacePower", tweaks.mSubsurfacePower.value);
                         matInstance->setParameter("subsurfaceTint", tweaks.mSubsurfaceTint.value * tweaks.mSubsurfaceIntensity.value);
                     }
@@ -1313,13 +1319,11 @@ void SimpleViewer::updateUserInterface() {
                         matInstance->setParameter("anisotropyDirection", normalize(tweaks.mAnisotropyDirection.value));
 
                         if (tweaks.mSheenColor.useDerivedQuantity) {
-                            matInstance->setParameter("doDeriveSheenColor", 1);
                             matInstance->setParameter("sheenIntensity", tweaks.mSheenIntensity.value);
                         }
                         else {
                             matInstance->setParameter("sheenColor", tweaks.mSheenColor.value);
                             matInstance->setParameter("sheenIntensity", 1.0f);
-                            matInstance->setParameter("doDeriveSheenColor", 0);
                         }
                         if (tweaks.mShaderType == TweakableMaterial::MaterialType::Opaque) {
                             setTextureIfPresent(tweaks.mSheenRoughness.isFile, tweaks.mSheenRoughness.filename, "sheenRoughness");
@@ -1328,12 +1332,8 @@ void SimpleViewer::updateUserInterface() {
 
                         if (tweaks.mShaderType == TweakableMaterial::MaterialType::Refractive) {
                             // Only refractive materials have the properties below
-                            if (tweaks.mAbsorption.useDerivedQuantity) {
-                                matInstance->setParameter("doDeriveAbsorption", 1);
-                            }
-                            else {
+                            if (!tweaks.mAbsorption.useDerivedQuantity) {
                                 matInstance->setParameter("absorption", tweaks.mAbsorption.value);
-                                matInstance->setParameter("doDeriveAbsorption", 0);
                             }
 
                             setTextureIfPresent(tweaks.mTransmission.isFile, tweaks.mTransmission.filename, "transmission");

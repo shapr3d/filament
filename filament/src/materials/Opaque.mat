@@ -9,10 +9,6 @@ material {
         // no texture is selected is optional but always named as the material, if present.
         //////////////////////////////////////////////////////////////////////////////////////////////////
         {
-            type : int,
-            name : useBaseColorTexture
-        },
-        {
             type : sampler2d,
             name : baseColorTexture
         },
@@ -27,18 +23,10 @@ material {
         },
 
         {
-            type : int,
-            name : useNormalTexture
-        },
-        {
             type : sampler2d,
             name : normalTexture
         },
 
-        {
-            type : int,
-            name : useRoughnessTexture
-        },
         {
             type : sampler2d,
             name : roughnessTexture
@@ -49,18 +37,10 @@ material {
         },
 
         {
-            type : int,
-            name : useClearCoatNormalTexture
-        },
-        {
             type : sampler2d,
             name : clearCoatNormalTexture
         },
 
-        {
-            type : int,
-            name : useClearCoatRoughnessTexture
-        },
         {
             type : sampler2d,
             name : clearCoatRoughnessTexture
@@ -71,10 +51,6 @@ material {
         },
 
         {
-            type : int,
-            name : useMetallicTexture
-        },
-        {
             type : sampler2d,
             name : metallicTexture
         },
@@ -83,10 +59,6 @@ material {
             name : metallic
         },
 
-        {
-            type : int,
-            name : useOcclusionTexture
-        },
         {
             type : sampler2d,
             name : occlusionTexture
@@ -101,10 +73,6 @@ material {
         },
 
         {
-            type : int,
-            name : useSheenRoughnessTexture
-        },
-        {
             type : sampler2d,
             name : sheenRoughnessTexture
         },
@@ -112,7 +80,6 @@ material {
             type : float,
             name : sheenRoughness
         },
-
         //////////////////////////////////////////////////////////////////////////////////////////////////
         // Texture lookup scaling that transforms world coordinates to triplanar coordinates
         //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -157,10 +124,6 @@ material {
             name : anisotropyDirection
         },
         {
-            type : int,
-            name : doDeriveSheenColor
-        },
-        {
             type : float3,
             name : sheenColor
         },
@@ -169,20 +132,15 @@ material {
             name : sheenIntensity
         },
         {
-            type : int,
-            name : useWard
-        },
-        {
             type : float4,
             name : ambientColor
         },
-        ////////////////////////////////////////////////////////////////////////////////////////////////////
-        // Our ASTC compressor lays out the coordinates as XXXY but our BC5 compressor lays them out as XY.
-        // This flag indicates if data is stored as XY or XXXY (so we can sample the normal map accordingly)
-        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        //////////////////////////////////////////////////////////////////////////////////////////////////
+        // Material texture usage and various other control flags
+        //////////////////////////////////////////////////////////////////////////////////////////////////
         {
-            type : int,
-            name : useSwizzledNormalMaps
+            type : uint,
+            name : usageFlags
         }
     ],
     variables: [
