@@ -13,6 +13,7 @@ float SignNoZero(float f) {
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
 // Material usage getters
 //
 // The usageFlags bitfield stores whether the material should source certain attributes from 
@@ -100,6 +101,42 @@ bool DoDeriveSubsurfaceColor() {
     return ( materialParams.usageFlags & 16384u ) != 0u;
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Various attributes have scalers associated with them. These are their human-readable getters
+//
+//	                        basicIntensities	    sheenIntensity
+//  normalIntensity 	        .x	
+//  clearCoatNormalIntensity 	.y	
+//  specularIntensity 	        .z	
+//  occlusionIntensity 	        .w	
+//  sheenIntensity 		                                 .x
+//
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+float GetNormalIntensity() {
+    return materialParams.basicIntensities.x;
+}
+
+float GetClearCoatNormalIntensity() {
+    return materialParams.basicIntensities.y;
+}
+
+float GetSpecularIntensity() {
+    return materialParams.basicIntensities.z;
+}
+
+float GetOcclusionIntensity() {
+    return materialParams.basicIntensities.w;
+}
+
+float GetSheenIntensity() {
+#if defined(MATERIAL_HAS_SHEEN_COLOR) && !defined(SHADING_MODEL_SUBSURFACE) && defined(BLENDING_DISABLED)
+    return materialParams.sheenIntensity;
+#else
+    return 0.0;
+#endif
+}
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -336,7 +373,7 @@ void ApplyNormalMap(inout MaterialInputs material, inout FragmentData fragmentDa
                                           fragmentData.pos,
                                           fragmentData.normal,
                                           IsNormalMapSwizzled(),
-                                          materialParams.normalIntensity);
+                                          GetNormalIntensity());
 #if defined(SHAPR_USE_WORLD_NORMALS)
         material.normal = normalWS;
 #else
@@ -359,7 +396,7 @@ void ApplyClearCoatNormalMap(inout MaterialInputs material, inout FragmentData f
                                                    fragmentData.pos,
                                                    fragmentData.normal,
                                                    IsNormalMapSwizzled(),
-                                                   materialParams.clearCoatNormalIntensity);
+                                                   GetClearCoatNormalIntensity());
 #if defined(SHAPR_USE_WORLD_NORMALS)
         material.clearCoatNormal = clearCoatNormalWS;
 #else
@@ -419,7 +456,7 @@ void ApplyOcclusion(inout MaterialInputs material, inout FragmentData fragmentDa
     } else {
         material.ambientOcclusion = materialParams.occlusion;
     }
-    material.ambientOcclusion = clamp(1.0 - materialParams.occlusionIntensity * (1.0 - material.ambientOcclusion), 0.0, 1.0);
+    material.ambientOcclusion = clamp(1.0 - GetOcclusionIntensity() * (1.0 - material.ambientOcclusion), 0.0, 1.0);
 #endif
 }
 
@@ -540,7 +577,7 @@ void ApplySheenRoughness(inout MaterialInputs material, inout FragmentData fragm
 
 void ApplyShaprScalars(inout MaterialInputs material, inout FragmentData fragmentData) {
     // All of our materials have specularIntensity and useWard, so no need to define-guard these
-    material.specularIntensity = materialParams.specularIntensity;
+    material.specularIntensity = GetSpecularIntensity();
     material.useWard = IsWard();
 }
 
@@ -569,7 +606,7 @@ void ApplyNonTextured(inout MaterialInputs material, inout FragmentData fragment
     // Subsurface and transparent are not using sheen color but the others are
     material.sheenColor = 
         DoDeriveSheenColor() ? BaseColorToSheenColor(material.baseColor.rgb) : materialParams.sheenColor;
-    material.sheenColor *= materialParams.sheenIntensity;
+    material.sheenColor *= GetSheenIntensity();
 #endif
 #if defined(MATERIAL_HAS_SUBSURFACE_COLOR) && ( defined(SHADING_MODEL_SUBSURFACE) || defined(SHADING_MODEL_CLOTH) )
     if (DoDeriveSubsurfaceColor()) {

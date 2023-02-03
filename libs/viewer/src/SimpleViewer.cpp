@@ -1265,22 +1265,26 @@ void SimpleViewer::updateUserInterface() {
 
                     matInstance->setParameter("tintColor", tweaks.mTintColor.value);
 
-                    matInstance->setParameter("normalIntensity", tweaks.mNormalIntensity.value);
+                    filament::math::float4 basicIntensities = {
+                        tweaks.mNormalIntensity.value,
+                        tweaks.mClearCoatNormalIntensity.value,
+                        tweaks.mSpecularIntensity.value,
+                        tweaks.mOcclusionIntensity.value
+                    };
+                    matInstance->setParameter("basicIntensities", basicIntensities);
+
                     setTextureIfPresent(tweaks.mNormal.isFile, tweaks.mNormal.filename, "normal");
                     matInstance->setParameter("roughnessScale", tweaks.mRoughnessScale.value);
                     setTextureIfPresent(tweaks.mRoughness.isFile, tweaks.mRoughness.filename, "roughness");
                     if (tweaks.mShaderType == TweakableMaterial::MaterialType::Opaque || tweaks.mShaderType == TweakableMaterial::MaterialType::Cloth || tweaks.mShaderType == TweakableMaterial::MaterialType::Subsurface || tweaks.mShaderType == TweakableMaterial::MaterialType::Refractive) {
-                        matInstance->setParameter("occlusionIntensity", tweaks.mOcclusionIntensity.value);
                         setTextureIfPresent(tweaks.mOcclusion.isFile, tweaks.mOcclusion.filename, "occlusion");
                         matInstance->setParameter("occlusion", tweaks.mOcclusion.value);
                     }
 
-                    matInstance->setParameter("clearCoatNormalIntensity", tweaks.mClearCoatNormalIntensity.value);
                     setTextureIfPresent(tweaks.mClearCoatNormal.isFile, tweaks.mClearCoatNormal.filename, "clearCoatNormal");
                     setTextureIfPresent(tweaks.mClearCoatRoughness.isFile, tweaks.mClearCoatRoughness.filename, "clearCoatRoughness");
 
                     matInstance->setParameter("textureScaler", math::float4(tweaks.mBaseTextureScale, tweaks.mNormalTextureScale, tweaks.mClearCoatTextureScale, tweaks.mRefractiveTextureScale));
-                    matInstance->setParameter("specularIntensity", tweaks.mSpecularIntensity.value);
                     math::float4 gammaBaseColor{}; 
                     gammaBaseColor.r = std::pow(tweaks.mBaseColor.value.r, 2.22f); 
                     gammaBaseColor.g = std::pow(tweaks.mBaseColor.value.g, 2.22f);

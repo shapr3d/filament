@@ -59,10 +59,6 @@ material {
             type : float,
             name : occlusion
         },
-        {
-            type : float,
-            name : occlusionIntensity
-        },
 
         //////////////////////////////////////////////////////////////////////////////////////////////////
         // Texture lookup scaling that transforms world coordinates to triplanar coordinates
@@ -76,21 +72,9 @@ material {
             type : float4,
             name : scalingControl
         },
-        { // this is a compatibility attribute with the Filament generated materials
-            type : float,
-            name : normalIntensity
-        },
-        { // this is a compatibility attribute with the Filament generated materials
-            type : float,
-            name : clearCoatNormalIntensity
-        },
         //////////////////////////////////////////////////////////////////////////////////////////////////
         // material attributes that are purely driven by UBO values
         //////////////////////////////////////////////////////////////////////////////////////////////////
-        {
-            type : float,
-            name : specularIntensity
-        },
         {
             type : float,
             name : clearCoat
@@ -130,6 +114,10 @@ material {
         //////////////////////////////////////////////////////////////////////////////////////////////////
         // Material texture usage and various other control flags
         //////////////////////////////////////////////////////////////////////////////////////////////////
+        {
+            type : float4,
+            name : basicIntensities
+        },
         {
             type : uint,
             name : usageFlags
