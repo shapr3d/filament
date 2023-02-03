@@ -40,7 +40,7 @@ void main() {
 #endif
 
 #if defined(HAS_FOG)
-    vec3 view = -getWorldViewVectorWithMagnitude();
+    vec3 view = getWorldPosition() - getWorldCameraPosition();
     fragColor = fog(fragColor, view);
 #endif
 
