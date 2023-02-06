@@ -20,20 +20,23 @@ float SignNoZero(float f) {
 // textures, how it should swizzle them, and/or alter lighting. These used to be separate uniform
 // integers but we simply ran out of the spare space and were forced to pack these together. 
 //
-// Old uniform int name	        Bit	    New query from flag bitfield
-// =====================================================================
-// useBaseColorTexture	        0	    materialParams.usageFlags & 1
-// useClearCoatNormalTexture	1	    materialParams.usageFlags & 2
-// useClearCoatRoughnessTexture	2	    materialParams.usageFlags & 4
-// useMetallicTexture	        3	    materialParams.usageFlags & 8
-// useNormalTexture	            4	    materialParams.usageFlags & 16
-// useOcclusionTexture	        5	    materialParams.usageFlags & 32
-// useRoughnessTexture	        6	    materialParams.usageFlags & 64
-// useSheenRoughnessTexture	    7	    materialParams.usageFlags & 128
-// useSwizzledNormalMaps	    8	    materialParams.usageFlags & 256
-// useThicknessTexture 	        9	    materialParams.usageFlags & 512
-// useTransmissionTexture 	    10	    materialParams.usageFlags & 1024
-// useWard	                    11	    materialParams.usageFlags & 2048
+// Bit   Old uniform int name	        New query from flag bitfield
+// ======================================================================================================
+// 0     useBaseColorTexture            materialParams.usageFlags & 1
+// 1     useClearCoatNormalTexture      materialParams.usageFlags & 2
+// 2     useClearCoatRoughnessTexture   materialParams.usageFlags & 4
+// 3     useMetallicTexture             materialParams.usageFlags & 8
+// 4     useNormalTexture               materialParams.usageFlags & 16
+// 5     useOcclusionTexture            materialParams.usageFlags & 32
+// 6     useRoughnessTexture            materialParams.usageFlags & 64
+// 7     useSheenRoughnessTexture       materialParams.usageFlags & 128
+// 8     useSwizzledNormalMaps          materialParams.usageFlags & 256
+// 9     useThicknessTexture            materialParams.usageFlags & 512
+// 10    useTransmissionTexture         materialParams.usageFlags & 1024
+// 11    useWard                        materialParams.usageFlags & 2048
+// 12    doDeriveAbsorption             materialParams.usageFlags & 4096
+// 13    doDeriveSheenColor             materialParams.usageFlags & 8192
+// 14    doDeriveSubsurfaceColor        materialParams.usageFlags & 16384
 //
 // Our ASTC compressor lays out the coordinates as XXXY but our BC5 compressor lays them out as XY.
 // The useSwizzledNormalMaps flag indicates if data is stored as XY or XXXY (so we can sample the 
@@ -657,3 +660,4 @@ void ApplyAllPostPrepare(inout MaterialInputs material, inout FragmentData fragm
     ApplyNonTextured(material, fragmentData);
     ApplyShaprScalars(material, fragmentData);
 }
+
