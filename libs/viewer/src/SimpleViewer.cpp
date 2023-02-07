@@ -1244,21 +1244,21 @@ void SimpleViewer::updateUserInterface() {
                     });
 
                     std::uint32_t usageFlags = 0u;
-                    usageFlags |= (tweaks.mBaseColor.isFile) * 1u;
-                    usageFlags |= (tweaks.mClearCoatNormal.isFile) * 2u;
-                    usageFlags |= (tweaks.mClearCoatRoughness.isFile) * 4u;
-                    usageFlags |= (tweaks.mMetallic.isFile) * 8u;
-                    usageFlags |= (tweaks.mNormal.isFile) * 16u;
-                    usageFlags |= (tweaks.mOcclusion.isFile) * 32u;
-                    usageFlags |= (tweaks.mRoughness.isFile) * 64u;
-                    usageFlags |= (tweaks.mSheenRoughness.isFile) * 128u;
-                    //usageFlags |= 0; // this would be the useSwizzledNormalMaps case
-                    usageFlags |= (tweaks.mThickness.isFile) * 512u;
-                    usageFlags |= (tweaks.mTransmission.isFile) * 1024u;
-                    usageFlags |= (tweaks.mUseWard) * 2048u;
-                    usageFlags |= (tweaks.mAbsorption.useDerivedQuantity) * 4096u;
-                    usageFlags |= (tweaks.mSheenColor.useDerivedQuantity) * 8192u;
-                    usageFlags |= (tweaks.mSubsurfaceColor.useDerivedQuantity) * 16384u;
+                    usageFlags |= static_cast<std::uint32_t>(tweaks.mBaseColor.isFile) << 0u;
+                    usageFlags |= static_cast<std::uint32_t>(tweaks.mClearCoatNormal.isFile) << 1u;
+                    usageFlags |= static_cast<std::uint32_t>(tweaks.mClearCoatRoughness.isFile) << 2u;
+                    usageFlags |= static_cast<std::uint32_t>(tweaks.mMetallic.isFile) << 3u;
+                    usageFlags |= static_cast<std::uint32_t>(tweaks.mNormal.isFile) << 4u;
+                    usageFlags |= static_cast<std::uint32_t>(tweaks.mOcclusion.isFile) << 5u;
+                    usageFlags |= static_cast<std::uint32_t>(tweaks.mRoughness.isFile) << 6u;
+                    usageFlags |= static_cast<std::uint32_t>(tweaks.mSheenRoughness.isFile) << 7u;
+                    usageFlags |= 0u << 8u; // useSwizzledNormalMaps bit
+                    usageFlags |= static_cast<std::uint32_t>(tweaks.mThickness.isFile) << 9u;
+                    usageFlags |= static_cast<std::uint32_t>(tweaks.mTransmission.isFile) << 10u;
+                    usageFlags |= static_cast<std::uint32_t>(tweaks.mUseWard) << 11u;
+                    usageFlags |= static_cast<std::uint32_t>(tweaks.mAbsorption.useDerivedQuantity) << 12u;
+                    usageFlags |= static_cast<std::uint32_t>(tweaks.mSheenColor.useDerivedQuantity) << 13u;
+                    usageFlags |= static_cast<std::uint32_t>(tweaks.mSubsurfaceColor.useDerivedQuantity) << 14u;
                     matInstance->setParameter("usageFlags", usageFlags);
 
                     setTextureIfPresent(tweaks.mBaseColor.isFile, tweaks.mBaseColor.filename, "baseColor");
@@ -1270,23 +1270,27 @@ void SimpleViewer::updateUserInterface() {
                     };
                     matInstance->setParameter("emissiveControl", emissiveControl);
 
-                    matInstance->setParameter("normalIntensity", tweaks.mNormalIntensity.value);
+                    filament::math::float4 basicIntensities = {
+                        tweaks.mNormalIntensity.value,
+                        tweaks.mClearCoatNormalIntensity.value,
+                        tweaks.mSpecularIntensity.value,
+                        tweaks.mOcclusionIntensity.value
+                    };
+                    matInstance->setParameter("basicIntensities", basicIntensities);
+
                     setTextureIfPresent(tweaks.mNormal.isFile, tweaks.mNormal.filename, "normal");
                     matInstance->setParameter("roughnessScale", tweaks.mRoughnessScale.value);
                     setTextureIfPresent(tweaks.mRoughness.isFile, tweaks.mRoughness.filename, "roughness");
                     matInstance->setParameter("roughnessUvScaler", tweaks.mRoughnessUvScaler.value);
                     if (tweaks.mShaderType == TweakableMaterial::MaterialType::Opaque || tweaks.mShaderType == TweakableMaterial::MaterialType::Cloth || tweaks.mShaderType == TweakableMaterial::MaterialType::Subsurface || tweaks.mShaderType == TweakableMaterial::MaterialType::Refractive) {
-                        matInstance->setParameter("occlusionIntensity", tweaks.mOcclusionIntensity.value);
                         setTextureIfPresent(tweaks.mOcclusion.isFile, tweaks.mOcclusion.filename, "occlusion");
                         matInstance->setParameter("occlusion", tweaks.mOcclusion.value);
                     }
 
-                    matInstance->setParameter("clearCoatNormalIntensity", tweaks.mClearCoatNormalIntensity.value);
                     setTextureIfPresent(tweaks.mClearCoatNormal.isFile, tweaks.mClearCoatNormal.filename, "clearCoatNormal");
                     setTextureIfPresent(tweaks.mClearCoatRoughness.isFile, tweaks.mClearCoatRoughness.filename, "clearCoatRoughness");
 
                     matInstance->setParameter("textureScaler", math::float4(tweaks.mBaseTextureScale, tweaks.mNormalTextureScale, tweaks.mClearCoatTextureScale, tweaks.mRefractiveTextureScale));
-                    matInstance->setParameter("specularIntensity", tweaks.mSpecularIntensity.value);
                     math::float4 gammaBaseColor{}; 
                     gammaBaseColor.r = std::pow(tweaks.mBaseColor.value.r, 2.22f); 
                     gammaBaseColor.g = std::pow(tweaks.mBaseColor.value.g, 2.22f);

@@ -103,6 +103,135 @@ bool DoDeriveSubsurfaceColor() {
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
+// Material usage getters
+//
+// The usageFlags bitfield stores whether the material should source certain attributes from 
+// textures, how it should swizzle them, and/or alter lighting. These used to be separate uniform
+// integers but we simply ran out of the spare space and were forced to pack these together. 
+//
+// Bit   Old uniform int name	        New query from flag bitfield
+// ======================================================================================================
+// 0     useBaseColorTexture            materialParams.usageFlags & 1
+// 1     useClearCoatNormalTexture      materialParams.usageFlags & 2
+// 2     useClearCoatRoughnessTexture   materialParams.usageFlags & 4
+// 3     useMetallicTexture             materialParams.usageFlags & 8
+// 4     useNormalTexture               materialParams.usageFlags & 16
+// 5     useOcclusionTexture            materialParams.usageFlags & 32
+// 6     useRoughnessTexture            materialParams.usageFlags & 64
+// 7     useSheenRoughnessTexture       materialParams.usageFlags & 128
+// 8     useSwizzledNormalMaps          materialParams.usageFlags & 256
+// 9     useThicknessTexture            materialParams.usageFlags & 512
+// 10    useTransmissionTexture         materialParams.usageFlags & 1024
+// 11    useWard                        materialParams.usageFlags & 2048
+// 12    doDeriveAbsorption             materialParams.usageFlags & 4096
+// 13    doDeriveSheenColor             materialParams.usageFlags & 8192
+// 14    doDeriveSubsurfaceColor        materialParams.usageFlags & 16384
+//
+// Our ASTC compressor lays out the coordinates as XXXY but our BC5 compressor lays them out as XY.
+// The useSwizzledNormalMaps flag indicates if data is stored as XY or XXXY (so we can sample the 
+// normal map accordingly)        
+//
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+bool IsBaseColorTextured() {
+    return ( materialParams.usageFlags & 1u ) != 0u;
+}
+
+bool IsClearCoatNormalTextured() {
+    return ( materialParams.usageFlags & 2u ) != 0u;
+}
+
+bool IsClearCoatRoughnessTextured() {
+    return ( materialParams.usageFlags & 4u ) != 0u;
+}
+
+bool IsMetallicTextured() {
+    return ( materialParams.usageFlags & 8u ) != 0u;
+}
+
+bool IsNormalTextured() {
+    return ( materialParams.usageFlags & 16u ) != 0u;
+}
+
+bool IsOcclusionTextured() {
+    return ( materialParams.usageFlags & 32u ) != 0u;
+}
+
+bool IsRoughnessTextured() {
+    return ( materialParams.usageFlags & 64u ) != 0u;
+}
+
+bool IsSheenRoughnessTextured() {
+    return ( materialParams.usageFlags & 128u ) != 0u;
+}
+
+bool IsNormalMapSwizzled() {
+    return ( materialParams.usageFlags & 256u ) != 0u;
+}
+
+bool IsThicknessTextured() {
+    return ( materialParams.usageFlags & 512u ) != 0u;
+}
+
+bool IsTransmissionTextured() {
+    return ( materialParams.usageFlags & 1024u ) != 0u;
+}
+
+bool IsWard() {
+    return ( materialParams.usageFlags & 2048u ) != 0u;
+}
+
+bool DoDeriveAbsorption() {
+    return ( materialParams.usageFlags & 4096u ) != 0u;
+}
+
+bool DoDeriveSheenColor() {
+    return ( materialParams.usageFlags & 8192u ) != 0u;
+}
+
+bool DoDeriveSubsurfaceColor() {
+    return ( materialParams.usageFlags & 16384u ) != 0u;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Various attributes have scalers associated with them. These are their human-readable getters
+//
+//	                        basicIntensities	    sheenIntensity
+//  normalIntensity 	        .x	
+//  clearCoatNormalIntensity 	.y	
+//  specularIntensity 	        .z	
+//  occlusionIntensity 	        .w	
+//  sheenIntensity 		                                 .x
+//
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+float GetNormalIntensity() {
+    return materialParams.basicIntensities.x;
+}
+
+float GetClearCoatNormalIntensity() {
+    return materialParams.basicIntensities.y;
+}
+
+float GetSpecularIntensity() {
+    return materialParams.basicIntensities.z;
+}
+
+float GetOcclusionIntensity() {
+    return materialParams.basicIntensities.w;
+}
+
+float GetSheenIntensity() {
+#if defined(MATERIAL_HAS_SHEEN_COLOR) && !defined(SHADING_MODEL_SUBSURFACE) && defined(BLENDING_DISABLED)
+    return materialParams.sheenIntensity;
+#else
+    return 0.0;
+#endif
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
 // Input adjustment functions
 //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -336,7 +465,7 @@ void ApplyNormalMap(inout MaterialInputs material, inout FragmentData fragmentDa
                                           fragmentData.pos,
                                           fragmentData.normal,
                                           IsNormalMapSwizzled(),
-                                          materialParams.normalIntensity);
+                                          GetNormalIntensity());
 #if defined(SHAPR_USE_WORLD_NORMALS)
         material.normal = normalWS;
 #else
@@ -359,7 +488,7 @@ void ApplyClearCoatNormalMap(inout MaterialInputs material, inout FragmentData f
                                                    fragmentData.pos,
                                                    fragmentData.normal,
                                                    IsNormalMapSwizzled(),
-                                                   materialParams.clearCoatNormalIntensity);
+                                                   GetClearCoatNormalIntensity());
 #if defined(SHAPR_USE_WORLD_NORMALS)
         material.clearCoatNormal = clearCoatNormalWS;
 #else
@@ -423,7 +552,7 @@ void ApplyOcclusion(inout MaterialInputs material, inout FragmentData fragmentDa
     } else {
         material.ambientOcclusion = materialParams.occlusion;
     }
-    material.ambientOcclusion = clamp(1.0 - materialParams.occlusionIntensity * (1.0 - material.ambientOcclusion), 0.0, 1.0);
+    material.ambientOcclusion = clamp(1.0 - GetOcclusionIntensity() * (1.0 - material.ambientOcclusion), 0.0, 1.0);
 #endif
 }
 
@@ -544,7 +673,7 @@ void ApplySheenRoughness(inout MaterialInputs material, inout FragmentData fragm
 
 void ApplyShaprScalars(inout MaterialInputs material, inout FragmentData fragmentData) {
     // All of our materials have specularIntensity and useWard, so no need to define-guard these
-    material.specularIntensity = materialParams.specularIntensity;
+    material.specularIntensity = GetSpecularIntensity();
     material.useWard = IsWard();
 }
 
@@ -573,7 +702,7 @@ void ApplyNonTextured(inout MaterialInputs material, inout FragmentData fragment
     // Subsurface and transparent are not using sheen color but the others are
     material.sheenColor = 
         DoDeriveSheenColor() ? BaseColorToSheenColor(material.baseColor.rgb) : materialParams.sheenColor;
-    material.sheenColor *= materialParams.sheenIntensity;
+    material.sheenColor *= GetSheenIntensity();
 #endif
 #if defined(MATERIAL_HAS_SUBSURFACE_COLOR) && ( defined(SHADING_MODEL_SUBSURFACE) || defined(SHADING_MODEL_CLOTH) )
     if (DoDeriveSubsurfaceColor()) {
