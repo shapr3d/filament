@@ -660,4 +660,3 @@ void ApplyAllPostPrepare(inout MaterialInputs material, inout FragmentData fragm
     ApplyNonTextured(material, fragmentData);
     ApplyShaprScalars(material, fragmentData);
 }
-
