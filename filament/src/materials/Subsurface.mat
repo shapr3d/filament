@@ -10,10 +10,6 @@ material {
         // no texture is selected is optional but always named as the material, if present.
         //////////////////////////////////////////////////////////////////////////////////////////////////
         {
-            type : int,
-            name : useBaseColorTexture
-        },
-        {
             type : sampler2d,
             name : baseColorTexture
         },
@@ -28,18 +24,10 @@ material {
         },
 
         {
-            type : int,
-            name : useNormalTexture
-        },
-        {
             type : sampler2d,
             name : normalTexture
         },
 
-        {
-            type : int,
-            name : useRoughnessTexture
-        },
         {
             type : sampler2d,
             name : roughnessTexture
@@ -50,18 +38,10 @@ material {
         },
 
         {
-            type : int,
-            name : useClearCoatNormalTexture
-        },
-        {
             type : sampler2d,
             name : clearCoatNormalTexture
         },
 
-        {
-            type : int,
-            name : useClearCoatRoughnessTexture
-        },
         {
             type : sampler2d,
             name : clearCoatRoughnessTexture
@@ -72,10 +52,6 @@ material {
         },
 
         {
-            type : int,
-            name : useMetallicTexture
-        },
-        {
             type : sampler2d,
             name : metallicTexture
         },
@@ -85,20 +61,12 @@ material {
         },
 
         {
-            type : int,
-            name : useOcclusionTexture
-        },
-        {
             type : sampler2d,
             name : occlusionTexture
         },
         {
             type : float,
             name : occlusion
-        },
-        {
-            type : float,
-            name : occlusionIntensity
         },
 
         //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -113,21 +81,9 @@ material {
             type : float4,
             name : scalingControl
         },
-        { // this is a compatibility attribute with the Filament generated materials
-            type : float,
-            name : normalIntensity
-        },
-        { // this is a compatibility attribute with the Filament generated materials
-            type : float,
-            name : clearCoatNormalIntensity
-        },
         //////////////////////////////////////////////////////////////////////////////////////////////////
         // material attributes that are purely driven by UBO values
         //////////////////////////////////////////////////////////////////////////////////////////////////
-        {
-            type : float,
-            name : specularIntensity
-        },
         {
             type : float,
             name : clearCoat
@@ -149,21 +105,12 @@ material {
             name : subsurfaceColor
         },
         {
-            type : int,
-            name : doDeriveSubsurfaceColor
-        },
-        {
             type : float3,
             name : subsurfaceTint,
         },
         {
             type : float,
             name : subsurfacePower
-        },
-        // this is somewhat special because the value here will be assigned to both material.thickness and material.microThickness
-        {
-            type : int,
-            name : useThicknessTexture
         },
         {
             type : sampler2d,
@@ -178,20 +125,19 @@ material {
             name : maxThickness
         },
         {
-            type : int,
-            name : useWard
-        },
-        {
             type : float4,
             name : ambientColor
         },
-        ////////////////////////////////////////////////////////////////////////////////////////////////////
-        // Our ASTC compressor lays out the coordinates as XXXY but our BC5 compressor lays them out as XY.
-        // This flag indicates if data is stored as XY or XXXY (so we can sample the normal map accordingly)
-        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        //////////////////////////////////////////////////////////////////////////////////////////////////
+        // Material texture usage and various other control flags
+        //////////////////////////////////////////////////////////////////////////////////////////////////
         {
-            type : int,
-            name : useSwizzledNormalMaps
+            type : float4,
+            name : basicIntensities
+        },
+        {
+            type : uint,
+            name : usageFlags
         }
     ],
     variables: [

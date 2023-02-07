@@ -14,6 +14,135 @@ float SignNoZero(float f) {
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
+// Material usage getters
+//
+// The usageFlags bitfield stores whether the material should source certain attributes from 
+// textures, how it should swizzle them, and/or alter lighting. These used to be separate uniform
+// integers but we simply ran out of the spare space and were forced to pack these together. 
+//
+// Bit   Old uniform int name	        New query from flag bitfield
+// ======================================================================================================
+// 0     useBaseColorTexture            materialParams.usageFlags & 1
+// 1     useClearCoatNormalTexture      materialParams.usageFlags & 2
+// 2     useClearCoatRoughnessTexture   materialParams.usageFlags & 4
+// 3     useMetallicTexture             materialParams.usageFlags & 8
+// 4     useNormalTexture               materialParams.usageFlags & 16
+// 5     useOcclusionTexture            materialParams.usageFlags & 32
+// 6     useRoughnessTexture            materialParams.usageFlags & 64
+// 7     useSheenRoughnessTexture       materialParams.usageFlags & 128
+// 8     useSwizzledNormalMaps          materialParams.usageFlags & 256
+// 9     useThicknessTexture            materialParams.usageFlags & 512
+// 10    useTransmissionTexture         materialParams.usageFlags & 1024
+// 11    useWard                        materialParams.usageFlags & 2048
+// 12    doDeriveAbsorption             materialParams.usageFlags & 4096
+// 13    doDeriveSheenColor             materialParams.usageFlags & 8192
+// 14    doDeriveSubsurfaceColor        materialParams.usageFlags & 16384
+//
+// Our ASTC compressor lays out the coordinates as XXXY but our BC5 compressor lays them out as XY.
+// The useSwizzledNormalMaps flag indicates if data is stored as XY or XXXY (so we can sample the 
+// normal map accordingly)        
+//
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+bool IsBaseColorTextured() {
+    return ( materialParams.usageFlags & 1u ) != 0u;
+}
+
+bool IsClearCoatNormalTextured() {
+    return ( materialParams.usageFlags & 2u ) != 0u;
+}
+
+bool IsClearCoatRoughnessTextured() {
+    return ( materialParams.usageFlags & 4u ) != 0u;
+}
+
+bool IsMetallicTextured() {
+    return ( materialParams.usageFlags & 8u ) != 0u;
+}
+
+bool IsNormalTextured() {
+    return ( materialParams.usageFlags & 16u ) != 0u;
+}
+
+bool IsOcclusionTextured() {
+    return ( materialParams.usageFlags & 32u ) != 0u;
+}
+
+bool IsRoughnessTextured() {
+    return ( materialParams.usageFlags & 64u ) != 0u;
+}
+
+bool IsSheenRoughnessTextured() {
+    return ( materialParams.usageFlags & 128u ) != 0u;
+}
+
+bool IsNormalMapSwizzled() {
+    return ( materialParams.usageFlags & 256u ) != 0u;
+}
+
+bool IsThicknessTextured() {
+    return ( materialParams.usageFlags & 512u ) != 0u;
+}
+
+bool IsTransmissionTextured() {
+    return ( materialParams.usageFlags & 1024u ) != 0u;
+}
+
+bool IsWard() {
+    return ( materialParams.usageFlags & 2048u ) != 0u;
+}
+
+bool DoDeriveAbsorption() {
+    return ( materialParams.usageFlags & 4096u ) != 0u;
+}
+
+bool DoDeriveSheenColor() {
+    return ( materialParams.usageFlags & 8192u ) != 0u;
+}
+
+bool DoDeriveSubsurfaceColor() {
+    return ( materialParams.usageFlags & 16384u ) != 0u;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Various attributes have scalers associated with them. These are their human-readable getters
+//
+//	                        basicIntensities	    sheenIntensity
+//  normalIntensity 	        .x	
+//  clearCoatNormalIntensity 	.y	
+//  specularIntensity 	        .z	
+//  occlusionIntensity 	        .w	
+//  sheenIntensity 		                                 .x
+//
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+float GetNormalIntensity() {
+    return materialParams.basicIntensities.x;
+}
+
+float GetClearCoatNormalIntensity() {
+    return materialParams.basicIntensities.y;
+}
+
+float GetSpecularIntensity() {
+    return materialParams.basicIntensities.z;
+}
+
+float GetOcclusionIntensity() {
+    return materialParams.basicIntensities.w;
+}
+
+float GetSheenIntensity() {
+#if defined(MATERIAL_HAS_SHEEN_COLOR) && !defined(SHADING_MODEL_SUBSURFACE) && defined(BLENDING_DISABLED)
+    return materialParams.sheenIntensity;
+#else
+    return 0.0;
+#endif
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
 // Input adjustment functions
 //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -160,10 +289,10 @@ vec4 BiplanarTexture(sampler2D tex, float scaler, highp vec3 pos, lowp vec3 norm
 	return (mainPlaneSample * queryData.mainWeight + secondaryPlaneSample * queryData.medianWeight) / (queryData.mainWeight + queryData.medianWeight);
 }
 
-vec2 SampleNormalMap(sampler2D normalMap, vec2 pos, vec2 DpDx, vec2 DpDy, int useSwizzledNormalMaps) {
+vec2 SampleNormalMap(sampler2D normalMap, vec2 pos, vec2 DpDx, vec2 DpDy, bool useSwizzledNormalMaps) {
     vec4 normalMapSample = textureGrad(normalMap, pos, DpDx, DpDy);
 #if defined(IN_SHAPR_SHADER)
-    if (useSwizzledNormalMaps == 0) {
+    if (!useSwizzledNormalMaps) {
         // In BC5-compressed normal maps data is stored as XY
         return normalMapSample.rg;
     } else {
@@ -200,7 +329,7 @@ vec3 swizzleIvec(vec3 x, ivec3 i) {
 // approximated by the appropriate sequence and flips of world space axes. For more details
 // Refer to https://iquilezles.org/articles/biplanar/
 // Refer to (basic triplanar mapping) https://bgolus.medium.com/normal-mapping-for-a-triplanar-shader-10bf39dca05a
-vec3 BiplanarNormalMap(sampler2D normalMap, float scaler, highp vec3 pos, lowp vec3 normal, int useSwizzledNormalMaps, float normalIntensity) {
+vec3 BiplanarNormalMap(sampler2D normalMap, float scaler, highp vec3 pos, lowp vec3 normal, bool useSwizzledNormalMaps, float normalIntensity) {
     // We sort triplanar plane relevance by the relative ordering of the weights and not by the normal
     vec3 weights = ComputeWeights(normal);
     BiplanarAxes axes = ComputeBiplanarPlanes(weights);
@@ -239,15 +368,15 @@ vec3 BiplanarNormalMap(sampler2D normalMap, float scaler, highp vec3 pos, lowp v
 
 void ApplyNormalMap(inout MaterialInputs material, inout FragmentData fragmentData) {
 #if defined(MATERIAL_HAS_NORMAL)
-    if (materialParams.useNormalTexture != 0) {
+    if (IsNormalTextured()) {
         // We combine the normals in world space, hence the transformation in the end from world to tangent, assuming an
         // orthonormal tangent frame (which may not hold actually but looks fine enough for now).
         vec3 normalWS = BiplanarNormalMap(materialParams_normalTexture,
                                           materialParams.textureScaler.y,
                                           fragmentData.pos,
                                           fragmentData.normal,
-                                          materialParams.useSwizzledNormalMaps,
-                                          materialParams.normalIntensity);
+                                          IsNormalMapSwizzled(),
+                                          GetNormalIntensity());
 #if defined(SHAPR_USE_WORLD_NORMALS)
         material.normal = normalWS;
 #else
@@ -264,13 +393,13 @@ void ApplyNormalMap(inout MaterialInputs material, inout FragmentData fragmentDa
 
 void ApplyClearCoatNormalMap(inout MaterialInputs material, inout FragmentData fragmentData) {
 #if defined(MATERIAL_HAS_CLEAR_COAT_NORMAL)
-    if (materialParams.useClearCoatNormalTexture != 0) {
+    if (IsClearCoatNormalTextured()) {
         vec3 clearCoatNormalWS = BiplanarNormalMap(materialParams_clearCoatNormalTexture,
                                                    materialParams.textureScaler.z,
                                                    fragmentData.pos,
                                                    fragmentData.normal,
-                                                   materialParams.useSwizzledNormalMaps,
-                                                   materialParams.clearCoatNormalIntensity);
+                                                   IsNormalMapSwizzled(),
+                                                   GetClearCoatNormalIntensity());
 #if defined(SHAPR_USE_WORLD_NORMALS)
         material.clearCoatNormal = clearCoatNormalWS;
 #else
@@ -287,7 +416,7 @@ void ApplyClearCoatNormalMap(inout MaterialInputs material, inout FragmentData f
 
 void ApplyBaseColor(inout MaterialInputs material, inout FragmentData fragmentData) {
 #if defined(MATERIAL_HAS_BASE_COLOR)
-    if (materialParams.useBaseColorTexture != 0) {
+    if (IsBaseColorTextured()) {
 #if defined(BLENDING_ENABLED) || defined(HAS_REFRACTION)
         material.baseColor.rgba = BiplanarTexture(materialParams_baseColorTexture,
                                                 materialParams.textureScaler.x,
@@ -322,7 +451,7 @@ void ApplyBaseColor(inout MaterialInputs material, inout FragmentData fragmentDa
 
 void ApplyOcclusion(inout MaterialInputs material, inout FragmentData fragmentData) {
 #if defined(MATERIAL_HAS_AMBIENT_OCCLUSION) && defined(BLENDING_DISABLED)
-    if (materialParams.useOcclusionTexture != 0) {
+    if (IsOcclusionTextured()) {
         material.ambientOcclusion = BiplanarTexture(materialParams_occlusionTexture,
                                                     materialParams.textureScaler.y,
                                                     fragmentData.pos,
@@ -330,13 +459,13 @@ void ApplyOcclusion(inout MaterialInputs material, inout FragmentData fragmentDa
     } else {
         material.ambientOcclusion = materialParams.occlusion;
     }
-    material.ambientOcclusion = clamp(1.0 - materialParams.occlusionIntensity * (1.0 - material.ambientOcclusion), 0.0, 1.0);
+    material.ambientOcclusion = clamp(1.0 - GetOcclusionIntensity() * (1.0 - material.ambientOcclusion), 0.0, 1.0);
 #endif
 }
 
 void ApplyRoughness(inout MaterialInputs material, inout FragmentData fragmentData) {
 #if defined(MATERIAL_HAS_ROUGHNESS)
-    if (materialParams.useRoughnessTexture != 0) {
+    if (IsRoughnessTextured()) {
         material.roughness = BiplanarTexture(materialParams_roughnessTexture,
                                              materialParams.textureScaler.y,
                                              fragmentData.pos,
@@ -361,7 +490,7 @@ void ApplyReflectance(inout MaterialInputs material, inout FragmentData fragment
 void ApplyMetallic(inout MaterialInputs material, inout FragmentData fragmentData) {
     // Cloth and specular glossiness explicitly do not have these properties.
 #if defined(MATERIAL_HAS_METALLIC) && !defined(SHADING_MODEL_CLOTH) && !defined(SHADING_MODEL_SPECULAR_GLOSSINESS)
-    if (materialParams.useMetallicTexture != 0) {
+    if (IsMetallicTextured()) {
         material.metallic = BiplanarTexture(materialParams_metallicTexture,
                                             materialParams.textureScaler.y,
                                             fragmentData.pos,
@@ -374,7 +503,7 @@ void ApplyMetallic(inout MaterialInputs material, inout FragmentData fragmentDat
 
 void ApplyClearCoatRoughness(inout MaterialInputs material, inout FragmentData fragmentData) {
 #if defined(MATERIAL_HAS_CLEAR_COAT_ROUGHNESS)
-    if (materialParams.useClearCoatRoughnessTexture != 0) {
+    if (IsClearCoatRoughnessTextured()) {
         material.clearCoatRoughness = BiplanarTexture(materialParams_clearCoatRoughnessTexture,
                                                        materialParams.textureScaler.z,
                                                        fragmentData.pos,
@@ -388,7 +517,7 @@ void ApplyClearCoatRoughness(inout MaterialInputs material, inout FragmentData f
 void ApplyAbsorption(inout MaterialInputs material, inout FragmentData fragmentData) {
     // This is a transmission-only property and those materials actually disable blending
 #if defined(MATERIAL_HAS_ABSORPTION) && defined(HAS_REFRACTION)
-    material.absorption = ( materialParams.doDeriveAbsorption != 0 ) ? 1.0 - material.baseColor.rgb : materialParams.absorption;
+    material.absorption = DoDeriveAbsorption() ? 1.0 - material.baseColor.rgb : materialParams.absorption;
 #endif
 }
 
@@ -402,7 +531,7 @@ void ApplyIOR(inout MaterialInputs material, inout FragmentData fragmentData) {
 void ApplyTransmission(inout MaterialInputs material, inout FragmentData fragmentData) {
     // This is a transmission-only property and those materials actually disable blending
 #if defined(MATERIAL_HAS_TRANSMISSION) && defined(HAS_REFRACTION)
-    if ( materialParams.useTransmissionTexture != 0 ) {
+    if ( IsTransmissionTextured() ) {
         material.transmission = BiplanarTexture(materialParams_transmissionTexture, materialParams.textureScaler.w, fragmentData.pos, fragmentData.normal).r;
     } else {
         material.transmission = materialParams.transmission;
@@ -415,7 +544,7 @@ void ApplyThickness(inout MaterialInputs material, inout FragmentData fragmentDa
     // This applies both micro and regular thickness, although we only do the latter for now (the former would be used in transparent thin materials).
 #if defined(BLENDING_DISABLED) && defined(HAS_REFRACTION)
     float thicknessValue = 0.0;
-    if (materialParams.useThicknessTexture != 0) {
+    if (IsThicknessTextured()) {
         thicknessValue = BiplanarTexture(materialParams_thicknessTexture,
                                           materialParams.textureScaler.w,
                                           fragmentData.pos,
@@ -437,7 +566,7 @@ void ApplySheenRoughness(inout MaterialInputs material, inout FragmentData fragm
 #if defined(MATERIAL_HAS_SHEEN_ROUGHNESS) && !defined(SHADING_MODEL_SUBSURFACE) && !defined(SHADING_MODEL_CLOTH) &&    \
     defined(BLENDING_DISABLED)
 #if defined(MATERIAL_HAS_USE_SHEEN_ROUGHNESS_TEXTURE)
-    if (materialParams.useSheenRoughnessTexture != 0) {
+    if (IsSheenRoughnessTextured()) {
         material.sheenRoughness =
             BiplanarTexture(materialParams_sheenRoughnessTexture, 1.0f, fragmentData.pos, fragmentData.normal).r;
     } else {
@@ -451,8 +580,8 @@ void ApplySheenRoughness(inout MaterialInputs material, inout FragmentData fragm
 
 void ApplyShaprScalars(inout MaterialInputs material, inout FragmentData fragmentData) {
     // All of our materials have specularIntensity and useWard, so no need to define-guard these
-    material.specularIntensity = materialParams.specularIntensity;
-    material.useWard = (materialParams.useWard != 0) ? true : false;
+    material.specularIntensity = GetSpecularIntensity();
+    material.useWard = IsWard();
 }
 
 // As all-black cloth materials require positive sheen contribution in order to be visible (read: not pitch black),
@@ -479,11 +608,11 @@ void ApplyNonTextured(inout MaterialInputs material, inout FragmentData fragment
 #if defined(MATERIAL_HAS_SHEEN_COLOR) && !defined(SHADING_MODEL_SUBSURFACE) && defined(BLENDING_DISABLED)
     // Subsurface and transparent are not using sheen color but the others are
     material.sheenColor = 
-        (materialParams.doDeriveSheenColor != 0) ? BaseColorToSheenColor(material.baseColor.rgb) : materialParams.sheenColor;
-    material.sheenColor *= materialParams.sheenIntensity;
+        DoDeriveSheenColor() ? BaseColorToSheenColor(material.baseColor.rgb) : materialParams.sheenColor;
+    material.sheenColor *= GetSheenIntensity();
 #endif
 #if defined(MATERIAL_HAS_SUBSURFACE_COLOR) && ( defined(SHADING_MODEL_SUBSURFACE) || defined(SHADING_MODEL_CLOTH) )
-    if (materialParams.doDeriveSubsurfaceColor != 0) {
+    if (DoDeriveSubsurfaceColor()) {
         material.subsurfaceColor = material.baseColor.rgb;
     } else {
         material.subsurfaceColor = materialParams.subsurfaceColor;
