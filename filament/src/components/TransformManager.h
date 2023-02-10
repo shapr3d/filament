@@ -117,6 +117,18 @@ public:
         return r;
     }
 
+    void setOrientation(Instance ci, const math::mat3f& rotation) noexcept;
+
+    const math::mat3f& getOrientation(Instance ci) const noexcept {
+        return mManager[ci].localOrientation;
+    }
+
+    const math::mat3f& getWorldOrientation(Instance ci) const noexcept {
+        return mManager[ci].orientation;
+    }
+
+    math::mat3f getCompoundOrientation(Instance ci) const noexcept;
+
 private:
     struct Sim;
 
@@ -134,6 +146,9 @@ private:
             math::mat4f const& pt, math::mat4f const& local,
             math::float3 const& ptTranslationLo, math::float3 const& localTranslationLo,
             bool accurate);
+    
+    void computeWorldOrientation(math::mat3f& outOrientation, math::mat3f const& parentOrientation,
+            math::mat3f const& localOrientation);
 
     friend class TransformManager::children_iterator;
 
@@ -142,6 +157,8 @@ private:
         WORLD,          // world transform
         LOCAL_LO,       // accurate local translation
         WORLD_LO,       // accurate world translation
+        LOCAL_ORIENTATION, // local orientation of bi/triplanar mapping
+        ORIENTATION,    // bi/triplanar mapping rotation matrix, composed with other transforms
         PARENT,         // instance to the parent
         FIRST_CHILD,    // instance to our first child
         NEXT,           // instance to our next sibling
@@ -153,6 +170,8 @@ private:
             math::mat4f,    // world
             math::float3,   // accurate local translation
             math::float3,   // accurate world translation
+            math::mat3f,    // local orientation
+            math::mat3f,    // orientation
             Instance,       // parent
             Instance,       // firstChild
             Instance,       // next
@@ -177,6 +196,8 @@ private:
                 Field<WORLD>        world;
                 Field<LOCAL_LO>     localTranslationLo;
                 Field<WORLD_LO>     worldTranslationLo;
+                Field<LOCAL_ORIENTATION>  localOrientation;
+                Field<ORIENTATION>  orientation;
                 Field<PARENT>       parent;
                 Field<FIRST_CHILD>  firstChild;
                 Field<NEXT>         next;

@@ -189,6 +189,16 @@ void FTransformManager::setTransform(Instance ci, const mat4& model) noexcept {
     }
 }
 
+void FTransformManager::setOrientation(Instance ci, const math::mat3f& rotation) noexcept {
+    validateNode(ci);
+    if (ci) {
+        auto& manager = mManager;
+        // store our local transform
+        manager[ci].localOrientation = rotation;
+        updateNodeTransform(ci);
+    }
+}
+
 void FTransformManager::updateNodeTransform(Instance i) noexcept {
     if (UTILS_UNLIKELY(mLocalTransformTransactionOpen)) {
         return;
@@ -205,6 +215,9 @@ void FTransformManager::updateNodeTransform(Instance i) noexcept {
             manager[parent].world, manager[i].local,
             manager[parent].worldTranslationLo, manager[i].localTranslationLo,
             mAccurateTranslations);
+
+    // we apply the parent orientation
+    computeWorldOrientation(manager[i].orientation, manager[parent].orientation, manager[i].localOrientation);
 
     // update our children's world transforms
     Instance child = manager[i].firstChild;
@@ -244,6 +257,8 @@ void FTransformManager::computeAllWorldTransforms() noexcept {
                 manager[parent].world, manager[i].local,
                 manager[parent].worldTranslationLo, manager[i].localTranslationLo,
                 accurate);
+        
+        computeWorldOrientation(manager[i].orientation, manager[parent].orientation, manager[i].localOrientation);
     }
 }
 
@@ -377,6 +392,9 @@ void FTransformManager::transformChildren(Sim& manager, Instance i) noexcept {
                 manager[parent].worldTranslationLo, manager[i].localTranslationLo,
                 accurate);
 
+        // we need to update our orientation too
+        computeWorldOrientation(manager[i].orientation, manager[parent].orientation, manager[i].localOrientation);
+
         // assume we don't have a deep hierarchy
         Instance child = manager[i].firstChild;
         if (UTILS_UNLIKELY(child)) {
@@ -420,6 +438,31 @@ void FTransformManager::computeWorldTransform(
         inoutWorldTranslationLo = worldTranslation.xyz - float3{ worldTranslation.xyz };
         outWorld[3] = worldTranslation;
     }
+}
+
+void FTransformManager::computeWorldOrientation(
+        math::mat3f& outOrientation, 
+        math::mat3f const& parentOrientation, 
+        math::mat3f const& localOrientation) {
+
+    outOrientation = parentOrientation * localOrientation;
+}
+
+math::mat3f FTransformManager::getCompoundOrientation(Instance ci) const noexcept {
+    const mat4f& world = mManager[ci].world;
+    const mat3f& orientation = mManager[ci].orientation;
+
+    // we need to strip everything from our world transform, except rotation
+    mat3f worldRotation = mat3f(world[0].xyz, world[1].xyz, world[2].xyz);
+    worldRotation[0] = normalize(worldRotation[0]);
+    worldRotation[1] = normalize(worldRotation[1]);
+    worldRotation[2] = normalize(worldRotation[2]);
+    // we need to invert the rotation, because we undo it to keep texture direction
+    // orthonormal matrix -> transpose = inverse
+    worldRotation = transpose(worldRotation);
+
+    // we apply the orientation transformation first, then our world rotation
+    return worldRotation * orientation;
 }
 
 
@@ -545,6 +588,18 @@ size_t TransformManager::getChildCount(Instance i) const noexcept {
 size_t TransformManager::getChildren(Instance i, utils::Entity* children,
         size_t count) const noexcept {
     return upcast(this)->getChildren(i, children, count);
+}
+
+void TransformManager::setOrientation(Instance ci, const mat3f& rotation) noexcept {
+    upcast(this)->setOrientation(ci, rotation);
+}
+
+const mat3f& TransformManager::getOrientation(Instance ci) const noexcept {
+    return upcast(this)->getOrientation(ci);
+}
+
+const mat3f& TransformManager::getWorldOrientation(Instance ci) const noexcept {
+    return upcast(this)->getWorldOrientation(ci);
 }
 
 void TransformManager::openLocalTransformTransaction() noexcept {

@@ -151,12 +151,14 @@ struct alignas(256) PerRenderableUib {
     static constexpr utils::StaticString _name{ "ObjectUniforms" };
     math::mat4f worldFromModelMatrix;
     math::mat3f worldFromModelNormalMatrix;   // this gets expanded to 48 bytes during the copy to the UBO
+    alignas(16) math::mat3f triplanarOrientationMatrix;   // this gets expanded to 48 bytes during the copy to the UBO
     alignas(16) math::float4 morphWeights;    // morph weights (we could easily have 8 using half)
     uint32_t flags;                           // see packFlags() below
     uint32_t channels;                        // 0x000000ll
     uint32_t objectId;                        // used for picking
     // TODO: We need a better solution, this currently holds the average local scale for the renderable
     float userData;
+    alignas(16) math::float3 worldAabbCenter; // center of renderable's AABB in world space
 
     static uint32_t packFlags(bool skinning, bool morphing, bool contactShadows) noexcept {
         return (skinning ? 1 : 0) |

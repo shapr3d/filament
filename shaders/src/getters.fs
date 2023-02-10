@@ -65,6 +65,14 @@ float getNdotV() {
     return shading_NoV;
 }
 
+mat3 getTriplanarOrientationMatrix() {
+    return objectUniforms.triplanarOrientationMatrix;
+}
+
+vec3 getObjectAabbCenterWorldSpace() {
+    return objectUniforms.worldAabbCenter;
+}
+
 /**
  * Transforms a texture UV to make it suitable for a render target attachment.
  *
