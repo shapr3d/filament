@@ -282,34 +282,35 @@ public:
     const math::mat4 getWorldTransformAccurate(Instance ci) const noexcept;
 
     /**
-     * Sets a local orientation of a transform component. This enables changing texture
+     * Sets a local material orientation of a transform component. This enables changing texture
      * bi/triplanar mapping direction.
-     * @param ci              The instance of the transform component to set the local orientation to.
-     * @param localTransform  The local orientation (i.e. relative to the parent).
-     * @see getOrientation()
+     * @param ci              The instance of the transform component to set the local material orientation to.
+     * @param localTransform  The local material orientation (i.e. relative to the parent).
+     * @see getMaterialOrientation()
      * @attention This operation can be slow if the hierarchy of transform is too deep, and this
      *            will be particularly bad when updating a lot of transforms. In that case,
      *            consider using openLocalTransformTransaction() / commitLocalTransformTransaction().
      */
-    void setOrientation(Instance ci, const math::mat3f& rotation) noexcept;
+    void setMaterialOrientation(Instance ci, const math::mat3f& rotation) noexcept;
 
     /**
-     * Returns the local orientation of a transform component.
-     * @param ci The instance of the transform component to query the local orientation from.
-     * @return The local orientation of the component (i.e. relative to the parent). This always
-     *         returns the value set by setOrientation()).
-     * @see setOrientation()
+     * Returns the local material orientation of a transform component.
+     * @param ci The instance of the transform component to query the local material orientation from.
+     * @return The local orientation of the component's material (i.e. relative to the parent). This always
+     *         returns the value set by setMaterialOrientation()).
+     * @see setMaterialOrientation()
      */
-    const math::mat3f& getOrientation(Instance ci) const noexcept;
+    const math::mat3f& getMaterialOrientation(Instance ci) const noexcept;
 
     /**
-     * Returns the world orientation of a transform component.
-     * @param ci The instance of the transform component to query the world orientation from.
-     * @return The world orientation of the component (i.e. relative to the root). This is the
-     *         composition of this component's local orientation with its parent's world orientation.
-     * @see setOrientation()
+     * Returns the world material orientation of a transform component.
+     * @param ci The instance of the transform component to query the world material orientation from.
+     * @return The world orientation of the component's material (i.e. relative to the root). This is the
+     *         composition of this component's local material orientation with its parent's world
+     *         material orientation.
+     * @see setMaterialOrientation()
      */
-    const math::mat3f& getWorldOrientation(Instance ci) const noexcept;
+    const math::mat3f& getMaterialWorldOrientation(Instance ci) const noexcept;
 
     /**
      * Opens a local transform transaction. During a transaction, getWorldTransform() can

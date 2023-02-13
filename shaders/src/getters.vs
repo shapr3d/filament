@@ -16,10 +16,6 @@ mat3 getWorldFromModelNormalMatrix() {
     return objectUniforms.worldFromModelNormalMatrix;
 }
 
-mat3 getTriplanarOrientationMatrix() {
-    return objectUniforms.triplanarOrientationMatrix;
-}
-
 //------------------------------------------------------------------------------
 // Attributes access
 //------------------------------------------------------------------------------

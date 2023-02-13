@@ -189,12 +189,12 @@ void FTransformManager::setTransform(Instance ci, const mat4& model) noexcept {
     }
 }
 
-void FTransformManager::setOrientation(Instance ci, const math::mat3f& rotation) noexcept {
+void FTransformManager::setMaterialOrientation(Instance ci, const math::mat3f& rotation) noexcept {
     validateNode(ci);
     if (ci) {
         auto& manager = mManager;
         // store our local transform
-        manager[ci].localOrientation = rotation;
+        manager[ci].materialLocalOrientation = rotation;
         updateNodeTransform(ci);
     }
 }
@@ -217,7 +217,7 @@ void FTransformManager::updateNodeTransform(Instance i) noexcept {
             mAccurateTranslations);
 
     // we apply the parent orientation
-    computeWorldOrientation(manager[i].orientation, manager[parent].orientation, manager[i].localOrientation);
+    computeMaterialWorldOrientation(manager[i].materialOrientation, manager[parent].materialOrientation, manager[i].materialLocalOrientation);
 
     // update our children's world transforms
     Instance child = manager[i].firstChild;
@@ -258,7 +258,7 @@ void FTransformManager::computeAllWorldTransforms() noexcept {
                 manager[parent].worldTranslationLo, manager[i].localTranslationLo,
                 accurate);
         
-        computeWorldOrientation(manager[i].orientation, manager[parent].orientation, manager[i].localOrientation);
+        computeMaterialWorldOrientation(manager[i].materialOrientation, manager[parent].materialOrientation, manager[i].materialLocalOrientation);
     }
 }
 
@@ -393,7 +393,7 @@ void FTransformManager::transformChildren(Sim& manager, Instance i) noexcept {
                 accurate);
 
         // we need to update our orientation too
-        computeWorldOrientation(manager[i].orientation, manager[parent].orientation, manager[i].localOrientation);
+        computeMaterialWorldOrientation(manager[i].materialOrientation, manager[parent].materialOrientation, manager[i].materialLocalOrientation);
 
         // assume we don't have a deep hierarchy
         Instance child = manager[i].firstChild;
@@ -440,7 +440,7 @@ void FTransformManager::computeWorldTransform(
     }
 }
 
-void FTransformManager::computeWorldOrientation(
+void FTransformManager::computeMaterialWorldOrientation(
         math::mat3f& outOrientation, 
         math::mat3f const& parentOrientation, 
         math::mat3f const& localOrientation) {
@@ -448,9 +448,9 @@ void FTransformManager::computeWorldOrientation(
     outOrientation = parentOrientation * localOrientation;
 }
 
-math::mat3f FTransformManager::getCompoundOrientation(Instance ci) const noexcept {
+math::mat3f FTransformManager::getMaterialCompoundOrientation(Instance ci) const noexcept {
     const mat4f& world = mManager[ci].world;
-    const mat3f& orientation = mManager[ci].orientation;
+    const mat3f& orientation = mManager[ci].materialOrientation;
 
     // we need to strip everything from our world transform, except rotation
     mat3f worldRotation = mat3f(world[0].xyz, world[1].xyz, world[2].xyz);
@@ -590,16 +590,16 @@ size_t TransformManager::getChildren(Instance i, utils::Entity* children,
     return upcast(this)->getChildren(i, children, count);
 }
 
-void TransformManager::setOrientation(Instance ci, const mat3f& rotation) noexcept {
-    upcast(this)->setOrientation(ci, rotation);
+void TransformManager::setMaterialOrientation(Instance ci, const mat3f& rotation) noexcept {
+    upcast(this)->setMaterialOrientation(ci, rotation);
 }
 
-const mat3f& TransformManager::getOrientation(Instance ci) const noexcept {
-    return upcast(this)->getOrientation(ci);
+const mat3f& TransformManager::getMaterialOrientation(Instance ci) const noexcept {
+    return upcast(this)->getMaterialOrientation(ci);
 }
 
-const mat3f& TransformManager::getWorldOrientation(Instance ci) const noexcept {
-    return upcast(this)->getWorldOrientation(ci);
+const mat3f& TransformManager::getMaterialWorldOrientation(Instance ci) const noexcept {
+    return upcast(this)->getMaterialWorldOrientation(ci);
 }
 
 void TransformManager::openLocalTransformTransaction() noexcept {

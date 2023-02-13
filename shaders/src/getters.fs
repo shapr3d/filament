@@ -65,8 +65,8 @@ float getNdotV() {
     return shading_NoV;
 }
 
-mat3 getTriplanarOrientationMatrix() {
-    return objectUniforms.triplanarOrientationMatrix;
+mat3 getMaterialOrientationMatrix() {
+    return objectUniforms.materialOrientationMatrix;
 }
 
 vec3 getObjectAabbCenterWorldSpace() {

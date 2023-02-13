@@ -117,17 +117,17 @@ public:
         return r;
     }
 
-    void setOrientation(Instance ci, const math::mat3f& rotation) noexcept;
+    void setMaterialOrientation(Instance ci, const math::mat3f& rotation) noexcept;
 
-    const math::mat3f& getOrientation(Instance ci) const noexcept {
-        return mManager[ci].localOrientation;
+    const math::mat3f& getMaterialOrientation(Instance ci) const noexcept {
+        return mManager[ci].materialLocalOrientation;
     }
 
-    const math::mat3f& getWorldOrientation(Instance ci) const noexcept {
-        return mManager[ci].orientation;
+    const math::mat3f& getMaterialWorldOrientation(Instance ci) const noexcept {
+        return mManager[ci].materialOrientation;
     }
 
-    math::mat3f getCompoundOrientation(Instance ci) const noexcept;
+    math::mat3f getMaterialCompoundOrientation(Instance ci) const noexcept;
 
 private:
     struct Sim;
@@ -147,7 +147,7 @@ private:
             math::float3 const& ptTranslationLo, math::float3 const& localTranslationLo,
             bool accurate);
     
-    void computeWorldOrientation(math::mat3f& outOrientation, math::mat3f const& parentOrientation,
+    void computeMaterialWorldOrientation(math::mat3f& outOrientation, math::mat3f const& parentOrientation,
             math::mat3f const& localOrientation);
 
     friend class TransformManager::children_iterator;
@@ -157,8 +157,8 @@ private:
         WORLD,          // world transform
         LOCAL_LO,       // accurate local translation
         WORLD_LO,       // accurate world translation
-        LOCAL_ORIENTATION, // local orientation of bi/triplanar mapping
-        ORIENTATION,    // bi/triplanar mapping rotation matrix, composed with other transforms
+        MATERIAL_LOCAL_ORIENTATION, // local orientation of bi/triplanar mapping
+        MATERIAL_ORIENTATION,       // bi/triplanar mapping rotation matrix, composed with other transforms
         PARENT,         // instance to the parent
         FIRST_CHILD,    // instance to our first child
         NEXT,           // instance to our next sibling
@@ -196,8 +196,8 @@ private:
                 Field<WORLD>        world;
                 Field<LOCAL_LO>     localTranslationLo;
                 Field<WORLD_LO>     worldTranslationLo;
-                Field<LOCAL_ORIENTATION>  localOrientation;
-                Field<ORIENTATION>  orientation;
+                Field<MATERIAL_LOCAL_ORIENTATION>   materialLocalOrientation;
+                Field<MATERIAL_ORIENTATION>         materialOrientation;
                 Field<PARENT>       parent;
                 Field<FIRST_CHILD>  firstChild;
                 Field<NEXT>         next;
