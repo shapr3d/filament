@@ -462,7 +462,7 @@ math::mat3f FTransformManager::getMaterialCompoundOrientation(Instance ci) const
     worldRotation = transpose(worldRotation);
 
     // we apply the orientation transformation first, then our world rotation
-    return worldRotation * orientation;
+    return orientation * worldRotation;
 }
 
 
