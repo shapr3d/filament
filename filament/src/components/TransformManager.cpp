@@ -199,6 +199,16 @@ void FTransformManager::setMaterialOrientation(Instance ci, const math::mat3f& r
     }
 }
 
+void FTransformManager::setMaterialOrientationCenter(Instance ci, const math::float3& center) noexcept {
+    validateNode(ci);
+    if (ci) {
+        auto& manager = mManager;
+        // store our local transform
+        manager[ci].materialLocalOrientationCenter = center;
+        updateNodeTransform(ci);
+    }
+}
+
 void FTransformManager::updateNodeTransform(Instance i) noexcept {
     if (UTILS_UNLIKELY(mLocalTransformTransactionOpen)) {
         return;
@@ -217,7 +227,9 @@ void FTransformManager::updateNodeTransform(Instance i) noexcept {
             mAccurateTranslations);
 
     // we apply the parent orientation
-    computeMaterialWorldOrientation(manager[i].materialOrientation, manager[parent].materialOrientation, manager[i].materialLocalOrientation);
+    computeMaterialWorldOrientation(manager[i].materialOrientation, manager[parent].materialOrientation,
+            manager[i].materialLocalOrientation, manager[i].materialOrientationCenter, manager[parent].materialOrientationCenter,
+            manager[i].materialLocalOrientationCenter);
 
     // update our children's world transforms
     Instance child = manager[i].firstChild;
@@ -258,7 +270,9 @@ void FTransformManager::computeAllWorldTransforms() noexcept {
                 manager[parent].worldTranslationLo, manager[i].localTranslationLo,
                 accurate);
         
-        computeMaterialWorldOrientation(manager[i].materialOrientation, manager[parent].materialOrientation, manager[i].materialLocalOrientation);
+        computeMaterialWorldOrientation(manager[i].materialOrientation, manager[parent].materialOrientation, 
+                manager[i].materialLocalOrientation, manager[i].materialOrientationCenter, 
+                manager[parent].materialOrientationCenter, manager[i].materialLocalOrientationCenter);
     }
 }
 
@@ -393,7 +407,9 @@ void FTransformManager::transformChildren(Sim& manager, Instance i) noexcept {
                 accurate);
 
         // we need to update our orientation too
-        computeMaterialWorldOrientation(manager[i].materialOrientation, manager[parent].materialOrientation, manager[i].materialLocalOrientation);
+        computeMaterialWorldOrientation(manager[i].materialOrientation, manager[parent].materialOrientation, 
+                manager[i].materialLocalOrientation, manager[i].materialOrientationCenter, 
+                manager[parent].materialOrientationCenter, manager[i].materialLocalOrientationCenter);
 
         // assume we don't have a deep hierarchy
         Instance child = manager[i].firstChild;
@@ -443,9 +459,13 @@ void FTransformManager::computeWorldTransform(
 void FTransformManager::computeMaterialWorldOrientation(
         math::mat3f& outOrientation, 
         math::mat3f const& parentOrientation, 
-        math::mat3f const& localOrientation) {
+        math::mat3f const& localOrientation,
+        math::float3& outOrientationCenter,
+        math::float3 const& parentOrientationCenter,
+        math::float3 const& localOrientationCenter) {
 
     outOrientation = parentOrientation * localOrientation;
+    outOrientationCenter = parentOrientationCenter + localOrientationCenter;
 }
 
 math::mat3f FTransformManager::getMaterialCompoundOrientation(Instance ci) const noexcept {
@@ -600,6 +620,14 @@ const mat3f& TransformManager::getMaterialOrientation(Instance ci) const noexcep
 
 const mat3f& TransformManager::getMaterialWorldOrientation(Instance ci) const noexcept {
     return upcast(this)->getMaterialWorldOrientation(ci);
+}
+
+const float3& TransformManager::getMaterialOrientationCenter(Instance ci) const noexcept {
+    return upcast(this)->getMaterialOrientationCenter(ci);
+}
+
+const float3& TransformManager::getMaterialWorldOrientationCenter(Instance ci) const noexcept {
+    return upcast(this)->getMaterialWorldOrientationCenter(ci);
 }
 
 void TransformManager::openLocalTransformTransaction() noexcept {

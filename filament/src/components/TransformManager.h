@@ -129,6 +129,16 @@ public:
 
     math::mat3f getMaterialCompoundOrientation(Instance ci) const noexcept;
 
+    void setMaterialOrientationCenter(Instance ci, const math::float3& center) noexcept;
+
+    const math::float3& getMaterialOrientationCenter(Instance ci) const noexcept {
+        return mManager[ci].materialLocalOrientationCenter;
+    }
+
+    const math::float3& getMaterialWorldOrientationCenter(Instance ci) const noexcept {
+        return mManager[ci].materialOrientationCenter;
+    }
+
 private:
     struct Sim;
 
@@ -148,7 +158,8 @@ private:
             bool accurate);
     
     void computeMaterialWorldOrientation(math::mat3f& outOrientation, math::mat3f const& parentOrientation,
-            math::mat3f const& localOrientation);
+            math::mat3f const& localOrientation,math::float3& outOrientationCenter,
+            math::float3 const& parentOrientationCenter, math::float3 const& localOrientationCenter);
 
     friend class TransformManager::children_iterator;
 
@@ -157,8 +168,10 @@ private:
         WORLD,          // world transform
         LOCAL_LO,       // accurate local translation
         WORLD_LO,       // accurate world translation
-        MATERIAL_LOCAL_ORIENTATION, // local orientation of bi/triplanar mapping
-        MATERIAL_ORIENTATION,       // bi/triplanar mapping rotation matrix, composed with other transforms
+        MATERIAL_LOCAL_ORIENTATION,         // local orientation of bi/triplanar mapping
+        MATERIAL_ORIENTATION,               // bi/triplanar mapping rotation matrix, composed with parent transforms
+        MATERIAL_LOCAL_ORIENTATION_CENTER,  // local center of bi/triplanar mapping
+        MATERIAL_ORIENTATION_CENTER,        // bi/triplanar mapping center, composed with parent center
         PARENT,         // instance to the parent
         FIRST_CHILD,    // instance to our first child
         NEXT,           // instance to our next sibling
@@ -172,6 +185,8 @@ private:
             math::float3,   // accurate world translation
             math::mat3f,    // local orientation
             math::mat3f,    // orientation
+            math::float3,   // local orientation center
+            math::float3,   // orientation center
             Instance,       // parent
             Instance,       // firstChild
             Instance,       // next
@@ -196,8 +211,10 @@ private:
                 Field<WORLD>        world;
                 Field<LOCAL_LO>     localTranslationLo;
                 Field<WORLD_LO>     worldTranslationLo;
-                Field<MATERIAL_LOCAL_ORIENTATION>   materialLocalOrientation;
-                Field<MATERIAL_ORIENTATION>         materialOrientation;
+                Field<MATERIAL_LOCAL_ORIENTATION>           materialLocalOrientation;
+                Field<MATERIAL_ORIENTATION>                 materialOrientation;
+                Field<MATERIAL_LOCAL_ORIENTATION_CENTER>    materialLocalOrientationCenter;
+                Field<MATERIAL_ORIENTATION_CENTER>          materialOrientationCenter;
                 Field<PARENT>       parent;
                 Field<FIRST_CHILD>  firstChild;
                 Field<NEXT>         next;

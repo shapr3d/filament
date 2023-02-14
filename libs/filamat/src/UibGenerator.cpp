@@ -137,7 +137,7 @@ UniformInterfaceBlock const& UibGenerator::getPerRenderableUib() noexcept {
             .add("channels", 1, UniformInterfaceBlock::Type::UINT)
             .add("objectId", 1, UniformInterfaceBlock::Type::UINT)
             .add("userData", 1, UniformInterfaceBlock::Type::FLOAT)
-            .add("worldAabbCenter", 1, UniformInterfaceBlock::Type::FLOAT3, Precision::HIGH)
+            .add("materialOrientationCenter", 1, UniformInterfaceBlock::Type::FLOAT3, Precision::HIGH)
             .build();
     return uib;
 }

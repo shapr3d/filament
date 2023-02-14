@@ -158,7 +158,7 @@ struct alignas(256) PerRenderableUib {
     uint32_t objectId;                        // used for picking
     // TODO: We need a better solution, this currently holds the average local scale for the renderable
     float userData;
-    alignas(16) math::float3 worldAabbCenter; // center of renderable's AABB in world space
+    alignas(16) math::float3 materialOrientationCenter; // center of renderable's material mapping in world space
 
     static uint32_t packFlags(bool skinning, bool morphing, bool contactShadows) noexcept {
         return (skinning ? 1 : 0) |

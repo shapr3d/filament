@@ -313,6 +313,30 @@ public:
     const math::mat3f& getMaterialWorldOrientation(Instance ci) const noexcept;
 
     /**
+     * Sets the center of material texture mapping of a transform component in local space.
+     * @param ci        The instance of the transform component to set the material center for.
+     * @param center    The center of material mapping in local space (i.e. relative to the parent).
+     */
+    void setMaterialOrientationCenter(Instance ci, const math::float3& center) noexcept;
+
+    /**
+     * Gets the center of material texture mapping of a transform component in local space.
+     * @return  The center of material mapping in local space (i.e. relative to the parent). This
+     *          always returns the value set by setMaterialOrientationCenter()
+     * @see setMaterialOrientationCenter()
+     */
+    const math::float3& getMaterialOrientationCenter(Instance ci) const noexcept;
+
+    /**
+     * Gets the center of material texture mapping of a transform component in world space.
+     * @return  The center of material mapping in world space (i.e. relative to the root). This
+     *          returns the sum of the value set by setMaterialOrientationCenter() and the parent's
+     *          world space orientation center.
+     * @see setMaterialOrientationCenter(), getMaterialOrientationCenter()
+     */
+    const math::float3& getMaterialWorldOrientationCenter(Instance ci) const noexcept;
+
+    /**
      * Opens a local transform transaction. During a transaction, getWorldTransform() can
      * return an invalid transform until commitLocalTransformTransaction() is called. However,
      * setTransform() will perform significantly better and in constant time.

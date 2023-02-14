@@ -69,8 +69,8 @@ mat3 getMaterialOrientationMatrix() {
     return objectUniforms.materialOrientationMatrix;
 }
 
-vec3 getObjectAabbCenterWorldSpace() {
-    return objectUniforms.worldAabbCenter;
+vec3 getMaterialOrientationCenter() {
+    return objectUniforms.materialOrientationCenter;
 }
 
 /**

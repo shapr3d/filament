@@ -115,6 +115,7 @@ void FScene::prepare(const mat4& worldOriginTransform, bool shadowReceiversAreCa
         const bool reversedWindingOrder = det(worldTransform.upperLeft()) < 0;
 
         const mat3f materialOrientation = tcm.getMaterialCompoundOrientation(ti);
+        const float3 materialOrientationCenter = tcm.getMaterialWorldOrientationCenter(ti);
 
         // don't even draw this object if it doesn't have a transform (which shouldn't happen
         // because one is always created when creating a Renderable component).
@@ -139,6 +140,7 @@ void FScene::prepare(const mat4& worldOriginTransform, bool shadowReceiversAreCa
                     ri,                             // RENDERABLE_INSTANCE
                     worldTransform,                 // WORLD_TRANSFORM
                     materialOrientation,            // MATERIAL_ORIENTATION
+                    materialOrientationCenter,      // MATERIAL_ORIENTATION_CENTER
                     visibility,                     // VISIBILITY_STATE
                     rcm.getSkinningBufferInfo(ri),  // SKINNING_BUFFER
                     worldAABB.center,               // WORLD_AABB_CENTER
@@ -279,8 +281,8 @@ void FScene::updateUBOs(utils::Range<uint32_t> visibleRenderables, backend::Hand
                 sceneData.elementAt<USER_DATA>(i));
         
         UniformBuffer::setUniform(buffer,
-                offset + offsetof(PerRenderableUib, worldAabbCenter),
-                sceneData.elementAt<WORLD_AABB_CENTER>(i));
+                offset + offsetof(PerRenderableUib, materialOrientationCenter),
+                sceneData.elementAt<MATERIAL_ORIENTATION_CENTER>(i));
     }
 
     // TODO: handle static objects separately
