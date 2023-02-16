@@ -622,6 +622,10 @@ const mat3f& TransformManager::getMaterialWorldOrientation(Instance ci) const no
     return upcast(this)->getMaterialWorldOrientation(ci);
 }
 
+void TransformManager::setMaterialOrientationCenter(Instance ci, const float3& center) noexcept {
+    upcast(this)->setMaterialOrientationCenter(ci, center);
+}
+
 const float3& TransformManager::getMaterialOrientationCenter(Instance ci) const noexcept {
     return upcast(this)->getMaterialOrientationCenter(ci);
 }
