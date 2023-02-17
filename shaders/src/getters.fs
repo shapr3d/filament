@@ -65,6 +65,14 @@ float getNdotV() {
     return shading_NoV;
 }
 
+mat3 getMaterialOrientationMatrix() {
+    return objectUniforms.materialOrientationMatrix;
+}
+
+vec3 getMaterialOrientationCenter() {
+    return objectUniforms.materialOrientationCenter;
+}
+
 /**
  * Transforms a texture UV to make it suitable for a render target attachment.
  *

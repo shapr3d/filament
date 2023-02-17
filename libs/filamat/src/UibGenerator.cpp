@@ -131,11 +131,13 @@ UniformInterfaceBlock const& UibGenerator::getPerRenderableUib() noexcept {
             .name(PerRenderableUib::_name)
             .add("worldFromModelMatrix",       1, UniformInterfaceBlock::Type::MAT4, Precision::HIGH)
             .add("worldFromModelNormalMatrix", 1, UniformInterfaceBlock::Type::MAT3, Precision::HIGH)
+            .add("materialOrientationMatrix", 1, UniformInterfaceBlock::Type::MAT3, Precision::HIGH)
             .add("morphWeights", 1, UniformInterfaceBlock::Type::FLOAT4, Precision::HIGH)
             .add("flags", 1, UniformInterfaceBlock::Type::UINT)
             .add("channels", 1, UniformInterfaceBlock::Type::UINT)
             .add("objectId", 1, UniformInterfaceBlock::Type::UINT)
             .add("userData", 1, UniformInterfaceBlock::Type::FLOAT)
+            .add("materialOrientationCenter", 1, UniformInterfaceBlock::Type::FLOAT3, Precision::HIGH)
             .build();
     return uib;
 }
