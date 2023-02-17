@@ -265,7 +265,7 @@ void TweakableMaterial::drawUI(const std::string& header) {
         mNormal.addWidget("normal");
         if (mNormal.isFile) enqueueTextureRequest(mNormal, false, false, 3);
 
-        mRoughnessScale.addWidget("roughness scale", 0.0f, 3.0f);
+        mRoughnessScale.addWidget("roughness scale", 0.125f, 2.0f);
         mRoughnessUvScaler.addWidget("roughness UV multiplier", 1.0f, 8.0f);
 
         mRoughness.addWidget("roughness");
