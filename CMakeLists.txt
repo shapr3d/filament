@@ -61,29 +61,34 @@ endif()
 # ==================================================================================================
 # Support for ccache
 # ==================================================================================================
-#find_program(CCACHE_PROGRAM ccache)
-#if (CCACHE_PROGRAM)
-#    set(C_LAUNCHER   "${CCACHE_PROGRAM}")
-#    set(CXX_LAUNCHER "${CCACHE_PROGRAM}")
-#
-#    configure_file(build/launch-c.in   launch-c)
-#    configure_file(build/launch-cxx.in launch-cxx)
-#
-#    execute_process(COMMAND chmod a+rx
-#        "${CMAKE_BINARY_DIR}/launch-c"
-#        "${CMAKE_BINARY_DIR}/launch-cxx"
-#    )
-#
-#    if (CMAKE_GENERATOR STREQUAL "Xcode")
-#        set(CMAKE_XCODE_ATTRIBUTE_CC         "${CMAKE_BINARY_DIR}/launch-c")
-#        set(CMAKE_XCODE_ATTRIBUTE_CXX        "${CMAKE_BINARY_DIR}/launch-cxx")
-#        set(CMAKE_XCODE_ATTRIBUTE_LD         "${CMAKE_BINARY_DIR}/launch-c")
-#        set(CMAKE_XCODE_ATTRIBUTE_LDPLUSPLUS "${CMAKE_BINARY_DIR}/launch-cxx")
-#    else()
-#        set(CMAKE_C_COMPILER_LAUNCHER        "${CMAKE_BINARY_DIR}/launch-c")
-#        set(CMAKE_CXX_COMPILER_LAUNCHER      "${CMAKE_BINARY_DIR}/launch-cxx")
-#    endif()
-#endif()
+find_program(CCACHE_PROGRAM ccache)
+if (CCACHE_PROGRAM)
+	if(WIN32)
+		set(CMAKE_C_COMPILER_LAUNCHER   "${CCACHE_PROGRAM}")
+		set(CMAKE_CXX_COMPILER_LAUNCHER	"${CCACHE_PROGRAM}")
+	else()
+		set(C_LAUNCHER   "${CCACHE_PROGRAM}")
+		set(CXX_LAUNCHER "${CCACHE_PROGRAM}")
+	
+		configure_file(build/launch-c.in   launch-c)
+		configure_file(build/launch-cxx.in launch-cxx)
+
+		execute_process(COMMAND chmod a+rx
+			"${CMAKE_BINARY_DIR}/launch-c"
+			"${CMAKE_BINARY_DIR}/launch-cxx"
+		)
+
+		if (CMAKE_GENERATOR STREQUAL "Xcode")
+			set(CMAKE_XCODE_ATTRIBUTE_CC         "${CMAKE_BINARY_DIR}/launch-c")
+			set(CMAKE_XCODE_ATTRIBUTE_CXX        "${CMAKE_BINARY_DIR}/launch-cxx")
+			set(CMAKE_XCODE_ATTRIBUTE_LD         "${CMAKE_BINARY_DIR}/launch-c")
+			set(CMAKE_XCODE_ATTRIBUTE_LDPLUSPLUS "${CMAKE_BINARY_DIR}/launch-cxx")
+		else()
+			set(CMAKE_C_COMPILER_LAUNCHER        "${CMAKE_BINARY_DIR}/launch-c")
+			set(CMAKE_CXX_COMPILER_LAUNCHER      "${CMAKE_BINARY_DIR}/launch-cxx")
+		endif()
+	endif()
+endif()
 
 # ==================================================================================================
 # Support Vim and Visual Studio Code by generating compile_commands.json
