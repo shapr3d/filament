@@ -452,6 +452,10 @@ void ApplyBaseColor(inout MaterialInputs material, inout FragmentData fragmentDa
 #endif
 }
 
+void ApplyEmissive(inout MaterialInputs material, inout FragmentData fragmentData) {
+    material.emissive = float4( material.baseColor.rgb *  materialParams.emissiveControl.x, materialParams.emissiveControl.y);
+}
+
 void ApplyOcclusion(inout MaterialInputs material, inout FragmentData fragmentData) {
 #if defined(MATERIAL_HAS_AMBIENT_OCCLUSION) && defined(BLENDING_DISABLED)
     if (IsOcclusionTextured()) {
@@ -470,7 +474,7 @@ void ApplyRoughness(inout MaterialInputs material, inout FragmentData fragmentDa
 #if defined(MATERIAL_HAS_ROUGHNESS)
     if (IsRoughnessTextured()) {
         material.roughness = BiplanarTexture(materialParams_roughnessTexture,
-                                             materialParams.textureScaler.y,
+                                             materialParams.textureScaler.y * materialParams.roughnessUvScaler,
                                              fragmentData.pos,
                                              fragmentData.normal).r;
     } else {
@@ -648,6 +652,7 @@ void ApplyAllPrePrepare(inout MaterialInputs material, inout FragmentData fragme
 void ApplyAllPostPrepare(inout MaterialInputs material, inout FragmentData fragmentData) {
     ApplyOcclusion(material, fragmentData);
     ApplyBaseColor(material, fragmentData);
+    ApplyEmissive(material, fragmentData);
     ApplyRoughness(material, fragmentData);
     ApplyReflectance(material, fragmentData);
     ApplyMetallic(material, fragmentData);

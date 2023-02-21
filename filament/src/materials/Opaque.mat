@@ -76,6 +76,14 @@ material {
             type : float,
             name : sheenRoughness
         },
+        {
+            type : float,
+            name : roughnessUvScaler
+        },
+        {
+            type : float2,
+            name : emissiveControl
+        },
         //////////////////////////////////////////////////////////////////////////////////////////////////
         // Texture lookup scaling that transforms world coordinates to triplanar coordinates
         //////////////////////////////////////////////////////////////////////////////////////////////////

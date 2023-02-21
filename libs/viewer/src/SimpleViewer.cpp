@@ -1264,6 +1264,11 @@ void SimpleViewer::updateUserInterface() {
                     setTextureIfPresent(tweaks.mBaseColor.isFile, tweaks.mBaseColor.filename, "baseColor");
 
                     matInstance->setParameter("tintColor", tweaks.mTintColor.value);
+                    filament::math::float2 emissiveControl = {
+                        tweaks.mEmissiveIntensity.value,
+                        tweaks.mEmissiveExposureWeight.value
+                    };
+                    matInstance->setParameter("emissiveControl", emissiveControl);
 
                     filament::math::float4 basicIntensities = {
                         tweaks.mNormalIntensity.value,
@@ -1276,6 +1281,7 @@ void SimpleViewer::updateUserInterface() {
                     setTextureIfPresent(tweaks.mNormal.isFile, tweaks.mNormal.filename, "normal");
                     matInstance->setParameter("roughnessScale", tweaks.mRoughnessScale.value);
                     setTextureIfPresent(tweaks.mRoughness.isFile, tweaks.mRoughness.filename, "roughness");
+                    matInstance->setParameter("roughnessUvScaler", tweaks.mRoughnessUvScaler.value);
                     if (tweaks.mShaderType == TweakableMaterial::MaterialType::Opaque || tweaks.mShaderType == TweakableMaterial::MaterialType::Cloth || tweaks.mShaderType == TweakableMaterial::MaterialType::Subsurface || tweaks.mShaderType == TweakableMaterial::MaterialType::Refractive) {
                         setTextureIfPresent(tweaks.mOcclusion.isFile, tweaks.mOcclusion.filename, "occlusion");
                         matInstance->setParameter("occlusion", tweaks.mOcclusion.value);

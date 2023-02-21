@@ -68,6 +68,10 @@ material {
             type : float,
             name : occlusion
         },
+        {
+            type : float,
+            name : roughnessUvScaler
+        },
 
         //////////////////////////////////////////////////////////////////////////////////////////////////
         // Texture lookup scaling that transforms world coordinates to triplanar coordinates
@@ -127,6 +131,10 @@ material {
         {
             type : float4,
             name : ambientColor
+        },        
+        {
+            type : float2,
+            name : emissiveControl
         },
         //////////////////////////////////////////////////////////////////////////////////////////////////
         // Material texture usage and various other control flags

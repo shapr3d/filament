@@ -10,6 +10,7 @@ TweakableMaterial::TweakableMaterial() {
     mIorScale.value = 1.0f;
     mNormalIntensity.value = 1.0f;
     mRoughnessScale.value = 1.0f;
+    mRoughnessUvScaler.value = 1.0f;
     mOcclusionIntensity.value = 1.0f;
 }
 
@@ -23,12 +24,15 @@ json TweakableMaterial::toJson() {
 
     writeTexturedToJson(result, "baseColor", mBaseColor);
     result["tintColor"] = mTintColor.value;
+    result["emissiveIntensity"] = mEmissiveIntensity.value;
+    result["emissiveExposureWeight"] = mEmissiveExposureWeight.value;
 
     result["normalIntensity"] = mNormalIntensity.value;
 
     writeTexturedToJson(result, "normalTexture", mNormal);
 
     result["roughnessScale"] = mRoughnessScale.value;
+    result["roughnessUvScaler"] = mRoughnessUvScaler.value;
     writeTexturedToJson(result, "roughness", mRoughness);
 
     writeTexturedToJson(result, "metallic", mMetallic);
@@ -89,11 +93,14 @@ void TweakableMaterial::fromJson(const json& source) {
 
     readTexturedFromJson(source, "baseColor", mBaseColor, true, isAlpha, isAlpha ? 4 : 3);
     readValueFromJson(source, "tintColor", mTintColor, { 1.0f, 1.0f, 1.0f });
+    readValueFromJson(source, "emissiveIntensity", mEmissiveIntensity, { 0.0f });
+    readValueFromJson(source, "emissiveExposureWeight", mEmissiveExposureWeight, { 0.0f });
 
     readValueFromJson(source, "normalIntensity", mNormalIntensity, 1.0f);
     readTexturedFromJson(source, "normalTexture", mNormal, false, false, 3);
 
     readValueFromJson(source, "roughnessScale", mRoughnessScale, 1.0f);
+    readValueFromJson(source, "roughnessUvScaler", mRoughnessUvScaler, 1.0f);
     readTexturedFromJson(source, "roughness", mRoughness);
 
     readTexturedFromJson(source, "metallic", mMetallic);
@@ -170,6 +177,7 @@ void TweakableMaterial::resetWithType(MaterialType newType) {
     resetMemberToValue(mNormal, {});
     resetMemberToValue(mOcclusion, 1.0f);
     resetMemberToValue(mRoughnessScale, 1.0f);
+    resetMemberToValue(mRoughnessUvScaler, 1.0f);
     resetMemberToValue(mRoughness, 0.0f);
     resetMemberToValue(mMetallic, {});
 
@@ -180,6 +188,9 @@ void TweakableMaterial::resetWithType(MaterialType newType) {
     mRequestedTextures = {};
 
     resetMemberToValue(mTintColor, { 1.0f, 1.0f, 1.0f });
+    resetMemberToValue(mEmissiveExposureWeight, 0.0f);
+    resetMemberToValue(mEmissiveIntensity, 0.0f);
+
     mBaseTextureScale = 1.0f;
     mNormalTextureScale = 1.0f;
     mClearCoatTextureScale = 1.0f;
@@ -240,6 +251,9 @@ void TweakableMaterial::drawUI(const std::string& header) {
         }
 
         mTintColor.addWidget("tintColor");
+
+        mEmissiveIntensity.addWidget("emissive intensity", 0.0f, 1000.0f);
+        mEmissiveExposureWeight.addWidget("exposure weight on emissive");
     }
 
     if (ImGui::CollapsingHeader("Normal, roughness, specular, metallic")) {
@@ -252,6 +266,7 @@ void TweakableMaterial::drawUI(const std::string& header) {
         if (mNormal.isFile) enqueueTextureRequest(mNormal, false, false, 3);
 
         mRoughnessScale.addWidget("roughness scale", 0.0f, 3.0f);
+        mRoughnessUvScaler.addWidget("roughness UV multiplier", 0.125f, 4.0f);
 
         mRoughness.addWidget("roughness");
         if (mRoughness.isFile) enqueueTextureRequest(mRoughness);

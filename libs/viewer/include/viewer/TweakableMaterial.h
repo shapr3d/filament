@@ -86,12 +86,15 @@ public:
 
     TweakablePropertyTextured<filament::math::float4,true> mBaseColor{ {1.0f, 1.0f, 1.0f, 1.0f} };
     TweakableProperty<filament::math::float3> mTintColor{ { 1.0f, 1.0f, 1.0f } };
+    TweakableProperty<float> mEmissiveIntensity{ 0.0f };
+    TweakableProperty<float> mEmissiveExposureWeight{ 0.0f };
 
     TweakablePropertyTextured<float> mNormal{};
     TweakableProperty<float, false> mOcclusionIntensity{ 1.0f };
     TweakablePropertyTextured<float> mOcclusion{1.0f};
     TweakableProperty<float> mRoughnessScale{};
     TweakablePropertyTextured<float> mRoughness;
+    TweakableProperty<float> mRoughnessUvScaler{ 1.0f };
     TweakablePropertyTextured<float> mMetallic{};
 
     TweakableProperty<float> mClearCoat{};
