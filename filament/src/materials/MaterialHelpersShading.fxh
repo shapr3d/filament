@@ -233,7 +233,7 @@ BiplanarAxes ComputeBiplanarPlanes(vec3 weights) {
 
 BiplanarData GenerateBiplanarData(BiplanarAxes axes, float scaler, highp vec3 pos, lowp vec3 weights) {
     // Depending on the resolution of the texture, we may want to multiply the texture coordinates
-    vec3 queryPos = scaler * (getMaterialOrientationMatrix() * (pos - getMaterialOrientationCenter()));
+    vec3 queryPos = (scaler * (pos - getMaterialOrientationCenter() - (objectUniforms.worldFromModelMatrix[3].xyz + getWorldOffset()))) * getMaterialOrientationMatrix();
 
     // Store the query data
     BiplanarData result = DEFAULT_BIPLANAR_DATA;
@@ -264,7 +264,7 @@ BiplanarData GenerateBiplanarData(BiplanarAxes axes, float scaler, highp vec3 po
 // A simple linear blend with normalization
 vec3 ComputeWeights(vec3 normal) {
     // We transform the normal only here for material rotation
-    normal = getMaterialOrientationMatrix() * normal;
+    normal = normal * getMaterialOrientationMatrix();
 
     // This one has a region where there is no blend, creating more defined interpolations
     const float blendBias = 0.2;
