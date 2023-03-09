@@ -464,7 +464,7 @@ void FTransformManager::computeMaterialWorldOrientation(
         math::float3 const& parentOrientationCenter,
         math::float3 const& localOrientationCenter) {
 
-    outOrientation = parentOrientation * localOrientation;
+    outOrientation = localOrientation * parentOrientation;
     outOrientationCenter = parentOrientationCenter + localOrientationCenter;
 }
 
@@ -477,12 +477,13 @@ math::mat3f FTransformManager::getMaterialCompoundOrientation(Instance ci) const
     worldRotation[0] = normalize(worldRotation[0]);
     worldRotation[1] = normalize(worldRotation[1]);
     worldRotation[2] = normalize(worldRotation[2]);
-    // we need to invert the rotation, because we undo it to keep texture direction
-    // orthonormal matrix -> transpose = inverse
-    worldRotation = transpose(worldRotation);
 
-    // we apply the orientation transformation first, then our world rotation
-    return orientation * worldRotation;
+    // We need to apply the inverse of the world transformation's rotation component
+    // then apply our own orientation. Multiplying with worldRotation on the right is
+    // equivalent to multiplying on the left with the transpose of it, which in this
+    // case is equal to the inverse (orthonormal matrix). This allows us to compute only
+    // one matrix multiplication, instead of two (one on the left, one on the right).
+    return worldRotation * orientation;
 }
 
 
