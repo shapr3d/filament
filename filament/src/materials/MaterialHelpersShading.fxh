@@ -443,6 +443,13 @@ void ApplyBaseColor(inout MaterialInputs material, inout FragmentData fragmentDa
 
     // Naive multiplicative tinting seems to be fine enough for now
     material.baseColor.rgb *= materialParams.tintColor.rgb;
+
+#if defined(DRAW_WEIGHTS)
+if((materialParams.debugUsageFlags & 1u ) != 0u) {
+    material.baseColor.rgb = ComputeWeights(fragmentData.normal);
+}
+
+#endif
 #if defined(BLENDING_ENABLED)
     material.baseColor.rgb *= material.baseColor.a;
     material.baseColor.a = 0.0;
