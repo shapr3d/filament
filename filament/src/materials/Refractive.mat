@@ -171,6 +171,10 @@ material {
         {
             type : uint,
             name : usageFlags
+        },
+        {
+            type : uint,
+            name : debugUsageFlags
         }
     ],
     variables: [
