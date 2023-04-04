@@ -18,6 +18,12 @@ Let's focus on the what? and how?.
 Don't duplicate what's in the Jira ticket. If it's outdated, let's update that.
 -->
 
+## Material shader statistics implications
+<!---
+If you are altering the material shaders directly or indirectly, make sure to update the statistics as per
+https://shapr3d.atlassian.net/wiki/spaces/RT/pages/3323134029/Benchmark+material+attribute+performance .
+-->
+
 ## Upstreaming scope
 <!---
 Should we propagate these changes to upstream? If so, reference the upstream PR
