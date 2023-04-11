@@ -939,11 +939,11 @@ FrameGraphId<FrameGraphTexture> FRenderer::colorPass(FrameGraph& fg, const char*
 
                 // set shadow sampler
                 view.prepareShadow(data.shadows ?
-                        resources.getTexture(data.shadows) : ppm.getOneTextureArray());
+                        resources.getTexture(data.shadows) : ppm.getOneDepthTextureArray());
 
                 // set structure sampler
                 view.prepareStructure(data.structure ?
-                        resources.getTexture(data.structure) : ppm.getOneTexture());
+                        resources.getTexture(data.structure) : ppm.getOneDepthTexture());
 
                 if (data.ssr) {
                     view.prepareSSR(resources.getTexture(data.ssr), config.refractionLodOffset);

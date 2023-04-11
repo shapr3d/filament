@@ -145,8 +145,10 @@ public:
             bool reinhard, size_t kernelWidth, float sigma = 6.0f) noexcept;
 
     backend::Handle<backend::HwTexture> getOneTexture() const { return mDummyOneTexture; }
+    backend::Handle<backend::HwTexture> getOneDepthTexture() const { return mDummyOneDepthTexture; }
     backend::Handle<backend::HwTexture> getZeroTexture() const { return mDummyZeroTexture; }
     backend::Handle<backend::HwTexture> getOneTextureArray() const { return mDummyOneTextureArray; }
+    backend::Handle<backend::HwTexture> getOneDepthTextureArray() const { return mDummyOneDepthTextureArray; }
 
     math::float2 halton(size_t index) const noexcept {
         return mHaltonSamples[index & 0xFu];
@@ -223,7 +225,9 @@ private:
     PostProcessMaterial& getPostProcessMaterial(utils::StaticString name) noexcept;
 
     backend::Handle<backend::HwTexture> mDummyOneTexture;
+    backend::Handle<backend::HwTexture> mDummyOneDepthTexture;
     backend::Handle<backend::HwTexture> mDummyOneTextureArray;
+    backend::Handle<backend::HwTexture> mDummyOneDepthTextureArray;
     backend::Handle<backend::HwTexture> mDummyZeroTexture;
     backend::Handle<backend::HwTexture> mStarburstTexture;
 
