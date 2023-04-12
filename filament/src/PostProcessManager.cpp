@@ -255,8 +255,14 @@ void PostProcessManager::init() noexcept {
     mDummyOneTexture = driver.createTexture(SamplerType::SAMPLER_2D, 1,
             TextureFormat::RGBA8, 1, 1, 1, 1, TextureUsage::DEFAULT);
 
+    mDummyOneDepthTexture = driver.createTexture(SamplerType::SAMPLER_2D, 1,
+            TextureFormat::DEPTH16, 1, 1, 1, 1, TextureUsage::DEFAULT);
+
     mDummyOneTextureArray = driver.createTexture(SamplerType::SAMPLER_2D_ARRAY, 1,
             TextureFormat::RGBA8, 1, 1, 1, 1, TextureUsage::DEFAULT);
+
+    mDummyOneDepthTextureArray = driver.createTexture(SamplerType::SAMPLER_2D_ARRAY, 1,
+            TextureFormat::DEPTH16, 1, 1, 1, 1, TextureUsage::DEFAULT);
 
     mDummyZeroTexture = driver.createTexture(SamplerType::SAMPLER_2D, 1,
             TextureFormat::RGBA8, 1, 1, 1, 1, TextureUsage::DEFAULT);
@@ -265,11 +271,15 @@ void PostProcessManager::init() noexcept {
             TextureFormat::R8, 1, 256, 1, 1, TextureUsage::DEFAULT);
 
     PixelBufferDescriptor dataOne(driver.allocate(4), 4, PixelDataFormat::RGBA, PixelDataType::UBYTE);
+    PixelBufferDescriptor dataOneDepth(driver.allocate(2), 2, PixelDataFormat::DEPTH_COMPONENT, PixelDataType::USHORT);
     PixelBufferDescriptor dataOneArray(driver.allocate(4), 4, PixelDataFormat::RGBA, PixelDataType::UBYTE);
+    PixelBufferDescriptor dataOneDepthArray(driver.allocate(2), 2, PixelDataFormat::DEPTH_COMPONENT, PixelDataType::USHORT);
     PixelBufferDescriptor dataZero(driver.allocate(4), 4, PixelDataFormat::RGBA, PixelDataType::UBYTE);
     PixelBufferDescriptor dataStarburst(driver.allocate(256), 256, PixelDataFormat::R, PixelDataType::UBYTE);
     *static_cast<uint32_t *>(dataOne.buffer) = 0xFFFFFFFF;
+    *static_cast<uint16_t *>(dataOneDepth.buffer) = 0xFFFF;
     *static_cast<uint32_t *>(dataOneArray.buffer) = 0xFFFFFFFF;
+    *static_cast<uint16_t *>(dataOneDepthArray.buffer) = 0xFFFF;
     *static_cast<uint32_t *>(dataZero.buffer) = 0;
     std::generate_n((uint8_t*)dataStarburst.buffer, 256,
             [&dist = mUniformDistribution, &gen = mEngine.getRandomEngine()]() {
@@ -277,7 +287,9 @@ void PostProcessManager::init() noexcept {
         return uint8_t(r * 255.0f);
     });
     driver.update2DImage(mDummyOneTexture, 0, 0, 0, 1, 1, std::move(dataOne));
+    driver.update2DImage(mDummyOneDepthTexture, 0, 0, 0, 1, 1, std::move(dataOneDepth));
     driver.update3DImage(mDummyOneTextureArray, 0, 0, 0, 0, 1, 1, 1, std::move(dataOneArray));
+    driver.update3DImage(mDummyOneDepthTextureArray, 0, 0, 0, 0, 1, 1, 1, std::move(dataOneDepthArray));
     driver.update2DImage(mDummyZeroTexture, 0, 0, 0, 1, 1, std::move(dataZero));
     driver.update2DImage(mStarburstTexture, 0, 0, 0, 256, 1, std::move(dataStarburst));
 }
@@ -285,7 +297,9 @@ void PostProcessManager::init() noexcept {
 void PostProcessManager::terminate(DriverApi& driver) noexcept {
     FEngine& engine = mEngine;
     driver.destroyTexture(mDummyOneTexture);
+    driver.destroyTexture(mDummyOneDepthTexture);
     driver.destroyTexture(mDummyOneTextureArray);
+    driver.destroyTexture(mDummyOneDepthTextureArray);
     driver.destroyTexture(mDummyZeroTexture);
     driver.destroyTexture(mStarburstTexture);
     auto first = mMaterialRegistry.begin();
