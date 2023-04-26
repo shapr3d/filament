@@ -238,7 +238,7 @@ BiplanarAxes ComputeBiplanarPlanes(vec3 weights) {
 
 BiplanarData GenerateBiplanarData(BiplanarAxes axes, float scaler, highp vec3 pos, lowp vec3 weights) {
     // Depending on the resolution of the texture, we may want to multiply the texture coordinates
-    vec3 queryPos = scaler * (pos - getMaterialOrientationCenter() - (objectUniforms.worldFromModelMatrix[3].xyz + getWorldOffset()));
+    vec3 queryPos = scaler * (pos - getMaterialOrientationCenter());
     if (IsAutoOrientationEnabled()) {
         queryPos *= getMaterialOrientationMatrix();
     }
