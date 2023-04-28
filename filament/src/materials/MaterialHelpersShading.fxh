@@ -236,7 +236,7 @@ BiplanarAxes ComputeBiplanarPlanes(vec3 weights) {
     return result;
 }
 
-BiplanarData GenerateBiplanarData(BiplanarAxes axes, float scaler, highp vec3 pos, lowp vec3 weights) {
+BiplanarData GenerateBiplanarData(BiplanarAxes axes, float scaler, highp vec3 pos, lowp vec3 normal, lowp vec3 weights) {
     // Depending on the resolution of the texture, we may want to multiply the texture coordinates
     vec3 queryPos = scaler * (pos - getMaterialOrientationCenter());
     if (IsAutoOrientationEnabled()) {
@@ -245,8 +245,10 @@ BiplanarData GenerateBiplanarData(BiplanarAxes axes, float scaler, highp vec3 po
     // Store the query data
     BiplanarData result = DEFAULT_BIPLANAR_DATA;
 
-    // Position needs some fixed flipping-fu so that textures are oriented as intended
-    vec2 uvQueries[3] = vec2[3](queryPos.yz * vec2(1, -1), -queryPos.xz, queryPos.yx);
+    // Position needs some fixed flipping-fu so that textures are oriented as intended    
+    vec2 uvQueries[3] = vec2[3](queryPos.yz * vec2(SignNoZero(normal.x), -1.0), 
+                                queryPos.xz * vec2(SignNoZero(normal.y), -1.0), 
+                                queryPos.xy * vec2(1.0, SignNoZero(normal.z)));
 
     result.maxPos = uvQueries[axes.maximum.x];
     result.medPos = uvQueries[axes.median.x];
@@ -274,6 +276,7 @@ vec3 ComputeWeights(vec3 normal) {
     if (IsAutoOrientationEnabled()) {
         normal = normal * getMaterialOrientationMatrix();
     }
+
     // This one has a region where there is no blend, creating more defined interpolations
     const float blendBias = 0.2;
     vec3 blend = abs(normal.xyz);
@@ -287,7 +290,7 @@ vec4 BiplanarTexture(sampler2D tex, float scaler, highp vec3 pos, lowp vec3 norm
     // We sort triplanar plane relevance by the relative ordering of the weights and not by the normal
     vec3 weights = ComputeWeights(normal);
     BiplanarAxes axes = ComputeBiplanarPlanes(weights);
-    BiplanarData queryData = GenerateBiplanarData(axes, scaler, pos, weights);
+    BiplanarData queryData = GenerateBiplanarData(axes, scaler, pos, normal, weights);
 
     vec4 mainPlaneSample = textureGrad( tex, queryData.maxPos, queryData.maxDpDx, queryData.maxDpDy );
     vec4 secondaryPlaneSample = textureGrad( tex, queryData.medPos, queryData.medDpDx, queryData.medDpDy );
@@ -344,7 +347,7 @@ vec3 BiplanarNormalMap(sampler2D normalMap, float scaler, highp vec3 pos, lowp v
     // We sort triplanar plane relevance by the relative ordering of the weights and not by the normal
     vec3 weights = ComputeWeights(normal);
     BiplanarAxes axes = ComputeBiplanarPlanes(weights);
-    BiplanarData queryData = GenerateBiplanarData(axes, scaler, pos, weights);
+    BiplanarData queryData = GenerateBiplanarData(axes, scaler, pos, normal, weights);
 
     // Tangent space normal maps in a quasi world space. 2-channel XY TS normal texture: this saves 33% on storage
     vec2 packedNormalMax = SampleNormalMap(normalMap, queryData.maxPos, queryData.maxDpDx, queryData.maxDpDy, useSwizzledNormalMaps);
@@ -453,11 +456,16 @@ void ApplyBaseColor(inout MaterialInputs material, inout FragmentData fragmentDa
     material.baseColor.rgb *= materialParams.tintColor.rgb;
 
 #if defined(DRAW_WEIGHTS)
-if((materialParams.debugUsageFlags & 1u ) != 0u) {
-    material.baseColor.rgb = ComputeWeights(fragmentData.normal);
-}
-
+    if((materialParams.debugUsageFlags & 1u ) != 0u) {
+        vec3 vn = material.normal.xyz * getMaterialOrientationMatrix();
+        // If an axis has negative value, a complementer color is calculated using the following matrix
+        mat3 complementerMatrix = mat3(0.0, 1.0, 1.0,    // -X => cyan
+                                    1.0, 0.0, 1.0,    // -Y => magenta
+                                    1.0, 1.0, 0.0);   // -Z => yellow
+        material.baseColor = vec4(clamp(vn, 0.0, 1.0) + clamp(-vn, 0.0, 1.0) * complementerMatrix, 1.0);
+    }
 #endif
+
 #if defined(BLENDING_ENABLED)
     material.baseColor.rgb *= material.baseColor.a;
     material.baseColor.a = 0.0;
