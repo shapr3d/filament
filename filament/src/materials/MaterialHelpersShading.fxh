@@ -8,9 +8,8 @@
 #define BLENDING_ENABLED
 #endif
 
-float SignNoZero(float f) {
-    return f < 0.0 ? -1.0 : 1.0;
-}
+// NB: Do NOT change to a function, it causes a crash on Intel driver version 30.0.101.1122.
+#define SIGN_NO_ZERO(VALUE) ((VALUE) < 0.0 ? -1.0 : 1.0)
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -246,9 +245,9 @@ BiplanarData GenerateBiplanarData(BiplanarAxes axes, float scaler, highp vec3 po
     BiplanarData result = DEFAULT_BIPLANAR_DATA;
 
     // Position needs some fixed flipping-fu so that textures are oriented as intended    
-    vec2 uvQueries[3] = vec2[3](queryPos.yz * vec2(SignNoZero(normal.x), -1.0), 
-                                queryPos.xz * vec2(SignNoZero(normal.y), -1.0), 
-                                queryPos.xy * vec2(1.0, SignNoZero(normal.z)));
+    vec2 uvQueries[3] = vec2[3](queryPos.yz * vec2(SIGN_NO_ZERO(normal.x), -1.0), 
+                                queryPos.xz * vec2(SIGN_NO_ZERO(normal.y), -1.0), 
+                                queryPos.xy * vec2(1.0, SIGN_NO_ZERO(normal.z)));
 
     result.maxPos = uvQueries[axes.maximum.x];
     result.medPos = uvQueries[axes.median.x];
@@ -322,7 +321,7 @@ vec2 SampleNormalMap(sampler2D normalMap, vec2 pos, vec2 DpDx, vec2 DpDy, bool u
 }
 
 vec2 NormalMapScale(lowp vec3 normal, int component, float normalIntensity) {
-    return vec2(SignNoZero(normal[component]) * normalIntensity, normalIntensity);
+    return vec2(SIGN_NO_ZERO(normal[component]) * normalIntensity, normalIntensity);
 }
 
 vec3 UnpackNormal(vec2 packedNormal, vec2 scale) {
@@ -360,14 +359,14 @@ vec3 BiplanarNormalMap(sampler2D normalMap, float scaler, highp vec3 pos, lowp v
     // Swizzle the above normals to tangent space and apply Whiteout blend
     const ivec2 tangentSwizzles[3] = ivec2[3](ivec2(1, 2), ivec2(0, 2), ivec2(1, 0)); // YZ, XZ, YX
     const vec2 tangentMultipliers[3] = vec2[3]( vec2(1, 1), vec2(-1, 1), vec2(1, -1) );
-    tNormalMax = vec3(tNormalMax.xy + swizzleIvec(normal, tangentSwizzles[maxAxis]) * tangentMultipliers[maxAxis] * vec2( SignNoZero(normal[maxAxis]),  1), abs(tNormalMax.z) * abs(normal[maxAxis]));
-    tNormalMed = vec3(tNormalMed.xy + swizzleIvec(normal, tangentSwizzles[medAxis]) * tangentMultipliers[medAxis] * vec2( SignNoZero(normal[medAxis]),  1), abs(tNormalMed.z) * abs(normal[medAxis]));
+    tNormalMax = vec3(tNormalMax.xy + swizzleIvec(normal, tangentSwizzles[maxAxis]) * tangentMultipliers[maxAxis] * vec2( SIGN_NO_ZERO(normal[maxAxis]),  1), abs(tNormalMax.z) * abs(normal[maxAxis]));
+    tNormalMed = vec3(tNormalMed.xy + swizzleIvec(normal, tangentSwizzles[medAxis]) * tangentMultipliers[medAxis] * vec2( SIGN_NO_ZERO(normal[medAxis]),  1), abs(tNormalMed.z) * abs(normal[medAxis]));
 
     // Swizzle tangent normals to match world orientation
     const ivec3 worldSwizzles[3] = ivec3[3](ivec3(2, 0, 1), ivec3(0, 2, 1), ivec3(1, 0, 2));
-    vec3 worldMultipliers[3] = vec3[3]( vec3(SignNoZero(normal.x), SignNoZero(normal.x), 1),
-                                          vec3(-SignNoZero(normal.y), SignNoZero(normal.y), 1),
-                                          vec3(-1, SignNoZero(normal.z), SignNoZero(normal.z)) );
+    vec3 worldMultipliers[3] = vec3[3]( vec3(SIGN_NO_ZERO(normal.x), SIGN_NO_ZERO(normal.x), 1),
+                                          vec3(-SIGN_NO_ZERO(normal.y), SIGN_NO_ZERO(normal.y), 1),
+                                          vec3(-1, SIGN_NO_ZERO(normal.z), SIGN_NO_ZERO(normal.z)) );
     // Blend and normalize
     vec3 r = swizzleIvec(tNormalMax, worldSwizzles[maxAxis]) * queryData.mainWeight * worldMultipliers[maxAxis] +
              swizzleIvec(tNormalMed, worldSwizzles[medAxis]) * queryData.medianWeight * worldMultipliers[medAxis];
