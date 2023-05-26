@@ -244,10 +244,11 @@ BiplanarData GenerateBiplanarData(BiplanarAxes axes, float scaler, highp vec3 po
     // Store the query data
     BiplanarData result = DEFAULT_BIPLANAR_DATA;
 
-    // Position needs some fixed flipping-fu so that textures are oriented as intended    
-    vec2 uvQueries[3] = vec2[3](queryPos.yz * vec2(SIGN_NO_ZERO(normal.x), -1.0), 
-                                queryPos.xz * vec2(SIGN_NO_ZERO(normal.y), -1.0), 
-                                queryPos.xy * vec2(1.0, SIGN_NO_ZERO(normal.z)));
+    // Position needs some fixed flipping-fu so that textures are oriented as intended
+    vec3 materialOrientedNormal = normal * getMaterialOrientationMatrix();
+    vec2 uvQueries[3] = vec2[3](queryPos.yz * vec2(SIGN_NO_ZERO(materialOrientedNormal.x), -1.0), 
+                                queryPos.xz * vec2(SIGN_NO_ZERO(materialOrientedNormal.y), -1.0), 
+                                queryPos.xy * vec2(1.0, SIGN_NO_ZERO(materialOrientedNormal.z)));
 
     result.maxPos = uvQueries[axes.maximum.x];
     result.medPos = uvQueries[axes.median.x];
