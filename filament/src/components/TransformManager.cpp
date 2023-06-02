@@ -60,6 +60,8 @@ void FTransformManager::create(Entity entity, Instance parent, const mat4f& loca
     assert_invariant(i);
     assert_invariant(i != parent);
 
+    manager[i].applyWorldToMaterialOrientation = true;
+
     if (i && i != parent) {
         manager[i].parent = 0;
         manager[i].next = 0;
@@ -81,6 +83,8 @@ void FTransformManager::create(Entity entity, Instance parent, const mat4& local
     Instance i = manager.addComponent(entity);
     assert_invariant(i);
     assert_invariant(i != parent);
+
+    manager[i].applyWorldToMaterialOrientation = true;
 
     if (i && i != parent) {
         manager[i].parent = 0;
@@ -196,6 +200,14 @@ void FTransformManager::setMaterialOrientation(Instance ci, const math::mat3f& r
         // store our local transform
         manager[ci].materialLocalOrientation = rotation;
         updateNodeTransform(ci);
+    }
+}
+
+void FTransformManager::applyWorldTransformToMaterialOrientation(Instance ci, bool apply) noexcept {
+    validateNode(ci);
+    if (ci) {
+        auto& manager = mManager;
+        manager[ci].applyWorldToMaterialOrientation = apply;
     }
 }
 
@@ -619,7 +631,11 @@ const mat3f& TransformManager::getMaterialOrientation(Instance ci) const noexcep
     return upcast(this)->getMaterialOrientation(ci);
 }
 
-const mat3f& TransformManager::getMaterialWorldOrientation(Instance ci) const noexcept {
+void TransformManager::applyWorldTransformToMaterialOrientation(Instance ci, bool apply) noexcept {
+    upcast(this)->applyWorldTransformToMaterialOrientation(ci, apply);
+}
+
+const mat3f &TransformManager::getMaterialWorldOrientation(Instance ci) const noexcept {
     return upcast(this)->getMaterialWorldOrientation(ci);
 }
 

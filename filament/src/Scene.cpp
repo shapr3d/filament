@@ -114,7 +114,8 @@ void FScene::prepare(const mat4& worldOriginTransform, bool shadowReceiversAreCa
         const mat4f worldTransform{ worldOriginTransform * tcm.getWorldTransformAccurate(ti) };
         const bool reversedWindingOrder = det(worldTransform.upperLeft()) < 0;
 
-        const mat3f materialOrientation = tcm.getMaterialCompoundOrientation(ti);
+        const bool applyWorldToMaterialOrientation = tcm.isWorldTransformAppliedToMaterialOrientation(ti);
+        const mat3f materialOrientation = applyWorldToMaterialOrientation ? tcm.getMaterialCompoundOrientation(ti) : tcm.getMaterialOrientation(ti);
         const float3 materialOrientationCenter = tcm.getMaterialWorldOrientationCenter(ti);
 
         // don't even draw this object if it doesn't have a transform (which shouldn't happen
