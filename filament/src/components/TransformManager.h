@@ -119,6 +119,11 @@ public:
 
     void setMaterialOrientation(Instance ci, const math::mat3f& rotation) noexcept;
 
+    void applyWorldTransformToMaterialOrientation(Instance ci, bool apply) noexcept;
+    bool isWorldTransformAppliedToMaterialOrientation(Instance ci) const noexcept {
+        return mManager[ci].applyWorldToMaterialOrientation;
+    }
+
     const math::mat3f& getMaterialOrientation(Instance ci) const noexcept {
         return mManager[ci].materialLocalOrientation;
     }
@@ -172,6 +177,7 @@ private:
         MATERIAL_ORIENTATION,               // bi/triplanar mapping rotation matrix, composed with parent transforms
         MATERIAL_LOCAL_ORIENTATION_CENTER,  // local center of bi/triplanar mapping
         MATERIAL_ORIENTATION_CENTER,        // bi/triplanar mapping center, composed with parent center
+        APPLY_WORLD_TO_MATERIAL_ORIENTATION,// whether to concatenate the world transform to material orientation
         PARENT,         // instance to the parent
         FIRST_CHILD,    // instance to our first child
         NEXT,           // instance to our next sibling
@@ -187,6 +193,7 @@ private:
             math::mat3f,    // orientation
             math::float3,   // local orientation center
             math::float3,   // orientation center
+            bool,           // apply world to material orientation
             Instance,       // parent
             Instance,       // firstChild
             Instance,       // next
@@ -215,6 +222,7 @@ private:
                 Field<MATERIAL_ORIENTATION>                 materialOrientation;
                 Field<MATERIAL_LOCAL_ORIENTATION_CENTER>    materialLocalOrientationCenter;
                 Field<MATERIAL_ORIENTATION_CENTER>          materialOrientationCenter;
+                Field<APPLY_WORLD_TO_MATERIAL_ORIENTATION>  applyWorldToMaterialOrientation;
                 Field<PARENT>       parent;
                 Field<FIRST_CHILD>  firstChild;
                 Field<NEXT>         next;

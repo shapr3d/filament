@@ -303,6 +303,23 @@ public:
     const math::mat3f& getMaterialOrientation(Instance ci) const noexcept;
 
     /**
+     * Sets whether the world transformation's rotation component should be applied to the material
+     * orientation of a transform component.
+     * @param ci    The instance of the transform component to set this property to.
+     * @param apply Whether to apply the world transform or not.
+     * @see isWorldTransformAppliedToMaterialOrientation()
+    */
+    void applyWorldTransformToMaterialOrientation(Instance ci, bool apply) noexcept;
+
+    /**
+     * Returns whether the world transformation's rotation component is applied to the material
+     * orientation of a transform component.
+     * @param ci The instance of the transform component to query this property from.
+     * @return True, if the world transform is applied to the material orientation, false otherwise.
+    */
+    bool isWorldTransformAppliedToMaterialOrientation(Instance ci) const noexcept;
+
+    /**
      * Returns the world material orientation of a transform component.
      * @param ci The instance of the transform component to query the world material orientation from.
      * @return The world orientation of the component's material (i.e. relative to the root). This is the

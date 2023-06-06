@@ -36,7 +36,6 @@
 // 12    doDeriveAbsorption             materialParams.usageFlags & 4096
 // 13    doDeriveSheenColor             materialParams.usageFlags & 8192
 // 14    doDeriveSubsurfaceColor        materialParams.usageFlags & 16384
-// 15    isAutoOrientationEnabled       materialParams.usageFlags & 32768
 //
 // Our ASTC compressor lays out the coordinates as XXXY but our BC5 compressor lays them out as XY.
 // The useSwizzledNormalMaps flag indicates if data is stored as XY or XXXY (so we can sample the 
@@ -102,10 +101,6 @@ bool DoDeriveSheenColor() {
 
 bool DoDeriveSubsurfaceColor() {
     return ( materialParams.usageFlags & 16384u ) != 0u;
-}
-
-bool IsAutoOrientationEnabled() {
-    return ( materialParams.usageFlags & 32768u ) != 0u;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -238,9 +233,8 @@ BiplanarAxes ComputeBiplanarPlanes(vec3 weights) {
 BiplanarData GenerateBiplanarData(BiplanarAxes axes, float scaler, highp vec3 pos, lowp vec3 normal, lowp vec3 weights) {
     // Depending on the resolution of the texture, we may want to multiply the texture coordinates
     vec3 queryPos = scaler * (pos - getMaterialOrientationCenter());
-    if (IsAutoOrientationEnabled()) {
-        queryPos *= getMaterialOrientationMatrix();
-    }
+    queryPos *= getMaterialOrientationMatrix();
+
     // Store the query data
     BiplanarData result = DEFAULT_BIPLANAR_DATA;
 
@@ -273,9 +267,7 @@ BiplanarData GenerateBiplanarData(BiplanarAxes axes, float scaler, highp vec3 po
 // A simple linear blend with normalization
 vec3 ComputeWeights(vec3 normal) {
     // We transform the normal only here for material rotation
-    if (IsAutoOrientationEnabled()) {
-        normal = normal * getMaterialOrientationMatrix();
-    }
+    normal = normal * getMaterialOrientationMatrix();
 
     // This one has a region where there is no blend, creating more defined interpolations
     const float blendBias = 0.2;
