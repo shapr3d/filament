@@ -1143,7 +1143,7 @@ FrameGraphId<FrameGraphTexture> PostProcessManager::dof(FrameGraph& fg,
                       dofOptions.maxBackgroundCOC ? dofOptions.maxBackgroundCOC : DOF_DEFAULT_MAX_COC});
                 mi->setParameter("uvscale", float4{ width, height,
                         1.0f / colorDesc.width, 1.0f / colorDesc.height });
-                commitAndRender(out, material, driver);
+                commitAndRender(out, material, variant, driver);
             });
 
     /*
@@ -1389,7 +1389,7 @@ FrameGraphId<FrameGraphTexture> PostProcessManager::dof(FrameGraph& fg,
                     0.0 // unused for now
                 });
                 mi->setParameter("bokehAngle",  bokehAngle);
-                commitAndRender(out, material, driver);
+                commitAndRender(out, material, variant, driver);
             });
 
     /*
@@ -1495,7 +1495,7 @@ FrameGraphId<FrameGraphTexture> PostProcessManager::dof(FrameGraph& fg,
                     colorDesc.width  / (tilesDesc.width  * float(tileSize)),
                     colorDesc.height / (tilesDesc.height * float(tileSize))
                 });
-                commitAndRender(out, material, driver);
+                commitAndRender(out, material, variant, driver);
             });
 
     return ppDoFCombine->output;
