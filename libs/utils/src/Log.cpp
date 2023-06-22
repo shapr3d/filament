@@ -63,17 +63,36 @@ ostream& LogStream::flush() noexcept {
             break;
     }
 #else
+
+    LoggerCallback callback = nullptr;
+    FILE* stream = nullptr;
+
     switch (mPriority) {
-        case LOG_DEBUG:
-        case LOG_WARNING:
-        case LOG_INFO:
-            fprintf(stdout, "%s", buf.get());
-            break;
-        case LOG_ERROR:
-            fprintf(stderr, "%s", buf.get());
-            break;
+    case LOG_DEBUG:
+        callback = slogdcb;
+        stream = stdout;
+        break;
+    case LOG_WARNING:
+        callback = slogwcb;
+        stream = stdout;
+        break;
+    case LOG_INFO:
+        callback = slogicb;
+        stream = stdout;
+        break;
+    case LOG_ERROR:
+        callback = slogecb;
+        stream = stderr;
+        break;
     }
 #endif
+
+    if (callback) {
+        callback(buf.get());
+    } else {
+        fprintf(stream, "%s", buf.get());
+    }
+
     buf.reset();
     return *this;
 }
@@ -92,5 +111,10 @@ Loggers const slog = {
         io::cwarn,  // warning
         io::cinfo   // info
 };
+
+LoggerCallback slogdcb = nullptr;
+LoggerCallback slogecb = nullptr;
+LoggerCallback slogwcb = nullptr;
+LoggerCallback slogicb = nullptr;
 
 } // namespace utils
