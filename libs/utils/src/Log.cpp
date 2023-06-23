@@ -68,22 +68,22 @@ ostream& LogStream::flush() noexcept {
     FILE* stream = nullptr;
 
     switch (mPriority) {
-    case LOG_DEBUG:
-        callback = slogdcb;
-        stream = stdout;
-        break;
-    case LOG_WARNING:
-        callback = slogwcb;
-        stream = stdout;
-        break;
-    case LOG_INFO:
-        callback = slogicb;
-        stream = stdout;
-        break;
-    case LOG_ERROR:
-        callback = slogecb;
-        stream = stderr;
-        break;
+        case LOG_DEBUG:
+            callback = slogdcb;
+            stream = stdout;
+            break;
+        case LOG_WARNING:
+            callback = slogwcb;
+            stream = stdout;
+            break;
+        case LOG_INFO:
+            callback = slogicb;
+            stream = stdout;
+            break;
+        case LOG_ERROR:
+            callback = slogecb;
+            stream = stderr;
+            break;
     }
 #endif
 
