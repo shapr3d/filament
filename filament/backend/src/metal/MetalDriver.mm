@@ -81,12 +81,14 @@ MetalDriver::MetalDriver(backend::MetalPlatform* platform) noexcept
     // In order to support texture swizzling, the GPU needs to support it and the system be running
     // iOS 13+.
     mContext->supportsTextureSwizzling = false;
+    #if !TARGET_OS_SIMULATOR
     if (@available(iOS 13, *)) {
         mContext->supportsTextureSwizzling =
             mContext->highestSupportedGpuFamily.apple >= 1 ||       // all Apple GPUs
             mContext->highestSupportedGpuFamily.mac   >= 2 ||       // newer macOS GPUs
             mContext->highestSupportedGpuFamily.macCatalyst >= 2;   // newer Mac Catalyst GPUs
     }
+    #endif
 
     mContext->supportsDepthResolve =
         mContext->highestSupportedGpuFamily.apple >= 3 ||
