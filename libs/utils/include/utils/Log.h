@@ -38,6 +38,12 @@ struct UTILS_PUBLIC Loggers {
 
 extern UTILS_PUBLIC Loggers const slog;
 
+using LoggerCallback = void(*)(const char*);
+extern UTILS_PUBLIC LoggerCallback slogdcb;
+extern UTILS_PUBLIC LoggerCallback slogecb;
+extern UTILS_PUBLIC LoggerCallback slogwcb;
+extern UTILS_PUBLIC LoggerCallback slogicb;
+
 } // namespace utils
 
 #endif // TNT_UTILS_LOG_H
