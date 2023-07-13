@@ -104,10 +104,10 @@ Driver* PlatformEGL::createDriver(void* sharedContext) noexcept {
     eglCreateImageKHR = (PFNEGLCREATEIMAGEKHRPROC) eglGetProcAddress("eglCreateImageKHR");
     eglDestroyImageKHR = (PFNEGLDESTROYIMAGEKHRPROC) eglGetProcAddress("eglDestroyImageKHR");
 
-#ifndef FILAMENT_USE_ANGLE
-    constexpr EGLint recordable = 1;
-#else
+#ifdef FILAMENT_USE_ANGLE
     constexpr EGLint recordable = EGL_DONT_CARE;
+#else
+    constexpr EGLint recordable = 1;
 #endif
 
     EGLint configsCount;
