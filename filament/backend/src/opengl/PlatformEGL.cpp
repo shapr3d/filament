@@ -185,7 +185,7 @@ Driver* PlatformEGL::createDriver(void* sharedContext) noexcept {
             goto error;
         }
     }
-    
+
     if (!extensions.has("EGL_KHR_no_config_context")) {
         // if we have the EGL_KHR_no_config_context, we don't need to worry about the config
         // when creating the context, otherwise, we must always pick a transparent config.
