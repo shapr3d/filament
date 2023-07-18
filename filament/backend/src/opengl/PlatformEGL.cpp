@@ -104,6 +104,12 @@ Driver* PlatformEGL::createDriver(void* sharedContext) noexcept {
     eglCreateImageKHR = (PFNEGLCREATEIMAGEKHRPROC) eglGetProcAddress("eglCreateImageKHR");
     eglDestroyImageKHR = (PFNEGLDESTROYIMAGEKHRPROC) eglGetProcAddress("eglDestroyImageKHR");
 
+#ifdef FILAMENT_USE_ANGLE
+    constexpr EGLint recordable = EGL_DONT_CARE;
+#else
+    constexpr EGLint recordable = 1;
+#endif
+
     EGLint configsCount;
     EGLint configAttribs[] = {
             EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT_KHR,        //  0
@@ -112,7 +118,7 @@ Driver* PlatformEGL::createDriver(void* sharedContext) noexcept {
             EGL_BLUE_SIZE,   8,                                 //  6
             EGL_ALPHA_SIZE,  0,                                 //  8 : reserved to set ALPHA_SIZE below
             EGL_DEPTH_SIZE, 24,                                 // 10
-            EGL_RECORDABLE_ANDROID, 1,                          // 12
+            EGL_RECORDABLE_ANDROID, recordable,                 // 12
             EGL_NONE                                            // 14
     };
 
@@ -140,21 +146,22 @@ Driver* PlatformEGL::createDriver(void* sharedContext) noexcept {
     EGLConfig eglConfig = nullptr;
 
     // find an opaque config
-    if (!eglChooseConfig(mEGLDisplay, configAttribs, &mEGLConfig, 1, &configsCount)) {
+    if (!eglChooseConfig(mEGLDisplay, configAttribs, &mEGLConfig, 1, &configsCount) ||
+            (configAttribs[13] == EGL_DONT_CARE && configsCount == 0)) {
         logEglError("eglChooseConfig");
         goto error;
     }
 
-    if (configsCount == 0) {
-      // warn and retry without EGL_RECORDABLE_ANDROID
-      logEglError("eglChooseConfig(..., EGL_RECORDABLE_ANDROID) failed. Continuing without it.");
-      configAttribs[12] = EGL_RECORDABLE_ANDROID;
-      configAttribs[13] = EGL_DONT_CARE;
-      if (!eglChooseConfig(mEGLDisplay, configAttribs, &mEGLConfig, 1, &configsCount) ||
-              configsCount == 0) {
-          logEglError("eglChooseConfig");
-          goto error;
-      }
+    if (recordable == 1 && configsCount == 0) {
+        // warn and retry without EGL_RECORDABLE_ANDROID
+        logEglError("eglChooseConfig(..., EGL_RECORDABLE_ANDROID) failed. Continuing without it.");
+        configAttribs[12] = EGL_RECORDABLE_ANDROID;
+        configAttribs[13] = EGL_DONT_CARE;
+        if (!eglChooseConfig(mEGLDisplay, configAttribs, &mEGLConfig, 1, &configsCount) ||
+                configsCount == 0) {
+            logEglError("eglChooseConfig");
+            goto error;
+        }
     }
 
     // find a transparent config
@@ -166,17 +173,17 @@ Driver* PlatformEGL::createDriver(void* sharedContext) noexcept {
         goto error;
     }
 
-    if (configsCount == 0) {
-      // warn and retry without EGL_RECORDABLE_ANDROID
+    if (recordable == 1 && configsCount == 0) {
+        // warn and retry without EGL_RECORDABLE_ANDROID
         logEglError("eglChooseConfig(..., EGL_RECORDABLE_ANDROID) failed. Continuing without it.");
-      // this is not fatal
-      configAttribs[12] = EGL_RECORDABLE_ANDROID;
-      configAttribs[13] = EGL_DONT_CARE;
-      if (!eglChooseConfig(mEGLDisplay, configAttribs, &mEGLTransparentConfig, 1, &configsCount) ||
-              configsCount == 0) {
-          logEglError("eglChooseConfig");
-          goto error;
-      }
+        // this is not fatal
+        configAttribs[12] = EGL_RECORDABLE_ANDROID;
+        configAttribs[13] = EGL_DONT_CARE;
+        if (!eglChooseConfig(mEGLDisplay, configAttribs, &mEGLTransparentConfig, 1, &configsCount) ||
+                configsCount == 0) {
+            logEglError("eglChooseConfig");
+            goto error;
+        }
     }
 
     if (!extensions.has("EGL_KHR_no_config_context")) {
