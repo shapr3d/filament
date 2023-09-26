@@ -29,9 +29,22 @@ UTILS_NOINLINE
 HandleAllocator<P0, P1, P2>::Allocator::Allocator(AreaPolicy::HeapArea const& area)
         : mArea(area) {
     // TODO: we probably need a better way to set the size of these pools
+#if defined(WIN32)
+    // OpenGL backend uses pool2 the most
+    const size_t unit = area.size() / 100;
+    const size_t offsetPool1 = unit;
+    const size_t offsetPool2 = 85 * unit;
+#elif defined(IOS)
+    // Metal backend uses pool3 99% of the time (and barely ever uses pool2)
     const size_t unit = area.size() / 256;
     const size_t offsetPool1 = unit;
     const size_t offsetPool2 = 2 * unit;
+#else
+    // Upstream Filament uses 1:15:16 ratio on all platforms
+    const size_t unit = area.size() / 32;
+    const size_t offsetPool1 =      unit;
+    const size_t offsetPool2 = 16 * unit;
+#endif
     char* const p = (char*)area.begin();
     mPool0 = PoolAllocator< P0, 16>(p, p + offsetPool1);
     mPool1 = PoolAllocator< P1, 16>(p + offsetPool1, p + offsetPool2);
