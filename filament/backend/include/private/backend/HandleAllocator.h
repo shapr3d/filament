@@ -44,9 +44,9 @@ template <size_t P0, size_t P1, size_t P2>
 class HandleAllocator {
 public:
     struct PoolRatios {
+        size_t pool0;
         size_t pool1;
         size_t pool2;
-        size_t pool3;
     };
 
     HandleAllocator(const char* name, size_t size, const PoolRatios& poolRatios) noexcept;

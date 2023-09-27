@@ -28,9 +28,9 @@ template <size_t P0, size_t P1, size_t P2>
 UTILS_NOINLINE
 HandleAllocator<P0, P1, P2>::Allocator::Allocator(AreaPolicy::HeapArea const& area, const PoolRatios& poolRatios)
         : mArea(area) {
-    const size_t unit = area.size() / (poolRatios.pool1 + poolRatios.pool2 + poolRatios.pool3);
-    const size_t offsetPool1 = poolRatios.pool1 * unit;
-    const size_t offsetPool2 = (poolRatios.pool1 + poolRatios.pool2) * unit;
+    const size_t unit = area.size() / (poolRatios.pool0 + poolRatios.pool1 + poolRatios.pool2);
+    const size_t offsetPool1 = poolRatios.pool0 * unit;
+    const size_t offsetPool2 = (poolRatios.pool0 + poolRatios.pool1) * unit;
     char* const p = (char*)area.begin();
     mPool0 = PoolAllocator< P0, 16>(p, p + offsetPool1);
     mPool1 = PoolAllocator< P1, 16>(p + offsetPool1, p + offsetPool2);
