@@ -43,8 +43,13 @@ namespace filament::backend {
 template <size_t P0, size_t P1, size_t P2>
 class HandleAllocator {
 public:
+    struct PoolRatios {
+        size_t pool0;
+        size_t pool1;
+        size_t pool2;
+    };
 
-    HandleAllocator(const char* name, size_t size) noexcept;
+    HandleAllocator(const char* name, size_t size, const PoolRatios& poolRatios) noexcept;
     HandleAllocator(HandleAllocator const& rhs) = delete;
     HandleAllocator& operator=(HandleAllocator const& rhs) = delete;
     ~HandleAllocator();
@@ -219,7 +224,7 @@ private:
         UTILS_UNUSED_IN_RELEASE const utils::AreaPolicy::HeapArea& mArea;
     public:
         static constexpr size_t MIN_ALIGNMENT_SHIFT = 4;
-        explicit Allocator(const utils::AreaPolicy::HeapArea& area);
+        Allocator(const utils::AreaPolicy::HeapArea& area, const PoolRatios& poolRatios);
 
         // this is in fact always called with a constexpr size argument
         [[nodiscard]] inline void* alloc(size_t size, size_t alignment, size_t extra) noexcept {
