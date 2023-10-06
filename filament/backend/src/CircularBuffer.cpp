@@ -25,6 +25,7 @@
 #endif
 
 #include <stdio.h>
+#include <algorithm>
 
 #include <utils/ashmem.h>
 #include <utils/Log.h>
@@ -123,7 +124,8 @@ void* CircularBuffer::alloc(size_t size) noexcept {
     }
     return data;
 #else
-    return ::malloc(2 * size);
+    // Use 20% or 3 MiB overflow guard, whichever is bigger
+    return ::malloc(std::max(6 * size / 5, size + 3 * 1024 * 1024));
 #endif
 }
 
