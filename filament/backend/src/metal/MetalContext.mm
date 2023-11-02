@@ -63,7 +63,7 @@ void initializeSupportedGpuFamilies(MetalContext* context) {
 
         if ([device supportsFamily:MTLGPUFamilyMac2]) {
             highestSupportedFamily.mac = 2;
-        } else if ([device supportsFamily:MTLGPUFamilyMac1]) {
+        } else {
             highestSupportedFamily.mac = 1;
         }
     } else {

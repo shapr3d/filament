@@ -881,12 +881,8 @@ void MetalSamplerGroup::useResources(id<MTLRenderCommandEncoder> renderPassEncod
         // TODO: pass only the appropriate stages to useResources.
         [renderPassEncoder useResources:textures.data()
                                   count:textures.size()
-                                  usage:MTLResourceUsageRead | MTLResourceUsageSample
+                                  usage:MTLResourceUsageRead
                                  stages:MTLRenderStageFragment | MTLRenderStageVertex];
-    } else {
-        [renderPassEncoder useResources:textures.data()
-                                  count:textures.size()
-                                  usage:MTLResourceUsageRead | MTLResourceUsageSample];
     }
 }
 
