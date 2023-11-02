@@ -191,6 +191,8 @@ TEST_F(BackendTest, VertexBufferUpdate) {
     }
 
     executeCommands();
+
+    getDriver().purge();
 }
 
 // This test renders two triangles in two separate draw calls. Between the draw calls, a uniform
