@@ -31,15 +31,8 @@ layout(location = 0) in vec4 mesh_position;
 
 layout(location = 0) out uvec4 indices;
 
-uniform Params {
-    highp vec4 padding[4];  // offset of 64 bytes
-
-    highp vec4 color;
-    highp vec4 offset;
-} params;
-
 void main() {
-    gl_Position = vec4(mesh_position.xy + params.offset.xy, 0.0, 1.0);
+    gl_Position = vec4(mesh_position.xy, 0.0, 1.0);
 #if defined(TARGET_VULKAN_ENVIRONMENT)
     // In Vulkan, clip space is Y-down. In OpenGL and Metal, clip space is Y-up.
     gl_Position.y = -gl_Position.y;
@@ -51,15 +44,8 @@ std::string fragment (R"(#version 450 core
 
 layout(location = 0) out vec4 fragColor;
 
-uniform Params {
-    highp vec4 padding[4];  // offset of 64 bytes
-
-    highp vec4 color;
-    highp vec4 offset;
-} params;
-
 void main() {
-    fragColor = vec4(params.color.rgb, 1.0f);
+    fragColor = vec4(1.0f, 0.0f, 1.0f, 1.0f);
 }
 
 )");
@@ -124,29 +110,7 @@ TEST_P(BackendTest_ImportBO, VertexBufferUpdate) {
         state.rasterState.depthFunc = RasterState::DepthFunc::A;
         state.rasterState.culling = CullingMode::NONE;
 
-        // Create a uniform buffer.
-        // We use STATIC here, even though the buffer is updated, to force the Metal backend to use a
-        // GPU buffer, which is more interesting to test.
-        auto ubuffer = getDriverApi().createBufferObject(sizeof(MaterialParams) + 64,
-                BufferObjectBinding::UNIFORM, BufferUsage::STATIC);
-        getDriverApi().bindUniformBuffer(0, ubuffer);
-
         getDriverApi().startCapture(0);
-
-        // Upload uniforms.
-        {
-            MaterialParams params {
-                    .color = { 1.0f, 1.0f, 1.0f, 1.0f },
-                    .offset = { 0.0f, 0.0f, 0.0f, 0.0f }
-            };
-            auto* tmp = new MaterialParams(params);
-            auto cb = [](void* buffer, size_t size, void* user) {
-                auto* sp = (MaterialParams*) buffer;
-                delete sp;
-            };
-            BufferDescriptor bd(tmp, sizeof(MaterialParams), cb);
-            getDriverApi().updateBufferObject(ubuffer, std::move(bd), 64);
-        }
 
         getDriverApi().makeCurrent(swapChain, swapChain);
         getDriverApi().beginFrame(0, 0);
