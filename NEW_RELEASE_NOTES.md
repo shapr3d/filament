@@ -11,4 +11,4 @@ appropriate header in [RELEASE_NOTES.md](./RELEASE_NOTES.md).
 - engine: Support up to 4 side-by-side stereoscopic eyes, configurable at Engine creation time. See
   `Engine::Config::stereoscopicEyeCount`. [⚠️ **Recompile Materials**]
 - backend: Support importing native buffers as buffer objects.
-   Currently none of the backends support this.
+   Currently only the Metal backends supports this.
