@@ -398,7 +398,7 @@ install(DIRECTORY ${PUBLIC_HDR_DIR}/backend DESTINATION include)
 option(INSTALL_BACKEND_TEST "Install the backend test library so it can be consumed on iOS" OFF)
 
 if (APPLE)
-    add_library(backend_test STATIC
+    set(BACKEND_TEST_SOURCE
         test/BackendTest.cpp
         test/ShaderGenerator.cpp
         test/TrianglePrimitive.cpp
@@ -415,6 +415,13 @@ if (APPLE)
         test/test_Scissor.cpp
         test/test_MipLevels.cpp
         )
+    if (FILAMENT_SUPPORTS_METAL)
+        list(APPEND BACKEND_TEST_SOURCE test/TrianglePrimitive_Metal.mm)
+    else()
+        list(APPEND BACKEND_TEST_SOURCE test/TrianglePrimitive_Noop.cpp)
+    endif()
+
+    add_library(backend_test STATIC ${BACKEND_TEST_SOURCE})
 
     target_link_libraries(backend_test PRIVATE
         backend

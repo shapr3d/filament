@@ -45,7 +45,8 @@ public:
 
     using index_type = uint32_t;
 
-    TrianglePrimitive(filament::backend::DriverApi& driverApi, bool allocateLargeBuffers = false);
+    TrianglePrimitive(filament::backend::DriverApi& driverApi, bool allocateLargeBuffers = false,
+            bool importNativeBuffers = false);
     ~TrianglePrimitive();
 
     PrimitiveHandle getRenderPrimitive() const noexcept;
@@ -55,6 +56,8 @@ public:
     void updateIndices(const index_type* indices, int count, int offset) noexcept;
 
 private:
+    intptr_t createNativeVertexBuffer(size_t size) const noexcept;
+    void destroyNativeVertexBuffer(intptr_t nativeBuffer) const noexcept;
 
     size_t mVertexCount = 3;
     size_t mIndexCount = 3;
@@ -65,6 +68,7 @@ private:
     BufferObjectHandle mBufferObject;
     VertexHandle mVertexBuffer;
     IndexHandle mIndexBuffer;
+    intptr_t mNativeVertexBuffer = 0;
 
 };
 

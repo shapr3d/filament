@@ -79,12 +79,17 @@ struct MaterialParams {
 };
 static_assert(sizeof(MaterialParams) == 8 * sizeof(float));
 
-TEST_F(BackendTest, VertexBufferUpdate) {
+class BackendTest_ImportBO : public BackendTest, public testing::WithParamInterface<bool> {};
+
+TEST_P(BackendTest_ImportBO, VertexBufferUpdate) {
     const bool largeBuffers = false;
 
     // If updateIndices is true, then even-numbered triangles will have their indices set to
     // {0, 0, 0}, effectively "hiding" every other triangle.
     const bool updateIndices = true;
+
+    // Currently this feature is only implemented for Metal
+    const bool importNativeBuffers = sBackend == Backend::METAL && GetParam();
 
     // The test is executed within this block scope to force destructors to run before
     // executeCommands().
@@ -103,7 +108,7 @@ TEST_F(BackendTest, VertexBufferUpdate) {
 
         // To test large buffers (which exercise a different code path) create an extra large
         // buffer. Only the first 3 vertices will be used.
-        TrianglePrimitive triangle(getDriverApi(), largeBuffers);
+        TrianglePrimitive triangle(getDriverApi(), largeBuffers, importNativeBuffers);
 
         RenderPassParams params = {};
         fullViewport(params);
@@ -194,6 +199,10 @@ TEST_F(BackendTest, VertexBufferUpdate) {
 
     getDriver().purge();
 }
+
+INSTANTIATE_TEST_SUITE_P(Parameterized, BackendTest_ImportBO, testing::Bool(), [](const auto& info) {
+    return info.param ? "ImportBO" : "CreateBO";
+});
 
 // This test renders two triangles in two separate draw calls. Between the draw calls, a uniform
 // buffer object is partially updated.

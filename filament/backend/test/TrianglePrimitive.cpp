@@ -30,7 +30,7 @@ static constexpr filament::math::float2 gVertices[3] = {
 static constexpr TrianglePrimitive::index_type gIndices[3] = { 0, 1, 2 };
 
 TrianglePrimitive::TrianglePrimitive(filament::backend::DriverApi& driverApi,
-        bool allocateLargeBuffers) : mDriverApi(driverApi) {
+        bool allocateLargeBuffers, bool importNativeBuffers) : mDriverApi(driverApi) {
     mVertexCount = allocateLargeBuffers ? 2048 : 3;
     mIndexCount = allocateLargeBuffers ? 4096 : 3;
     AttributeArray attributes = {
@@ -47,7 +47,14 @@ TrianglePrimitive::TrianglePrimitive(filament::backend::DriverApi& driverApi,
     attributes[5].flags |= Attribute::FLAG_INTEGER_TARGET;
 
     const size_t size = sizeof(math::float2) * 3;
-    mBufferObject = mDriverApi.createBufferObject(size, BufferObjectBinding::VERTEX, BufferUsage::STATIC);
+    if (importNativeBuffers) {
+        mNativeVertexBuffer = createNativeVertexBuffer(size);
+        mDriverApi.setupExternalResource(mNativeVertexBuffer);
+        mBufferObject = mDriverApi.importBufferObject(
+              mNativeVertexBuffer, BufferObjectBinding::VERTEX, BufferUsage::STATIC, size);
+    } else {
+        mBufferObject = mDriverApi.createBufferObject(size, BufferObjectBinding::VERTEX, BufferUsage::STATIC);
+    }
     mVertexBuffer = mDriverApi.createVertexBuffer(1, 1, mVertexCount, attributes);
     mDriverApi.setVertexBufferObject(mVertexBuffer, 0, mBufferObject);
     BufferDescriptor vertexBufferDesc(gVertices, size);
@@ -104,6 +111,9 @@ TrianglePrimitive::~TrianglePrimitive() {
     mDriverApi.destroyVertexBuffer(mVertexBuffer);
     mDriverApi.destroyIndexBuffer(mIndexBuffer);
     mDriverApi.destroyRenderPrimitive(mRenderPrimitive);
+    if (mNativeVertexBuffer) {
+        destroyNativeVertexBuffer(mNativeVertexBuffer);
+    }
 }
 
 TrianglePrimitive::PrimitiveHandle TrianglePrimitive::getRenderPrimitive() const noexcept {
