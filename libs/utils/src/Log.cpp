@@ -65,15 +65,11 @@ ostream& LogStream::flush() noexcept {
             __android_log_write(ANDROID_LOG_VERBOSE, UTILS_LOG_TAG, buf.get());
             break;
     }
-<<<<<<< HEAD
-#else
+#else // ANDROID
 
     LoggerCallback callback = nullptr;
     FILE* stream = nullptr;
 
-=======
-#else // ANDROID
->>>>>>> 0cf78b3abe70a6504de7f0d4f2c5fcb3d945ee9e
     switch (mPriority) {
         case LOG_DEBUG:
             callback = slogdcb;
@@ -93,9 +89,12 @@ ostream& LogStream::flush() noexcept {
             break;
         case LOG_VERBOSE:
 #ifndef NDEBUG
-            fprintf(stdout, "%s", buf.get());
+            callback = slogvcb;
+            stream = stdout;
 #endif
-<<<<<<< HEAD
+            break;
+    }
+#endif // ANDROID
 
     if (callback) {
         callback(buf.get());
@@ -103,11 +102,6 @@ ostream& LogStream::flush() noexcept {
         fprintf(stream, "%s", buf.get());
     }
 
-=======
-            break;
-    }
-#endif // ANDROID
->>>>>>> 0cf78b3abe70a6504de7f0d4f2c5fcb3d945ee9e
     buf.reset();
     return *this;
 }
@@ -133,5 +127,6 @@ LoggerCallback slogdcb = nullptr;
 LoggerCallback slogecb = nullptr;
 LoggerCallback slogwcb = nullptr;
 LoggerCallback slogicb = nullptr;
+LoggerCallback slogvcb = nullptr;
 
 } // namespace utils

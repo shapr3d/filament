@@ -46,6 +46,7 @@ extern UTILS_PUBLIC LoggerCallback slogdcb;
 extern UTILS_PUBLIC LoggerCallback slogecb;
 extern UTILS_PUBLIC LoggerCallback slogwcb;
 extern UTILS_PUBLIC LoggerCallback slogicb;
+extern UTILS_PUBLIC LoggerCallback slogvcb;
 
 } // namespace utils
 
