@@ -39,7 +39,7 @@ namespace backend {
 
 DriverBase::DriverBase(Dispatcher* dispatcher) noexcept
         : mDispatcher(dispatcher) {
-    if constexpr (UTILS_HAS_THREADING) {
+    if constexpr (FILAMENT_THREADING_MODE == FILAMENT_THREADING_MODE_ASYNCHRONOUS_DRIVER) {
         // This thread services user callbacks
         mServiceThread = std::thread([this]() {
             do {
@@ -67,7 +67,7 @@ DriverBase::DriverBase(Dispatcher* dispatcher) noexcept
 }
 
 DriverBase::~DriverBase() noexcept {
-    if constexpr (UTILS_HAS_THREADING) {
+    if constexpr (FILAMENT_THREADING_MODE == FILAMENT_THREADING_MODE_ASYNCHRONOUS_DRIVER) {
         // quit our service thread
         std::unique_lock<std::mutex> lock(mServiceThreadLock);
         mExitRequested = true;
@@ -99,7 +99,7 @@ void DriverBase::CallbackData::release(CallbackData* data) {
 
 
 void DriverBase::scheduleCallback(CallbackHandler* handler, void* user, CallbackHandler::Callback callback) {
-    if (handler && UTILS_HAS_THREADING) {
+    if (handler && FILAMENT_THREADING_MODE == FILAMENT_THREADING_MODE_ASYNCHRONOUS_DRIVER) {
         std::lock_guard<std::mutex> lock(mServiceThreadLock);
         mServiceThreadCallbackQueue.emplace_back(handler, callback, user);
         mServiceThreadCondition.notify_one();
