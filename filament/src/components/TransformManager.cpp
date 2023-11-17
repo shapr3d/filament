@@ -498,7 +498,6 @@ math::mat3f FTransformManager::getMaterialCompoundOrientation(Instance ci) const
     return worldRotation * orientation;
 }
 
-
 void FTransformManager::validateNode(Instance i) noexcept {
 #ifndef NDEBUG
     auto& manager = mManager;

@@ -34,7 +34,7 @@ class LogStream : public ostream {
 public:
 
     enum Priority {
-        LOG_DEBUG, LOG_ERROR, LOG_WARNING, LOG_INFO
+        LOG_DEBUG, LOG_ERROR, LOG_WARNING, LOG_INFO, LOG_VERBOSE
     };
 
     explicit LogStream(Priority p) noexcept : mPriority(p) {}
@@ -61,12 +61,19 @@ ostream& LogStream::flush() noexcept {
         case LOG_INFO:
             __android_log_write(ANDROID_LOG_INFO, UTILS_LOG_TAG, buf.get());
             break;
+        case LOG_VERBOSE:
+            __android_log_write(ANDROID_LOG_VERBOSE, UTILS_LOG_TAG, buf.get());
+            break;
     }
+<<<<<<< HEAD
 #else
 
     LoggerCallback callback = nullptr;
     FILE* stream = nullptr;
 
+=======
+#else // ANDROID
+>>>>>>> 0cf78b3abe70a6504de7f0d4f2c5fcb3d945ee9e
     switch (mPriority) {
         case LOG_DEBUG:
             callback = slogdcb;
@@ -84,8 +91,11 @@ ostream& LogStream::flush() noexcept {
             callback = slogecb;
             stream = stderr;
             break;
-    }
+        case LOG_VERBOSE:
+#ifndef NDEBUG
+            fprintf(stdout, "%s", buf.get());
 #endif
+<<<<<<< HEAD
 
     if (callback) {
         callback(buf.get());
@@ -93,6 +103,11 @@ ostream& LogStream::flush() noexcept {
         fprintf(stream, "%s", buf.get());
     }
 
+=======
+            break;
+    }
+#endif // ANDROID
+>>>>>>> 0cf78b3abe70a6504de7f0d4f2c5fcb3d945ee9e
     buf.reset();
     return *this;
 }
@@ -101,15 +116,17 @@ static LogStream cout(LogStream::Priority::LOG_DEBUG);
 static LogStream cerr(LogStream::Priority::LOG_ERROR);
 static LogStream cwarn(LogStream::Priority::LOG_WARNING);
 static LogStream cinfo(LogStream::Priority::LOG_INFO);
+static LogStream cverbose(LogStream::Priority::LOG_VERBOSE);
 
 } // namespace io
 
 
 Loggers const slog = {
-        io::cout,   // debug
-        io::cerr,   // error
-        io::cwarn,  // warning
-        io::cinfo   // info
+        io::cout,       // debug
+        io::cerr,       // error
+        io::cwarn,      // warning
+        io::cinfo,      // info
+        io::cverbose    // verbose
 };
 
 LoggerCallback slogdcb = nullptr;

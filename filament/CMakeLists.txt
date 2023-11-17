@@ -176,6 +176,7 @@ set(MATERIAL_SRCS
         src/materials/fsr/fsr_rcas.mat
         src/materials/colorGrading/colorGrading.mat
         src/materials/colorGrading/colorGradingAsSubpass.mat
+        src/materials/colorGrading/customResolveAsSubpass.mat
         src/materials/defaultMaterial.mat
         src/materials/Opaque.mat
         src/materials/Transparent.mat

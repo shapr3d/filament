@@ -543,7 +543,6 @@ void evaluateClearCoatIBL(const MaterialInputs material, const PixelParams pixel
 
     // TODO: Should we apply specularAO to the attenuation as well?
     float specularAO = specularAO(clearCoatNoV, diffuseAO, pixel.clearCoatRoughness, cache);
-    
     Fr += prefilteredRadiance(clearCoatR, pixel.clearCoatPerceptualRoughness) * (specularAO * Fc);
 #endif
 }
