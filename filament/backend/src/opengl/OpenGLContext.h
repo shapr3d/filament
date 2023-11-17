@@ -248,6 +248,9 @@ public:
             {   bugs.invalidate_end_only_if_invalidate_start,
                     "invalidate_end_only_if_invalidate_start",
                     ""},
+            {   bugs.allow_read_only_ancillary_feedback_loop,
+                    "allow_read_only_ancillary_feedback_loop",
+                    ""},
     }};
 
     // state getters -- as needed.
