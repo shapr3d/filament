@@ -34,6 +34,9 @@ struct UTILS_PUBLIC Loggers {
 
     // INFORMATION level logging stream
     io::ostream& i;
+
+    // VERBOSE level logging stream
+    io::ostream& v;
 };
 
 extern UTILS_PUBLIC Loggers const slog;
@@ -43,6 +46,7 @@ extern UTILS_PUBLIC LoggerCallback slogdcb;
 extern UTILS_PUBLIC LoggerCallback slogecb;
 extern UTILS_PUBLIC LoggerCallback slogwcb;
 extern UTILS_PUBLIC LoggerCallback slogicb;
+extern UTILS_PUBLIC LoggerCallback slogvcb;
 
 } // namespace utils
 

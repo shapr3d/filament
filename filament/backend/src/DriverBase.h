@@ -23,20 +23,23 @@
 #include <backend/Platform.h>
 
 #include <backend/DriverEnums.h>
+#include <backend/CallbackHandler.h>
 
 #include "private/backend/AcquiredImage.h"
 #include "private/backend/Driver.h"
 #include "private/backend/SamplerGroup.h"
 
 #include <array>
+#include <condition_variable>
 #include <memory>
 #include <mutex>
+#include <thread>
 #include <utility>
+#include <vector>
 
 #include <stdint.h>
 
-namespace filament {
-namespace backend {
+namespace filament::backend {
 
 class Dispatcher;
 
@@ -53,7 +56,7 @@ struct HwVertexBuffer : public HwBase {
     uint8_t bufferCount{};                //   1
     uint8_t attributeCount{};             //   1
     bool padding{};                       //   1
-    uint32_t bufferObjectsVersion{};       //  4 -> total struct is 144 bytes
+    uint32_t bufferObjectsVersion{};      //   4 -> total struct is 140 bytes
 
     HwVertexBuffer() noexcept = default;
     HwVertexBuffer(uint8_t bufferCount, uint8_t attributeCount, uint32_t elementCount,
@@ -75,7 +78,7 @@ struct HwBufferObject : public HwBase {
 struct HwIndexBuffer : public HwBase {
     uint32_t count : 27;
     uint32_t elementSize : 5;
-    uint32_t bufferObjectVersion{};      
+    uint32_t bufferObjectVersion{};
 
     HwIndexBuffer() noexcept : count{}, elementSize{} { }
     HwIndexBuffer(uint8_t elementSize, uint32_t indexCount) noexcept :
@@ -184,6 +187,38 @@ public:
 protected:
     Dispatcher* mDispatcher;
 
+    class CallbackDataDetails;
+
+    // Helpers...
+    struct CallbackData {
+        CallbackData(CallbackData const &) = delete;
+        CallbackData(CallbackData&&) = delete;
+        CallbackData& operator=(CallbackData const &) = delete;
+        CallbackData& operator=(CallbackData&&) = delete;
+        void* storage[8] = {};
+        static CallbackData* obtain(DriverBase* allocator);
+        static void release(CallbackData* data);
+    protected:
+        CallbackData() = default;
+    };
+
+    template<typename T>
+    void scheduleCallback(CallbackHandler* handler, T&& functor) {
+        CallbackData* data = CallbackData::obtain(this);
+        static_assert(sizeof(T) <= sizeof(data->storage), "functor too large");
+        new(data->storage) T(std::forward<T>(functor));
+        scheduleCallback(handler, data, (CallbackHandler::Callback)[](void* data) {
+            CallbackData* details = static_cast<CallbackData*>(data);
+            void* user = details->storage;
+            T& functor = *static_cast<T*>(user);
+            functor();
+            functor.~T();
+            CallbackData::release(details);
+        });
+    }
+
+    void scheduleCallback(CallbackHandler* handler, void* user, CallbackHandler::Callback callback);
+
     inline void scheduleDestroy(BufferDescriptor&& buffer) noexcept {
         if (buffer.hasCallback()) {
             scheduleDestroySlow(std::move(buffer));
@@ -192,19 +227,23 @@ protected:
 
     void scheduleDestroySlow(BufferDescriptor&& buffer) noexcept;
 
-    void scheduleRelease(AcquiredImage&& image) noexcept;
+    void scheduleRelease(AcquiredImage const& image) noexcept;
 
     void debugCommandBegin(CommandStream* cmds, bool synchronous, const char* methodName) noexcept override;
     void debugCommandEnd(CommandStream* cmds, bool synchronous, const char* methodName) noexcept override;
 
 private:
     std::mutex mPurgeLock;
-    std::vector<BufferDescriptor> mBufferToPurge;
-    std::vector<AcquiredImage> mImagesToPurge;
+    std::vector<std::pair<void*, CallbackHandler::Callback>> mCallbacks;
+
+    std::thread mServiceThread;
+    std::mutex mServiceThreadLock;
+    std::condition_variable mServiceThreadCondition;
+    std::vector<std::tuple<CallbackHandler*, CallbackHandler::Callback, void*>> mServiceThreadCallbackQueue;
+    bool mExitRequested = false;
 };
 
 
-} // namespace backend
-} // namespace filament
+} // namespace backend::filament
 
 #endif // TNT_FILAMENT_DRIVER_DRIVERBASE_H

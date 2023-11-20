@@ -280,7 +280,7 @@ void FScene::updateUBOs(utils::Range<uint32_t> visibleRenderables, backend::Hand
         UniformBuffer::setUniform(buffer,
                 offset + offsetof(PerRenderableUib, userData),
                 sceneData.elementAt<USER_DATA>(i));
-        
+
         UniformBuffer::setUniform(buffer,
                 offset + offsetof(PerRenderableUib, materialOrientationCenter),
                 sceneData.elementAt<MATERIAL_ORIENTATION_CENTER>(i));
