@@ -98,7 +98,7 @@ ostream& LogStream::flush() noexcept {
 
     if (callback) {
         callback(buf.get());
-    } else {
+    } else if (stream) {
         fprintf(stream, "%s", buf.get());
     }
 
