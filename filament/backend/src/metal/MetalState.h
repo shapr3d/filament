@@ -261,7 +261,7 @@ using PipelineStateCache = StateCache<PipelineState, id<MTLRenderPipelineState>,
 // Depth-stencil State
 
 struct DepthStencilState {
-    MTLCompareFunction compareFunction = MTLCompareFunctionNever;       // 8 bytes
+    MTLCompareFunction compareFunction = MTLCompareFunctionAlways;      // 8 bytes
     MTLStencilOperation stencilDepthFail = MTLStencilOperationKeep;     // 8 bytes
     MTLStencilOperation stencilDepthPass = MTLStencilOperationKeep;     // 8 bytes
     bool depthWriteEnabled = false;                                     // 1 byte

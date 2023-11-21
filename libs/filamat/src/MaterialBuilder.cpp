@@ -17,6 +17,7 @@
 #include "filamat/MaterialBuilder.h"
 
 #include <atomic>
+#include <utility>
 #include <vector>
 
 #include <utils/JobSystem.h>
@@ -141,13 +142,13 @@ MaterialBuilder& MaterialBuilder::fileName(const char* fileName) noexcept {
 }
 
 MaterialBuilder& MaterialBuilder::material(const char* code, size_t line) noexcept {
-    mMaterialCode.setUnresolved(CString(code));
-    mMaterialCode.setLineOffset(line);
+    mMaterialFragmentCode.setUnresolved(CString(code));
+    mMaterialFragmentCode.setLineOffset(line);
     return *this;
 }
 
 MaterialBuilder& MaterialBuilder::includeCallback(IncludeCallback callback) noexcept {
-    mIncludeCallback = callback;
+    mIncludeCallback = std::move(callback);
     return *this;
 }
 
@@ -244,12 +245,12 @@ MaterialBuilder& MaterialBuilder::parameter(SubpassType subpassType, const char*
     return parameter(subpassType, SamplerFormat::FLOAT, ParameterPrecision::DEFAULT, name);
 }
 
-MaterialBuilder& MaterialBuilder::require(filament::VertexAttribute attribute) noexcept {
+MaterialBuilder& MaterialBuilder::require(VertexAttribute attribute) noexcept {
     mRequiredAttributes.set(attribute);
     return *this;
 }
 
-MaterialBuilder& MaterialBuilder::materialDomain(MaterialDomain materialDomain) noexcept {
+MaterialBuilder& MaterialBuilder::materialDomain(filament::MaterialDomain materialDomain) noexcept {
     mMaterialDomain = materialDomain;
     return *this;
 }
@@ -388,6 +389,11 @@ MaterialBuilder& MaterialBuilder::transparencyMode(TransparencyMode mode) noexce
     return *this;
 }
 
+MaterialBuilder& MaterialBuilder::reflectionMode(ReflectionMode mode) noexcept {
+    mReflectionMode = mode;
+    return *this;
+}
+
 MaterialBuilder& MaterialBuilder::platform(Platform platform) noexcept {
     mPlatform = platform;
     return *this;
@@ -494,6 +500,7 @@ void MaterialBuilder::prepareToBuild(MaterialInfo& info) noexcept {
     info.specularAOSet = mSpecularAOSet;
     info.refractionMode = mRefractionMode;
     info.refractionType = mRefractionType;
+    info.reflectionMode = mReflectionMode;
     info.quality = mShaderQuality;
     info.hasCustomSurfaceShading = mCustomSurfaceShading;
 }
@@ -535,7 +542,7 @@ bool MaterialBuilder::findAllProperties() noexcept {
     return true;
 #else
     GLSLToolsLite glslTools;
-    if (glslTools.findProperties(ShaderType::FRAGMENT, mMaterialCode.getResolved(), mProperties)) {
+    if (glslTools.findProperties(ShaderType::FRAGMENT, mMaterialFragmentCode.getResolved(), mProperties)) {
         return glslTools.findProperties(
                 ShaderType::VERTEX, mMaterialVertexCode.getResolved(), mProperties);
     }
@@ -602,7 +609,7 @@ bool MaterialBuilder::ShaderCode::resolveIncludes(IncludeCallback callback,
             .lineNumberOffset = getLineOffset(),
             .name = utils::CString("")
         };
-        if (!::filamat::resolveIncludes(source, callback, options)) {
+        if (!::filamat::resolveIncludes(source, std::move(callback), options)) {
             return false;
         }
         mCode = source.text;
@@ -650,17 +657,11 @@ bool MaterialBuilder::generateShaders(JobSystem& jobSystem, const std::vector<Va
     // End: must be protected by lock
 
     ShaderGenerator sg(
-            mProperties, mVariables, mOutputs, mDefines, mMaterialCode.getResolved(),
-            mMaterialCode.getLineOffset(), mMaterialVertexCode.getResolved(),
+            mProperties, mVariables, mOutputs, mDefines, mMaterialFragmentCode.getResolved(),
+            mMaterialFragmentCode.getLineOffset(), mMaterialVertexCode.getResolved(),
             mMaterialVertexCode.getLineOffset(), mMaterialDomain);
 
-    bool emptyVertexCode = mMaterialVertexCode.getResolved().empty();
-    bool customDepth = sg.hasCustomDepthShader() ||
-            mBlendingMode == BlendingMode::MASKED ||
-            ((mBlendingMode == BlendingMode::TRANSPARENT ||mBlendingMode == BlendingMode::FADE) &&
-                    mTransparentShadow) ||
-            !emptyVertexCode;
-    container.addSimpleChild<bool>(ChunkType::MaterialHasCustomDepthShader, customDepth);
+    container.addSimpleChild<bool>(ChunkType::MaterialHasCustomDepthShader, needsStandardDepthProgram());
 
     std::atomic_bool cancelJobs(false);
     bool firstJob = true;
@@ -763,7 +764,7 @@ bool MaterialBuilder::generateShaders(JobSystem& jobSystem, const std::vector<Va
 
                 if (targetApi == TargetApi::OPENGL) {
                     if (targetLanguage == TargetLanguage::SPIRV) {
-                        sg.fixupExternalSamplers(shaderModel, shader, info);
+                        ShaderGenerator::fixupExternalSamplers(shaderModel, shader, info);
                     }
                 }
 
@@ -930,7 +931,7 @@ Package MaterialBuilder::build(JobSystem& jobSystem) noexcept {
     }
 
     // Resolve all the #include directives within user code.
-    if (!mMaterialCode.resolveIncludes(mIncludeCallback, mFileName) ||
+    if (!mMaterialFragmentCode.resolveIncludes(mIncludeCallback, mFileName) ||
         !mMaterialVertexCode.resolveIncludes(mIncludeCallback, mFileName)) {
         return Package::invalidPackage();
     }
@@ -982,10 +983,30 @@ Package MaterialBuilder::build(JobSystem& jobSystem) noexcept {
     return package;
 }
 
-const std::string MaterialBuilder::peek(filament::backend::ShaderType type,
+bool MaterialBuilder::hasCustomVaryings() const noexcept {
+    for (const auto& variable : mVariables) {
+        if (!variable.empty()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool MaterialBuilder::needsStandardDepthProgram() const noexcept {
+    const bool hasEmptyVertexCode = mMaterialVertexCode.getResolved().empty();
+    return !hasEmptyVertexCode ||
+           hasCustomVaryings() ||
+           mBlendingMode == BlendingMode::MASKED ||
+           (mTransparentShadow &&
+            (mBlendingMode == BlendingMode::TRANSPARENT ||
+             mBlendingMode == BlendingMode::FADE));
+}
+
+std::string MaterialBuilder::peek(filament::backend::ShaderType type,
         const CodeGenParams& params, const PropertyList& properties) noexcept {
-    ShaderGenerator sg(properties, mVariables, mOutputs, mDefines, mMaterialCode.getResolved(),
-            mMaterialCode.getLineOffset(), mMaterialVertexCode.getResolved(),
+
+    ShaderGenerator sg(properties, mVariables, mOutputs, mDefines, mMaterialFragmentCode.getResolved(),
+            mMaterialFragmentCode.getLineOffset(), mMaterialVertexCode.getResolved(),
             mMaterialVertexCode.getLineOffset(), mMaterialDomain);
 
     MaterialInfo info;
@@ -1002,8 +1023,6 @@ const std::string MaterialBuilder::peek(filament::backend::ShaderType type,
         return sg.createFragmentProgram(ShaderModel(params.shaderModel), params.targetApi,
                 params.targetLanguage, info, 0, mInterpolation);
     }
-
-    return std::string("");
 }
 
 void MaterialBuilder::writeCommonChunks(ChunkContainer& container, MaterialInfo& info) const noexcept {
@@ -1028,6 +1047,7 @@ void MaterialBuilder::writeCommonChunks(ChunkContainer& container, MaterialInfo&
 
     container.addSimpleChild<uint8_t>(ChunkType::MaterialBlendingMode, static_cast<uint8_t>(mBlendingMode));
     container.addSimpleChild<uint8_t>(ChunkType::MaterialTransparencyMode, static_cast<uint8_t>(mTransparencyMode));
+    container.addSimpleChild<uint8_t>(ChunkType::MaterialReflectionMode, static_cast<uint8_t>(mReflectionMode));
     container.addSimpleChild<bool>(ChunkType::MaterialDepthWriteSet, mDepthWriteSet);
     container.addSimpleChild<bool>(ChunkType::MaterialColorWrite, mColorWrite);
     container.addSimpleChild<bool>(ChunkType::MaterialDepthWrite, mDepthWrite);

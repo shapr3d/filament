@@ -208,19 +208,20 @@ public:
         return boolish ? std::numeric_limits<uint64_t>::max() : uint64_t(0);
     }
 
-    struct PrimitiveInfo { // 24 bytes
+    struct PrimitiveInfo { // 32 bytes
         FMaterialInstance const* mi = nullptr;                          // 8 bytes (4)
+        FMorphTargetBuffer const* morphTargetBuffer = nullptr;          // 8 bytes (4)
         backend::RasterState rasterState;                               // 5 bytes
         Variant materialVariant;                                        // 1 byte
         uint16_t index = 0;                                             // 2 bytes
         backend::Handle<backend::HwRenderPrimitive> primitiveHandle;    // 4 bytes
-        uint8_t reserved[12 - sizeof(void*)] = {};                      // 4 byte (8)
+        uint8_t reserved[20 - sizeof(void*) - sizeof(void*)] = {};      // 4 bytes (12)
     };
-    static_assert(sizeof(PrimitiveInfo) == 24);
+    static_assert(sizeof(PrimitiveInfo) == 32);
 
-    struct alignas(8) Command {     // 32 bytes
+    struct alignas(8) Command {     // 40 bytes
         CommandKey key = 0;         //  8 bytes
-        PrimitiveInfo primitive;    // 24 bytes
+        PrimitiveInfo primitive;    // 32 bytes
         bool operator < (Command const& rhs) const noexcept { return key < rhs.key; }
         // placement new declared as "throw" to avoid the compiler's null-check
         inline void* operator new (std::size_t, void* ptr) {
@@ -228,7 +229,7 @@ public:
             return ptr;
         }
     };
-    static_assert(sizeof(Command) == 32);
+    static_assert(sizeof(Command) == 40);
     static_assert(std::is_trivially_destructible_v<Command>,
             "Command isn't trivially destructible");
 
@@ -240,6 +241,7 @@ public:
     static constexpr RenderFlags HAS_FOG                 = 0x10;
     static constexpr RenderFlags HAS_VSM                 = 0x20;
     static constexpr RenderFlags HAS_PICKING             = 0x40;
+    static constexpr RenderFlags HAS_DPCF_OR_PCSS        = 0x80;
 
     // Arena used for commands
     using Arena = utils::Arena<

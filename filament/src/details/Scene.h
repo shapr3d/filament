@@ -107,9 +107,9 @@ public:
         MATERIAL_ORIENTATION_CENTER,    // 12 | orientation center for bi/triplanar mapping
         VISIBILITY_STATE,       //  1 | visibility data of the component
         SKINNING_BUFFER,        //  8 | bones uniform buffer handle, count, offset
+        MORPHING_BUFFER,        //  8 | weights uniform buffer handle, count
         WORLD_AABB_CENTER,      // 12 | world-space bounding box center of the renderable
-        VISIBLE_MASK,           //  1 | each bit represents a visibility in a pass
-        MORPH_WEIGHTS,          //  4 | floats for morphing
+        VISIBLE_MASK,           //  2 | each bit represents a visibility in a pass
         CHANNELS,               //  1 | currently light channels only
 
         // These are not needed anymore after culling
@@ -131,9 +131,9 @@ public:
             math::float3,                               // MATERIAL_ORIENTATION_CENTER
             FRenderableManager::Visibility,             // VISIBILITY_STATE
             FRenderableManager::SkinningBindingInfo,    // SKINNING_BUFFER
+            FRenderableManager::MorphingBindingInfo,    // MORPHING_BUFFER
             math::float3,                               // WORLD_AABB_CENTER
             VisibleMaskType,                            // VISIBLE_MASK
-            math::float4,                               // MORPH_WEIGHTS
             uint8_t,                                    // CHANNELS
             uint8_t,                                    // LAYERS
             math::float3,                               // WORLD_AABB_EXTENT

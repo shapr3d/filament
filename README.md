@@ -31,7 +31,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.google.android.filament:filament-android:1.12.9'
+    implementation 'com.google.android.filament:filament-android:1.17.0'
 }
 ```
 
@@ -52,7 +52,7 @@ Here are all the libraries available in the group `com.google.android.filament`:
 iOS projects can use CocoaPods to install the latest release:
 
 ```
-pod 'Filament', '~> 1.12.9'
+pod 'Filament', '~> 1.17.0'
 ```
 
 ### Snapshots
@@ -122,7 +122,7 @@ steps:
 - Specular anti-aliasing
 - Spot and directional light shadows
 - Cascaded shadows
-- EVSM or PCF shadows
+- EVSM, PCSS, DPCF, or PCF shadows
 - Transparent shadows
 - Contact shadows
 - Screen-space ambient occlusion
@@ -151,9 +151,9 @@ steps:
   - [x] Points
   - [x] Lines
   - [ ] Line Loop
-  - [ ] Line Strip
+  - [x] Line Strip
   - [x] Triangles
-  - [ ] Triangle Strip
+  - [x] Triangle Strip
   - [ ] Triangle Fan
 
 - Animation

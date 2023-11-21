@@ -82,6 +82,8 @@ public:
     using TemporalAntiAliasingOptions = TemporalAntiAliasingOptions;
     using MultiSampleAntiAliasingOptions = MultiSampleAntiAliasingOptions;
     using VsmShadowOptions = VsmShadowOptions;
+    using SoftShadowOptions = SoftShadowOptions;
+    using ScreenSpaceReflectionsOptions = ScreenSpaceReflectionsOptions;
 
     /**
      * Sets the View's name. Only useful for debugging.
@@ -362,6 +364,20 @@ public:
     TemporalAntiAliasingOptions const& getTemporalAntiAliasingOptions() const noexcept;
 
     /**
+     * Enables or disable screen-space reflections. Disabled by default.
+     *
+     * @param options screen-space reflections options
+     */
+    void setScreenSpaceReflectionsOptions(ScreenSpaceReflectionsOptions options) noexcept;
+
+    /**
+     * Returns screen-space reflections options.
+     *
+     * @return screen-space reflections options
+     */
+    ScreenSpaceReflectionsOptions const& getScreenSpaceReflectionsOptions() const noexcept;
+
+    /**
      * Enables or disable multi-sample anti-aliasing (MSAA). Disabled by default.
      *
      * @param options multi-sample anti-aliasing options
@@ -570,18 +586,43 @@ public:
     VsmShadowOptions getVsmShadowOptions() const noexcept;
 
     /**
+     * Sets soft shadowing options that apply across the entire View.
+     *
+     * Additional light-specific soft shadow parameters can be set with LightManager::setShadowOptions.
+     *
+     * Only applicable when shadow type is set to ShadowType::DPCF or ShadowType::PCSS.
+     *
+     * @param options Options for shadowing.
+     *
+     * @see setShadowType
+     *
+     * @warning This API is still experimental and subject to change.
+     */
+    void setSoftShadowOptions(SoftShadowOptions const& options) noexcept;
+
+    /**
+     * Returns the soft shadowing options associated with this View.
+     *
+     * @return value set by setSoftShadowOptions().
+     */
+    SoftShadowOptions getSoftShadowOptions() const noexcept;
+
+    /**
      * Enables or disables post processing. Enabled by default.
      *
      * Post-processing includes:
+     *  - Depth-of-field
      *  - Bloom
-     *  - Tone-mapping & gamma encoding
+     *  - Vignetting
+     *  - Temporal Anti-aliasing (TAA)
+     *  - Color grading & gamma encoding
      *  - Dithering
-     *  - MSAA
      *  - FXAA
      *  - Dynamic scaling
      *
-     * Disabling post-processing forgoes color correctness as well as anti-aliasing and
-     * should only be used experimentally (e.g., for UI overlays).
+     * Disabling post-processing forgoes color correctness as well as some anti-aliasing techniques
+     * and should only be used for debugging, UI overlays or when using custom render targets
+     * (see RenderTarget).
      *
      * @param enabled true enables post processing, false disables it.
      *

@@ -41,6 +41,7 @@
 #include <cctype>
 #include <string>
 #include <vector>
+#include <sstream>
 
 #include <viewer/json.hpp>
 
@@ -224,7 +225,6 @@ static void computeToneMapPlot(ColorGradingSettings& settings, float* plot) {
         case ToneMapping::GENERIC:
             mapper = new GenericToneMapper(
                     settings.genericToneMapper.contrast,
-                    settings.genericToneMapper.shoulder,
                     settings.genericToneMapper.midGrayIn,
                     settings.genericToneMapper.midGrayOut,
                     settings.genericToneMapper.hdrMax
@@ -284,7 +284,6 @@ static void colorGradingUI(Settings& settings, float* rangePlot, float* curvePlo
             if (ImGui::CollapsingHeader("Tonemap parameters")) {
                 GenericToneMapperSettings& generic = colorGrading.genericToneMapper;
                 ImGui::SliderFloat("Contrast##genericToneMapper", &generic.contrast, 1e-5f, 3.0f);
-                ImGui::SliderFloat("Shoulder##genericToneMapper", &generic.shoulder, 0.0f, 1.0f);
                 ImGui::SliderFloat("Mid-gray in##genericToneMapper", &generic.midGrayIn, 0.0f, 1.0f);
                 ImGui::SliderFloat("Mid-gray out##genericToneMapper", &generic.midGrayOut, 0.0f, 1.0f);
                 ImGui::SliderFloat("HDR max", &generic.hdrMax, 1.0f, 64.0f);
@@ -547,6 +546,13 @@ void SimpleViewer::populateScene(FilamentAsset* asset,  FilamentInstance* instan
         mAnimator = instanceToAnimate ? instanceToAnimate->getAnimator() : asset->getAnimator();
         updateRootTransform();
         mScene->addEntities(asset->getLightEntities(), asset->getLightEntityCount());
+
+        int morphCount = 0;
+        for (size_t i = 0, c = asset->getEntityCount(); i < c; ++i) {
+            auto entity = asset->getEntities()[i];
+            morphCount = std::max(morphCount, asset->getMorphTargetCount(entity));
+        }
+        mMorphWeights.resize(std::min(morphCount, 128), 0);
     }
 
     auto& tcm = mEngine->getRenderableManager();
@@ -568,6 +574,7 @@ void SimpleViewer::removeAsset() {
     }
     mAsset = nullptr;
     mAnimator = nullptr;
+    mMorphWeights.clear();
 }
 
 void SimpleViewer::setIndirectLight(filament::IndirectLight* ibl,
@@ -1006,8 +1013,11 @@ void SimpleViewer::updateUserInterface() {
 
         auto instance = rm.getInstance(entity);
         bool scaster = rm.isShadowCaster(instance);
+        bool sreceiver = rm.isShadowReceiver(instance);
         ImGui::Checkbox("casts shadows", &scaster);
         rm.setCastShadows(instance, scaster);
+        ImGui::Checkbox("receives shadows", &sreceiver);
+        rm.setReceiveShadows(instance, sreceiver);
         size_t numPrims = rm.getPrimitiveCount(instance);
         for (size_t prim = 0; prim < numPrims; ++prim) {
             // check if we have already assigned a custom material tweak to this entity
@@ -1317,7 +1327,6 @@ void SimpleViewer::updateUserInterface() {
                         matInstance->setParameter("subsurfaceTint", tweaks.mSubsurfaceTint.value * tweaks.mSubsurfaceIntensity.value);
                     } else if (tweaks.mShaderType == TweakableMaterial::MaterialType::Subsurface) {
                         matInstance->setParameter("thickness", tweaks.mThickness.value);
-                        setTextureIfPresent(tweaks.mThickness.isFile, tweaks.mThickness.filename, "thickness");
                         matInstance->setParameter("subsurfaceColor", tweaks.mSubsurfaceColor.value);
                         matInstance->setParameter("subsurfacePower", tweaks.mSubsurfacePower.value);
                         matInstance->setParameter("subsurfaceTint", tweaks.mSubsurfaceTint.value * tweaks.mSubsurfaceIntensity.value);
@@ -1347,7 +1356,6 @@ void SimpleViewer::updateUserInterface() {
                             }
 
                             setTextureIfPresent(tweaks.mTransmission.isFile, tweaks.mTransmission.filename, "transmission");
-                            setTextureIfPresent(tweaks.mThickness.isFile, tweaks.mThickness.filename, "thickness");
 
                             matInstance->setParameter("iorScale", tweaks.mIorScale.value);
                             matInstance->setParameter("ior", tweaks.mIor.value);
@@ -1456,6 +1464,15 @@ void SimpleViewer::updateUserInterface() {
                 ssao.ssct.sampleCount = sampleCount;
             }
         }
+
+        ImGui::Checkbox("Screen-space reflections", &mSettings.view.screenSpaceReflections.enabled);
+        if (ImGui::CollapsingHeader("Screen-space reflections Options")) {
+            auto& ssrefl = mSettings.view.screenSpaceReflections;
+            ImGui::SliderFloat("Ray thickness", &ssrefl.thickness, 0.001f, 0.2f);
+            ImGui::SliderFloat("Bias", &ssrefl.bias, 0.001f, 0.5f);
+            ImGui::SliderFloat("Max distance", &ssrefl.maxDistance, 0.1, 10.0f);
+            ImGui::SliderFloat("Stride", &ssrefl.stride, 1.0, 10.0f);
+        }
         ImGui::Unindent();
     }
 
@@ -1531,26 +1548,32 @@ void SimpleViewer::updateUserInterface() {
             light.shadowOptions.mapSize = mapSize;
 
 
-            bool enableVsm = mSettings.view.shadowType == ShadowType::VSM;
-            ImGui::Checkbox("Enable VSM", &enableVsm);
-            mSettings.view.shadowType = enableVsm ? ShadowType::VSM : ShadowType::PCF;
+            int shadowType = (int)mSettings.view.shadowType;
+            ImGui::Combo("Shadow type", &shadowType, "PCF\0VSM\0DPCF\0PCSS\0\0");
+            mSettings.view.shadowType = (ShadowType)shadowType;
 
-            char label[32];
-            snprintf(label, 32, "%d", 1 << mVsmMsaaSamplesLog2);
-            ImGui::SliderInt("VSM MSAA samples", &mVsmMsaaSamplesLog2, 0, 3, label);
-            light.shadowOptions.vsm.msaaSamples = static_cast<uint8_t>(1u << mVsmMsaaSamplesLog2);
+            if (mSettings.view.shadowType == ShadowType::VSM) {
+                char label[32];
+                snprintf(label, 32, "%d", 1 << mVsmMsaaSamplesLog2);
+                ImGui::SliderInt("VSM MSAA samples", &mVsmMsaaSamplesLog2, 0, 3, label);
+                light.shadowOptions.vsm.msaaSamples =
+                        static_cast<uint8_t>(1u << mVsmMsaaSamplesLog2);
 
-            int vsmAnisotropy = mSettings.view.vsmShadowOptions.anisotropy;
-            snprintf(label, 32, "%d", 1 << vsmAnisotropy);
-            ImGui::SliderInt("VSM anisotropy", &vsmAnisotropy, 0, 3, label);
-            mSettings.view.vsmShadowOptions.anisotropy = vsmAnisotropy;
-            ImGui::Checkbox("VSM mipmapping", &mSettings.view.vsmShadowOptions.mipmapping);
-            ImGui::SliderFloat("VSM blur", &light.shadowOptions.vsm.blurWidth, 0.0f, 125.0f);
+                int vsmAnisotropy = mSettings.view.vsmShadowOptions.anisotropy;
+                snprintf(label, 32, "%d", 1 << vsmAnisotropy);
+                ImGui::SliderInt("VSM anisotropy", &vsmAnisotropy, 0, 3, label);
+                mSettings.view.vsmShadowOptions.anisotropy = vsmAnisotropy;
+                ImGui::Checkbox("VSM mipmapping", &mSettings.view.vsmShadowOptions.mipmapping);
+                ImGui::SliderFloat("VSM blur", &light.shadowOptions.vsm.blurWidth, 0.0f, 125.0f);
 
-            // These are not very useful in practice (defaults are good), but we keep them here for debugging
-            //ImGui::SliderFloat("VSM exponent", &mSettings.view.vsmShadowOptions.exponent, 0.0, 6.0f);
-            //ImGui::SliderFloat("VSM Light bleed", &mSettings.view.vsmShadowOptions.lightBleedReduction, 0.0, 1.0f);
-            //ImGui::SliderFloat("VSM min variance scale", &mSettings.view.vsmShadowOptions.minVarianceScale, 0.0, 10.0f);
+                // These are not very useful in practice (defaults are good), but we keep them here for debugging
+                //ImGui::SliderFloat("VSM exponent", &mSettings.view.vsmShadowOptions.exponent, 0.0, 6.0f);
+                //ImGui::SliderFloat("VSM Light bleed", &mSettings.view.vsmShadowOptions.lightBleedReduction, 0.0, 1.0f);
+                //ImGui::SliderFloat("VSM min variance scale", &mSettings.view.vsmShadowOptions.minVarianceScale, 0.0, 10.0f);
+            } else if (mSettings.view.shadowType == ShadowType::DPCF || mSettings.view.shadowType == ShadowType::PCSS) {
+                ImGui::SliderFloat("Penumbra scale", &light.softShadowOptions.penumbraScale, 0.0f, 100.0f);
+                ImGui::SliderFloat("Penumbra Ratio scale", &light.softShadowOptions.penumbraRatioScale, 1.0f, 100.0f);
+            }
 
             int shadowCascades = light.shadowOptions.shadowCascades;
             ImGui::SliderInt("Cascades", &shadowCascades, 1, 4);
@@ -1682,6 +1705,8 @@ void SimpleViewer::updateUserInterface() {
     //  so we can now push them into the Filament View.
     applySettings(mSettings.view, mView);
 
+    mView->setSoftShadowOptions(mSettings.lighting.softShadowOptions);
+
     // Set IBL options
     {        
         filament::math::float3 linearBgColor = filament::Color::toLinear(mSettings.viewer.backgroundColor);
@@ -1743,6 +1768,19 @@ void SimpleViewer::updateUserInterface() {
                 mResetAnimation = true;
             }
             ImGui::Unindent();
+        }
+
+        if (!mMorphWeights.empty() && ImGui::CollapsingHeader("Morphing")) {
+            for (int i = 0; i != mMorphWeights.size(); ++i) {
+                std::stringstream ss;
+                ss << i + 1 << " Weight";
+                std::string label = ss.str();
+                ImGui::SliderFloat(label.data(), &mMorphWeights[i], 0.0f, 1.0);
+            }
+            for (size_t i = 0, c = mAsset->getEntityCount(); i != c; ++i) {
+                mAsset->setMorphWeights(mAsset->getEntities()[i],
+                        mMorphWeights.data(), mMorphWeights.size());
+            }
         }
 
         if (mEnableWireframe) {

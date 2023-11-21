@@ -19,50 +19,56 @@
 #include <utils/Systrace.h>
 #include <utils/debug.h>
 
-#if defined(ANDROID)
+#if defined(__ANDROID__)
     #include <sys/system_properties.h>
     #if defined(FILAMENT_SUPPORTS_OPENGL) && !defined(FILAMENT_USE_EXTERNAL_GLES3)
-        #include "opengl/PlatformEGLAndroid.h"
+        #include "opengl/platforms/PlatformEGLAndroid.h"
     #endif
     #if defined(FILAMENT_DRIVER_SUPPORTS_VULKAN)
         #include "vulkan/PlatformVkAndroid.h"
     #endif
 #elif defined(IOS)
     #if defined(FILAMENT_SUPPORTS_OPENGL) && !defined(FILAMENT_USE_EXTERNAL_GLES3)
-        #include "opengl/PlatformCocoaTouchGL.h"
+        #include "opengl/platforms/PlatformCocoaTouchGL.h"
     #endif
     #if defined(FILAMENT_DRIVER_SUPPORTS_VULKAN)
         #include "vulkan/PlatformVkCocoaTouch.h"
     #endif
 #elif defined(__APPLE__)
     #if defined(FILAMENT_SUPPORTS_OPENGL) && !defined(FILAMENT_USE_EXTERNAL_GLES3) && !defined(FILAMENT_USE_SWIFTSHADER)
-        #include "opengl/PlatformCocoaGL.h"
+        #include "opengl/platforms/PlatformCocoaGL.h"
     #endif
     #if defined(FILAMENT_DRIVER_SUPPORTS_VULKAN)
         #include "vulkan/PlatformVkCocoa.h"
     #endif
 #elif defined(__linux__)
-    #if defined(FILAMENT_SUPPORTS_OPENGL) && !defined(FILAMENT_USE_EXTERNAL_GLES3) && !defined(FILAMENT_USE_SWIFTSHADER)
-        #include "opengl/PlatformGLX.h"
-    #endif
-    #if defined (FILAMENT_DRIVER_SUPPORTS_VULKAN)
-        #include "vulkan/PlatformVkLinux.h"
+    #if defined(FILAMENT_SUPPORTS_WAYLAND)
+        #if defined (FILAMENT_DRIVER_SUPPORTS_VULKAN)
+            #include "vulkan/PlatformVkLinuxWayland.h"
+        #endif
+    #elif defined(FILAMENT_SUPPORTS_X11)
+        #if defined(FILAMENT_SUPPORTS_OPENGL) && !defined(FILAMENT_USE_EXTERNAL_GLES3) && !defined(FILAMENT_USE_SWIFTSHADER)
+            #include "opengl/platforms/PlatformGLX.h"
+        #endif
+        #if defined (FILAMENT_DRIVER_SUPPORTS_VULKAN)
+            #include "vulkan/PlatformVkLinuxX11.h"
+        #endif
     #endif
 #elif defined(WIN32)
     #if defined(FILAMENT_SUPPORTS_OPENGL) && !defined(FILAMENT_USE_EXTERNAL_GLES3) && !defined(FILAMENT_USE_SWIFTSHADER) && !defined(FILAMENT_USE_ANGLE)
-        #include "opengl/PlatformWGL.h"
+        #include "opengl/platforms/PlatformWGL.h"
     #endif
     #if defined(FILAMENT_SUPPORTS_OPENGL) && defined(FILAMENT_USE_ANGLE)
-        #include "opengl/PlatformEGL.h"
+        #include "opengl/platforms/PlatformEGL.h"
     #endif
     #if defined(FILAMENT_DRIVER_SUPPORTS_VULKAN)
         #include "vulkan/PlatformVkWindows.h"
     #endif
 #elif defined(__EMSCRIPTEN__)
-    #include "opengl/PlatformWebGL.h"
+    #include "opengl/platforms/PlatformWebGL.h"
 #else
     #if defined(FILAMENT_SUPPORTS_OPENGL) && !defined(FILAMENT_USE_EXTERNAL_GLES3)
-        #include "opengl/PlatformDummyGL.h"
+        #include "opengl/platforms/PlatformDummyGL.h"
     #endif
 #endif
 
@@ -87,7 +93,7 @@ DefaultPlatform* DefaultPlatform::create(Backend* backend, void* nativeDisplay) 
     SYSTRACE_CALL();
     assert_invariant(backend);
 
-#if defined(ANDROID)
+#if defined(__ANDROID__)
     char scratch[PROP_VALUE_MAX + 1];
     int length = __system_property_get("debug.filament.backend", scratch);
     if (length > 0) {
@@ -100,7 +106,7 @@ DefaultPlatform* DefaultPlatform::create(Backend* backend, void* nativeDisplay) 
         *backend = Backend::OPENGL;
 #elif defined(FILAMENT_USE_ANGLE)
         *backend = Backend::OPENGL;
-#elif defined(ANDROID)
+#elif defined(__ANDROID__)
         *backend = Backend::OPENGL;
 #elif defined(IOS) || defined(__APPLE__)
         *backend = Backend::METAL;
@@ -115,12 +121,16 @@ DefaultPlatform* DefaultPlatform::create(Backend* backend, void* nativeDisplay) 
     }
     if (*backend == Backend::VULKAN) {
         #if defined(FILAMENT_DRIVER_SUPPORTS_VULKAN)
-            #if defined(ANDROID)
+            #if defined(__ANDROID__)
                 return new PlatformVkAndroid();
             #elif defined(IOS)
                 return new PlatformVkCocoaTouch();
             #elif defined(__linux__)
-                return new PlatformVkLinux();
+                #if defined(FILAMENT_SUPPORTS_WAYLAND)
+                    return new PlatformVkLinuxWayland();
+                #elif defined(FILAMENT_SUPPORTS_X11)
+                    return new PlatformVkLinuxX11();
+                #endif
             #elif defined(__APPLE__)
                 return new PlatformVkCocoa();
             #elif defined(WIN32)
@@ -145,14 +155,16 @@ DefaultPlatform* DefaultPlatform::create(Backend* backend, void* nativeDisplay) 
             return nullptr;
         #elif defined(FILAMENT_USE_ANGLE)
             return new PlatformEGL(nativeDisplay);
-        #elif defined(ANDROID)
+        #elif defined(__ANDROID__)
             return new PlatformEGLAndroid();
         #elif defined(IOS)
             return new PlatformCocoaTouchGL();
         #elif defined(__APPLE__)
             return new PlatformCocoaGL();
         #elif defined(__linux__)
-            return new PlatformGLX();
+            #if defined(FILAMENT_SUPPORTS_X11)
+                return new PlatformGLX();
+            #endif
         #elif defined(WIN32)
             return new PlatformWGL();
         #elif defined(__EMSCRIPTEN__)

@@ -144,9 +144,9 @@ void FScene::prepare(const mat4& worldOriginTransform, bool shadowReceiversAreCa
                     materialOrientationCenter,      // MATERIAL_ORIENTATION_CENTER
                     visibility,                     // VISIBILITY_STATE
                     rcm.getSkinningBufferInfo(ri),  // SKINNING_BUFFER
+                    rcm.getMorphingBufferInfo(ri),  // MORPHING_BUFFER
                     worldAABB.center,               // WORLD_AABB_CENTER
                     0,                              // VISIBLE_MASK
-                    rcm.getMorphWeights(ri),        // MORPH_WEIGHTS
                     rcm.getChannels(ri),            // CHANNELS
                     rcm.getLayerMask(ri),           // LAYERS
                     worldAABB.halfExtent,           // WORLD_AABB_EXTENT
@@ -209,7 +209,7 @@ void FScene::updateUBOs(utils::Range<uint32_t> visibleRenderables, backend::Hand
     const size_t size = visibleRenderables.size() * sizeof(PerRenderableUib);
 
     // allocate space into the command stream directly
-    void* const buffer = driver.allocate(size);
+    void* const buffer = driver.allocatePod<PerRenderableUib>(visibleRenderables.size());
 
     bool hasContactShadows = false;
     auto& sceneData = mRenderableData;
@@ -265,8 +265,8 @@ void FScene::updateUBOs(utils::Range<uint32_t> visibleRenderables, backend::Hand
                         visibility.screenSpaceContactShadows));
 
         UniformBuffer::setUniform(buffer,
-                offset + offsetof(PerRenderableUib, morphWeights),
-                sceneData.elementAt<MORPH_WEIGHTS>(i));
+                offset + offsetof(PerRenderableUib, morphTargetCount),
+                sceneData.elementAt<MORPHING_BUFFER>(i).count);
 
         UniformBuffer::setUniform(buffer,
                 offset + offsetof(PerRenderableUib, channels),
@@ -331,9 +331,11 @@ void FScene::prepareDynamicLights(const CameraInfo& camera, ArenaScope& rootAren
         const size_t gpuIndex = i - DIRECTIONAL_LIGHTS_COUNT;
         auto li = instances[i];
         lp[gpuIndex].positionFalloff      = { spheres[i].xyz, lcm.getSquaredFalloffInv(li) };
-        lp[gpuIndex].color                = { lcm.getColor(li), 0.0f };
-        lp[gpuIndex].directionIES         = { directions[i], 0.0f };
+        lp[gpuIndex].direction            = directions[i];
+        lp[gpuIndex].reserved1            = {};
+        lp[gpuIndex].colorIES             = { lcm.getColor(li), 0.0f };
         lp[gpuIndex].spotScaleOffset      = lcm.getSpotParams(li).scaleOffset;
+        lp[gpuIndex].reserved3            = {};
         lp[gpuIndex].intensity            = lcm.getIntensity(li);
         lp[gpuIndex].typeShadow           = LightsUib::packTypeShadow(
                 lcm.isPointLight(li) ? 0u : 1u,
@@ -341,7 +343,6 @@ void FScene::prepareDynamicLights(const CameraInfo& camera, ArenaScope& rootAren
                 shadowInfo[i].index,
                 shadowInfo[i].layer);
         lp[gpuIndex].channels             = LightsUib::packChannels(lcm.getLightChannels(li), shadowInfo[i].castsShadows);
-        lp[gpuIndex].reserved             = {};
     }
 
     driver.updateBufferObject(lightUbh, { lp, positionalLightCount * sizeof(LightsUib) }, 0);

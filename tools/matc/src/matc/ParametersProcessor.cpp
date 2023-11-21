@@ -696,6 +696,20 @@ static bool processRefractionMode(MaterialBuilder& builder, const JsonishValue& 
     return true;
 }
 
+static bool processReflectionMode(MaterialBuilder& builder, const JsonishValue& value) {
+    static const std::unordered_map<std::string, MaterialBuilder::ReflectionMode> strToEnum {
+            { "default", MaterialBuilder::ReflectionMode ::DEFAULT },
+            { "screenspace", MaterialBuilder::ReflectionMode::SCREEN_SPACE },
+    };
+    auto jsonString = value.toJsonString();
+    if (!isStringValidEnum(strToEnum, jsonString->getString())) {
+        return logEnumIssue("reflection_mode", *jsonString, strToEnum);
+    }
+
+    builder.reflectionMode(stringToEnum(strToEnum, jsonString->getString()));
+    return true;
+}
+
 static bool processRefractionType(MaterialBuilder& builder, const JsonishValue& value) {
     static const std::unordered_map<std::string, MaterialBuilder::RefractionType> strToEnum {
             { "solid", MaterialBuilder::RefractionType::SOLID },
@@ -770,6 +784,7 @@ ParametersProcessor::ParametersProcessor() {
 
     mParameters["doubleSided"]                   = { &processDoubleSided, Type::BOOL };
     mParameters["transparency"]                  = { &processTransparencyMode, Type::STRING };
+    mParameters["reflections"]                   = { &processReflectionMode, Type::STRING };
     mParameters["maskThreshold"]                 = { &processMaskThreshold, Type::NUMBER };
     mParameters["shadowMultiplier"]              = { &processShadowMultiplier, Type::BOOL };
     mParameters["transparentShadow"]             = { &processTransparentShadow, Type::BOOL };

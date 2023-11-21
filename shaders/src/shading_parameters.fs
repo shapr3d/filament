@@ -32,7 +32,7 @@ void computeShadingParams() {
 #endif
 #endif
 
-    shading_position = vertex_worldPosition;
+    shading_position = vertex_worldPosition.xyz;
 
     // With perspective camera, the view vector is cast from the fragment pos to the eye position,
     // With ortho camera, however, the view vector is the same for all fragments:
