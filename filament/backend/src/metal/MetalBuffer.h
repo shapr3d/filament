@@ -36,6 +36,10 @@ public:
 
     MetalBuffer(MetalContext& context, BufferObjectBinding bindingType, BufferUsage usage,
          size_t size, bool forceGpuBuffer = false);
+
+    // Constructor for importing an id<MTLBuffer> outside of Filament.
+    MetalBuffer(MetalContext& context, size_t size, id<MTLBuffer> buffer);
+
     ~MetalBuffer();
 
     MetalBuffer(const MetalBuffer& rhs) = delete;

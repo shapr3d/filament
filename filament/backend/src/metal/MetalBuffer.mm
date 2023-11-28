@@ -18,6 +18,8 @@
 
 #include "MetalContext.h"
 
+#include <TargetConditionals.h>
+
 namespace filament {
 namespace backend {
 
@@ -38,6 +40,11 @@ MetalBuffer::MetalBuffer(MetalContext& context, BufferObjectBinding bindingType,
     ASSERT_POSTCONDITION(mBuffer, "Could not allocate Metal buffer of size %zu.", size);
 }
 
+MetalBuffer::MetalBuffer(MetalContext& context, size_t size, id<MTLBuffer> buffer)
+        : mBuffer(buffer), mBufferSize(size), mContext(context) {
+    ASSERT_PRECONDITION(buffer, "External buffer cannot be nil");
+}
+
 MetalBuffer::~MetalBuffer() {
     if (mCpuBuffer) {
         free(mCpuBuffer);
@@ -55,6 +62,17 @@ void MetalBuffer::copyIntoBuffer(void* src, size_t size, size_t byteOffset) {
     // Either copy into the Metal buffer or into our cpu buffer.
     if (mCpuBuffer) {
         memcpy(static_cast<uint8_t*>(mCpuBuffer) + byteOffset, src, size);
+        return;
+    }
+
+    // If the GPU buffer is not private, just perform the copy
+    if (mBuffer.storageMode != MTLStorageModePrivate) {
+        memcpy(static_cast<uint8_t*>(mBuffer.contents), src, size);
+#if !TARGET_OS_IOS || TARGET_OS_MACCATALYST
+        if (mBuffer.storageMode == MTLStorageModeManaged) {
+            [mBuffer didModifyRange:NSMakeRange(0, size)];
+        }
+#endif
         return;
     }
 

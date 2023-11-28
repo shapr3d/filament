@@ -283,6 +283,9 @@ MetalBufferObject::MetalBufferObject(MetalContext& context, BufferObjectBinding 
         BufferUsage usage, uint32_t byteCount)
         : HwBufferObject(byteCount), buffer(context, bindingType, usage, byteCount) {}
 
+MetalBufferObject::MetalBufferObject(MetalContext& context, uint32_t byteCount, id<MTLBuffer> buffer)
+        : HwBufferObject(byteCount), buffer(context, byteCount, buffer) {}
+
 void MetalBufferObject::updateBuffer(void* data, size_t size, uint32_t byteOffset) {
     buffer.copyIntoBuffer(data, size, byteOffset);
 }

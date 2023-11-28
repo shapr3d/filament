@@ -131,6 +131,9 @@ public:
     MetalBufferObject(MetalContext& context, BufferObjectBinding bindingType, BufferUsage usage,
          uint32_t byteCount);
 
+    // Constructor for importing an id<MTLBuffer> outside of Filament.
+    MetalBufferObject(MetalContext& context, uint32_t byteCount, id<MTLBuffer> buffer);
+
     void updateBuffer(void* data, size_t size, uint32_t byteOffset);
     void updateBufferUnsynchronized(void* data, size_t size, uint32_t byteOffset);
     MetalBuffer* getBuffer() { return &buffer; }

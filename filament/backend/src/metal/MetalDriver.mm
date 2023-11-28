@@ -263,7 +263,8 @@ void MetalDriver::createBufferObjectR(Handle<HwBufferObject> boh, uint32_t byteC
 
 void MetalDriver::importBufferObjectR(Handle<HwBufferObject> boh, intptr_t id_,
         BufferObjectBinding bindingType, BufferUsage usage, uint32_t byteCount) {
-    // TODO: implement!
+    id<MTLBuffer> metalBuffer = (id<MTLBuffer>) CFBridgingRelease((void*) id_);
+    construct_handle<MetalBufferObject>(boh, *mContext, byteCount, metalBuffer);
 }
 
 void MetalDriver::createTextureR(Handle<HwTexture> th, SamplerType target, uint8_t levels,
