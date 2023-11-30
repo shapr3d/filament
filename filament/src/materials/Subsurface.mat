@@ -77,7 +77,7 @@ material {
         // Texture lookup scaling that transforms world coordinates to triplanar coordinates
         //////////////////////////////////////////////////////////////////////////////////////////////////
 
-        { // .r: baseColor, .g: normal|roughness|metallic, .b: clearCoat{Normal|Roughness|value} scaler, .a: ior, transmission, thickness|microThickness texture scalers
+        { // .r: baseColor, .g: normal|roughness|metallic, .b: clearCoat{Normal|Roughness|value} scaler, .a: ior, transmission, microThickness texture scalers
             type : float4,
             name : textureScaler
         },
@@ -115,10 +115,6 @@ material {
         {
             type : float,
             name : subsurfacePower
-        },
-        {
-            type : sampler2d,
-            name : thicknessTexture
         },
         {
             type : float,

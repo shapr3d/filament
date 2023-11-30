@@ -30,12 +30,11 @@
 // 6     useRoughnessTexture            materialParams.usageFlags & 64
 // 7     useSheenRoughnessTexture       materialParams.usageFlags & 128
 // 8     useSwizzledNormalMaps          materialParams.usageFlags & 256
-// 9     useThicknessTexture            materialParams.usageFlags & 512
-// 10    useTransmissionTexture         materialParams.usageFlags & 1024
-// 11    useWard                        materialParams.usageFlags & 2048
-// 12    doDeriveAbsorption             materialParams.usageFlags & 4096
-// 13    doDeriveSheenColor             materialParams.usageFlags & 8192
-// 14    doDeriveSubsurfaceColor        materialParams.usageFlags & 16384
+// 9     useTransmissionTexture         materialParams.usageFlags & 512
+// 10    useWard                        materialParams.usageFlags & 1024
+// 11    doDeriveAbsorption             materialParams.usageFlags & 2048
+// 12    doDeriveSheenColor             materialParams.usageFlags & 4096
+// 13    doDeriveSubsurfaceColor        materialParams.usageFlags & 8192
 //
 // Our ASTC compressor lays out the coordinates as XXXY but our BC5 compressor lays them out as XY.
 // The useSwizzledNormalMaps flag indicates if data is stored as XY or XXXY (so we can sample the 
@@ -79,28 +78,24 @@ bool IsNormalMapSwizzled() {
     return ( materialParams.usageFlags & 256u ) != 0u;
 }
 
-bool IsThicknessTextured() {
+bool IsTransmissionTextured() {
     return ( materialParams.usageFlags & 512u ) != 0u;
 }
 
-bool IsTransmissionTextured() {
+bool IsWard() {
     return ( materialParams.usageFlags & 1024u ) != 0u;
 }
 
-bool IsWard() {
+bool DoDeriveAbsorption() {
     return ( materialParams.usageFlags & 2048u ) != 0u;
 }
 
-bool DoDeriveAbsorption() {
+bool DoDeriveSheenColor() {
     return ( materialParams.usageFlags & 4096u ) != 0u;
 }
 
-bool DoDeriveSheenColor() {
-    return ( materialParams.usageFlags & 8192u ) != 0u;
-}
-
 bool DoDeriveSubsurfaceColor() {
-    return ( materialParams.usageFlags & 16384u ) != 0u;
+    return ( materialParams.usageFlags & 8192u ) != 0u;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -565,17 +560,7 @@ void ApplyThickness(inout MaterialInputs material, inout FragmentData fragmentDa
     // This is a transmission-only property and those materials actually disable blending
     // This applies both micro and regular thickness, although we only do the latter for now (the former would be used in transparent thin materials).
 #if defined(BLENDING_DISABLED) && defined(HAS_REFRACTION)
-    float thicknessValue = 0.0;
-    if (IsThicknessTextured()) {
-        thicknessValue = BiplanarTexture(materialParams_thicknessTexture,
-                                          materialParams.textureScaler.w,
-                                          fragmentData.pos,
-                                          fragmentData.normal).r;
-    } else {
-        thicknessValue = materialParams.thickness;
-    }
-    thicknessValue *= materialParams.maxThickness;
-
+    float thicknessValue = materialParams.thickness * materialParams.maxThickness;
 #if defined(MATERIAL_HAS_MICRO_THICKNESS) && defined(REFRACTION_TYPE) && REFRACTION_TYPE == REFRACTION_TYPE_THIN
     material.microThickness = thicknessValue; // default 0.0
 #elif defined(HAS_REFRACTION)

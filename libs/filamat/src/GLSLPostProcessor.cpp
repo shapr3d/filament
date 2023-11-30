@@ -156,10 +156,16 @@ void GLSLPostProcessor::spirvToToMsl(const SpirvBlob *spirv, std::string *outMsl
 
     CompilerMSL::Options mslOptions = {};
     mslOptions.platform = platform,
-    mslOptions.msl_version = CompilerMSL::Options::make_msl_version(1, 1);
+    mslOptions.msl_version = config.shaderModel == filament::backend::ShaderModel::GL_ES_30 ?
+        CompilerMSL::Options::make_msl_version(2, 0) : CompilerMSL::Options::make_msl_version(2, 2);
 
-    if (config.shaderModel == filament::backend::ShaderModel::GL_ES_30) {
+    if (config.hasFramebufferFetch) {
         mslOptions.use_framebuffer_fetch_subpasses = true;
+        // On macOS, framebuffer fetch is only available starting with MSL 2.3. Filament will only
+        // use framebuffer fetch materials on devices that support it.
+        if (config.shaderModel == filament::backend::ShaderModel::GL_CORE_41) {
+            mslOptions.msl_version = CompilerMSL::Options::make_msl_version(2, 3);
+        }
     }
 
     mslCompiler.set_msl_options(mslOptions);
@@ -387,7 +393,7 @@ void GLSLPostProcessor::fullOptimization(const TShader& tShader,
         CompilerGLSL glslCompiler(move(spirv));
         glslCompiler.set_common_options(glslOptions);
 
-        if (tShader.getStage() == EShLangFragment && !glslOptions.es) {
+        if (!glslOptions.es) {
             // enable GL_ARB_shading_language_packing if available
             glslCompiler.add_header_line("#extension GL_ARB_shading_language_packing : enable");
         }

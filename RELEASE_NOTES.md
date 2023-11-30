@@ -3,7 +3,88 @@
 This file contains one line summaries of commits that are worthy of mentioning in release notes.
 A new header is inserted each time a *tag* is created.
 
-## v1.12.9 (currently main branch)
+## v1.17.1 (currently main branch)
+
+## v1.17.0
+
+- engine: Add experimental glossy screen-space reflections.
+- engine: Add support for GPU morphing and 128 morph targets.
+- engine: Fix crash with non-shadow receiving renderables and VSM.
+- engine: Bring back the 3x3 filter for PCF shadows.
+- engine: Correct AABB calculation for skinned glTF models.
+
+## v1.16.1
+
+- engine: Added line/triangle strip support.
+
+## v1.16.0
+
+- engine: Fixes skinning calculations (#4887) [⚠️ **Material breakage**].
+- engine: Add support for the glTF extension KHR_materials_emissive_strength.
+- engine: Improvements and fixes to skinning calculations.
+- engine: Fix debug checks for compressed textures.
+- Metal: Fix `readPixels` when dimensions are greater than the render target's.
+
+## v1.15.2
+
+- engine: add support for PCSS (Percentage Closer Soft Shadows).
+- engine: fix spotlight shadow bias.
+- samples: avoid leaking IBLs in Android sample-gltf-viewer.
+- libs: fix `libibl` on mobile.
+
+## v1.15.1
+
+- engine: add support for DPCF (PCF shadows with contact hardening).
+- engine: add support for Wayland and Vulkan.
+- engine: Fade lights out when close to light far plane.
+- Java: Add missing `Engine#destroySkinningBuffer` method.
+
+## v1.15.0
+
+- engine: Fix spotlights normal bias calculation [⚠️ **Material breakage**].
+- libimage: Fix loading spherical harmonics on certain locals.
+
+## v1.14.2
+
+- Metal: Fix validation error when rendering to `RenderTarget` without depth attachment.
+- engine: Fix rendering glitch with zero-scale bone transforms.
+
+## v1.14.1
+
+- engine: Improvements to shadowing.
+
+## v1.14.0
+
+- engine: Internal materials can use structures as parameters [⚠️ **Material breakage**].
+- engine: `readPixels` on a `SwapChain` must be called within `beginFrame` / `endFrame` [⚠️ **API
+  Change**].
+- engine: Fix normal bias and improve spotlight quality.
+- Java: Fix shadow biases.
+
+## v1.13.0
+
+- Android: Gradle configuration caching is now enabled.
+- Android: Filament's Gradle properties have all been renamed to `com.google.android.filament.xxx`
+  where `xxx` is the property name. See `android/build.gradle` for a complete list [⚠️]
+- Android: The Gradle property `filament_tools_dir` (now called
+  `com.google.android.filament.tools-dir`) does not have a default value anymore. Please specify one
+  in your `gradle.properties` if you reuse the Gradle plugin in your projects [⚠️]
+- engine: Fix spotlights direction and falloff [⚠️ **Material breakage**].
+- engine: Improvements to VSM and spotlight shadows.
+
+## v1.12.11
+
+- Metal: Color grading performance improvement on M1 devices.
+- samples: Fix glitchy animation seen in gltf-viewer iOS sample.
+
+## v1.12.10
+
+- engine: rewrite dynamic resolution scaling controller for better accuracy and less jittering.
+- Java: fix missing ASTC texture enum.
+- tools: Fix normal map issues in mipgen.
+- WebGL: expose some `SurfaceOrientation` functions.
+
+## v1.12.9
 
 - engine: New API: `MultiSampleAntiAliasingOptions` and HDR-aware MSAA resolve. When `customResolve`
   is enabled, improves anti-aliasing quality [**NEW API**].

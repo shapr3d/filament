@@ -289,7 +289,8 @@ void RenderPass::generateCommandsImpl(uint32_t extraFlags,
     materialVariant.setDirectionalLighting(renderFlags & HAS_DIRECTIONAL_LIGHT);
     materialVariant.setDynamicLighting(renderFlags & HAS_DYNAMIC_LIGHTING);
     materialVariant.setFog(renderFlags & HAS_FOG);
-    materialVariant.setVsm((renderFlags & HAS_VSM) && hasShadowing);
+    // DPCF and PCSS uses the same color pass shader as VSM (but not for depth)
+    materialVariant.setVsm(((renderFlags & HAS_VSM) || (renderFlags & HAS_DPCF_OR_PCSS)) && hasShadowing);
     materialVariant.setShadowReceiver(false); // this is set per Renderable
 
     Command cmdColor;
@@ -383,6 +384,7 @@ void RenderPass::generateCommandsImpl(uint32_t extraFlags,
             FMaterialInstance const* const mi = primitive.getMaterialInstance();
             if constexpr (isColorPass) {
                 cmdColor.primitive.primitiveHandle = primitive.getHwHandle();
+                cmdColor.primitive.morphTargetBuffer = primitive.getMorphTargetBuffer();
                 cmdColor.primitive.materialVariant = materialVariant;
                 RenderPass::setupColorCommand(cmdColor, mi, inverseFrontFaces);
 
@@ -472,6 +474,7 @@ void RenderPass::generateCommandsImpl(uint32_t extraFlags,
                 // unconditionally write the command
                 cmdDepth.primitive.primitiveHandle = primitive.getHwHandle();
                 cmdDepth.primitive.mi = mi;
+                cmdDepth.primitive.morphTargetBuffer = primitive.getMorphTargetBuffer();
                 cmdDepth.primitive.rasterState.culling = mi->getCullingMode();
 
                 // FIXME: should writeDepthForShadowCasters take precedence over mi->getDepthWrite()?
@@ -531,6 +534,7 @@ void RenderPass::Executor::recordDriverCommands(backend::DriverApi& driver,
         SYSTRACE_VALUE32("commandCount", last - first);
 
         auto const* const UTILS_RESTRICT soaSkinning = soa.data<FScene::SKINNING_BUFFER>();
+        auto const* const UTILS_RESTRICT soaMorphing = soa.data<FScene::MORPHING_BUFFER>();
 
         PolygonOffset dummyPolyOffset;
         PipelineState pipeline{ .polygonOffset = mPolygonOffset };
@@ -579,6 +583,18 @@ void RenderPass::Executor::recordDriverCommands(backend::DriverApi& driver,
                         skinning.offset * sizeof(PerRenderableUibBone),
                         CONFIG_MAX_BONE_COUNT * sizeof(PerRenderableUibBone));
             }
+
+            auto morphTargetBuffer = info.morphTargetBuffer;
+            if (UTILS_UNLIKELY(morphTargetBuffer)) {
+                // Instead of using a UBO per primitive, we could also have a single UBO for all primitives
+                // and use bindUniformBufferRange which might be more efficient.
+                auto morphing = soaMorphing[info.index];
+                assert_invariant(morphing.handle);
+                driver.bindUniformBuffer(BindingPoints::PER_RENDERABLE_MORPHING, morphing.handle);
+                assert_invariant(morphing.count <= morphTargetBuffer->getCount());
+                morphTargetBuffer->bind(driver);
+            }
+
             driver.draw(pipeline, info.primitiveHandle);
         }
     }

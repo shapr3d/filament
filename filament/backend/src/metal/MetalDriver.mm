@@ -64,19 +64,22 @@ MetalDriver::MetalDriver(backend::MetalPlatform* platform) noexcept
 
     initializeSupportedGpuFamilies(mContext);
 
-    utils::slog.d << "Supported GPU families: " << utils::io::endl;
+    utils::slog.v << "Supported GPU families: " << utils::io::endl;
     if (mContext->highestSupportedGpuFamily.common > 0) {
-        utils::slog.d << "  MTLGPUFamilyCommon" << (int) mContext->highestSupportedGpuFamily.common << utils::io::endl;
+        utils::slog.v << "  MTLGPUFamilyCommon" << (int) mContext->highestSupportedGpuFamily.common << utils::io::endl;
     }
     if (mContext->highestSupportedGpuFamily.apple > 0) {
-        utils::slog.d << "  MTLGPUFamilyApple" << (int) mContext->highestSupportedGpuFamily.apple << utils::io::endl;
+        utils::slog.v << "  MTLGPUFamilyApple" << (int) mContext->highestSupportedGpuFamily.apple << utils::io::endl;
     }
     if (mContext->highestSupportedGpuFamily.mac > 0) {
-        utils::slog.d << "  MTLGPUFamilyMac" << (int) mContext->highestSupportedGpuFamily.mac << utils::io::endl;
+        utils::slog.v << "  MTLGPUFamilyMac" << (int) mContext->highestSupportedGpuFamily.mac << utils::io::endl;
     }
     if (mContext->highestSupportedGpuFamily.macCatalyst > 0) {
-        utils::slog.d << "  MTLGPUFamilyMacCatalyst" << (int) mContext->highestSupportedGpuFamily.macCatalyst << utils::io::endl;
+        utils::slog.v << "  MTLGPUFamilyMacCatalyst" << (int) mContext->highestSupportedGpuFamily.macCatalyst << utils::io::endl;
     }
+    utils::slog.v << "Features:" << utils::io::endl;
+    utils::slog.v << "  readWriteTextureSupport: " <<
+            (bool) mContext->device.readWriteTextureSupport << utils::io::endl;
 
     // In order to support texture swizzling, the GPU needs to support it and the system be running
     // iOS 13+.
@@ -692,11 +695,10 @@ bool MetalDriver::isRenderTargetFormatSupported(TextureFormat format) {
 }
 
 bool MetalDriver::isFrameBufferFetchSupported() {
-#if defined(FILAMENT_IOS_SIMULATOR)
-    return false;
-#else
-    return mContext->highestSupportedGpuFamily.apple >= 1;
-#endif
+    // FrameBuffer fetch is achievable via "programmable blending" in Metal, and only supported on
+    // Apple GPUs with readWriteTextureSupport.
+    return mContext->highestSupportedGpuFamily.apple >= 1 &&
+            mContext->device.readWriteTextureSupport;
 }
 
 bool MetalDriver::isFrameBufferFetchMultiSampleSupported() {
@@ -1018,6 +1020,11 @@ void MetalDriver::readPixels(Handle<HwRenderTarget> src, uint32_t x, uint32_t y,
     id<MTLTexture> srcTexture = color.getTexture();
     size_t miplevel = color.level;
 
+    // Clamp height and width to actual texture's height and width
+    MTLSize srcTextureSize = MTLSizeMake(srcTexture.width >> miplevel, srcTexture.height >> miplevel, 1);
+    height = std::min(static_cast<uint32_t>(srcTextureSize.height), height);
+    width = std::min(static_cast<uint32_t>(srcTextureSize.width), width);
+
     const MTLPixelFormat format = getMetalFormat(data.format, data.type);
     ASSERT_PRECONDITION(format != MTLPixelFormatInvalid,
             "The chosen combination of PixelDataFormat (%d) and PixelDataType (%d) is not supported for "
@@ -1033,8 +1040,8 @@ void MetalDriver::readPixels(Handle<HwRenderTarget> src, uint32_t x, uint32_t y,
 
     MTLTextureDescriptor* textureDescriptor =
             [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:format
-                                                               width:(srcTexture.width >> miplevel)
-                                                              height:(srcTexture.height >> miplevel)
+                                                               width:srcTextureSize.width
+                                                              height:srcTextureSize.height
                                                            mipmapped:NO];
     textureDescriptor.usage = MTLTextureUsageShaderWrite | MTLTextureUsageRenderTarget;
     id<MTLTexture> readPixelsTexture = [mContext->device newTextureWithDescriptor:textureDescriptor];
@@ -1261,13 +1268,14 @@ void MetalDriver::draw(backend::PipelineState ps, Handle<HwRenderPrimitive> rph)
     }
 
     // Set the depth-stencil state, if a state change is needed.
-    DepthStencilState depthState {
-        .compareFunction = getMetalCompareFunction(rs.depthFunc),
-        .stencilDepthFail = getMetalStencilOperation(rs.stencilDepthFail),
-        .stencilDepthPass = getMetalStencilOperation(rs.stencilDepthPass),
-        .depthWriteEnabled = rs.depthWrite,
-        .stencilWriteEnabled = rs.stencilWrite,
-    };
+    DepthStencilState depthState;
+    if (depthStencilAttachment) {
+        depthState.compareFunction = getMetalCompareFunction(rs.depthFunc);
+        depthState.stencilDepthFail = getMetalStencilOperation(rs.stencilDepthFail);
+        depthState.stencilDepthPass = getMetalStencilOperation(rs.stencilDepthPass);
+        depthState.depthWriteEnabled = rs.depthWrite;
+        depthState.stencilWriteEnabled = rs.stencilWrite;
+    }
     mContext->depthStencilState.updateState(depthState);
     if (mContext->depthStencilState.stateChanged()) {
         id<MTLDepthStencilState> state =

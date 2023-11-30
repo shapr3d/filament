@@ -126,7 +126,7 @@ public:
     TweakablePropertyDerivable<filament::math::float3> mAbsorption{}; // for refractive
     TweakablePropertyTextured<float> mTransmission{}; // for refractive
     TweakableProperty<float> mMaxThickness{}; // for refractive; this scales the values read from a thickness property/texture
-    TweakablePropertyTextured<float> mThickness{}; // for refractive and subsurface
+    TweakableProperty<float> mThickness{}; // for refractive and subsurface
     TweakableProperty<float> mIorScale{}; // for refractive
     TweakableProperty<float> mIor{}; // for refractive
 

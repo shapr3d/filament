@@ -16,6 +16,7 @@
 
 #include "details/Renderer.h"
 
+#include "PostProcessManager.h"
 #include "RenderPass.h"
 #include "ResourceAllocator.h"
 
@@ -53,8 +54,8 @@ using namespace backend;
 
 FRenderer::FRenderer(FEngine& engine) :
         mEngine(engine),
-        mFrameSkipper(engine, 1u),
-        mFrameInfoManager(engine),
+        mFrameSkipper(1u),
+        mFrameInfoManager(engine.getDriverApi()),
         mIsRGB8Supported(false),
         mPerRenderPassArena(engine.getPerRenderPassAllocator())
 {
@@ -129,7 +130,8 @@ void FRenderer::terminate(FEngine& engine) {
         // to initialize themselves, otherwise the engine tries to destroy invalid handles.
         engine.execute();
     }
-    mFrameInfoManager.terminate();
+    mFrameInfoManager.terminate(driver);
+    mFrameSkipper.terminate(driver);
 }
 
 void FRenderer::resetUserTime() {
@@ -246,7 +248,7 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
     bool hasColorGrading = hasPostProcess;
     bool hasDithering = view.getDithering() == Dithering::TEMPORAL;
     bool hasFXAA = view.getAntiAliasing() == AntiAliasing::FXAA;
-    float2 scale = view.updateScale(mFrameInfoManager.getLastFrameInfo());
+    float2 scale = view.updateScale(engine, mFrameInfoManager.getLastFrameInfo(), mFrameRateOptions, mDisplayInfo);
     auto msaaOptions = view.getMultiSampleAntiAliasingOptions();
     auto dsrOptions = view.getDynamicResolutionOptions();
     auto bloomOptions = view.getBloomOptions();
@@ -255,6 +257,7 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
     auto taaOptions = view.getTemporalAntiAliasingOptions();
     auto vignetteOptions = view.getVignetteOptions();
     auto colorGrading = view.getColorGrading();
+    auto ssReflectionsOptions = view.getScreenSpaceReflectionsOptions();
     if (!hasPostProcess) {
         // disable all effects that are part of post-processing
         dofOptions.enabled = false;
@@ -307,7 +310,12 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
     if (view.isFrontFaceWindingInverted()) baseRenderFlags |= RenderPass::HAS_INVERSE_FRONT_FACES;
 
     RenderPass::RenderFlags colorRenderFlags = baseRenderFlags;
-    if (view.hasVsm())                     colorRenderFlags |= RenderPass::HAS_VSM;
+    switch (view.getShadowType()) {
+        case ShadowType::PCF:   break;
+        case ShadowType::VSM:   colorRenderFlags |= RenderPass::HAS_VSM;            break;
+        case ShadowType::DPCF:  colorRenderFlags |= RenderPass::HAS_DPCF_OR_PCSS;   break;
+        case ShadowType::PCSS:  colorRenderFlags |= RenderPass::HAS_DPCF_OR_PCSS;   break;
+    }
 
     RenderPass::RenderFlags structureRenderFlags = baseRenderFlags;
     if (view.hasPicking())                 structureRenderFlags |= RenderPass::HAS_PICKING;
@@ -422,7 +430,8 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
             .msaa = msaaSampleCount,
             .clearFlags = clearFlags,
             .clearColor = clearColor,
-            .hasContactShadows = scene.hasContactShadows()
+            .hasContactShadows = scene.hasContactShadows(),
+            .hasScreenSpaceReflections = ssReflectionsOptions.enabled
     };
 
     // asSubpass is disabled with TAA (although it's supported) because performance was degraded
@@ -454,6 +463,9 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
     // of RenderPass::setCamera / RenderPass::setGeometry calls.
     view.updatePrimitivesLod(engine, cameraInfo,
             scene.getRenderableData(), view.getVisibleRenderables());
+    // updatePrimitivesMorphTargetBuffer must be run after updatePrimitivesLod.
+    view.updatePrimitivesMorphTargetBuffer(engine, cameraInfo,
+            scene.getRenderableData(), view.getVisibleRenderables());
 
     pass.setCamera(cameraInfo);
     pass.setGeometry(scene.getRenderableData(), view.getVisibleRenderables(), scene.getRenderableUBO());
@@ -471,14 +483,8 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
     // Currently it consists of a simple depth pass.
     // This is normally used by SSAO and contact-shadows
 
-    // TODO: ideally this should be a FrameGraph pass to participate to automatic culling
-    RenderPass structurePass(pass);
-    structurePass.setRenderFlags(structureRenderFlags);
-    structurePass.appendCommands(RenderPass::CommandTypeFlags::SSAO);
-    structurePass.sortCommands();
-
     // TODO: the scaling should depends on all passes that need the structure pass
-    ppm.structure(fg, structurePass, svp.width, svp.height, {
+    ppm.structure(fg, pass, structureRenderFlags, svp.width, svp.height, {
             .scale = aoOptions.resolution,
             .picking = view.hasPicking()
     });
@@ -503,6 +509,17 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
                     auto out = resources.getRenderPassInfo();
                     view.executePickingQueries(driver, out.target, aoOptions.resolution);
                 });
+    }
+
+    // Store this frame's camera projection in the frame history.
+    if (UTILS_UNLIKELY(taaOptions.enabled || ssReflectionsOptions.enabled)) {
+        auto projection = cameraInfo.projection * (cameraInfo.view * cameraInfo.worldOrigin);
+        setHistoryProjection(view, projection);
+        // update frame id
+        auto& history = view.getFrameHistory();
+        auto const& previous = history[0];
+        auto& current = history.getCurrent();
+        current.frameId = previous.frameId + 1;
     }
 
     // Apply the TAA jitter to everything after the structure pass, starting with the color pass.
@@ -532,7 +549,8 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
     // --------------------------------------------------------------------------------------------
     // Color passes
 
-    // TODO: ideally this should be a FrameGraph pass to participate to automatic culling
+    // This one doesn't need to be a FrameGraph pass because it always happens by construction
+    // (i.e. it won't be culled, unless everything is culled), so no need to complexify things.
     pass.setRenderFlags(colorRenderFlags);
     pass.appendCommands(RenderPass::COLOR);
     pass.sortCommands();
@@ -571,7 +589,7 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
     colorGradingConfigForColor.asSubpass = colorGradingConfigForColor.asSubpass && !taaOptions.enabled;
 
     if (colorGradingConfigForColor.asSubpass) {
-        // append colorgrading subpass after all other passes
+        // append color grading subpass after all other passes
         pass.appendCustomCommand(
                 RenderPass::Pass::BLENDED,
                 RenderPass::CustomCommand::EPILOG,
@@ -627,7 +645,25 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
 
     // TAA for color pass
     if (taaOptions.enabled) {
-        input = ppm.taa(fg, input, view.getFrameHistory(), taaOptions, colorGradingConfig);
+        input = ppm.taa(fg, input, view.getFrameHistory(),
+                getColorHistory(fg, view.getFrameHistory()), taaOptions, colorGradingConfig);
+    }
+
+    struct ExportColorHistoryData {
+        FrameGraphId<FrameGraphTexture> color;
+    };
+    if (taaOptions.enabled || ssReflectionsOptions.enabled) {
+        fg.addPass<ExportColorHistoryData>("Export color history", [&](FrameGraph::Builder& builder,
+                auto& data) {
+            // We need to use sideEffect here to ensure this pass won't be culled. The "output" of
+            // this pass is going to be used during the next frame as an "import".
+            builder.sideEffect();
+            data.color = builder.sample(input);
+        }, [&view](FrameGraphResources const& resources, auto const& data, backend::DriverApi&) {
+            FrameHistory& frameHistory = view.getFrameHistory();
+            FrameHistoryEntry& current = frameHistory.getCurrent();
+            resources.detach(data.color, &current.color, &current.colorDesc);
+        });
     }
 
     // --------------------------------------------------------------------------------------------
@@ -677,7 +713,7 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
     // * This is because the default render target is not multi-sampled, so we need an
     //   intermediate buffer when MSAA is enabled.
     // * We also need an extra buffer for blending the result to the framebuffer if the view
-    //   is translucent.
+    //   is translucent AND we've not already done it as part of upscaling.
     // * And we can't use the default rendertarget if MRT is required (e.g. with color grading
     //   as a subpass)
     // The intermediate buffer is accomplished with a "fake" opaqueBlit (i.e. blit) operation.
@@ -690,7 +726,7 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
         if (UTILS_LIKELY(!blending)) {
             input = ppm.opaqueBlit(fg, input, {
                     .width = vp.width, .height = vp.height,
-                    .format = colorGradingConfig.ldrFormat }, SamplerMagFilter::LINEAR);
+                    .format = colorGradingConfig.ldrFormat }, SamplerMagFilter::NEAREST);
         } else {
             input = ppm.blendBlit(fg, blending, {
                     .quality = QualityLevel::LOW
@@ -856,11 +892,24 @@ FrameGraphId<FrameGraphTexture> FRenderer::colorPass(FrameGraph& fg, const char*
         FrameGraphId<FrameGraphTexture> output;
         FrameGraphId<FrameGraphTexture> depth;
         FrameGraphId<FrameGraphTexture> ssao;
-        FrameGraphId<FrameGraphTexture> ssr;
+        FrameGraphId<FrameGraphTexture> ssr;    // either screen-space reflections or refractions
         FrameGraphId<FrameGraphTexture> structure;
         float4 clearColor{};
         TargetBufferFlags clearFlags{};
     };
+
+    FrameGraphId<FrameGraphTexture> colorHistory;
+    mat4f historyProjection;
+    if (config.hasScreenSpaceReflections) {
+        colorHistory = getColorHistory(fg, view.getFrameHistory());
+        if (UTILS_UNLIKELY(!colorHistory)) {
+            // if we don't have a history yet, don't render reflections this frame
+        } else {
+            const FrameHistory& frameHistory = view.getFrameHistory();
+            FrameHistoryEntry const& entry = frameHistory[0];
+            historyProjection = entry.projection;
+        }
+    }
 
     auto& colorPass = fg.addPass<ColorPassData>(name,
             [&](FrameGraph::Builder& builder, ColorPassData& data) {
@@ -871,12 +920,24 @@ FrameGraphId<FrameGraphTexture> FRenderer::colorPass(FrameGraph& fg, const char*
                 TargetBufferFlags clearStencilFlags = config.clearFlags & TargetBufferFlags::STENCIL;
 
                 data.shadows = blackboard.get<FrameGraphTexture>("shadows");
-                data.ssr  = blackboard.get<FrameGraphTexture>("ssr");
                 data.ssao = blackboard.get<FrameGraphTexture>("ssao");
                 data.color = blackboard.get<FrameGraphTexture>("color");
                 data.depth = blackboard.get<FrameGraphTexture>("depth");
 
-                if (config.hasContactShadows) {
+                // TODO: we currently only allow either screen-space reflections or refractions,
+                // but not both. If SS reflections are enabled, we prefer those.
+                if (config.hasScreenSpaceReflections && colorHistory) {
+                    // Screen-space reflections
+                    data.ssr = builder.sample(colorHistory);
+                } else {
+                    // Screen-space refractions
+                    data.ssr = blackboard.get<FrameGraphTexture>("ssr");
+                    if (data.ssr) {
+                        data.ssr = builder.sample(data.ssr);
+                    }
+                }
+
+                if (config.hasContactShadows || config.hasScreenSpaceReflections) {
                     data.structure = blackboard.get<FrameGraphTexture>("structure");
                     assert_invariant(data.structure);
                     data.structure = builder.sample(data.structure);
@@ -884,10 +945,6 @@ FrameGraphId<FrameGraphTexture> FRenderer::colorPass(FrameGraph& fg, const char*
 
                 if (data.shadows) {
                     data.shadows = builder.sample(data.shadows);
-                }
-
-                if (data.ssr) {
-                    data.ssr = builder.sample(data.ssr);
                 }
 
                 if (data.ssao) {
@@ -979,8 +1036,32 @@ FrameGraphId<FrameGraphTexture> FRenderer::colorPass(FrameGraph& fg, const char*
                 view.prepareStructure(data.structure ?
                         resources.getTexture(data.structure) : ppm.getOneDepthTexture());
 
+                // set screen-space reflections or screen-space refractions
                 if (data.ssr) {
-                    view.prepareSSR(resources.getTexture(data.ssr), config.refractionLodOffset);
+                    // We currently only allow either SS reflections or refractions.
+                    auto const& ssrOptions = view.getScreenSpaceReflectionsOptions();
+                    const bool reflections = config.hasScreenSpaceReflections && ssrOptions.enabled;
+                    const bool refractions = !config.hasScreenSpaceReflections;
+
+                    if (reflections) {
+                        const auto& cameraInfo = view.getCameraInfo();
+                        auto reprojection =
+                                getClipSpaceToTextureSpaceMatrix() *
+                                historyProjection *
+                                inverse(cameraInfo.view * cameraInfo.worldOrigin);
+
+                        auto projectToPixelMatrix =
+                                getClipSpaceToTextureSpaceMatrix() *
+                                cameraInfo.projection;
+
+                        view.prepareSSReflections(resources.getTexture(data.ssr), reprojection,
+                                projectToPixelMatrix, ssrOptions);
+                    } else if (refractions) { // TODO: support both
+                        view.prepareSSR(resources.getTexture(data.ssr), config.refractionLodOffset);
+                    }
+                } else {
+                    // Screen-space reflections must be explicitly disabled.
+                    view.disableSSReflections();
                 }
 
                 view.prepareViewport(static_cast<filament::Viewport&>(out.params.viewport));
@@ -1123,12 +1204,8 @@ bool FRenderer::beginFrame(FSwapChain* swapChain, uint64_t vsyncSteadyClockTimeN
 
         // This need to occur after the backend beginFrame() because some backends need to start
         // a command buffer before creating a fence.
-        mFrameInfoManager.beginFrame({
-                .targetFrameTime = FrameInfo::duration{
-                        float(mFrameRateOptions.interval) / mDisplayInfo.refreshRate
-                },
-                .headRoomRatio = mFrameRateOptions.headRoomRatio,
-                .oneOverTau = mFrameRateOptions.scaleRate,
+
+        mFrameInfoManager.beginFrame(driver, {
                 .historySize = mFrameRateOptions.history
         }, mFrameId);
 
@@ -1168,7 +1245,7 @@ bool FRenderer::beginFrame(FSwapChain* swapChain, uint64_t vsyncSteadyClockTimeN
         engine.prepare();
     };
 
-    if (mFrameSkipper.beginFrame()) {
+    if (mFrameSkipper.beginFrame(driver)) {
         // if beginFrame() returns true, we are expecting a call to endFrame(),
         // so do the beginFrame work right now, instead of requiring a call to render()
         beginFrameInternal();
@@ -1202,8 +1279,8 @@ void FRenderer::endFrame() {
         driver.debugThreading();
     }
 
-    mFrameInfoManager.endFrame();
-    mFrameSkipper.endFrame();
+    mFrameInfoManager.endFrame(driver);
+    mFrameSkipper.endFrame(driver);
 
     if (mSwapChain) {
         mSwapChain->commit(driver);
@@ -1226,6 +1303,11 @@ void FRenderer::endFrame() {
 
 void FRenderer::readPixels(uint32_t xoffset, uint32_t yoffset, uint32_t width, uint32_t height,
         PixelBufferDescriptor&& buffer) {
+#ifndef NDEBUG
+    const bool withinFrame = mSwapChain != nullptr;
+    ASSERT_PRECONDITION(withinFrame, "readPixels() on a SwapChain must be called after"
+            " beginFrame() and before endFrame().");
+#endif
     readPixels(mRenderTarget, xoffset, yoffset, width, height, std::move(buffer));
 }
 
@@ -1297,6 +1379,50 @@ void FRenderer::initializeClearFlags() {
         // clear implies discard
         mDiscardStartFlags = mClearFlags;
     }
+}
+
+math::mat4f FRenderer::getClipSpaceToTextureSpaceMatrix() const noexcept {
+    // Compute a clip-space [-1 to 1] to texture space [0 to 1] matrix, taking into account
+    // API-level differences.
+    const bool textureSpaceYFlipped =
+            mEngine.getBackend() == Backend::METAL || mEngine.getBackend() == Backend::VULKAN;
+    return mat4f(textureSpaceYFlipped ? mat4f::row_major_init{
+            0.5f,  0.0f,   0.0f, 0.5f,
+            0.0f, -0.5f,   0.0f, 0.5f,
+            0.0f,  0.0f,   1.0f, 0.0f,
+            0.0f,  0.0f,   0.0f, 1.0f
+    } : mat4f::row_major_init{
+            0.5f,  0.0f,   0.0f, 0.5f,
+            0.0f,  0.5f,   0.0f, 0.5f,
+            0.0f,  0.0f,   1.0f, 0.0f,
+            0.0f,  0.0f,   0.0f, 1.0f
+    });
+}
+
+void FRenderer::setHistoryProjection(FView& view, math::mat4f const& projection) {
+    auto& history = view.getFrameHistory();
+    auto& current = history.getCurrent();
+    current.projection = projection;
+}
+
+FrameGraphId<FrameGraphTexture> FRenderer::getColorHistory(FrameGraph& fg,
+        FrameHistory const& frameHistory) noexcept {
+    // Here we import the previous frame's color output and cache it in the blackboard. This ensures
+    // we only import it once per frame even across multiple calls to getColorHistory.
+    Blackboard& blackboard = fg.getBlackboard();
+
+    if (auto history = blackboard.get<FrameGraphTexture>("colorHistory")) {
+        return history;
+    }
+
+    FrameHistoryEntry const& entry = frameHistory[0];
+    if (UTILS_UNLIKELY(!entry.color.handle)) {
+        return {};
+    }
+    FrameGraphId<FrameGraphTexture> colorHistory = fg.import("Color history", entry.colorDesc,
+            FrameGraphTexture::Usage::SAMPLEABLE, entry.color);
+    blackboard["colorHistory"] = colorHistory;
+    return colorHistory;
 }
 
 // ------------------------------------------------------------------------------------------------

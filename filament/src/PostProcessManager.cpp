@@ -224,7 +224,10 @@ static const MaterialInfo sMaterialList[] = {
         { "mipmapDepth",                MATERIAL(MIPMAPDEPTH) },
         { "sao",                        MATERIAL(SAO) },
         { "saoBentNormals",             MATERIAL(SAOBENTNORMALS) },
-        { "separableGaussianBlur",      MATERIAL(SEPARABLEGAUSSIANBLUR) },
+        { "separableGaussianBlur1",     MATERIAL(SEPARABLEGAUSSIANBLUR1) },
+        { "separableGaussianBlur2",     MATERIAL(SEPARABLEGAUSSIANBLUR2) },
+        { "separableGaussianBlur3",     MATERIAL(SEPARABLEGAUSSIANBLUR3) },
+        { "separableGaussianBlur4",     MATERIAL(SEPARABLEGAUSSIANBLUR4) },
         { "taa",                        MATERIAL(TAA) },
         { "vsmMipmap",                  MATERIAL(VSMMIPMAP) },
         { "fsr_easu",                   MATERIAL(FSR_EASU) },
@@ -331,7 +334,8 @@ void PostProcessManager::commitAndRender(FrameGraphResources::RenderPassInfo con
 // ------------------------------------------------------------------------------------------------
 
 FrameGraphId<FrameGraphTexture> PostProcessManager::structure(FrameGraph& fg,
-        RenderPass const& pass, uint32_t width, uint32_t height,
+        RenderPass const& pass, uint8_t structureRenderFlags,
+        uint32_t width, uint32_t height,
         StructurePassConfig const& config) noexcept {
 
     const float scale = config.scale;
@@ -381,10 +385,13 @@ FrameGraphId<FrameGraphTexture> PostProcessManager::structure(FrameGraph& fg,
                         .clearFlags = TargetBufferFlags::COLOR0 | TargetBufferFlags::DEPTH
                 });
             },
-            [=](FrameGraphResources const& resources,
+            [=, renderPass = pass](FrameGraphResources const& resources,
                     auto const& data, DriverApi& driver) mutable {
                 auto out = resources.getRenderPassInfo();
-                pass.execute(resources.getPassName(), out.target, out.params);
+                renderPass.setRenderFlags(structureRenderFlags);
+                renderPass.appendCommands(RenderPass::CommandTypeFlags::SSAO);
+                renderPass.sortCommands();
+                renderPass.execute(resources.getPassName(), out.target, out.params);
             });
 
     auto depth = structurePass->depth;
@@ -909,7 +916,23 @@ FrameGraphId<FrameGraphTexture> PostProcessManager::gaussianBlurPass(FrameGraph&
             [=](FrameGraphResources const& resources,
                     auto const& data, DriverApi& driver) {
 
-                auto const& separableGaussianBlur = getPostProcessMaterial("separableGaussianBlur");
+                auto hwTempRT = resources.getRenderPassInfo(0);
+                auto hwOutRT = resources.getRenderPassInfo(1);
+                auto hwTemp = resources.getTexture(data.temp);
+                auto hwIn = resources.getTexture(data.in);
+                auto const& inDesc = resources.getDescriptor(data.in);
+                auto const& outDesc = resources.getDescriptor(data.out);
+                auto const& tempDesc = resources.getDescriptor(data.temp);
+
+                utils::StaticString materialName;
+                switch (backend::getFormatSize(outDesc.format)) {
+                    case 1: materialName = "separableGaussianBlur1";    break;
+                    case 2: materialName = "separableGaussianBlur2";    break;
+                    case 3: materialName = "separableGaussianBlur3";    break;
+                    default: materialName = "separableGaussianBlur4";   break;
+                }
+
+                auto const& separableGaussianBlur = getPostProcessMaterial(materialName);
                 FMaterialInstance* const mi = separableGaussianBlur.getMaterialInstance();
                 const size_t kernelStorageSize = mi->getMaterial()->reflect("kernel")->size;
 
@@ -918,13 +941,6 @@ FrameGraphId<FrameGraphTexture> PostProcessManager::gaussianBlurPass(FrameGraph&
                         std::min(sizeof(kernel) / sizeof(*kernel), kernelStorageSize));
 
                 // horizontal pass
-                auto hwTempRT = resources.getRenderPassInfo(0);
-                auto hwOutRT = resources.getRenderPassInfo(1);
-                auto hwTemp = resources.getTexture(data.temp);
-                auto hwIn = resources.getTexture(data.in);
-                auto const& inDesc = resources.getDescriptor(data.in);
-                auto const& outDesc = resources.getDescriptor(data.out);
-                auto const& tempDesc = resources.getDescriptor(data.temp);
 
                 mi->setParameter("source", hwIn, {
                         .filterMag = SamplerMagFilter::LINEAR,
@@ -2220,29 +2236,23 @@ void PostProcessManager::prepareTaa(FrameHistory& frameHistory,
     auto& current = frameHistory.getCurrent();
     // get sample position within a pixel [-0.5, 0.5]
     const float2 jitter = halton(previous.frameId) - 0.5f;
-    // compute the world-space to clip-space matrix for this frame
-    current.projection = cameraInfo.projection * (cameraInfo.view * cameraInfo.worldOrigin);
     // save this frame's sample position
     current.jitter = jitter;
-    // update frame id
-    current.frameId = previous.frameId + 1;
 }
 
 FrameGraphId<FrameGraphTexture> PostProcessManager::taa(FrameGraph& fg,
         FrameGraphId<FrameGraphTexture> input, FrameHistory& frameHistory,
+        FrameGraphId<FrameGraphTexture> colorHistory,
         TemporalAntiAliasingOptions const& taaOptions,
         ColorGradingConfig colorGradingConfig) noexcept {
 
     FrameHistoryEntry const& entry = frameHistory[0];
-    FrameGraphId<FrameGraphTexture> colorHistory;
     mat4f const* historyProjection = nullptr;
-    if (UTILS_UNLIKELY(!entry.color.handle)) {
+    if (UTILS_UNLIKELY(!colorHistory)) {
         // if we don't have a history yet, just use the current color buffer as history
         colorHistory = input;
         historyProjection = &frameHistory.getCurrent().projection;
     } else {
-        colorHistory = fg.import("TAA history", entry.colorDesc,
-                FrameGraphTexture::Usage::SAMPLEABLE, entry.color);
         historyProjection = &entry.projection;
     }
 
@@ -2349,9 +2359,6 @@ FrameGraphId<FrameGraphTexture> PostProcessManager::taa(FrameGraph& fg,
                     colorGradingSubpass(driver, colorGradingConfig);
                 }
                 driver.endRenderPass();
-
-                // perform TAA here using colorHistory + input -> output
-                resources.detach(data.output, &current.color, &current.colorDesc);
             });
     return colorGradingConfig.asSubpass ? taa->tonemappedOutput : taa->output;
 }

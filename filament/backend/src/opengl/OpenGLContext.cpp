@@ -77,13 +77,34 @@ OpenGLContext::OpenGLContext() noexcept {
 
     // Figure out which driver bugs we need to workaround
     if (strstr(renderer, "Adreno")) {
+        bugs.invalidate_end_only_if_invalidate_start = true;
+
         // On Adreno (As of 3/20) timer query seem to return the CPU time, not the GPU time.
         bugs.dont_use_timer_query = true;
+
         // Blits to texture arrays are failing
+        //   This bug continues to reproduce, though at times we've seen it appear to "go away". The
+        //   standalone sample app that was written to show this problem still reproduces.
+        //   The working hypthesis is that some other state affects this behavior.
         bugs.disable_sidecar_blit_into_texture_array = true;
+
         // early exit condition is flattened in EASU code
         bugs.split_easu = true;
-        bugs.invalidate_end_only_if_invalidate_start = true;
+
+        int maj, min, driverMajor, driverMinor;
+        int c = sscanf(version, "OpenGL ES %d.%d V@%d.%d", // NOLINT(cert-err34-c)
+                &maj, &min, &driverMajor, &driverMinor);
+        if (c == 4) {
+            // workarounds based on version here.
+            // notes:
+            //  bugs.invalidate_end_only_if_invalidate_start
+            //      - appeared at least in "OpenGL ES 3.2 V@0490.0 (GIT@85da404, I46ff5fc46f, 1606794520) (Date:11/30/20)"
+            //      - wasn't present in    "OpenGL ES 3.2 V@0490.0 (GIT@0905e9f, Ia11ce2d146, 1599072951) (Date:09/02/20)"
+            //      - has been confirmed fixed in V@570.1 by Qualcomm
+            if (driverMajor < 490 || driverMajor > 570 || (driverMajor == 570 && driverMinor >= 1)) {
+                bugs.invalidate_end_only_if_invalidate_start = false;
+            }
+        }
 
         // qualcomm seems to have no problem with this (which is good for us)
         bugs.allow_read_only_ancillary_feedback_loop = true;

@@ -70,7 +70,7 @@ json TweakableMaterial::toJson() {
     result["isAbsorptionDerived"] = mAbsorption.useDerivedQuantity;
     result["iorScale"] = mIorScale.value;
     writeTexturedToJson(result, "ior", mIor);
-    writeTexturedToJson(result, "thickness", mThickness);
+    result["thickness"] = mThickness.value;
     writeTexturedToJson(result, "transmission", mTransmission);
     result["maxThickness"] = mMaxThickness.value;
 
@@ -137,7 +137,7 @@ void TweakableMaterial::fromJson(const json& source) {
     readValueFromJson(source, "isAbsorptionDerived", mAbsorption.useDerivedQuantity, false);
     readValueFromJson(source, "iorScale", mIorScale, 1.0f);
     readValueFromJson(source, "ior", mIor);
-    readTexturedFromJson(source, "thickness", mThickness);
+    readValueFromJson(source, "thickness", mThickness);
     readTexturedFromJson(source, "transmission", mTransmission);
     readValueFromJson(source, "maxThickness", mMaxThickness, 1.0f);
 
