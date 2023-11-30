@@ -33,6 +33,10 @@ layout(location = 0) out uvec4 indices;
 
 void main() {
     gl_Position = vec4(mesh_position.xy, 0.0, 1.0);
+#if defined(TARGET_VULKAN_ENVIRONMENT)
+    // In Vulkan, clip space is Y-down. In OpenGL and Metal, clip space is Y-up.
+    gl_Position.y = -gl_Position.y;
+#endif
 }
 )");
 
@@ -126,7 +130,7 @@ TEST_F(BackendTest, VertexBufferUpdate) {
                     triangle.updateIndices(i);
                 }
             }
-            getDriverApi().draw(state, triangle.getRenderPrimitive());
+            getDriverApi().draw(state, triangle.getRenderPrimitive(), 1);
 
             triangleIndex++;
         }
@@ -151,16 +155,6 @@ struct MaterialParams {
     float green;
     float blue;
 };
-
-static void uploadUniforms(DriverApi& dapi, Handle<HwBufferObject> ubh, MaterialParams params) {
-    MaterialParams* tmp = new MaterialParams(params);
-    auto cb = [](void* buffer, size_t size, void* user) {
-        MaterialParams* sp = (MaterialParams*) buffer;
-        delete sp;
-    };
-    BufferDescriptor bd(tmp, sizeof(MaterialParams), cb);
-    dapi.updateBufferObject(ubh, std::move(bd), 0);
-}
 
 TEST_F(BackendTest, BufferObjectUpdateWithOffset) {
     // Create a platform-specific SwapChain and make it current.

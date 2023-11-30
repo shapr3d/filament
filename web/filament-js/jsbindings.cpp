@@ -58,18 +58,18 @@
 
 #include <geometry/SurfaceOrientation.h>
 
-#include <viewer/SimpleViewer.h>
+#include <viewer/ViewerGui.h>
 
 #include <gltfio/Animator.h>
 #include <gltfio/AssetLoader.h>
 #include <gltfio/FilamentAsset.h>
 #include <gltfio/FilamentInstance.h>
-#include <gltfio/Image.h>
 #include <gltfio/MaterialProvider.h>
 #include <gltfio/ResourceLoader.h>
+#include <gltfio/TextureProvider.h>
 
-#include <image/KtxBundle.h>
-#include <image/KtxUtility.h>
+#include <ktxreader/Ktx1Reader.h>
+#include <ktxreader/Ktx2Reader.h>
 
 #include <math/vec2.h>
 #include <math/vec3.h>
@@ -79,6 +79,8 @@
 #include <utils/EntityManager.h>
 #include <utils/NameComponentManager.h>
 #include <utils/Log.h>
+
+#include <stb_image.h>
 
 #include <emscripten.h>
 #include <emscripten/bind.h>
@@ -93,6 +95,7 @@ using namespace filamesh;
 using namespace geometry;
 using namespace gltfio;
 using namespace image;
+using namespace ktxreader;
 
 using namespace filament::viewer;
 
@@ -395,6 +398,13 @@ value_object<filament::View::TemporalAntiAliasingOptions>("View$TemporalAntiAlia
     .field("filterWidth", &filament::View::TemporalAntiAliasingOptions::filterWidth)
     .field("feedback", &filament::View::TemporalAntiAliasingOptions::feedback);
 
+value_object<filament::View::ScreenSpaceReflectionsOptions>("View$ScreenSpaceReflectionsOptions")
+    .field("thickness", &filament::View::ScreenSpaceReflectionsOptions::thickness)
+    .field("bias", &filament::View::ScreenSpaceReflectionsOptions::bias)
+    .field("maxDistance", &filament::View::ScreenSpaceReflectionsOptions::maxDistance)
+    .field("stride", &filament::View::ScreenSpaceReflectionsOptions::stride)
+    .field("enabled", &filament::View::ScreenSpaceReflectionsOptions::enabled);
+
 value_object<filament::View::BloomOptions>("View$BloomOptions")
     .field("dirtStrength", &filament::View::BloomOptions::dirtStrength)
     .field("strength", &filament::View::BloomOptions::strength)
@@ -436,6 +446,9 @@ value_object<filament::View::VignetteOptions>("View$VignetteOptions")
     .field("feather", &filament::View::VignetteOptions::feather)
     .field("color", &filament::View::VignetteOptions::color)
     .field("enabled", &filament::View::VignetteOptions::enabled);
+
+value_object<filament::View::GuardBandOptions>("View$GuardBandOptions")
+    .field("enabled", &filament::View::GuardBandOptions::enabled);
 
 value_object<LightManager::ShadowOptions>("LightManager$ShadowOptions")
     .field("mapSize", &LightManager::ShadowOptions::mapSize)
@@ -693,9 +706,11 @@ class_<View>("View")
     .function("_setDepthOfFieldOptions", &View::setDepthOfFieldOptions)
     .function("_setMultiSampleAntiAliasingOptions", &View::setMultiSampleAntiAliasingOptions)
     .function("_setTemporalAntiAliasingOptions", &View::setTemporalAntiAliasingOptions)
+    .function("_setScreenSpaceReflectionsOptions", &View::setScreenSpaceReflectionsOptions)
     .function("_setBloomOptions", &View::setBloomOptions)
     .function("_setFogOptions", &View::setFogOptions)
     .function("_setVignetteOptions", &View::setVignetteOptions)
+    .function("_setGuardBandOptions", &View::setGuardBandOptions)
     .function("setAmbientOcclusion", &View::setAmbientOcclusion)
     .function("getAmbientOcclusion", &View::getAmbientOcclusion)
     .function("setAntiAliasing", &View::setAntiAliasing)
@@ -1047,8 +1062,13 @@ class_<RenderableManager>("RenderableManager")
     }), allow_raw_pointers())
     
     .function("setMorphWeights", EMBIND_LAMBDA(void, (RenderableManager* self,
-            RenderableManager::Instance instance, float* weights, size_t count), {
-        self->setMorphWeights(instance, weights, count);
+            RenderableManager::Instance instance, emscripten::val weights), {
+        auto nfloats = weights["length"].as<size_t>();
+        std::vector<float> floats(nfloats);
+        for (size_t i = 0; i < nfloats; i++) {
+            floats[i] = weights[i].as<float>();
+        }
+        self->setMorphWeights(instance, floats.data(), nfloats);
     }), allow_raw_pointers())
 
     .function("getAxisAlignedBoundingBox", &RenderableManager::getAxisAlignedBoundingBox)
@@ -1512,29 +1532,29 @@ class_<PixelBufferDescriptor>("driver$PixelBufferDescriptor")
 // HELPER TYPES
 // ------------
 
-/// KtxBundle ::class:: In-memory representation of a KTX file.
+/// Ktx1Bundle ::class:: In-memory representation of a KTX file.
 /// Most clients should use one of the `create*FromKtx` utility methods in the JavaScript [Engine]
-/// wrapper rather than interacting with `KtxBundle` directly.
-class_<KtxBundle>("KtxBundle")
-    .constructor(EMBIND_LAMBDA(KtxBundle*, (BufferDescriptor kbd), {
-        return new KtxBundle((uint8_t*) kbd.bd->buffer, (uint32_t) kbd.bd->size);
+/// wrapper rather than interacting with `Ktx1Bundle` directly.
+class_<Ktx1Bundle>("Ktx1Bundle")
+    .constructor(EMBIND_LAMBDA(Ktx1Bundle*, (BufferDescriptor kbd), {
+        return new Ktx1Bundle((uint8_t*) kbd.bd->buffer, (uint32_t) kbd.bd->size);
     }))
 
     /// info ::method:: Obtains properties of the KTX header.
     /// ::retval:: The [KtxInfo] property accessor object.
-    .function("getNumMipLevels", &KtxBundle::getNumMipLevels)
+    .function("getNumMipLevels", &Ktx1Bundle::getNumMipLevels)
 
     /// getArrayLength ::method:: Obtains length of the texture array.
     /// ::retval:: The number of elements in the texture array
-    .function("getArrayLength", &KtxBundle::getArrayLength)
+    .function("getArrayLength", &Ktx1Bundle::getArrayLength)
 
     /// getInternalFormat ::method::
     /// srgb ::argument:: boolean that forces the resulting format to SRGB if possible.
     /// ::retval:: [Texture$InternalFormat]
     /// Returns "undefined" if no valid Filament enumerant exists.
     .function("getInternalFormat",
-            EMBIND_LAMBDA(Texture::InternalFormat, (KtxBundle* self, bool srgb), {
-        auto result = ktx::toTextureFormat(self->info());
+            EMBIND_LAMBDA(Texture::InternalFormat, (Ktx1Bundle* self, bool srgb), {
+        auto result = Ktx1Reader::toTextureFormat(self->info());
         if (srgb) {
             if (result == Texture::InternalFormat::RGB8) {
                 result = Texture::InternalFormat::SRGB8;
@@ -1550,42 +1570,42 @@ class_<KtxBundle>("KtxBundle")
     /// ::retval:: [PixelDataFormat]
     /// Returns "undefined" if no valid Filament enumerant exists.
     .function("getPixelDataFormat",
-            EMBIND_LAMBDA(backend::PixelDataFormat, (KtxBundle* self), {
-        return ktx::toPixelDataFormat(self->getInfo());
+            EMBIND_LAMBDA(backend::PixelDataFormat, (Ktx1Bundle* self), {
+        return Ktx1Reader::toPixelDataFormat(self->getInfo());
     }), allow_raw_pointers())
 
     /// getPixelDataType ::method::
     /// ::retval:: [PixelDataType]
     /// Returns "undefined" if no valid Filament enumerant exists.
     .function("getPixelDataType",
-            EMBIND_LAMBDA(backend::PixelDataType, (KtxBundle* self), {
-        return ktx::toPixelDataType(self->getInfo());
+            EMBIND_LAMBDA(backend::PixelDataType, (Ktx1Bundle* self), {
+        return Ktx1Reader::toPixelDataType(self->getInfo());
     }), allow_raw_pointers())
 
     /// getCompressedPixelDataType ::method::
     /// ::retval:: [CompressedPixelDataType]
     /// Returns "undefined" if no valid Filament enumerant exists.
     .function("getCompressedPixelDataType",
-            EMBIND_LAMBDA(backend::CompressedPixelDataType, (KtxBundle* self), {
-        return ktx::toCompressedPixelDataType(self->getInfo());
+            EMBIND_LAMBDA(backend::CompressedPixelDataType, (Ktx1Bundle* self), {
+        return Ktx1Reader::toCompressedPixelDataType(self->getInfo());
     }), allow_raw_pointers())
 
     /// isCompressed ::method::
     /// Per spec, compressed textures in KTX always have their glFormat field set to 0.
     /// ::retval:: boolean
-    .function("isCompressed", EMBIND_LAMBDA(bool, (KtxBundle* self), {
-        return ktx::isCompressed(self->getInfo());
+    .function("isCompressed", EMBIND_LAMBDA(bool, (Ktx1Bundle* self), {
+        return Ktx1Reader::isCompressed(self->getInfo());
     }), allow_raw_pointers())
 
-    .function("isCubemap", &KtxBundle::isCubemap)
-    .function("_getBlob", EMBIND_LAMBDA(BufferDescriptor, (KtxBundle* self, KtxBlobIndex index), {
+    .function("isCubemap", &Ktx1Bundle::isCubemap)
+    .function("_getBlob", EMBIND_LAMBDA(BufferDescriptor, (Ktx1Bundle* self, KtxBlobIndex index), {
         uint8_t* data;
         uint32_t size;
         self->getBlob(index, &data, &size);
         return BufferDescriptor(data, size);
     }), allow_raw_pointers())
     .function("_getCubeBlob", EMBIND_LAMBDA(BufferDescriptor,
-            (KtxBundle* self, uint32_t miplevel), {
+            (Ktx1Bundle* self, uint32_t miplevel), {
         uint8_t* data;
         uint32_t size;
         self->getBlob({miplevel}, &data, &size);
@@ -1594,22 +1614,31 @@ class_<KtxBundle>("KtxBundle")
 
     /// info ::method:: Obtains properties of the KTX header.
     /// ::retval:: The [KtxInfo] property accessor object.
-    .function("info", &KtxBundle::info)
+    .function("info", &Ktx1Bundle::info)
 
     /// getMetadata ::method:: Obtains arbitrary metadata from the KTX file.
     /// key ::argument:: string
     /// ::retval:: string
-    .function("getMetadata", EMBIND_LAMBDA(std::string, (KtxBundle* self, std::string key), {
+    .function("getMetadata", EMBIND_LAMBDA(std::string, (Ktx1Bundle* self, std::string key), {
         return std::string(self->getMetadata(key.c_str()));
     }), allow_raw_pointers());
 
-function("ktx$createTexture", EMBIND_LAMBDA(Texture*,
-        (Engine* engine, const KtxBundle& ktx, bool srgb), {
-    return ktx::createTexture(engine, ktx, srgb, nullptr, nullptr);
+function("ktx1reader$createTexture", EMBIND_LAMBDA(Texture*,
+        (Engine* engine, const Ktx1Bundle& ktx, bool srgb), {
+    return Ktx1Reader::createTexture(engine, ktx, srgb, nullptr, nullptr);
 }), allow_raw_pointers());
 
-/// KtxInfo ::class:: Property accessor for KTX header.
-/// For example, `ktxbundle.info().pixelWidth`. See the
+class_<Ktx2Reader>("Ktx2Reader")
+    .constructor<Engine&, bool>()
+    .function("requestFormat", &Ktx2Reader::requestFormat)
+    .function("unrequestFormat", &Ktx2Reader::unrequestFormat)
+    .function("load", EMBIND_LAMBDA(Texture*, (Ktx2Reader* self, BufferDescriptor bd,
+            Ktx2Reader::TransferFunction transfer), {
+        return self->load((uint8_t*) bd.bd->buffer, (uint32_t) bd.bd->size, transfer);
+    }), allow_raw_pointers());
+
+/// KtxInfo ::class:: Property accessor for KTX1 header.
+/// For example, `Ktx1Bundle.info().pixelWidth`. See the
 /// [KTX spec](https://www.khronos.org/opengles/sdk/tools/KTX/file_format_spec/) for the list of
 /// properties.
 class_<KtxInfo>("KtxInfo")
@@ -1767,6 +1796,7 @@ class_<SurfaceOrientation>("SurfaceOrientation")
 class_<Animator>("gltfio$Animator")
     .function("applyAnimation", &Animator::applyAnimation)
     .function("updateBoneMatrices", &Animator::updateBoneMatrices)
+    .function("resetBoneMatrices", &Animator::resetBoneMatrices)
     .function("getAnimationCount", &Animator::getAnimationCount)
     .function("getAnimationDuration", &Animator::getAnimationDuration)
     .function("getAnimationName", EMBIND_LAMBDA(std::string, (Animator* self, size_t index), {
@@ -1800,6 +1830,11 @@ class_<FilamentAsset>("gltfio$FilamentAsset")
         return EntityVector(ptr, ptr + self->getLightEntityCount());
     }), allow_raw_pointers())
 
+    .function("_getRenderableEntities", EMBIND_LAMBDA(EntityVector, (FilamentAsset* self), {
+        const utils::Entity* ptr = self->getRenderableEntities();
+        return EntityVector(ptr, ptr + self->getRenderableEntityCount());
+    }), allow_raw_pointers())
+
     .function("_getCameraEntities", EMBIND_LAMBDA(EntityVector, (FilamentAsset* self), {
         const utils::Entity* ptr = self->getCameraEntities();
         return EntityVector(ptr, ptr + self->getCameraEntityCount());
@@ -1808,6 +1843,8 @@ class_<FilamentAsset>("gltfio$FilamentAsset")
     .function("getRoot", &FilamentAsset::getRoot)
 
     .function("popRenderable", &FilamentAsset::popRenderable)
+
+    .function("applyMaterialVariant", &FilamentAsset::applyMaterialVariant)
 
     .function("getMaterialInstances", EMBIND_LAMBDA(std::vector<const MaterialInstance*>,
             (FilamentAsset* self), {
@@ -1821,11 +1858,19 @@ class_<FilamentAsset>("gltfio$FilamentAsset")
         return std::vector<FilamentInstance*>(ptr, ptr + self->getAssetInstanceCount());
     }), allow_raw_pointers())
 
-    .function("getResourceUris", EMBIND_LAMBDA(std::vector<std::string>, (FilamentAsset* self), {
+    .function("_getResourceUris", EMBIND_LAMBDA(std::vector<std::string>, (FilamentAsset* self), {
         std::vector<std::string> retval;
         auto uris = self->getResourceUris();
         for (size_t i = 0, len = self->getResourceUriCount(); i < len; ++i) {
             retval.push_back(uris[i]);
+        }
+        return retval;
+    }), allow_raw_pointers())
+
+    .function("_getMaterialVariantNames", EMBIND_LAMBDA(std::vector<std::string>, (FilamentAsset* self), {
+        std::vector<std::string> retval(self->getMaterialVariantCount());
+        for (size_t i = 0, len = retval.size(); i < len; ++i) {
+            retval[i] = self->getMaterialVariantName(i);
         }
         return retval;
     }), allow_raw_pointers())
@@ -1849,19 +1894,34 @@ class_<FilamentInstance>("gltfio$FilamentInstance")
         return EntityVector(ptr, ptr + self->getEntityCount());
     }), allow_raw_pointers())
     .function("getRoot", &FilamentInstance::getRoot)
+    .function("applyMaterialVariant", &FilamentInstance::applyMaterialVariant)
     .function("getAnimator", &FilamentInstance::getAnimator, allow_raw_pointers());
 
-// This little wrapper exists to get around RTTI requirements in embind.
+// These little wrappers exist to get around RTTI requirements in embind.
+
 struct UbershaderLoader {
     MaterialProvider* provider;
     void destroyMaterials() { provider->destroyMaterials(); }
 };
+
+struct StbProvider { TextureProvider* provider; };
+struct Ktx2Provider { TextureProvider* provider; };
 
 class_<UbershaderLoader>("gltfio$UbershaderLoader")
     .constructor(EMBIND_LAMBDA(UbershaderLoader, (Engine* engine), {
         return UbershaderLoader { createUbershaderLoader(engine) };
     }))
     .function("destroyMaterials", &UbershaderLoader::destroyMaterials);
+
+class_<StbProvider>("gltfio$StbProvider")
+    .constructor(EMBIND_LAMBDA(StbProvider, (Engine* engine), {
+        return StbProvider { createStbProvider(engine) };
+    }));
+
+class_<Ktx2Provider>("gltfio$Ktx2Provider")
+    .constructor(EMBIND_LAMBDA(Ktx2Provider, (Engine* engine), {
+        return Ktx2Provider { createKtx2Provider(engine) };
+    }));
 
 class_<AssetLoader>("gltfio$AssetLoader")
 
@@ -1924,6 +1984,16 @@ class_<ResourceLoader>("gltfio$ResourceLoader")
         self->addResourceData(url.c_str(), std::move(*buffer.bd));
     }), allow_raw_pointers())
 
+    .function("addStbProvider", EMBIND_LAMBDA(void, (ResourceLoader* self, std::string mime,
+            StbProvider provider), {
+        self->addTextureProvider(mime.c_str(), provider.provider);
+    }), allow_raw_pointers())
+
+    .function("addKtx2Provider", EMBIND_LAMBDA(void, (ResourceLoader* self, std::string mime,
+            Ktx2Provider provider), {
+        self->addTextureProvider(mime.c_str(), provider.provider);
+    }), allow_raw_pointers())
+
     .function("hasResourceData", EMBIND_LAMBDA(bool, (ResourceLoader* self, std::string url), {
         return self->hasResourceData(url.c_str());
     }), allow_raw_pointers())
@@ -1945,14 +2015,14 @@ class_<JsonSerializer>("JsonSerializer")
     .constructor<>()
     .function("writeJson", &JsonSerializer::writeJson);
 
-class_<SimpleViewer>("SimpleViewer")
+class_<ViewerGui>("ViewerGui")
     .constructor<Engine*, Scene*, View*, int>()
-    .function("renderUserInterface", &SimpleViewer::renderUserInterface, allow_raw_pointers())
-    .function("getSettings", &SimpleViewer::getSettings)
-    .function("mouseEvent", &SimpleViewer::mouseEvent)
-    .function("keyDownEvent", &SimpleViewer::keyDownEvent)
-    .function("keyUpEvent", &SimpleViewer::keyUpEvent)
-    .function("keyPressEvent", &SimpleViewer::keyPressEvent);
+    .function("renderUserInterface", &ViewerGui::renderUserInterface, allow_raw_pointers())
+    .function("getSettings", &ViewerGui::getSettings)
+    .function("mouseEvent", &ViewerGui::mouseEvent)
+    .function("keyDownEvent", &ViewerGui::keyDownEvent)
+    .function("keyUpEvent", &ViewerGui::keyUpEvent)
+    .function("keyPressEvent", &ViewerGui::keyPressEvent);
 
 function("fitIntoUnitCube", EMBIND_LAMBDA(flatmat4, (Aabb box, float zoffset), {
     return flatmat4 { fitIntoUnitCube(box, zoffset) };

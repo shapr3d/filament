@@ -26,19 +26,51 @@ using namespace utils;
 
 namespace gltfio {
 
-Animator* FFilamentInstance::getAnimator() noexcept {
-    if (!animator) {
-        if (!owner->mResourcesLoaded) {
-            slog.e << "Cannot create animator before resource loading." << io::endl;
-            return nullptr;
-        }
-        if (!owner->mSourceAsset) {
-            slog.e << "Cannot create animator from frozen asset." << io::endl;
-            return nullptr;
-        }
-        animator = new Animator(owner, this);
-    }
+Animator* FFilamentInstance::getAnimator() const noexcept {
+    assert_invariant(animator);
     return animator;
+}
+
+void FFilamentInstance::createAnimator() {
+    assert_invariant(animator == nullptr);
+    animator = new Animator(owner, this);
+}
+
+size_t FFilamentInstance::getSkinCount() const noexcept {
+    return skins.size();
+}
+
+const char* FFilamentInstance::getSkinNameAt(size_t skinIndex) const noexcept {
+    if (skins.size() <= skinIndex) {
+        return nullptr;
+    }
+    return skins[skinIndex].name.c_str();
+}
+
+size_t FFilamentInstance::getJointCountAt(size_t skinIndex) const noexcept {
+    if (skins.size() <= skinIndex) {
+        return 0;
+    }
+    return skins[skinIndex].joints.size();
+}
+
+const utils::Entity* FFilamentInstance::getJointsAt(size_t skinIndex) const noexcept {
+    if (skins.size() <= skinIndex) {
+        return nullptr;
+    }
+    return skins[skinIndex].joints.data();
+}
+
+void FFilamentInstance::applyMaterialVariant(size_t variantIndex) noexcept {
+    if (variantIndex >= variants.size()) {
+        return;
+    }
+    const auto& mappings = variants[variantIndex].mappings;
+    RenderableManager& rm = owner->mEngine->getRenderableManager();
+    for (const auto& mapping : mappings) {
+        auto renderable = rm.getInstance(mapping.renderable);
+        rm.setMaterialInstanceAt(renderable, mapping.primitiveIndex, mapping.material);
+    }
 }
 
 FilamentAsset* FilamentInstance::getAsset() const noexcept {
@@ -56,6 +88,10 @@ const Entity* FilamentInstance::getEntities() const noexcept {
 
 Entity FilamentInstance::getRoot() const noexcept {
     return upcast(this)->root;
+}
+
+void FilamentInstance::applyMaterialVariant(size_t variantIndex) noexcept {
+    return upcast(this)->applyMaterialVariant(variantIndex);
 }
 
 Animator* FilamentInstance::getAnimator() noexcept {

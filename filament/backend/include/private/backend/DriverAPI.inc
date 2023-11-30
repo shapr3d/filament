@@ -251,11 +251,6 @@ DECL_DRIVER_API_R_N(backend::SwapChainHandle, createSwapChainHeadless,
         uint32_t, height,
         uint64_t, flags)
 
-DECL_DRIVER_API_R_N(backend::StreamHandle, createStreamFromTextureId,
-        intptr_t, externalTextureId,
-        uint32_t, width,
-        uint32_t, height)
-
 DECL_DRIVER_API_R_0(backend::TimerQueryHandle, createTimerQuery)
 
 
@@ -298,6 +293,7 @@ DECL_DRIVER_API_SYNCHRONOUS_N(bool, isRenderTargetFormatSupported, backend::Text
 DECL_DRIVER_API_SYNCHRONOUS_0(bool, isFrameBufferFetchSupported)
 DECL_DRIVER_API_SYNCHRONOUS_0(bool, isFrameBufferFetchMultiSampleSupported)
 DECL_DRIVER_API_SYNCHRONOUS_0(bool, isFrameTimeSupported)
+DECL_DRIVER_API_SYNCHRONOUS_0(bool, isAutoDepthResolveSupported)
 DECL_DRIVER_API_SYNCHRONOUS_0(uint8_t, getMaxDrawBuffers)
 DECL_DRIVER_API_SYNCHRONOUS_0(math::float2, getClipSpaceParams)
 DECL_DRIVER_API_SYNCHRONOUS_0(bool, canGenerateMipmaps)
@@ -465,14 +461,6 @@ DECL_DRIVER_API_N(readPixels,
         uint32_t, height,
         backend::PixelBufferDescriptor&&, data)
 
-DECL_DRIVER_API_N(readStreamPixels,
-        backend::StreamHandle, sh,
-        uint32_t, x,
-        uint32_t, y,
-        uint32_t, width,
-        uint32_t, height,
-        backend::PixelBufferDescriptor&&, data)
-
 /*
  * Rendering operations
  * --------------------
@@ -488,7 +476,8 @@ DECL_DRIVER_API_N(blit,
 
 DECL_DRIVER_API_N(draw,
         backend::PipelineState, state,
-        backend::RenderPrimitiveHandle, rph)
+        backend::RenderPrimitiveHandle, rph,
+        uint32_t, instanceCount)
 
 #pragma clang diagnostic pop
 

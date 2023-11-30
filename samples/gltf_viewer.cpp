@@ -33,10 +33,11 @@
 #include <gltfio/AssetLoader.h>
 #include <gltfio/FilamentAsset.h>
 #include <gltfio/ResourceLoader.h>
+#include <gltfio/TextureProvider.h>
 
 #include <viewer/AutomationEngine.h>
 #include <viewer/AutomationSpec.h>
-#include <viewer/SimpleViewer.h>
+#include <viewer/ViewerGui.h>
 
 #include <camutils/Manipulator.h>
 
@@ -74,7 +75,7 @@ enum MaterialSource {
 
 struct App {
     Engine* engine;
-    SimpleViewer* viewer;
+    ViewerGui* viewer;
     Config config;
     Camera* mainCamera;
 
@@ -86,6 +87,8 @@ struct App {
     MaterialSource materialSource = GENERATE_SHADERS;
 
     gltfio::ResourceLoader* resourceLoader = nullptr;
+    gltfio::TextureProvider* stbDecoder = nullptr;
+    gltfio::TextureProvider* ktxDecoder = nullptr;
     bool recomputeAabb = false;
     bool ignoreBindTransform = false;
 
@@ -452,11 +455,13 @@ int main(int argc, char** argv) {
         configuration.normalizeSkinningWeights = true;
         if (!app.resourceLoader) {
             app.resourceLoader = new gltfio::ResourceLoader(configuration);
+            app.stbDecoder = createStbProvider(app.engine);
+            app.ktxDecoder = createKtx2Provider(app.engine);
+            app.resourceLoader->addTextureProvider("image/png", app.stbDecoder);
+            app.resourceLoader->addTextureProvider("image/jpeg", app.stbDecoder);
+            app.resourceLoader->addTextureProvider("image/ktx2", app.ktxDecoder);
         }
         app.resourceLoader->asyncBeginLoad(app.asset);
-
-        // Load animation data then free the source hierarchy.
-        app.asset->getAnimator();
         app.asset->releaseSourceData();
 
         auto ibl = FilamentApp::get().getIBL();
@@ -468,7 +473,7 @@ int main(int argc, char** argv) {
     auto setup = [&](Engine* engine, View* view, Scene* scene) {
         app.engine = engine;
         app.names = new NameComponentManager(EntityManager::get());
-        app.viewer = new SimpleViewer(engine, scene, view);
+        app.viewer = new ViewerGui(engine, scene, view);
         app.viewer->getSettings().viewer.autoScaleEnabled = !app.actualSize;
         app.viewer->getSettings().lighting.enableSunlight = false;
 
@@ -567,6 +572,7 @@ int main(int argc, char** argv) {
         }
 
         loadResources(filename);
+        app.viewer->setAsset(app.asset);
 
         createGroundPlane(engine, scene, app);
 
@@ -652,6 +658,7 @@ int main(int argc, char** argv) {
                         debug.getPropertyAddress<bool>("d.renderer.doFrameCapture");
                     *captureFrame = true;
                 }
+                ImGui::Checkbox("Camera at origin", debug.getPropertyAddress<bool>("d.view.camera_at_origin"));
                 auto dataSource = debug.getDataSource("d.view.frame_info");
                 if (dataSource.data) {
                     ImGuiExt::PlotLinesSeries("FrameInfo", 6,
@@ -721,6 +728,8 @@ int main(int argc, char** argv) {
         delete app.viewer;
         delete app.materials;
         delete app.names;
+        delete app.stbDecoder;
+        delete app.ktxDecoder;
 
         AssetLoader::destroy(&app.assetLoader);
     };
@@ -731,8 +740,8 @@ int main(int argc, char** argv) {
         // Optionally fit the model into a unit cube at the origin.
         app.viewer->updateRootTransform();
 
-        // Add renderables to the scene as they become ready.
-        app.viewer->populateScene(app.asset);
+        // Gradually add renderables to the scene as their textures become ready.
+        app.viewer->populateScene();
 
         app.viewer->applyAnimation(now);
     };
@@ -740,7 +749,7 @@ int main(int argc, char** argv) {
     auto resize = [&app](Engine* engine, View* view) {
         Camera& camera = view->getCamera();
         if (&camera == app.mainCamera) {
-            // Don't adjust the aspect ratio of the main camera, this is done inside
+            // Don't adjust the aspect ratio of the main camera, this is done inside of
             // FilamentApp.cpp
             return;
         }
@@ -832,6 +841,7 @@ int main(int argc, char** argv) {
         app.assetLoader->destroyAsset(app.asset);
         loadAsset(path);
         loadResources(path);
+        app.viewer->setAsset(app.asset);
     });
 
     filamentApp.run(app.config, setup, cleanup, gui, preRender, postRender);

@@ -136,7 +136,7 @@ public:
          *
          * Applied when the type is set to COLOR or GRADIENT.
          *
-         * @param color
+         * @param color the constant color
          *
          * @return This Builder, for chaining calls.
          */

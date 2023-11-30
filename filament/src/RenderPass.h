@@ -148,6 +148,8 @@ public:
     static constexpr uint64_t CUSTOM_INDEX_MASK             = 0x00000000FFFFFFFFllu;
     static constexpr unsigned CUSTOM_INDEX_SHIFT            = 0;
 
+    // we assume Variant fits in 8-bits.
+    static_assert(sizeof(Variant::type_t) == 1);
 
     enum class Pass : uint64_t {    // 6-bits max
         DEPTH    = uint64_t(0x00) << PASS_SHIFT,
@@ -169,15 +171,18 @@ public:
 
         // shadow-casters are rendered in the depth buffer, regardless of blending (or alpha masking)
         DEPTH_CONTAINS_SHADOW_CASTERS = 0x4,
-        // alpha-blended objects are not rendered in the depth buffer
-        DEPTH_FILTER_TRANSLUCENT_OBJECTS = 0x8,
         // alpha-tested objects are not rendered in the depth buffer
-        DEPTH_FILTER_ALPHA_MASKED_OBJECTS = 0x10,
+        DEPTH_FILTER_ALPHA_MASKED_OBJECTS = 0x08,
+
+        // alpha-blended objects are not rendered in the depth buffer
+        FILTER_TRANSLUCENT_OBJECTS = 0x10,
 
         // generate commands for shadow map
         SHADOW = DEPTH | DEPTH_CONTAINS_SHADOW_CASTERS,
         // generate commands for SSAO
-        SSAO = DEPTH | DEPTH_FILTER_TRANSLUCENT_OBJECTS,
+        SSAO = DEPTH | FILTER_TRANSLUCENT_OBJECTS,
+        // generate commands for screen-space reflections
+        SCREEN_SPACE_REFLECTIONS = COLOR | FILTER_TRANSLUCENT_OBJECTS
     };
 
 
@@ -210,12 +215,14 @@ public:
 
     struct PrimitiveInfo { // 32 bytes
         FMaterialInstance const* mi = nullptr;                          // 8 bytes (4)
-        FMorphTargetBuffer const* morphTargetBuffer = nullptr;          // 8 bytes (4)
+        backend::Handle<backend::HwRenderPrimitive> primitiveHandle;    // 4 bytes
+        backend::Handle<backend::HwBufferObject> morphWeightBuffer;     // 4 bytes
+        backend::Handle<backend::HwSamplerGroup> morphTargetBuffer;     // 4 bytes
         backend::RasterState rasterState;                               // 5 bytes
         Variant materialVariant;                                        // 1 byte
         uint16_t index = 0;                                             // 2 bytes
-        backend::Handle<backend::HwRenderPrimitive> primitiveHandle;    // 4 bytes
-        uint8_t reserved[20 - sizeof(void*) - sizeof(void*)] = {};      // 4 bytes (12)
+        uint16_t instanceCount;                                         // 2 bytes
+        uint8_t reserved[10 - sizeof(void*)] = {};                      // 2 bytes (6)
     };
     static_assert(sizeof(PrimitiveInfo) == 32);
 
@@ -235,13 +242,7 @@ public:
 
     using RenderFlags = uint8_t;
     static constexpr RenderFlags HAS_SHADOWING           = 0x01;
-    static constexpr RenderFlags HAS_DIRECTIONAL_LIGHT   = 0x02;
-    static constexpr RenderFlags HAS_DYNAMIC_LIGHTING    = 0x04;
-    static constexpr RenderFlags HAS_INVERSE_FRONT_FACES = 0x08;
-    static constexpr RenderFlags HAS_FOG                 = 0x10;
-    static constexpr RenderFlags HAS_VSM                 = 0x20;
-    static constexpr RenderFlags HAS_PICKING             = 0x40;
-    static constexpr RenderFlags HAS_DPCF_OR_PCSS        = 0x80;
+    static constexpr RenderFlags HAS_INVERSE_FRONT_FACES = 0x02;
 
     // Arena used for commands
     using Arena = utils::Arena<
@@ -271,10 +272,14 @@ public:
             backend::Handle<backend::HwBufferObject> uboHandle) noexcept;
 
     // specifies camera information (e.g. used for sorting commands)
-    void setCamera(const CameraInfo& camera) noexcept { mCamera = camera; }
+    void setCamera(const CameraInfo& camera) noexcept;
 
     //  flags controlling how commands are generated
     void setRenderFlags(RenderFlags flags) noexcept { mFlags = flags; }
+    RenderFlags getRenderFlags() const noexcept { return mFlags; }
+
+    // variant to use
+    void setVariant(Variant variant) noexcept { mVariant = variant; }
 
     // Sets the visibility mask, which is AND-ed against each Renderable's VISIBLE_MASK to determine
     // if the renderable is visible for this pass.
@@ -288,10 +293,6 @@ public:
     // This is the main function of this class, this appends commands to the pass using
     // the current camera, geometry and flags set. This can be called multiple times if needed.
     void appendCommands(CommandTypeFlags commandTypeFlags) noexcept;
-
-    // Appends a custom command.
-    void appendCustomCommand(Pass pass, CustomCommand custom, uint32_t order,
-            std::function<void()> command);
 
     // sorts commands, then trims sentinels
     void sortCommands() noexcept;
@@ -321,23 +322,18 @@ public:
         const backend::PolygonOffset mPolygonOffset;
         const bool mPolygonOffsetOverride;
 
-        Executor(RenderPass const* pass, Command const* b, Command const* e) noexcept
-                : mEngine(pass->mEngine), mBegin(b), mEnd(e), mRenderableSoa(*pass->mRenderableSoa),
-                  mCustomCommands(pass->mCustomCommands), mUboHandle(pass->mUboHandle),
-                  mPolygonOffset(pass->mPolygonOffset),
-                  mPolygonOffsetOverride(pass->mPolygonOffsetOverride) {
-            assert_invariant(b >= pass->begin());
-            assert_invariant(e <= pass->end());
-        }
+        Executor(RenderPass const* pass, Command const* b, Command const* e) noexcept;
 
-        void recordDriverCommands(backend::DriverApi& driver,
+        void recordDriverCommands(FEngine& engine, backend::DriverApi& driver,
                 const Command* first, const Command* last,
-                FScene::RenderableSoa const& soa) const noexcept;
+                FScene::RenderableSoa const& soa, uint16_t readOnlyDepthStencil) const noexcept;
 
     public:
+        Executor(Executor const& rhs);
+        ~Executor() noexcept;
         void execute(const char* name,
                 backend::Handle<backend::HwRenderTarget> renderTarget,
-                backend::RenderPassParams params) const noexcept;
+                backend::RenderPassParams const& params) const noexcept;
     };
 
     // returns a new executor for this pass
@@ -349,6 +345,11 @@ public:
     Executor getExecutor(Command const* b, Command const* e) const {
         return { this, b, e };
     }
+
+    // Appends a custom command.
+    void appendCustomCommand(Pass pass, CustomCommand custom, uint32_t order,
+            Executor::CustomCommandFn command);
+
 
 private:
     friend class FRenderer;
@@ -366,24 +367,22 @@ private:
             "Size of Commands jobs must be multiple of a cache-line size");
 
     static inline void generateCommands(uint32_t commandTypeFlags, Command* commands,
-            FScene::RenderableSoa const& soa, utils::Range<uint32_t> range, RenderFlags renderFlags,
-            FScene::VisibleMaskType visibilityMask, math::float3 cameraPosition, math::float3 cameraForward) noexcept;
+            FScene::RenderableSoa const& soa, utils::Range<uint32_t> range,
+            Variant variant, RenderFlags renderFlags,
+            FScene::VisibleMaskType visibilityMask,
+            math::float3 cameraPosition, math::float3 cameraForward) noexcept;
 
     template<uint32_t commandTypeFlags>
     static inline void generateCommandsImpl(uint32_t, Command* commands,
             FScene::RenderableSoa const& soa, utils::Range<uint32_t> range,
-            RenderFlags renderFlags, FScene::VisibleMaskType visibilityMask,
+            Variant variant, RenderFlags renderFlags, FScene::VisibleMaskType visibilityMask,
             math::float3 cameraPosition, math::float3 cameraForward) noexcept;
 
-    static void setupColorCommand(Command& cmdDraw,
+    static void setupColorCommand(Command& cmdDraw, Variant variant,
             FMaterialInstance const* mi, bool inverseFrontFaces) noexcept;
 
     static void updateSummedPrimitiveCounts(
             FScene::RenderableSoa& renderableData, utils::Range<uint32_t> vr) noexcept;
-
-    using CustomCommandFn = std::function<void()>;
-    using CustomCommandVector = std::vector<CustomCommandFn,
-            utils::STLAllocator<CustomCommandFn, LinearAllocatorArena>>;
 
     // a reference to the Engine, mostly to get to things like JobSystem
     FEngine& mEngine;
@@ -407,10 +406,14 @@ private:
     backend::Handle<backend::HwBufferObject> mUboHandle;
 
     // info about the camera
-    CameraInfo mCamera;
+    math::float3 mCameraPosition{};
+    math::float3 mCameraForwardVector{};
 
     // info about the scene features (e.g.: has shadows, lighting, etc...)
     RenderFlags mFlags{};
+
+    // Variant to use
+    Variant mVariant{};
 
     // Additional visibility mask
     FScene::VisibleMaskType mVisibilityMask = std::numeric_limits<FScene::VisibleMaskType>::max();
@@ -422,7 +425,7 @@ private:
     backend::PolygonOffset mPolygonOffset{};
 
     // a vector for our custom commands
-    mutable CustomCommandVector mCustomCommands;
+    mutable Executor::CustomCommandVector mCustomCommands;
 };
 
 } // namespace filament

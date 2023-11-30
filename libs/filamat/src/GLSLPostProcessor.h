@@ -22,6 +22,8 @@
 
 #include <backend/DriverEnums.h>
 
+#include <private/filament/Variant.h>
+
 #include "filamat/MaterialBuilder.h"    // for MaterialBuilder:: enums
 
 #include "ShaderMinifier.h"
@@ -48,9 +50,12 @@ public:
     ~GLSLPostProcessor();
 
     struct Config {
+        filament::Variant variant;
+        MaterialBuilder::TargetApi targetApi;
         filament::backend::ShaderType shaderType;
         filament::backend::ShaderModel shaderModel;
         filament::MaterialDomain domain;
+        const filamat::MaterialInfo* materialInfo;
         bool hasFramebufferFetch;
         struct {
             std::vector<std::pair<uint32_t, uint32_t>> subpassInputToColorLocation;
@@ -89,8 +94,8 @@ private:
     static void registerPerformancePasses(spvtools::Optimizer& optimizer, Config const& config);
 
     void optimizeSpirv(OptimizerPtr optimizer, SpirvBlob& spirv) const;
-    void spirvToToMsl(const SpirvBlob *spirv, std::string *outMsl, const Config &config,
-            ShaderMinifier& minifier) const;
+    static void spirvToToMsl(const SpirvBlob* spirv, std::string* outMsl, const Config& config,
+            ShaderMinifier& minifier);
 
     const MaterialBuilder::Optimization mOptimization;
     const bool mPrintShaders;

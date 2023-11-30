@@ -418,7 +418,7 @@ void ApplyClearCoatNormalMap(inout MaterialInputs material, inout FragmentData f
 void ApplyBaseColor(inout MaterialInputs material, inout FragmentData fragmentData) {
 #if defined(MATERIAL_HAS_BASE_COLOR)
     if (IsBaseColorTextured()) {
-#if defined(BLENDING_ENABLED) || defined(HAS_REFRACTION)
+#if defined(BLENDING_ENABLED) || defined(MATERIAL_HAS_REFRACTION)
         material.baseColor.rgba = BiplanarTexture(materialParams_baseColorTexture,
                                                 materialParams.textureScaler.x,
                                                 fragmentData.pos,
@@ -432,7 +432,7 @@ void ApplyBaseColor(inout MaterialInputs material, inout FragmentData fragmentDa
                                     .rgb;
 #endif
     } else {
-#if defined(BLENDING_ENABLED) || defined(HAS_REFRACTION)
+#if defined(BLENDING_ENABLED) || defined(MATERIAL_HAS_REFRACTION)
         material.baseColor.rgba = materialParams.baseColor.rgba;
 #else
         material.baseColor.rgb = materialParams.baseColor.rgb;
@@ -533,21 +533,21 @@ void ApplyClearCoatRoughness(inout MaterialInputs material, inout FragmentData f
 
 void ApplyAbsorption(inout MaterialInputs material, inout FragmentData fragmentData) {
     // This is a transmission-only property and those materials actually disable blending
-#if defined(MATERIAL_HAS_ABSORPTION) && defined(HAS_REFRACTION)
+#if defined(MATERIAL_HAS_ABSORPTION) && defined(MATERIAL_HAS_REFRACTION)
     material.absorption = DoDeriveAbsorption() ? 1.0 - material.baseColor.rgb : materialParams.absorption;
 #endif
 }
 
 void ApplyIOR(inout MaterialInputs material, inout FragmentData fragmentData) {
     // This is a transmission-only property and those materials actually disable blending
-#if defined(MATERIAL_HAS_IOR) && defined(HAS_REFRACTION)
+#if defined(MATERIAL_HAS_IOR) && defined(MATERIAL_HAS_REFRACTION)
     material.ior = 1.0 + materialParams.iorScale * ( materialParams.ior - 1.0 );
 #endif
 }
 
 void ApplyTransmission(inout MaterialInputs material, inout FragmentData fragmentData) {
     // This is a transmission-only property and those materials actually disable blending
-#if defined(MATERIAL_HAS_TRANSMISSION) && defined(HAS_REFRACTION)
+#if defined(MATERIAL_HAS_TRANSMISSION) && defined(MATERIAL_HAS_REFRACTION)
     if ( IsTransmissionTextured() ) {
         material.transmission = BiplanarTexture(materialParams_transmissionTexture, materialParams.textureScaler.w, fragmentData.pos, fragmentData.normal).r;
     } else {
@@ -559,11 +559,11 @@ void ApplyTransmission(inout MaterialInputs material, inout FragmentData fragmen
 void ApplyThickness(inout MaterialInputs material, inout FragmentData fragmentData) {
     // This is a transmission-only property and those materials actually disable blending
     // This applies both micro and regular thickness, although we only do the latter for now (the former would be used in transparent thin materials).
-#if defined(BLENDING_DISABLED) && defined(HAS_REFRACTION)
+#if defined(BLENDING_DISABLED) && defined(MATERIAL_HAS_REFRACTION)
     float thicknessValue = materialParams.thickness * materialParams.maxThickness;
 #if defined(MATERIAL_HAS_MICRO_THICKNESS) && defined(REFRACTION_TYPE) && REFRACTION_TYPE == REFRACTION_TYPE_THIN
     material.microThickness = thicknessValue; // default 0.0
-#elif defined(HAS_REFRACTION)
+#elif defined(MATERIAL_HAS_REFRACTION)
     material.thickness = thicknessValue; // default 0.5
 #endif
 #endif

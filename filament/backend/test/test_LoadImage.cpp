@@ -24,11 +24,6 @@
 #include <fstream>
 #include <vector>
 
-#ifndef IOS
-#include <imageio/BlockCompression.h>
-using namespace image;
-#endif
-
 using namespace filament;
 using namespace filament::backend;
 
@@ -45,7 +40,7 @@ layout(location = 0) in vec4 mesh_position;
 void main() {
     gl_Position = vec4(mesh_position.xy, 0.0, 1.0);
 #if defined(TARGET_VULKAN_ENVIRONMENT)
-    //gl_Position.y = 1.0f - gl_Position.y;
+    // In Vulkan, clip space is Y-down. In OpenGL and Metal, clip space is Y-up.
     gl_Position.y *= -1.0f;
 #endif
 }
@@ -136,28 +131,6 @@ static void fillCheckerboard(void* buffer, size_t size, size_t stride, size_t co
         row += stride * components;
     }
 }
-
-#ifndef IOS
-static PixelBufferDescriptor compressedCheckerboardPixelBuffer(size_t size) {
-    LinearImage uncompressed(size, size, 4);
-    fillCheckerboard<float>(uncompressed.getPixelRef(), size, size, 4, 1.0f);
-
-    S3tcConfig config {
-        .format = CompressedFormat::RGBA_S3TC_DXT1,
-        .srgb = false
-    };
-    CompressedTexture compressed = s3tcCompress(uncompressed, config);
-
-    void* buffer = malloc(compressed.size);
-    memcpy(buffer, compressed.data.get(), compressed.size);
-
-    PixelBufferDescriptor descriptor(buffer, compressed.size, CompressedPixelDataType::DXT1_RGBA,
-            compressed.size, [](void* buffer, size_t size, void* user) {
-                free(buffer);
-            }, nullptr);
-    return descriptor;
-}
-#endif
 
 static PixelBufferDescriptor checkerboardPixelBuffer(PixelDataFormat format, PixelDataType type,
         size_t size, size_t bufferPadding = 0) {
@@ -355,11 +328,6 @@ TEST_F(BackendTest, UpdateImage2D) {
     testCases.emplace_back("RGBA, UBYTE -> RGBA8 (subregions, buffer padding)", PixelDataFormat::RGBA, PixelDataType::UBYTE, TextureFormat::RGBA8, 64u, true);
     testCases.emplace_back("RGB, FLOAT -> RGB32F (subregions, buffer padding)", PixelDataFormat::RGB, PixelDataType::FLOAT, TextureFormat::RGB32F, 64u, true);
 
-    // Test compresseed format upload.
-#ifndef IOS
-    testCases.emplace_back("RGBA, DXT1_RGBA -> DXT1_RGBA", PixelDataFormat::RGBA, CompressedPixelDataType::DXT1_RGBA, TextureFormat::DXT1_RGBA);
-#endif
-
     auto& api = getDriverApi();
 
     api.startCapture();
@@ -379,7 +347,7 @@ TEST_F(BackendTest, UpdateImage2D) {
         ShaderGenerator shaderGen(vertex, fragment, sBackend, sIsMobilePlatform);
         Program prog = shaderGen.getProgram();
         Program::Sampler psamplers[] = { utils::CString("tex"), 0, false };
-        prog.setSamplerGroup(0, psamplers, sizeof(psamplers) / sizeof(psamplers[0]));
+        prog.setSamplerGroup(0, ALL_SHADER_STAGE_FLAGS, psamplers, sizeof(psamplers) / sizeof(psamplers[0]));
         program = api.createProgram(std::move(prog));
 
         // Create a Texture.
@@ -388,31 +356,21 @@ TEST_F(BackendTest, UpdateImage2D) {
                 t.textureFormat, 1, 512, 512, 1u, usage);
 
         // Upload some pixel data.
-        if (t.compressed) {
-#ifdef IOS
-            assert_invariant(false);
-#else
-            assert_invariant(!t.uploadSubregions);
-            PixelBufferDescriptor descriptor = compressedCheckerboardPixelBuffer(512);
-            api.update2DImage(texture, 0, 0, 0, 512, 512, std::move(descriptor));
-#endif
+        if (t.uploadSubregions) {
+            const auto& pf = t.pixelFormat;
+            const auto& pt = t.pixelType;
+            PixelBufferDescriptor subregion1 = checkerboardPixelBuffer(pf, pt, 256, t.bufferPadding);
+            PixelBufferDescriptor subregion2 = checkerboardPixelBuffer(pf, pt, 256, t.bufferPadding);
+            PixelBufferDescriptor subregion3 = checkerboardPixelBuffer(pf, pt, 256, t.bufferPadding);
+            PixelBufferDescriptor subregion4 = checkerboardPixelBuffer(pf, pt, 256, t.bufferPadding);
+            api.update2DImage(texture, 0, 0, 0, 256, 256, std::move(subregion1));
+            api.update2DImage(texture, 0, 256, 0, 256, 256, std::move(subregion2));
+            api.update2DImage(texture, 0, 0, 256, 256, 256, std::move(subregion3));
+            api.update2DImage(texture, 0, 256, 256, 256, 256, std::move(subregion4));
         } else {
-            if (t.uploadSubregions) {
-                const auto& pf = t.pixelFormat;
-                const auto& pt = t.pixelType;
-                PixelBufferDescriptor subregion1 = checkerboardPixelBuffer(pf, pt, 256, t.bufferPadding);
-                PixelBufferDescriptor subregion2 = checkerboardPixelBuffer(pf, pt, 256, t.bufferPadding);
-                PixelBufferDescriptor subregion3 = checkerboardPixelBuffer(pf, pt, 256, t.bufferPadding);
-                PixelBufferDescriptor subregion4 = checkerboardPixelBuffer(pf, pt, 256, t.bufferPadding);
-                api.update2DImage(texture, 0, 0, 0, 256, 256, std::move(subregion1));
-                api.update2DImage(texture, 0, 256, 0, 256, 256, std::move(subregion2));
-                api.update2DImage(texture, 0, 0, 256, 256, 256, std::move(subregion3));
-                api.update2DImage(texture, 0, 256, 256, 256, 256, std::move(subregion4));
-            } else {
-                PixelBufferDescriptor descriptor
-                    = checkerboardPixelBuffer(t.pixelFormat, t.pixelType, 512, t.bufferPadding);
-                api.update2DImage(texture, 0, 0, 0, 512, 512, std::move(descriptor));
-            }
+            PixelBufferDescriptor descriptor
+                = checkerboardPixelBuffer(t.pixelFormat, t.pixelType, 512, t.bufferPadding);
+            api.update2DImage(texture, 0, 0, 0, 512, 512, std::move(descriptor));
         }
 
         SamplerGroup samplers(1);
@@ -468,7 +426,7 @@ TEST_F(BackendTest, UpdateImageSRGB) {
     ShaderGenerator shaderGen(vertex, fragment, sBackend, sIsMobilePlatform);
     Program prog = shaderGen.getProgram();
     Program::Sampler psamplers[] = { utils::CString("tex"), 0, false };
-    prog.setSamplerGroup(0, psamplers, sizeof(psamplers) / sizeof(psamplers[0]));
+    prog.setSamplerGroup(0, ALL_SHADER_STAGE_FLAGS, psamplers, sizeof(psamplers) / sizeof(psamplers[0]));
     ProgramHandle program = api.createProgram(std::move(prog));
 
     // Create a texture.
@@ -554,7 +512,7 @@ TEST_F(BackendTest, UpdateImageMipLevel) {
     ShaderGenerator shaderGen(vertex, fragment, sBackend, sIsMobilePlatform);
     Program prog = shaderGen.getProgram();
     Program::Sampler psamplers[] = { utils::CString("tex"), 0, false };
-    prog.setSamplerGroup(0, psamplers, sizeof(psamplers) / sizeof(psamplers[0]));
+    prog.setSamplerGroup(0, ALL_SHADER_STAGE_FLAGS, psamplers, sizeof(psamplers) / sizeof(psamplers[0]));
     ProgramHandle program = api.createProgram(std::move(prog));
 
     // Create a texture with 3 mip levels.
@@ -626,7 +584,7 @@ TEST_F(BackendTest, UpdateImage3D) {
     ShaderGenerator shaderGen(vertex, fragment, sBackend, sIsMobilePlatform);
     Program prog = shaderGen.getProgram();
     Program::Sampler psamplers[] = { utils::CString("tex"), 0, false };
-    prog.setSamplerGroup(0, psamplers, sizeof(psamplers) / sizeof(psamplers[0]));
+    prog.setSamplerGroup(0, ALL_SHADER_STAGE_FLAGS, psamplers, sizeof(psamplers) / sizeof(psamplers[0]));
     ProgramHandle program = api.createProgram(std::move(prog));
 
     // Create a texture.

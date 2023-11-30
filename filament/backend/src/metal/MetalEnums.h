@@ -27,7 +27,6 @@
 
 namespace filament {
 namespace backend {
-namespace metal {
 
 struct MetalContext;
 
@@ -471,7 +470,6 @@ constexpr inline bool formatHasStencil(MTLPixelFormat format) {
     }
 }
 
-} // namespace metal
 } // namespace backend
 } // namespace filament
 

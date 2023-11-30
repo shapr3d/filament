@@ -12,22 +12,21 @@ endif()
 # ==================================================================================================
 set(SHADERS
         src/ambient_occlusion.fs
+        src/attributes.vs
         src/brdf.fs
         src/common_debug.fs
-        src/common_getters.fs
+        src/common_getters.glsl
         src/common_graphics.fs
         src/common_lighting.fs
         src/common_material.fs
-        src/common_math.fs
+        src/common_math.glsl
         src/common_shading.fs
-        src/common_shadowing.fs
+        src/common_shadowing.glsl
         src/common_types.fs
         src/depth_main.fs
         src/fog.fs
         src/getters.fs
         src/getters.vs
-        src/inputs.fs
-        src/inputs.vs
         src/light_directional.fs
         src/light_indirect.fs
         src/light_reflections.fs
@@ -47,8 +46,10 @@ set(SHADERS
         src/shading_model_standard.fs
         src/shading_model_subsurface.fs
         src/shading_parameters.fs
+        src/shading_reflections.fs
         src/shading_unlit.fs
         src/shadowing.fs
+        src/varyings.glsl
         src/vignette.fs
 )
 

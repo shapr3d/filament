@@ -79,9 +79,11 @@ public class View {
     private VignetteOptions mVignetteOptions;
     private ColorGrading mColorGrading;
     private TemporalAntiAliasingOptions mTemporalAntiAliasingOptions;
+    private ScreenSpaceReflectionsOptions mScreenSpaceReflectionsOptions;
     private MultiSampleAntiAliasingOptions mMultiSampleAntiAliasingOptions;
     private VsmShadowOptions mVsmShadowOptions;
     private SoftShadowOptions mSoftShadowOptions;
+    private GuardBandOptions mGuardBandOptions;
 
     /**
      * Generic quality level.
@@ -332,6 +334,41 @@ public class View {
         public float feedback = 0.04f;
 
         /** enables or disables temporal anti-aliasing */
+        public boolean enabled = false;
+    };
+
+    /**
+     * Options for Screen-space Reflections.
+     * @see View#setScreenSpaceReflectionOptions
+     */
+    public static class ScreenSpaceReflectionsOptions {
+        /** ray thickness, in world units */
+        public float thickness = 0.1f;
+
+        /** bias, in world units, to prevent self-intersections */
+        public float bias = 0.01f;
+
+        /** maximum distance, in world units, to raycast */
+        public float maxDistance = 3.0f;
+
+        /** stride, in texels, for samples along the ray. */
+        public float stride = 2.0f;
+
+        /** enables or disables screen-space reflections */
+        public boolean enabled = false;
+    };
+
+    /**
+     * Options for the  screen-space guard band.
+     * A guard band can be enabled to avoid some artifacts towards the edge of the screen when
+     * using screen-space effects such as SSAO.
+     * Enabling the guard band reduces performance slightly.
+     * Currently the guard band can only be enabled or disabled.
+     *
+     * @see View#setGuardBandOptions
+     */
+    public static class GuardBandOptions {
+        /** enables or disables the guard band */
         public boolean enabled = false;
     };
 
@@ -1199,6 +1236,54 @@ public class View {
     }
 
     /**
+     * Enables or disable screen-space reflections. Disabled by default.
+     *
+     * @param options screen-space reflections options
+     */
+    public void setScreenSpaceReflectionsOptions(@NonNull ScreenSpaceReflectionsOptions options) {
+        mScreenSpaceReflectionsOptions = options;
+        nSetScreenSpaceReflectionsOptions(getNativeObject(), options.thickness, options.bias,
+                options.maxDistance, options.stride, options.enabled);
+    }
+
+    /**
+     * Returns screen-space reflections options.
+     *
+     * @return screen-space reflections options
+     */
+    @NonNull
+    public ScreenSpaceReflectionsOptions getScreenSpaceReflectionsOptions() {
+        if (mScreenSpaceReflectionsOptions == null) {
+            mScreenSpaceReflectionsOptions = new ScreenSpaceReflectionsOptions();
+        }
+        return mScreenSpaceReflectionsOptions;
+    }
+
+    /**
+     * Enables or disable screen-space guard band. Disabled by default.
+     *
+     * @param options guard band options
+     */
+    public void setGuardBandOptions(@NonNull GuardBandOptions options) {
+        mGuardBandOptions = options;
+        nSetGuardBandOptions(getNativeObject(), options.enabled);
+    }
+
+    /**
+     * Returns screen-space guard band options.
+     *
+     * @return guard band options
+     */
+    @NonNull
+    public GuardBandOptions getGuardBandOptions() {
+        if (mGuardBandOptions == null) {
+            mGuardBandOptions = new GuardBandOptions();
+        }
+        return mGuardBandOptions;
+    }
+
+
+    /**
      * Enables or disables tone-mapping in the post-processing stage. Enabled by default.
      *
      * @param type Tone-mapping function.
@@ -1782,9 +1867,11 @@ public class View {
             boolean nativeResolution, int foregroundRingCount, int backgroundRingCount, int fastGatherRingCount, int maxForegroundCOC, int maxBackgroundCOC);
     private static native void nSetVignetteOptions(long nativeView, float midPoint, float roundness, float feather, float r, float g, float b, float a, boolean enabled);
     private static native void nSetTemporalAntiAliasingOptions(long nativeView, float feedback, float filterWidth, boolean enabled);
+    private static native void nSetScreenSpaceReflectionsOptions(long nativeView, float thickness, float bias, float maxDistance, float stride, boolean enabled);
     private static native void nSetMultiSampleAntiAliasingOptions(long nativeView, boolean enabled, int sampleCount, boolean customResolve);
     private static native boolean nIsShadowingEnabled(long nativeView);
     private static native void nSetScreenSpaceRefractionEnabled(long nativeView, boolean enabled);
+    private static native void nSetGuardBandOptions(long nativeView, boolean enabled);
     private static native boolean nIsScreenSpaceRefractionEnabled(long nativeView);
     private static native void nPick(long nativeView, int x, int y, Object handler, InternalOnPickCallback internalCallback);
 }

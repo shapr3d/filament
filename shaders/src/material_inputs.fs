@@ -36,7 +36,7 @@ struct MaterialInputs {
     float anisotropy;
     vec3  anisotropyDirection;
 
-#if defined(SHADING_MODEL_SUBSURFACE) || defined(HAS_REFRACTION)
+#if defined(SHADING_MODEL_SUBSURFACE) || defined(MATERIAL_HAS_REFRACTION)
     float thickness;
 #endif
 #if defined(SHADING_MODEL_SUBSURFACE)
@@ -71,7 +71,7 @@ struct MaterialInputs {
 #endif
 
 #if !defined(SHADING_MODEL_CLOTH) && !defined(SHADING_MODEL_SUBSURFACE) && !defined(SHADING_MODEL_UNLIT)
-#if defined(HAS_REFRACTION)
+#if defined(MATERIAL_HAS_REFRACTION)
 #if defined(MATERIAL_HAS_ABSORPTION)
     vec3 absorption;
 #endif
@@ -125,7 +125,7 @@ void initMaterial(out MaterialInputs material) {
     material.anisotropyDirection = vec3(1.0, 0.0, 0.0);
 #endif
 
-#if defined(SHADING_MODEL_SUBSURFACE) || defined(HAS_REFRACTION)
+#if defined(SHADING_MODEL_SUBSURFACE) || defined(MATERIAL_HAS_REFRACTION)
     material.thickness = 0.5;
 #endif
 #if defined(SHADING_MODEL_SUBSURFACE)
@@ -160,7 +160,7 @@ void initMaterial(out MaterialInputs material) {
 #endif
 
 #if !defined(SHADING_MODEL_CLOTH) && !defined(SHADING_MODEL_SUBSURFACE) && !defined(SHADING_MODEL_UNLIT)
-#if defined(HAS_REFRACTION)
+#if defined(MATERIAL_HAS_REFRACTION)
 #if defined(MATERIAL_HAS_ABSORPTION)
     material.absorption = vec3(0.0);
 #endif

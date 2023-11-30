@@ -240,7 +240,7 @@ const char* toString(backend::StencilOperation stencilOp) noexcept {
 
 // Returns a human-readable variant description.
 // For example: DYN|DIR
-std::string formatVariantString(uint8_t variant, MaterialDomain domain) noexcept;
+std::string formatVariantString(Variant variant, MaterialDomain domain) noexcept;
 
 } // namespace matdbg
 } // namespace filament

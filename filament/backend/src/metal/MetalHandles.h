@@ -40,7 +40,6 @@
 
 namespace filament {
 namespace backend {
-namespace metal {
 
 class MetalSwapChain : public HwSwapChain {
 public:
@@ -162,7 +161,15 @@ struct MetalProgram : public HwProgram {
 
     id<MTLFunction> vertexFunction;
     id<MTLFunction> fragmentFunction;
-    Program::SamplerGroupInfo samplerGroupInfo;
+
+    struct SamplerBlockInfo {
+        uint8_t samplerGroup = UINT8_MAX;
+        uint8_t sampler = UINT8_MAX;
+    };
+
+    std::array<SamplerBlockInfo, MAX_VERTEX_SAMPLER_COUNT> vertexSamplerBlockInfo;
+    std::array<SamplerBlockInfo, MAX_FRAGMENT_SAMPLER_COUNT> fragmentSamplerBlockInfo;
+
     bool isValid = false;
 };
 
@@ -352,7 +359,6 @@ struct MetalTimerQuery : public HwTimerQuery {
     std::shared_ptr<Status> status;
 };
 
-} // namespace metal
 } // namespace backend
 } // namespace filament
 

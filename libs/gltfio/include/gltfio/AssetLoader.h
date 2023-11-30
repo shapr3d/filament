@@ -36,6 +36,8 @@ namespace utils {
  */
 namespace gltfio {
 
+class NodeManager;
+
 /**
  * \struct AssetConfiguration AssetLoader.h gltfio/AssetLoader.h
  * \brief Construction parameters for AssetLoader.
@@ -70,7 +72,8 @@ struct AssetConfiguration {
  * object, which is a bundle of Filament entities, material instances, textures, vertex buffers,
  * and index buffers.
  *
- * Clients must use AssetLoader to create and destroy FilamentAsset objects.
+ * Clients must use AssetLoader to create and destroy FilamentAsset objects. This is similar to
+ * how filament::Engine is used to create and destroy core objects like VertexBuffer.
  *
  * AssetLoader does not fetch external buffer data or create textures on its own. Clients can use
  * ResourceLoader for this, which obtains the URI list from the asset. This is demonstrated in the
@@ -84,6 +87,7 @@ struct AssetConfiguration {
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  * auto engine = Engine::create();
  * auto materials = createMaterialGenerator(engine);
+ * auto decoder = createStbProvider(engine);
  * auto loader = AssetLoader::create({engine, materials});
  *
  * // Parse the glTF content and create Filament entities.
@@ -92,10 +96,10 @@ struct AssetConfiguration {
  * content.clear();
  *
  * // Load buffers and textures from disk.
- * ResourceLoader({engine, ".", true}).loadResources(asset);
- *
- * // Obtain the simple animation interface.
- * Animator* animator = asset->getAnimator();
+ * ResourceLoader resourceLoader({engine, ".", true});
+ * resourceLoader.addTextureProvider("image/png", decoder)
+ * resourceLoader.addTextureProvider("image/jpeg", decoder)
+ * resourceLoader.loadResources(asset);
  *
  * // Free the glTF hierarchy as it is no longer needed.
  * asset->releaseSourceData();
@@ -105,8 +109,8 @@ struct AssetConfiguration {
  *
  * // Execute the render loop and play the first animation.
  * do {
- *      animator->applyAnimation(0, time);
- *      animator->updateBoneMatrices();
+ *      asset->getAnimator()->applyAnimation(0, time);
+ *      asset->getAnimator()->updateBoneMatrices();
  *      if (renderer->beginFrame(swapChain)) {
  *          renderer->render(view);
  *          renderer->endFrame();
@@ -117,6 +121,7 @@ struct AssetConfiguration {
  * loader->destroyAsset(asset);
  * materials->destroyMaterials();
  * delete materials;
+ * delete decoder;
  * AssetLoader::destroy(&loader);
  * Engine::destroy(&engine);
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -224,7 +229,9 @@ public:
 
     utils::NameComponentManager* getNames() const noexcept;
 
-    MaterialProvider* getMaterialProvider() const noexcept;
+    NodeManager& getNodeManager() noexcept;
+
+    MaterialProvider& getMaterialProvider() noexcept;
 
     /*! \cond PRIVATE */
 protected:

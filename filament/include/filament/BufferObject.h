@@ -119,7 +119,6 @@ public:
          * @see IndexBuffer::setBuffer
          */
         BufferObject* build(Engine& engine);
-
     private:
         friend class FBufferObject;
     };

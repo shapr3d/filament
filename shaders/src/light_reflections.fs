@@ -2,7 +2,7 @@
 // Screen-space reflections
 //------------------------------------------------------------------------------
 
-#if defined(HAS_REFLECTIONS) && REFLECTION_MODE == REFLECTION_MODE_SCREEN_SPACE
+#if defined(MATERIAL_HAS_REFLECTIONS)
 
 // Copied from depthUtils.fs
 highp float linearizeDepth(highp float depth) {
@@ -58,7 +58,7 @@ highp float distanceSquared(highp vec2 a, highp vec2 b) {
 // Note: McGuire and Mara use the "cs" prefix to stand for "camera space", equivalent to Filament's
 // "view space". "cs" has been replaced with "vs" to avoid confusion.
 bool traceScreenSpaceRay(const highp vec3 vsOrigin, const highp vec3 vsDirection,
-        const highp mat4 projectToPixelMatrix, const highp sampler2D vsZBuffer,
+        const highp mat4 uvFromViewMatrix, const highp sampler2D vsZBuffer,
         const float vsZThickness, const highp float nearPlaneZ, const float stride,
         const float jitterFraction, const highp float maxSteps, const float maxRayTraceDistance,
         out highp vec2 hitPixel, out highp vec3 vsHitPoint) {
@@ -69,8 +69,8 @@ bool traceScreenSpaceRay(const highp vec3 vsOrigin, const highp vec3 vsDirection
     highp vec3 vsEndPoint = vsDirection * rayLength + vsOrigin;
 
     // Project into screen space
-    highp vec4 H0 = mulMat4x4Float3(projectToPixelMatrix, vsOrigin);
-    highp vec4 H1 = mulMat4x4Float3(projectToPixelMatrix, vsEndPoint);
+    highp vec4 H0 = mulMat4x4Float3(uvFromViewMatrix, vsOrigin);
+    highp vec4 H1 = mulMat4x4Float3(uvFromViewMatrix, vsEndPoint);
 
     // There are a lot of divisions by w that can be turned into multiplications at some minor
     // precision loss...and we need to interpolate these 1/w values anyway.
@@ -191,36 +191,39 @@ highp mat4 scaleMatrix(const highp float x, const highp float y) {
 }
 
 /**
- * Evaluates screen-space reflections, storing a premultiplied color in Fr.rgb if there's a hit.
- * r is the desired reflected vector.
+ * Evaluates screen-space reflections, returning a color if there's a hit.
+ * wsRayDirection is the desired reflected vector.
  *
- * Fr.a is set to a value between [0, 1] representing the "opacity" of the reflection. 1.0f is full
- * screen-space reflection. Values < 1.0f should be blended with the scene's IBL. Fr.rgb is
- * premultiplied by Fr.a.
+ * The returned color's alpha is set to a value between [0, 1] representing the "opacity" of the
+ * reflection. 1.0f is full screen-space reflection. Values < 1.0f should be blended with the
+ * scene's IBL.
  *
- * If there is no hit, Fr is unmodified.
+ * If there is no hit, the return value is vec4(0).
  */
-void evaluateScreenSpaceReflections(vec3 r, inout vec4 Fr) {
-    vec3 wsRayDirection = r;
+vec4 evaluateScreenSpaceReflections(const highp vec3 wsRayDirection) {
+    vec4 Fr = vec4(0.0f);
     highp vec3 wsRayStart = shading_position + frameUniforms.ssrBias * wsRayDirection;
 
     // ray start/end in view space
-    highp vec4 vsRayStart = mulMat4x4Float3(getViewFromWorldMatrix(), wsRayStart);
-    highp vec4 vsRayDirection = getViewFromWorldMatrix() * vec4(wsRayDirection, 0.0);
+    highp vec3 vsOrigin = mulMat4x4Float3(getViewFromWorldMatrix(), wsRayStart).xyz;
 
-    highp vec3 vsOrigin = vsRayStart.xyz;
-    highp vec3 vsDirection = vsRayDirection.xyz;
+    // the view matrix is guaranteed to be a rigid transform
+    highp vec3 vsDirection = mulMat3x3Float3(getViewFromWorldMatrix(), wsRayDirection);
+
     float vsZThickness = frameUniforms.ssrThickness;
     highp float nearPlaneZ = -frameUniforms.nearOverFarMinusNear / frameUniforms.oneOverFarMinusNear;
     float stride = frameUniforms.ssrStride;
-    // TODO: jitterFraction should be between 0 and 1, but anything < 1 gives banding artifacts.
-    const float jitterFraction = 1.0f;
+
+    highp vec2 fragCoord = gl_FragCoord.xy;
+    fragCoord += vec2(frameUniforms.temporalNoise); // 0 when TAA is not used
+    float jitterFraction = interleavedGradientNoise(fragCoord);
+
     float maxRayTraceDistance = frameUniforms.ssrDistance;
 
     highp vec2 res = vec2(textureSize(light_structure, 0).xy);
-    highp mat4 projectToPixelMatrix =
+    highp mat4 uvFromViewMatrix =
         scaleMatrix(res.x, res.y) *
-        frameUniforms.ssrProjectToPixelMatrix;
+        frameUniforms.ssrUvFromViewMatrix;
 
     highp float maxSteps = float(max(res.x, res.y));
 
@@ -228,28 +231,34 @@ void evaluateScreenSpaceReflections(vec3 r, inout vec4 Fr) {
     highp vec2 hitPixel;  // not currently used
     highp vec3 vsHitPoint;
 
-    if (traceScreenSpaceRay(vsOrigin, vsDirection, projectToPixelMatrix, light_structure,
+    if (traceScreenSpaceRay(vsOrigin, vsDirection, uvFromViewMatrix, light_structure,
             vsZThickness, nearPlaneZ, stride, jitterFraction, maxSteps,
             maxRayTraceDistance, hitPixel, vsHitPoint)) {
-        highp vec4 reprojected = frameUniforms.ssrReprojection * vec4(vsHitPoint, 1.0f);
-        reprojected *= (1.0 / reprojected.w);
+        highp vec4 reprojected = mulMat4x4Float3(frameUniforms.ssrReprojection, vsHitPoint);
+        reprojected.xy *= (1.0 / reprojected.w);
 
         // Compute the screen-space reflection's contribution.
+
         // TODO: parameterize fadeRate.
-        const float fadeRate = 12.0f;
+        const float fadeRateEdge = 12.0f;
+        const float fadeRateDistance = 4.0f;
 
         // Fade the reflections out near the edges.
-        vec2 edgeFactor = max(fadeRate * abs(reprojected.xy - 0.5f) - (fadeRate / 2.0f - 1.0f), 0.0f);
-        float edgeFade = saturate(1.0 - dot(edgeFactor, edgeFactor));
+        vec2 edgeFactor = max(fadeRateEdge * abs(reprojected.xy - 0.5f) - (fadeRateEdge * 0.5f - 1.0f), 0.0f);
+        float fade = saturate(1.0 - dot(edgeFactor, edgeFactor));
 
         // Fade the reflections out near maxRayTraceDistance.
         float t = distance(vsOrigin, vsHitPoint) / maxRayTraceDistance;
-        float distFactor = max(fadeRate * (t - 0.5f) - (fadeRate / 2.0f - 1.0f), 0.0f);
-        float distanceFade = saturate(1.0 - (distFactor, distFactor));
+        fade *= saturate(fadeRateDistance - fadeRateDistance * t);
 
-        float fade = edgeFade * distanceFade;
-        Fr = vec4(textureLod(light_ssr, reprojected.xy, 0.0f).rgb * fade, fade);
+        // Fade when pointing towards the camera (likely to hit a backface)
+        // note: vsDirection.z is the cos(vsDirection, view)
+        fade *= (1.0 - max(0.0, vsDirection.z));
+
+        // we output a premultiplied alpha color because this is going to be mipmapped
+        Fr = vec4(textureLod(light_ssr, reprojected.xy, 0.0).rgb * fade, fade);
     }
+    return Fr;
 }
 
-#endif // screen-space reflections
+#endif // MATERIAL_HAS_REFLECTIONS

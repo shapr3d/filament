@@ -11,6 +11,18 @@ add_library(dracodec STATIC IMPORTED)
 set_target_properties(dracodec PROPERTIES IMPORTED_LOCATION
         ${FILAMENT_DIR}/lib/${ANDROID_ABI}/libdracodec.a)
 
+add_library(ktxreader STATIC IMPORTED)
+set_target_properties(ktxreader PROPERTIES IMPORTED_LOCATION
+        ${FILAMENT_DIR}/lib/${ANDROID_ABI}/libktxreader.a)
+
+add_library(stb STATIC IMPORTED)
+set_target_properties(stb PROPERTIES IMPORTED_LOCATION
+        ${FILAMENT_DIR}/lib/${ANDROID_ABI}/libstb.a)
+
+add_library(basis_transcoder STATIC IMPORTED)
+set_target_properties(basis_transcoder PROPERTIES IMPORTED_LOCATION
+        ${FILAMENT_DIR}/lib/${ANDROID_ABI}/libbasis_transcoder.a)
+
 add_library(utils STATIC IMPORTED)
 set_target_properties(utils PROPERTIES IMPORTED_LOCATION
         ${FILAMENT_DIR}/lib/${ANDROID_ABI}/libutils.a)
@@ -28,34 +40,37 @@ set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} -Wl,
 set(GLTFIO_SRCS
         ${GLTFIO_DIR}/include/gltfio/Animator.h
         ${GLTFIO_DIR}/include/gltfio/AssetLoader.h
-        ${GLTFIO_DIR}/include/gltfio/MaterialProvider.h
-        ${GLTFIO_DIR}/include/gltfio/ResourceLoader.h
         ${GLTFIO_DIR}/include/gltfio/FilamentAsset.h
         ${GLTFIO_DIR}/include/gltfio/FilamentInstance.h
+        ${GLTFIO_DIR}/include/gltfio/MaterialProvider.h
+        ${GLTFIO_DIR}/include/gltfio/NodeManager.h
+        ${GLTFIO_DIR}/include/gltfio/ResourceLoader.h
+        ${GLTFIO_DIR}/include/gltfio/TextureProvider.h
+        ${GLTFIO_DIR}/include/gltfio/math.h
 
         ${GLTFIO_DIR}/src/Animator.cpp
         ${GLTFIO_DIR}/src/AssetLoader.cpp
-        ${GLTFIO_DIR}/src/DracoCache.cpp
-        ${GLTFIO_DIR}/src/DracoCache.h
         ${GLTFIO_DIR}/src/DependencyGraph.cpp
         ${GLTFIO_DIR}/src/DependencyGraph.h
+        ${GLTFIO_DIR}/src/DracoCache.cpp
+        ${GLTFIO_DIR}/src/DracoCache.h
         ${GLTFIO_DIR}/src/FFilamentAsset.h
-        ${GLTFIO_DIR}/src/FilamentAsset.cpp
         ${GLTFIO_DIR}/src/FFilamentInstance.h
+        ${GLTFIO_DIR}/src/FilamentAsset.cpp
         ${GLTFIO_DIR}/src/FilamentInstance.cpp
+        ${GLTFIO_DIR}/src/FNodeManager.h
         ${GLTFIO_DIR}/src/GltfEnums.h
+        ${GLTFIO_DIR}/src/Ktx2Provider.cpp
         ${GLTFIO_DIR}/src/MaterialProvider.cpp
-        ${GLTFIO_DIR}/src/MorphHelper.h
-        ${GLTFIO_DIR}/src/MorphHelper.cpp
+        ${GLTFIO_DIR}/src/NodeManager.cpp
         ${GLTFIO_DIR}/src/ResourceLoader.cpp
-        ${GLTFIO_DIR}/src/TangentsJob.h
+        ${GLTFIO_DIR}/src/StbProvider.cpp
         ${GLTFIO_DIR}/src/TangentsJob.cpp
+        ${GLTFIO_DIR}/src/TangentsJob.h
         ${GLTFIO_DIR}/src/UbershaderLoader.cpp
         ${GLTFIO_DIR}/src/Wireframe.cpp
         ${GLTFIO_DIR}/src/Wireframe.h
-        ${GLTFIO_DIR}/src/math.h
         ${GLTFIO_DIR}/src/upcast.h
-        ${GLTFIO_DIR}/src/Image.cpp
 
         src/main/cpp/Animator.cpp
         src/main/cpp/AssetLoader.cpp
@@ -83,6 +98,7 @@ set(GLTFIO_INCLUDE_DIRS
         ../../third_party/hat-trie
         ../../third_party/stb
         ../../libs/utils/include
+        ../../libs/ktxreader/include
 )
 
 add_library(gltfio-jni SHARED ${GLTFIO_SRCS})
@@ -92,9 +108,9 @@ set_target_properties(gltfio-jni PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_
 
 if(GLTFIO_LITE)
         target_compile_definitions(gltfio-jni PUBLIC GLTFIO_LITE=1)
-        target_link_libraries(gltfio-jni filament-jni utils log gltfio_resources_lite)
+        target_link_libraries(gltfio-jni filament-jni utils log stb ktxreader basis_transcoder gltfio_resources_lite)
 else()
-        target_link_libraries(gltfio-jni filament-jni utils log gltfio_resources)
+        target_link_libraries(gltfio-jni filament-jni utils log stb ktxreader basis_transcoder gltfio_resources)
 
         # Enable Draco in the non-lite variant of gltfio.
         target_link_libraries(gltfio-jni dracodec)

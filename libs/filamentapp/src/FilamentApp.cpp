@@ -429,10 +429,6 @@ void FilamentApp::run(const Config& config, SetupCallback setupCallback,
             for (auto const& view : window->mViews) {
                 renderer->render(view->getView());
             }
-            renderer->endFrame();
-
-            // We call PostRender only when the frame has not been skipped. It might be used
-            // for taking screenshots under the assumption that a state change has taken effect.
             if (postRender) {
                 for (auto const& view : window->mViews) {
                     if (view.get() != window->mUiView) {
@@ -440,6 +436,7 @@ void FilamentApp::run(const Config& config, SetupCallback setupCallback,
                     }
                 }
             }
+            renderer->endFrame();
 
         } else {
             ++mSkippedFrames;
@@ -580,7 +577,7 @@ void FilamentApp::initSDL() {
 
 FilamentApp::Window::Window(FilamentApp* filamentApp,
         const Config& config, std::string title, size_t w, size_t h)
-        : mFilamentApp(filamentApp) {
+        : mFilamentApp(filamentApp), mIsHeadless(config.headless) {
     const int x = SDL_WINDOWPOS_CENTERED;
     const int y = SDL_WINDOWPOS_CENTERED;
     uint32_t windowFlags = SDL_WINDOW_SHOWN | SDL_WINDOW_ALLOW_HIGHDPI;
@@ -847,7 +844,7 @@ void FilamentApp::Window::configureCamerasForWindow() {
     float dpiScaleY = 1.0f;
 
     // If the app is not headless, query the window for its physical & virtual sizes.
-    if (mWindow) {
+    if (!mIsHeadless) {
         uint32_t width, height;
         SDL_GL_GetDrawableSize(mWindow, (int*) &width, (int*) &height);
         mWidth = (size_t) width;

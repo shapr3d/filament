@@ -15,11 +15,10 @@
  */
 
 #include <gltfio/Animator.h>
+#include <gltfio/math.h>
 
 #include "FFilamentAsset.h"
 #include "FFilamentInstance.h"
-#include "MorphHelper.h"
-#include "math.h"
 #include "upcast.h"
 
 #include <filament/MaterialEnums.h>
@@ -76,7 +75,6 @@ struct AnimatorImpl {
     RenderableManager* renderableManager;
     TransformManager* transformManager;
     vector<float> weights;
-    MorphHelper* morpher;
     void addChannels(const NodeMap& nodeMap, const cgltf_animation& srcAnim, Animation& dst);
     void applyAnimation(const Channel& channel, float t, size_t prevIndex, size_t nextIndex);
 };
@@ -221,8 +219,6 @@ Animator::Animator(FFilamentAsset* asset, FFilamentInstance* instance) {
             }
         }
     }
-
-    mImpl->morpher = asset->mMorpher;
 }
 
 void Animator::addInstance(FFilamentInstance* instance) {
@@ -287,6 +283,36 @@ void Animator::applyAnimation(size_t animationIndex, float time) const {
         }
 
         mImpl->applyAnimation(channel, t, prevIndex, nextIndex);
+    }
+}
+
+void Animator::resetBoneMatrices() {
+    auto renderableManager = mImpl->renderableManager;
+
+    auto update = [=](const SkinVector& skins, BoneVector& boneVector) {
+        for (const auto& skin : skins) {
+            size_t njoints = skin.joints.size();
+            boneVector.resize(njoints);
+            for (const auto& entity : skin.targets) {
+                auto renderable = renderableManager->getInstance(entity);
+                if (renderable) {
+                    for (size_t boneIndex = 0; boneIndex < njoints; ++boneIndex) {
+                        boneVector[boneIndex] = mat4f();
+                    }
+                    renderableManager->setBones(renderable, boneVector.data(), boneVector.size());
+                }
+            }
+        }
+    };
+
+    if (mImpl->instance) {
+        update(mImpl->instance->skins, mImpl->boneMatrices);
+    } else if (!mImpl->asset->isInstanced()) {
+        update(mImpl->asset->mSkins, mImpl->boneMatrices);
+    } else {
+        for (FFilamentInstance* instance : mImpl->asset->mInstances) {
+            update(instance->skins, mImpl->boneMatrices);
+        }
     }
 }
 
@@ -461,7 +487,8 @@ void AnimatorImpl::applyAnimation(const Channel& channel, float t, size_t prevIn
                 }
             }
 
-            morpher->setWeights(channel.targetEntity, weights.data(), weights.size());
+            auto ci = renderableManager->getInstance(channel.targetEntity);
+            renderableManager->setMorphWeights(ci, weights.data(), weights.size());
             return;
         }
     }

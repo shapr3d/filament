@@ -32,7 +32,6 @@
 
 namespace filament {
 namespace backend {
-namespace metal {
 
 static inline MTLTextureUsage getMetalTextureUsage(TextureUsage usage) {
     NSUInteger u = 0;
@@ -68,9 +67,8 @@ MetalSwapChain::MetalSwapChain(MetalContext& context, CAMetalLayer* nativeWindow
     }
 
     // Needed so we can use the SwapChain as a blit source.
-    if (flags & SwapChain::CONFIG_READABLE) {
-        nativeWindow.framebufferOnly = NO;
-    }
+    // Also needed for rendering directly into the SwapChain during refraction.
+    nativeWindow.framebufferOnly = NO;
 
     layer.device = context.device;
 }
@@ -81,7 +79,7 @@ MetalSwapChain::MetalSwapChain(MetalContext& context, int32_t width, int32_t hei
 
 MetalSwapChain::MetalSwapChain(MetalContext& context, CVPixelBufferRef pixelBuffer, uint64_t flags)
         : context(context), externalImage(context), type(SwapChainType::CVPIXELBUFFERREF) {
-    assert_invariant(flags & backend::SWAP_CHAIN_CONFIG_APPLE_CVPIXELBUFFER);
+    assert_invariant(flags & SWAP_CHAIN_CONFIG_APPLE_CVPIXELBUFFER);
     MetalExternalImage::assertWritableImage(pixelBuffer);
     externalImage.set(pixelBuffer);
     assert_invariant(externalImage.isValid());
@@ -219,7 +217,7 @@ void MetalSwapChain::scheduleFrameScheduledCallback() {
     }
 
     assert_invariant(drawable);
-    backend::FrameScheduledCallback callback = frameScheduledCallback;
+    FrameScheduledCallback callback = frameScheduledCallback;
     // This block strongly captures drawable to keep it alive until the handler executes.
     // We cannot simply reference this->drawable inside the block because the block would then only
     // capture the _this_ pointer (MetalSwapChain*) instead of the drawable.
@@ -240,12 +238,12 @@ void MetalSwapChain::scheduleFrameCompletedCallback() {
         return;
     }
 
-    backend::FrameCompletedCallback callback = frameCompletedCallback;
+    FrameCompletedCallback callback = frameCompletedCallback;
     void* userData = frameCompletedUserData;
     [getPendingCommandBuffer(&context) addCompletedHandler:^(id<MTLCommandBuffer> cb) {
         struct CallbackData {
             void* userData;
-            backend::FrameCompletedCallback callback;
+            FrameCompletedCallback callback;
         };
         CallbackData* data = new CallbackData();
         data->userData = userData;
@@ -329,7 +327,7 @@ void MetalRenderPrimitive::setBuffers(MetalVertexBuffer* vertexBuffer, MetalInde
 }
 
 MetalProgram::MetalProgram(id<MTLDevice> device, const Program& program) noexcept
-    : HwProgram(program.getName()), vertexFunction(nil), fragmentFunction(nil), samplerGroupInfo(),
+    : HwProgram(program.getName()), vertexFunction(nil), fragmentFunction(nil),
         isValid(false) {
 
     using MetalFunctionPtr = __strong id<MTLFunction>*;
@@ -366,10 +364,48 @@ MetalProgram::MetalProgram(id<MTLDevice> device, const Program& program) noexcep
         *shaderFunctions[i] = [library newFunctionWithName:@"main0"];
     }
 
-    // All stages of the program have compiled successfuly, this is a valid program.
+    // All stages of the program have compiled successfully, this is a valid program.
     isValid = true;
 
-    samplerGroupInfo = program.getSamplerGroupInfo();
+    // This calculates Metal resource binding indices. Filament's sampler bindings range from 0-31
+    // across both vertex and fragment stages. However, Metal binding indices must be < 16, with a
+    // separate binding "namespace" for each stage. So, we recompute binding indices for each shader
+    // stage. This logic should match updateResourceBinding in GLSLPostProcessor.cpp
+    // This is an example how binding indices each of shader stages is generated from sampler's
+    // bindings. Below is sampler's bindings.
+    //  0 shadowMap { fragment }
+    //  1 structure { fragment }
+    //  2 targets { vertex }
+    //  3 color { vertex | fragment }
+    //  4 depth { vertex | fragment }
+    // Below is generated vertex sampler binding indices.
+    //  0 targets
+    //  1 color
+    //  2 depth
+    // Below is generated fragment sampler binding indices.
+    //  0 shadowMap
+    //  1 structure
+    //  2 color
+    //  3 depth
+    auto& samplerGroupInfo = program.getSamplerGroupInfo();
+    for (size_t shaderType = 0; shaderType != PIPELINE_STAGE_COUNT; ++shaderType) {
+        size_t bindingIdx = 0;
+        auto& samplerBlockInfo = (shaderType == ShaderType::VERTEX) ? vertexSamplerBlockInfo
+                                                                    : fragmentSamplerBlockInfo;
+        for (size_t samplerGroupIdx = 0; samplerGroupIdx != SAMPLER_GROUP_COUNT; ++samplerGroupIdx) {
+            auto& groupData = samplerGroupInfo[samplerGroupIdx];
+            auto stageFlags = groupData.stageFlags;
+            if (!stageFlags.hasShaderType(static_cast<ShaderType>(shaderType))) {
+                continue;
+            }
+            auto& samplers = groupData.samplers;
+            for (size_t samplerIdx = 0, c = samplers.size(); samplerIdx != c; ++samplerIdx) {
+                samplerBlockInfo[bindingIdx].samplerGroup = samplerGroupIdx;
+                samplerBlockInfo[bindingIdx].sampler = samplerIdx;
+                ++bindingIdx;
+            }
+        }
+    }
 }
 
 MetalTexture::MetalTexture(MetalContext& context, SamplerType target, uint8_t levels,
@@ -1007,6 +1043,5 @@ FenceStatus MetalFence::wait(uint64_t timeoutNs) {
     return FenceStatus::ERROR;
 }
 
-} // namespace metal
 } // namespace backend
 } // namespace filament

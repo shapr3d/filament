@@ -84,7 +84,7 @@ public:
      *                      platform, on which you should pass in an EGLDisplay to connect to,
      *                      if you want to use one different from the default.
      *
-     * @return A pointer to the Plaform object.
+     * @return A pointer to the Platform object.
      *
      * @see destroy
      */

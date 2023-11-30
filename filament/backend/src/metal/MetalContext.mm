@@ -25,7 +25,6 @@
 
 namespace filament {
 namespace backend {
-namespace metal {
 
 void initializeSupportedGpuFamilies(MetalContext* context) {
     auto& highestSupportedFamily = context->highestSupportedGpuFamily;
@@ -161,6 +160,5 @@ bool isInRenderPass(MetalContext* context) {
     return context->currentRenderPassEncoder != nil;
 }
 
-} // namespace metal
 } // namespace backend
 } // namespace filament
