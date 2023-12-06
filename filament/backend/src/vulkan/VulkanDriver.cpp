@@ -1929,10 +1929,6 @@ void VulkanDriver::debugCommandBegin(CommandStream* cmds, bool synchronous, cons
 #endif
 }
 
-bool VulkanDriver::isDepthResolveSupported() {
-    return true;
-}
-
 // explicit instantiation of the Dispatcher
 template class ConcreteDispatcher<VulkanDriver>;
 

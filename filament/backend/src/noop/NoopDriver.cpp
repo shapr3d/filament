@@ -49,10 +49,6 @@ void NoopDriver::terminate() {
 void NoopDriver::tick(int) {
 }
 
-bool NoopDriver::isDepthResolveSupported() {
-    return true;
-}
-
 void NoopDriver::beginFrame(int64_t monotonic_clock_ns, uint32_t frameId) {
 }
 

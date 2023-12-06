@@ -57,7 +57,6 @@ FrameGraphId<FrameGraphTexture> RendererUtils::colorPass(
 
                 TargetBufferFlags clearDepthFlags = config.clearFlags & TargetBufferFlags::DEPTH;
                 TargetBufferFlags clearColorFlags = config.clearFlags & TargetBufferFlags::COLOR;
-                TargetBufferFlags clearStencilFlags = config.clearFlags & TargetBufferFlags::STENCIL;
 
                 data.shadows = blackboard.get<FrameGraphTexture>("shadows");
                 data.ssao = blackboard.get<FrameGraphTexture>("ssao");
@@ -98,7 +97,6 @@ FrameGraphId<FrameGraphTexture> RendererUtils::colorPass(
                 if (!data.depth) {
                     // clear newly allocated depth buffers, regardless of given clear flags
                     clearDepthFlags = TargetBufferFlags::DEPTH;
-                    clearStencilFlags = TargetBufferFlags::STENCIL;
                     data.depth = builder.createTexture("Depth Buffer", {
                             .width = colorBufferDesc.width,
                             .height = colorBufferDesc.height,
@@ -109,7 +107,7 @@ FrameGraphId<FrameGraphTexture> RendererUtils::colorPass(
                             // the tile depth buffer will be MS, but it'll be resolved to single
                             // sample automatically -- which is what we want.
                             .samples = canResolveDepth ? colorBufferDesc.samples : uint8_t(config.msaa),
-                            .format = config.depthFormat,
+                            .format = TextureFormat::DEPTH32F,
                     });
                 }
 
@@ -127,18 +125,11 @@ FrameGraphId<FrameGraphTexture> RendererUtils::colorPass(
 
                 // We set a "read" constraint on these attachments here because we need to preserve them
                 // when the color pass happens in several passes (e.g. with SSR)
-                auto depthAttachmentUsage = FrameGraphTexture::Usage::DEPTH_ATTACHMENT;
-                const bool hasStencil = TextureFormat::DEPTH32F_STENCIL8 == config.depthFormat ||
-                                        TextureFormat::DEPTH24_STENCIL8 == config.depthFormat;
-                if (hasStencil) {
-                    depthAttachmentUsage |= FrameGraphTexture::Usage::STENCIL_ATTACHMENT;
-                }
-
                 data.color = builder.read(data.color, FrameGraphTexture::Usage::COLOR_ATTACHMENT);
-                data.depth = builder.read(data.depth, depthAttachmentUsage);
+                data.depth = builder.read(data.depth, FrameGraphTexture::Usage::DEPTH_ATTACHMENT);
 
                 data.color = builder.write(data.color, FrameGraphTexture::Usage::COLOR_ATTACHMENT);
-                data.depth = builder.write(data.depth, depthAttachmentUsage);
+                data.depth = builder.write(data.depth, FrameGraphTexture::Usage::DEPTH_ATTACHMENT);
 
                 /*
                  * There is a bit of magic happening here regarding the viewport used.
@@ -157,13 +148,12 @@ FrameGraphId<FrameGraphTexture> RendererUtils::colorPass(
                 builder.declareRenderPass("Color Pass Target", {
                         .attachments = { .color = { data.color, data.output }, .depth = data.depth },
                         .samples = config.msaa,
-                        .clearFlags = clearColorFlags | clearDepthFlags | clearStencilFlags });
+                        .clearFlags = clearColorFlags | clearDepthFlags });
 
                 data.clearColor = config.clearColor;
-                data.clearFlags = clearColorFlags | clearDepthFlags | clearStencilFlags;
+                data.clearFlags = clearColorFlags | clearDepthFlags;
 
                 blackboard["depth"] = data.depth;
-                blackboard["hdr"] = data.color;
             },
             [=, &view, &engine](FrameGraphResources const& resources,
                     ColorPassData const& data, DriverApi& driver) {

@@ -1216,8 +1216,8 @@ void applySettings(const ViewerOptions& settings, Camera* camera, Skybox* skybox
         // we have to clear because the side-bar doesn't have a background, we cannot use
         // a skybox on the ui scene, because the ui view is always full screen.
         renderer->setClearOptions({
-                .clearColorValue = { inverseTonemapSRGB(settings.backgroundColor), 1.0f },
-                .clearColor = true
+                .clearColor = { inverseTonemapSRGB(settings.backgroundColor), 1.0f },
+                .clear = true
         });
     }
     if (skybox) {

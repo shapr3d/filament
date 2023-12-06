@@ -68,18 +68,6 @@ bool Material::isDepthCullingEnabled() const noexcept {
     return upcast(this)->isDepthCullingEnabled();
 }
 
-bool Material::isStencilWriteEnabled() const noexcept {
-    return upcast(this)->isStencilWriteEnabled();
-}
-
-StencilOperation Material::getStencilDepthFail() const noexcept {
-    return upcast(this)->getStencilDepthFail();
-}
-
-StencilOperation Material::getStencilDepthPass() const noexcept {
-    return upcast(this)->getStencilDepthPass();
-}
-
 bool Material::isDoubleSided() const noexcept {
     return upcast(this)->isDoubleSided();
 }

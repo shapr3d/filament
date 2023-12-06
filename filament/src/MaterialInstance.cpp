@@ -251,18 +251,6 @@ void MaterialInstance::setDepthCulling(bool enable) noexcept {
     upcast(this)->setDepthCulling(enable);
 }
 
-void MaterialInstance::setStencilWrite(bool enable) noexcept {
-    upcast(this)->setStencilWrite(enable);
-}
-
-void MaterialInstance::setStencilDepthFail(StencilOperation operation) noexcept {
-    upcast(this)->setStencilDepthFail(operation);
-}
-
-void MaterialInstance::setStencilDepthPass(StencilOperation operation) noexcept {
-    upcast(this)->setStencilDepthPass(operation);
-}
-
 MaterialInstance* MaterialInstance::duplicate(MaterialInstance const* other, const char* name) noexcept {
     return FMaterialInstance::duplicate(upcast(other), name);
 }

@@ -167,20 +167,12 @@ void FRenderer::getRenderTarget(FView const& view,
 void FRenderer::initializeClearFlags() {
     // We always discard and clear the depth+stencil buffers -- we don't allow sharing these
     // across views (clear implies discard)
-    mClearFlags = TargetBufferFlags::NONE;
-    if (mClearOptions.clearColor) {
-        mClearFlags |= TargetBufferFlags::COLOR;
-    }
-    if (mClearOptions.clearDepth) {
-        mClearFlags |= TargetBufferFlags::DEPTH_AND_STENCIL;
-    }
-    mDiscardStartFlags = TargetBufferFlags::NONE;
-    if (mClearOptions.discard) {
-        mDiscardStartFlags = TargetBufferFlags::COLOR | TargetBufferFlags::DEPTH_AND_STENCIL;
-    } else {
-        // clear implies discard
-        mDiscardStartFlags = mClearFlags;
-    }
+    mDiscardStartFlags = ((mClearOptions.discard || mClearOptions.clear) ?
+                          TargetBufferFlags::COLOR : TargetBufferFlags::NONE)
+                         | TargetBufferFlags::DEPTH_AND_STENCIL;
+
+    mClearFlags = (mClearOptions.clear ? TargetBufferFlags::COLOR : TargetBufferFlags::NONE)
+                  | TargetBufferFlags::DEPTH_AND_STENCIL;
 }
 
 void FRenderer::setPresentationTime(int64_t monotonic_clock_ns) {
@@ -677,7 +669,7 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
         initializeClearFlags();
     }
 
-    const float4 clearColor = mClearOptions.clearColorValue;
+    const float4 clearColor = mClearOptions.clearColor;
     const TargetBufferFlags clearFlags = mClearFlags;
     const TargetBufferFlags discardStartFlags = mDiscardStartFlags;
     TargetBufferFlags keepOverrideStartFlags = TargetBufferFlags::ALL & ~discardStartFlags;
@@ -699,43 +691,16 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
     Handle<HwRenderTarget> viewRenderTarget;
     TargetBufferFlags attachmentMask;
     getRenderTarget(view, attachmentMask, viewRenderTarget);
-    FrameGraphId<FrameGraphTexture> fgViewRenderTarget;
-    FrameGraphId<FrameGraphTexture> fgHdrTexture;
-    FrameGraphId<FrameGraphTexture> fgDepthTexture;
-
-    Texture::InternalFormat depthFormat = Texture::InternalFormat::DEPTH32F;
-
-    fgViewRenderTarget = fg.import("viewRenderTarget",
-        {
-                .attachments = attachmentMask,
-                .viewport = DEBUG_DYNAMIC_SCALING ? svp : vp,
-                .clearColor = clearColor,
-                .samples = 0,
-                .clearFlags = clearFlags,
-                .keepOverrideStart = keepOverrideStartFlags,
-                .keepOverrideEnd = keepOverrideEndFlags
-        }, viewRenderTarget);
-
-    auto importTexture = [&](const FTexture* texture, const char* name) {
-        FrameGraphTexture frameGraphTexture{ .handle = texture->getHwHandle() };
-        return fg.import(name, {
-                .width = (uint32_t)texture->getWidth(0u),
-                .height = (uint32_t)texture->getHeight(0u),
-                .samples = (uint8_t)texture->getSampleCount(),
-                .format = texture->getFormat(),
-        }, texture->getUsage(), frameGraphTexture);
-    };
-
-    auto* colorHdrTexture = upcast(view).getHdrColorTexture();
-    if (colorHdrTexture) {
-        fgHdrTexture = importTexture(colorHdrTexture, "colorHdrTexture");
-    }
-    auto* depthTexture = upcast(view).getDepthStencilTexture();
-    if (depthTexture) {
-        depthFormat = depthTexture->getFormat();
-        assert_invariant(driver.isDepthResolveSupported() || depthTexture->getSampleCount() == msaaSampleCount);
-        fgDepthTexture = importTexture(depthTexture, "depthStencil");
-    }
+    FrameGraphId<FrameGraphTexture> fgViewRenderTarget = fg.import("viewRenderTarget",
+            {
+                    .attachments = attachmentMask,
+                    .viewport = DEBUG_DYNAMIC_SCALING ? svp : vp,
+                    .clearColor = clearColor,
+                    .samples = 0,
+                    .clearFlags = clearFlags,
+                    .keepOverrideStart = keepOverrideStartFlags,
+                    .keepOverrideEnd = keepOverrideEndFlags
+            }, viewRenderTarget);
 
     const bool blending = blendModeTranslucent;
     const TextureFormat hdrFormat = getHdrFormat(view, needsAlphaChannel);
@@ -746,7 +711,6 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
             .xoffset = (uint32_t)xvp.left,
             .yoffset = (uint32_t)xvp.bottom,
             .scale = scale,
-            .depthFormat = depthFormat,
             .hdrFormat = hdrFormat,
             .msaa = msaaSampleCount,
             .clearFlags = clearFlags,
@@ -1111,16 +1075,7 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
 
     fg.compile();
 
-    if (fgHdrTexture) {
-        fg.forwardResource(fgHdrTexture,
-                           fg.getBlackboard().get<FrameGraphTexture>("hdr"));
-        fg.present(fgHdrTexture);
-    }
-    if (fgDepthTexture) {
-        fg.forwardResource(fgDepthTexture, depth);
-        fg.present(fgDepthTexture);
-    }
-    // fg.export_graphviz(slog.d, view.getName());
+    //fg.export_graphviz(slog.d, view.getName());
 
     fg.execute(driver);
 

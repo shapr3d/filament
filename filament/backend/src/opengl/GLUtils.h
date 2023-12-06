@@ -253,16 +253,6 @@ constexpr inline GLenum getTextureCompareFunc(SamplerCompareFunc func) noexcept 
     }
 }
 
-constexpr inline GLenum getStencilOperation(RasterState::StencilOperation operation) noexcept {
-    using StencilOperation = RasterState::StencilOperation;
-    switch (operation) {
-        case StencilOperation::KEEP:    return GL_KEEP;
-        case StencilOperation::ZERO:    return GL_ZERO;
-        case StencilOperation::INVERT:  return GL_INVERT;
-        case StencilOperation::REPLACE: return GL_REPLACE;
-    }
-}
-
 constexpr inline GLenum getDepthFunc(SamplerCompareFunc func) noexcept {
     return getTextureCompareFunc(func);
 }

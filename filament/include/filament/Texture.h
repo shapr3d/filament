@@ -155,14 +155,6 @@ public:
         Builder& sampler(Sampler target) noexcept;
 
         /**
-         * Specifies the sample count of the texture
-         *
-         * @param sampleCount sample count (default: 1)
-         * @return This Builder, for chaining calls.
-         */
-        Builder& samples(uint8_t sampleCount) noexcept;
-
-        /**
          * Specifies the *internal* format of this texture.
          *
          * The internal format specifies how texels are stored (which may be different from how
