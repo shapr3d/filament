@@ -52,17 +52,6 @@ constexpr inline MTLCompareFunction getMetalCompareFunction(RasterState::DepthFu
     }
 }
 
-constexpr inline MTLStencilOperation getMetalStencilOperation(RasterState::StencilOperation operation)
-        noexcept {
-    using StencilOperation = RasterState::StencilOperation;
-    switch (operation) {
-        case StencilOperation::KEEP:    return MTLStencilOperationKeep;
-        case StencilOperation::ZERO:    return MTLStencilOperationZero;
-        case StencilOperation::REPLACE: return MTLStencilOperationReplace;
-        case StencilOperation::INVERT:  return MTLStencilOperationInvert;
-    }
-}
-
 constexpr inline MTLIndexType getIndexType(size_t elementSize) noexcept {
     if (elementSize == 2) {
         return MTLIndexTypeUInt16;
@@ -297,27 +286,6 @@ constexpr inline MTLTextureType getMetalType(SamplerType target) {
     }
 }
 
-inline MTLTextureType getMetalTypeMultisample(SamplerType target) {
-    switch (target) {
-        case SamplerType::SAMPLER_2D:
-        case SamplerType::SAMPLER_EXTERNAL:
-            return MTLTextureType2DMultisample;
-        case SamplerType::SAMPLER_2D_ARRAY: {
-            if (@available(iOS 14.0, macCatalyst 14.0, *)) {
-                return MTLTextureType2DMultisampleArray;
-            }
-            else {
-                ASSERT_POSTCONDITION(false, "MTLTextureType2DMultisampleArray not supported on this platform.");
-                return MTLTextureType2D;
-            }
-        }
-        default: {
-            ASSERT_POSTCONDITION(false, "There is no multisample variant of this Metal texture type.");
-            return MTLTextureType2D;
-        }
-    }
-}
-
 constexpr inline MTLBlendOperation getMetalBlendOperation(BlendEquation equation) noexcept {
     switch (equation) {
         case BlendEquation::ADD: return MTLBlendOperationAdd;
@@ -457,17 +425,6 @@ inline MTLTextureSwizzleChannels getSwizzleChannels(TextureSwizzle r, TextureSwi
         TextureSwizzle a) {
     return MTLTextureSwizzleChannelsMake(getSwizzle(r), getSwizzle(g), getSwizzle(b),
             getSwizzle(a));
-}
-
-constexpr inline bool formatHasStencil(MTLPixelFormat format) {
-    switch (format) {
-        case MTLPixelFormatStencil8: return true;
-        case MTLPixelFormatDepth32Float_Stencil8: return true;
-#if (TARGET_OS_OSX || TARGET_OS_MACCATALYST)
-        case MTLPixelFormatDepth24Unorm_Stencil8: return true;
-#endif
-        default: return false;
-    }
 }
 
 } // namespace backend

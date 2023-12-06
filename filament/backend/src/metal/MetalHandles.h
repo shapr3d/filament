@@ -291,7 +291,7 @@ public:
 
     Attachment getDrawColorAttachment(size_t index);
     Attachment getReadColorAttachment(size_t index);
-    Attachment getDepthStencilAttachment();
+    Attachment getDepthAttachment();
 
 private:
 
@@ -305,7 +305,7 @@ private:
     uint8_t samples = 1;
 
     Attachment color[MRT::MAX_SUPPORTED_RENDER_TARGET_COUNT] = {};
-    Attachment depthStencil = {};
+    Attachment depth = {};
 };
 
 // MetalFence is used to implement both Fences and Syncs.

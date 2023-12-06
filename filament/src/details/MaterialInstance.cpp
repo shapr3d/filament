@@ -44,9 +44,6 @@ FMaterialInstance::FMaterialInstance(FEngine& engine,
           mCulling(other->mCulling),
           mColorWrite(other->mColorWrite),
           mDepthWrite(other->mDepthWrite),
-          mStencilWrite(other->mStencilWrite),
-          mStencilDepthFail(other->mStencilDepthFail),
-          mStencilDepthPass(other->mStencilDepthPass),
           mDepthFunc(other->mDepthFunc),
           mScissorRect(other->mScissorRect),
           mName(name ? CString(name) : other->mName) {
@@ -101,9 +98,6 @@ void FMaterialInstance::initDefaultInstance(FEngine& engine, FMaterial const* ma
     mCulling = rasterState.culling;
     mColorWrite = rasterState.colorWrite;
     mDepthWrite = rasterState.depthWrite;
-    mStencilWrite = rasterState.stencilWrite;
-    mStencilDepthFail = rasterState.stencilDepthFail;
-    mStencilDepthPass = rasterState.stencilDepthPass;
     mDepthFunc = rasterState.depthFunc;
 
     mMaterialSortingKey = RenderPass::makeMaterialSortingKey(

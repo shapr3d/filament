@@ -29,7 +29,6 @@
 #include <math/vec4.h>
 
 #include <array>    // FIXME: STL headers are not allowed in public headers
-#include <cstring>
 
 #include <stddef.h>
 #include <stdint.h>
@@ -302,15 +301,6 @@ enum class CullingMode : uint8_t {
     FRONT,              //!< Front face culling, only back faces are visible
     BACK,               //!< Back face culling, only front faces are visible
     FRONT_AND_BACK      //!< Front and Back, geometry is not visible
-};
-
-//! Stencil depth fail and pass operation mode.
-enum class StencilOperation : uint8_t {
-    KEEP,
-    ZERO,
-    INVERT,
-    REPLACE,
-    DEFAULT = KEEP
 };
 
 //! Pixel Data Format
@@ -862,10 +852,9 @@ struct RasterState {
     using DepthFunc = backend::SamplerCompareFunc;
     using BlendEquation = backend::BlendEquation;
     using BlendFunction = backend::BlendFunction;
-    using StencilOperation = StencilOperation;
 
     RasterState() noexcept { // NOLINT
-        static_assert(sizeof(RasterState) == sizeof(uint8_t[5]),
+        static_assert(sizeof(RasterState) == sizeof(uint32_t),
                 "RasterState size not what was intended");
         culling = CullingMode::BACK;
         blendEquationRGB = BlendEquation::ADD;
@@ -876,13 +865,8 @@ struct RasterState {
         blendFunctionDstAlpha = BlendFunction::ZERO;
     }
 
-    bool operator == (RasterState rhs) const noexcept { 
-        return std::memcmp(u, rhs.u, sizeof(u)) == 0;
-    }
-
-    bool operator != (RasterState rhs) const noexcept { 
-        return !operator==(rhs);
-    }
+    bool operator == (RasterState rhs) const noexcept { return u == rhs.u; }
+    bool operator != (RasterState rhs) const noexcept { return u != rhs.u; }
 
     void disableBlending() noexcept {
         blendEquationRGB = BlendEquation::ADD;
@@ -937,19 +921,10 @@ struct RasterState {
             //! whether front face winding direction must be inverted
             bool inverseFrontFaces              : 1;        // 31
 
-            //! Whether stencil-buffer writes are enabled
-            bool stencilWrite                   : 1;        // 32
-
-            //! stencil operation for depth test failures
-            StencilOperation stencilDepthFail   : 2;        // 34
-
-            //! stencil operation for depth test passes
-            StencilOperation stencilDepthPass   : 2;        // 36
-
             //! padding, must be 0
-            uint8_t padding                     : 4;        // 40
+            uint8_t padding                     : 1;        // 32
         };
-        uint8_t u[5] = {0};
+        uint32_t u = 0;
     };
 };
 

@@ -94,11 +94,6 @@ MetalDriver::MetalDriver(MetalPlatform* platform) noexcept
     }
     #endif
 
-    mContext->supportsDepthResolve =
-        mContext->highestSupportedGpuFamily.apple >= 3 ||
-        mContext->highestSupportedGpuFamily.mac   >= 2 ||
-        mContext->highestSupportedGpuFamily.macCatalyst >= 2;
-
     // In order to support memoryless render targets, an Apple GPU is needed.
     mContext->supportsMemorylessRenderTargets = mContext->highestSupportedGpuFamily.apple >= 1;
 
@@ -162,10 +157,6 @@ void MetalDriver::beginFrame(int64_t monotonic_clock_ns, uint32_t frameId) {
 #if defined(FILAMENT_METAL_PROFILING)
     os_signpost_interval_begin(mContext->log, mContext->signpostId, "Frame encoding", "%{public}d", frameId);
 #endif
-}
-
-bool MetalDriver::isDepthResolveSupported() {
-    return mContext->supportsDepthResolve;
 }
 
 void MetalDriver::setFrameScheduledCallback(Handle<HwSwapChain> sch,
@@ -303,7 +294,7 @@ void MetalDriver::importTextureR(Handle<HwTexture> th, intptr_t i,
     ASSERT_PRECONDITION(metalFormatOrderInvariantEqual(metalTexture.pixelFormat, filamentMetalFormat),
             "Imported id<MTLTexture> format (%d) != Filament texture format (%d)",
             metalTexture.pixelFormat, filamentMetalFormat);
-    MTLTextureType filamentMetalType = (samples == 1) ? getMetalType(target) : getMetalTypeMultisample(target);
+    MTLTextureType filamentMetalType = getMetalType(target);
     ASSERT_PRECONDITION(metalTexture.textureType == filamentMetalType,
             "Imported id<MTLTexture> type (%d) != Filament texture type (%d)",
             metalTexture.textureType, filamentMetalType);
@@ -1152,8 +1143,8 @@ void MetalDriver::blit(TargetBufferFlags buffers,
     }
 
     if (any(buffers & TargetBufferFlags::DEPTH)) {
-        MetalRenderTarget::Attachment srcDepthAttachment = srcTarget->getDepthStencilAttachment();
-        MetalRenderTarget::Attachment dstDepthAttachment = dstTarget->getDepthStencilAttachment();
+        MetalRenderTarget::Attachment srcDepthAttachment = srcTarget->getDepthAttachment();
+        MetalRenderTarget::Attachment dstDepthAttachment = dstTarget->getDepthAttachment();
 
         if (srcDepthAttachment && dstDepthAttachment) {
             ASSERT_PRECONDITION(isBlitableTextureType(srcDepthAttachment.getTexture().textureType) &&
@@ -1215,10 +1206,10 @@ void MetalDriver::draw(PipelineState ps, Handle<HwRenderPrimitive> rph, uint32_t
         }
         colorPixelFormat[i] = attachment.getPixelFormat();
     }
-    MTLPixelFormat depthStencilPixelFormat = MTLPixelFormatInvalid;
-    const auto& depthStencilAttachment = mContext->currentRenderTarget->getDepthStencilAttachment();
-    if (depthStencilAttachment) {
-        depthStencilPixelFormat = depthStencilAttachment.getPixelFormat();
+    MTLPixelFormat depthPixelFormat = MTLPixelFormatInvalid;
+    const auto& depthAttachment = mContext->currentRenderTarget->getDepthAttachment();
+    if (depthAttachment) {
+        depthPixelFormat = depthAttachment.getPixelFormat();
     }
     MetalPipelineState pipelineState {
         .vertexFunction = program->vertexFunction,
@@ -1234,8 +1225,7 @@ void MetalDriver::draw(PipelineState ps, Handle<HwRenderPrimitive> rph, uint32_t
             colorPixelFormat[6],
             colorPixelFormat[7]
         },
-        .depthAttachmentPixelFormat = depthStencilPixelFormat,
-        .stencilAttachmentPixelFormat = formatHasStencil(depthStencilPixelFormat) ? depthStencilPixelFormat : MTLPixelFormatInvalid,
+        .depthAttachmentPixelFormat = depthPixelFormat,
         .sampleCount = mContext->currentRenderTarget->getSamples(),
         .blendState = BlendState {
             .blendingEnabled = rs.hasBlending(),
@@ -1272,12 +1262,9 @@ void MetalDriver::draw(PipelineState ps, Handle<HwRenderPrimitive> rph, uint32_t
 
     // Set the depth-stencil state, if a state change is needed.
     DepthStencilState depthState;
-    if (depthStencilAttachment) {
+    if (depthAttachment) {
         depthState.compareFunction = getMetalCompareFunction(rs.depthFunc);
-        depthState.stencilDepthFail = getMetalStencilOperation(rs.stencilDepthFail);
-        depthState.stencilDepthPass = getMetalStencilOperation(rs.stencilDepthPass);
         depthState.depthWriteEnabled = rs.depthWrite;
-        depthState.stencilWriteEnabled = rs.stencilWrite;
     }
     mContext->depthStencilState.updateState(depthState);
     if (mContext->depthStencilState.stateChanged()) {
@@ -1285,7 +1272,6 @@ void MetalDriver::draw(PipelineState ps, Handle<HwRenderPrimitive> rph, uint32_t
                 mContext->depthStencilStateCache.getOrCreateState(depthState);
         assert_invariant(state != nil);
         [mContext->currentRenderPassEncoder setDepthStencilState:state];
-        [mContext->currentRenderPassEncoder setStencilReferenceValue:1];
     }
 
     if (ps.polygonOffset.constant != mContext->currentPolygonOffset.constant ||

@@ -50,8 +50,6 @@ public:
         uint32_t yoffset;
         // dynamic resolution scale
         math::float2 scale;
-        // Depth format
-        backend::TextureFormat depthFormat;
         // HDR format
         backend::TextureFormat hdrFormat;
         // MSAA sample count

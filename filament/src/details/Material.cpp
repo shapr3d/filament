@@ -276,18 +276,6 @@ FMaterial::FMaterial(FEngine& engine, const Material::Builder& builder)
         mRasterState.culling = mCullingMode;
     }
 
-    bool stencilWrite;
-    StencilOperation stencilDepthFail;
-    StencilOperation stencilDepthPass;
-
-    parser->getStencilWrite(&stencilWrite);
-    parser->getStencilDepthFail(&stencilDepthFail);
-    parser->getStencilDepthPass(&stencilDepthPass);
-
-    mRasterState.stencilWrite = stencilWrite;
-    mRasterState.stencilDepthFail = stencilDepthFail;
-    mRasterState.stencilDepthPass = stencilDepthPass;
-
     parser->getTransparencyMode(&mTransparencyMode);
     parser->hasCustomDepthShader(&mHasCustomDepthShader);
     mIsDefaultMaterial = builder->mDefaultMaterial;

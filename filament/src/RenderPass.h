@@ -218,11 +218,11 @@ public:
         backend::Handle<backend::HwRenderPrimitive> primitiveHandle;    // 4 bytes
         backend::Handle<backend::HwBufferObject> morphWeightBuffer;     // 4 bytes
         backend::Handle<backend::HwSamplerGroup> morphTargetBuffer;     // 4 bytes
-        backend::RasterState rasterState;                               // 5 bytes
-        Variant materialVariant;                                        // 1 byte
+        backend::RasterState rasterState;                               // 4 bytes
         uint16_t index = 0;                                             // 2 bytes
         uint16_t instanceCount;                                         // 2 bytes
-        uint8_t reserved[10 - sizeof(void*)] = {};                      // 2 bytes (6)
+        Variant materialVariant;                                        // 1 byte
+        uint8_t reserved[11 - sizeof(void*)] = {};                      // 3 bytes (7)
     };
     static_assert(sizeof(PrimitiveInfo) == 32);
 

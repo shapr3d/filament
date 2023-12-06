@@ -72,7 +72,6 @@ class FEngine;
 class FMaterialInstance;
 class FRenderer;
 class FScene;
-class FTexture;
 
 static constexpr Culler::result_type VISIBLE_RENDERABLE = 1u << VISIBLE_RENDERABLE_BIT;
 
@@ -191,22 +190,6 @@ public:
         assert_invariant(!renderTarget || !mMultiSampleAntiAliasingOptions.enabled ||
                 !renderTarget->hasSampleableDepth());
         mRenderTarget = renderTarget;
-    }
-
-    void setHdrColorTexture(FTexture* texture) noexcept {
-        mHdrTexture = texture;
-    }
-
-    FTexture* getHdrColorTexture() const noexcept {
-        return mHdrTexture;
-    }
-
-    void setDepthStencilTexture(FTexture* texture) noexcept {
-        mDepthStencilTexture = texture;
-    }
-
-    FTexture* getDepthStencilTexture() const noexcept {
-        return mDepthStencilTexture;
     }
 
     FRenderTarget* getRenderTarget() const noexcept {
@@ -499,8 +482,6 @@ private:
     bool mFrontFaceWindingInverted = false;
 
     FRenderTarget* mRenderTarget = nullptr;
-    FTexture* mHdrTexture = nullptr;
-    FTexture* mDepthStencilTexture = nullptr;
 
     uint8_t mVisibleLayers = 0x1;
     AntiAliasing mAntiAliasing = AntiAliasing::FXAA;
