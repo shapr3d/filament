@@ -127,11 +127,6 @@ const uint PCSS_SHADOW_BLOCKER_SEARCH_TAP_COUNT = 16u;
 // less samples lead to noisier shadows (can be mitigated with TAA)
 const uint PCSS_SHADOW_FILTER_TAP_COUNT         = 16u;
 
-float random(const highp vec2 w) {
-    const vec3 m = vec3(0.06711056, 0.00583715, 52.9829189);
-    return fract(m.z * fract(dot(w, m.xy)));
-}
-
 float hardenedKernel(float x) {
     // this is basically a stronger smoothstep()
     x = 2.0 * x - 1.0;
@@ -156,7 +151,7 @@ highp vec2 computeReceiverPlaneDepthBias(const highp vec3 position) {
 mat2 getRandomRotationMatrix(highp vec2 fragCoord) {
     // rotate the poisson disk randomly
     fragCoord += vec2(frameUniforms.temporalNoise); // 0 when TAA is not used
-    float randomAngle = random(fragCoord) * (2.0 * PI);
+    float randomAngle = interleavedGradientNoise(fragCoord) * (2.0 * PI);
     vec2 randomBase = vec2(cos(randomAngle), sin(randomAngle));
     mat2 R = mat2(randomBase.x, randomBase.y, -randomBase.y, randomBase.x);
     return R;
@@ -390,8 +385,7 @@ float screenSpaceContactShadow(vec3 lightDirection) {
     highp float tolerance = abs(rayData.ssViewRayEnd.z - rayData.ssRayStart.z) * dt;
 
     // dither the ray with interleaved gradient noise
-    const vec3 m = vec3(0.06711056, 0.00583715, 52.9829189);
-    float dither = fract(m.z * fract(dot(gl_FragCoord.xy, m.xy))) - 0.5;
+    float dither = interleavedGradientNoise(gl_FragCoord.xy) - 0.5;
 
     // normalized position on the ray (0 to 1)
     highp float t = dt * dither + dt;
@@ -490,11 +484,11 @@ float shadow(const bool DIRECTIONAL,
 
     // This conditional is resolved at compile time
     if (DIRECTIONAL) {
-#if defined(HAS_DIRECTIONAL_LIGHTING)
+#if defined(VARIANT_HAS_DIRECTIONAL_LIGHTING)
         shadowPosition = getCascadeLightSpacePosition(cascade);
 #endif
     } else {
-#if defined(HAS_DYNAMIC_LIGHTING)
+#if defined(VARIANT_HAS_DYNAMIC_LIGHTING)
         highp float zLight = dot(shadowUniforms.shadows[index].lightFromWorldZ, vec4(getWorldPosition(), 1.0));
         shadowPosition = getSpotLightSpacePosition(index, zLight);
 #endif
@@ -516,11 +510,11 @@ float shadow(const bool DIRECTIONAL,
 
     // This conditional is resolved at compile time
     if (DIRECTIONAL) {
-#if defined(HAS_DIRECTIONAL_LIGHTING)
+#if defined(VARIANT_HAS_DIRECTIONAL_LIGHTING)
         shadowPosition = getCascadeLightSpacePosition(cascade);
 #endif
     } else {
-#if defined(HAS_DYNAMIC_LIGHTING)
+#if defined(VARIANT_HAS_DYNAMIC_LIGHTING)
         zLight = dot(shadowUniforms.shadows[index].lightFromWorldZ, vec4(getWorldPosition(), 1.0));
         shadowPosition = getSpotLightSpacePosition(index, zLight);
 #endif

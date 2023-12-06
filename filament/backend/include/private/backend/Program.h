@@ -18,16 +18,17 @@
 #define TNT_FILAMENT_BACKEND_PRIVATE_PROGRAM_H
 
 #include <utils/compiler.h>
-#include <utils/FixedCapacityVector.h>
 #include <utils/CString.h>
+#include <utils/FixedCapacityVector.h>
+#include <utils/Invocable.h>
 #include <utils/Log.h>
+#include <utils/ostream.h>
 
 #include <backend/DriverEnums.h>
 
 #include <array>
 
-namespace filament {
-namespace backend {
+namespace filament::backend {
 
 class Program {
 public:
@@ -46,7 +47,12 @@ public:
         bool strict = false;        // if true, this sampler must always have a bound texture
     };
 
-    using SamplerGroupInfo = std::array<utils::FixedCapacityVector<Sampler>, BINDING_COUNT>;
+    struct SamplerGroupData {
+        utils::FixedCapacityVector<Sampler> samplers;
+        ShaderStageFlags stageFlags = ALL_SHADER_STAGE_FLAGS;
+    };
+
+    using SamplerGroupInfo = std::array<SamplerGroupData, BINDING_COUNT>;
     using UniformBlockInfo = std::array<utils::CString, BINDING_COUNT>;
 
     Program() noexcept;
@@ -57,7 +63,8 @@ public:
     ~Program() noexcept;
 
     // sets the material name and variant for diagnostic purposes only
-    Program& diagnostics(utils::CString const& name, uint8_t variantKey);
+    Program& diagnostics(utils::CString const& name,
+            utils::Invocable<utils::io::ostream&(utils::io::ostream& out)>&& logger);
 
     // sets one of the program's shader (e.g. vertex, fragment)
     Program& shader(Shader shader, void const* data, size_t size) noexcept;
@@ -74,7 +81,8 @@ public:
     // 'samplers' can be destroyed after this call.
     // This effectively associates a set of (BindingPoints, index) to a texture unit in the shader.
     // Or more precisely, what layout(binding=) is set to in GLSL.
-    Program& setSamplerGroup(size_t bindingPoint, Sampler const* samplers, size_t count) noexcept;
+    Program& setSamplerGroup(size_t bindingPoint, ShaderStageFlags stageFlags,
+            Sampler const* samplers, size_t count) noexcept;
 
     Program& withVertexShader(void const* data, size_t size) {
         return shader(Shader::VERTEX, data, size);
@@ -85,34 +93,31 @@ public:
     }
 
     using ShaderBlob = utils::FixedCapacityVector<uint8_t>;
-    std::array<ShaderBlob, SHADER_TYPE_COUNT> const& getShadersSource() const noexcept {
-        return mShadersSource;
-    }
+    using ShaderSource = std::array<ShaderBlob, SHADER_TYPE_COUNT>;
+    ShaderSource const& getShadersSource() const noexcept { return mShadersSource; }
+    ShaderSource& getShadersSource() noexcept { return mShadersSource; }
 
     UniformBlockInfo const& getUniformBlockInfo() const noexcept { return mUniformBlocks; }
+    UniformBlockInfo& getUniformBlockInfo() noexcept { return mUniformBlocks; }
 
     SamplerGroupInfo const& getSamplerGroupInfo() const { return mSamplerGroups; }
+    SamplerGroupInfo& getSamplerGroupInfo() { return mSamplerGroups; }
 
     const utils::CString& getName() const noexcept { return mName; }
-
-    uint8_t getVariant() const noexcept { return mVariant; }
 
     bool hasSamplers() const noexcept { return mHasSamplers; }
 
 private:
-#if !defined(NDEBUG)
-    friend utils::io::ostream& operator<< (utils::io::ostream& out, const Program& builder);
-#endif
+    friend utils::io::ostream& operator<<(utils::io::ostream& out, const Program& builder);
 
     UniformBlockInfo mUniformBlocks = {};
     SamplerGroupInfo mSamplerGroups = {};
-    std::array<ShaderBlob, SHADER_TYPE_COUNT> mShadersSource;
-    utils::CString mName;
+    ShaderSource mShadersSource;
     bool mHasSamplers = false;
-    uint8_t mVariant;
+    utils::CString mName;
+    utils::Invocable<utils::io::ostream&(utils::io::ostream& out)> mLogger;
 };
 
-} // namespace backend;
-} // namespace filament;
+} // namespace filament::backend
 
 #endif // TNT_FILAMENT_BACKEND_PRIVATE_PROGRAM_H

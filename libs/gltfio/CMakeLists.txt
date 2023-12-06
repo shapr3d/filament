@@ -10,10 +10,13 @@ set(PUBLIC_HDR_DIR include)
 set(PUBLIC_HDRS
         include/gltfio/Animator.h
         include/gltfio/AssetLoader.h
-        include/gltfio/MaterialProvider.h
-        include/gltfio/ResourceLoader.h
         include/gltfio/FilamentAsset.h
         include/gltfio/FilamentInstance.h
+        include/gltfio/MaterialProvider.h
+        include/gltfio/NodeManager.h
+        include/gltfio/ResourceLoader.h
+        include/gltfio/TextureProvider.h
+        include/gltfio/math.h
 )
 
 set(SRCS
@@ -21,25 +24,25 @@ set(SRCS
         src/AssetLoader.cpp
         src/DependencyGraph.cpp
         src/DependencyGraph.h
-        src/DracoCache.h
         src/DracoCache.cpp
+        src/DracoCache.h
         src/FFilamentAsset.h
-        src/FilamentAsset.cpp
         src/FFilamentInstance.h
+        src/FilamentAsset.cpp
         src/FilamentInstance.cpp
+        src/FNodeManager.h
         src/GltfEnums.h
+        src/Ktx2Provider.cpp
         src/MaterialProvider.cpp
-        src/MorphHelper.h
-        src/MorphHelper.cpp
+        src/NodeManager.cpp
         src/ResourceLoader.cpp
-        src/TangentsJob.h
+        src/StbProvider.cpp
         src/TangentsJob.cpp
+        src/TangentsJob.h
         src/UbershaderLoader.cpp
         src/Wireframe.cpp
         src/Wireframe.h
-        src/math.h
         src/upcast.h
-        src/Image.cpp
 )
 
 # ==================================================================================================
@@ -166,7 +169,7 @@ add_library(gltfio_resources_lite ${DUMMY_SRC} ${RESGEN_SOURCE})
 # ==================================================================================================
 
 include_directories(${PUBLIC_HDR_DIR} ${RESOURCE_DIR})
-link_libraries(math utils filament cgltf stb geometry gltfio_resources tsl trie)
+link_libraries(math utils filament cgltf stb ktxreader geometry gltfio_resources tsl trie)
 
 add_library(gltfio_core STATIC ${PUBLIC_HDRS} ${SRCS})
 
@@ -198,10 +201,7 @@ if (NOT WEBGL AND NOT ANDROID)
     # Installation
     # ==================================================================================================
     install(TARGETS ${TARGET} gltfio_core gltfio_resources gltfio_resources_lite ARCHIVE DESTINATION lib/${DIST_DIR})
-    # The Image.h header is only needed within Filament and does not need to be distributed.
-    install(DIRECTORY ${PUBLIC_HDR_DIR}/gltfio
-        DESTINATION include
-        PATTERN "Image.h" EXCLUDE)
+    install(DIRECTORY ${PUBLIC_HDR_DIR}/gltfio DESTINATION include)
 else()
 
     install(TARGETS gltfio_core gltfio_resources gltfio_resources_lite ARCHIVE DESTINATION lib/${DIST_DIR})

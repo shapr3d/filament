@@ -34,8 +34,7 @@
 
 using namespace utils;
 
-namespace filament {
-namespace backend {
+namespace filament::backend {
 
 CircularBuffer::CircularBuffer(size_t size) {
     mData = alloc(size);
@@ -57,6 +56,7 @@ CircularBuffer::~CircularBuffer() noexcept {
 // If the system does not support mmap, emulate soft circular buffer with two buffers next
 // to each others and a special case in circularize()
 
+UTILS_NOINLINE
 void* CircularBuffer::alloc(size_t size) noexcept {
 #if HAS_MMAP
     void* data = nullptr;
@@ -129,6 +129,7 @@ void* CircularBuffer::alloc(size_t size) noexcept {
 #endif
 }
 
+UTILS_NOINLINE
 void CircularBuffer::dealloc() noexcept {
 #if HAS_MMAP
     if (mData) {
@@ -164,5 +165,4 @@ void CircularBuffer::circularize() noexcept {
     mTail = mHead;
 }
 
-} // namespace backend
-} // namespace filament
+} // namespace filament::backend

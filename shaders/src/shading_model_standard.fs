@@ -113,7 +113,7 @@ vec3 surfaceShading(const MaterialInputs material, const PixelParams pixel, cons
 
     vec3 Fr = material.specularIntensity * specularLobe(material, pixel, light, h, NoV, NoL, NoH, LoH);
     vec3 Fd = diffuseLobe(pixel, NoV, NoL, LoH);
-#if defined(HAS_REFRACTION)
+#if defined(MATERIAL_HAS_REFRACTION)
     Fd *= (1.0 - pixel.transmission);
 #endif
 

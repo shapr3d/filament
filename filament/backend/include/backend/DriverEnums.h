@@ -34,7 +34,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-namespace filament {
 /**
  * Types and enums used by filament's driver.
  *
@@ -42,22 +41,24 @@ namespace filament {
  * internal redeclaration of these types.
  * For e.g. Use Texture::Sampler instead of filament::SamplerType.
  */
-namespace backend {
+namespace filament::backend {
 
-static constexpr uint64_t SWAP_CHAIN_CONFIG_TRANSPARENT = 0x1;
-static constexpr uint64_t SWAP_CHAIN_CONFIG_READABLE = 0x2;
-static constexpr uint64_t SWAP_CHAIN_CONFIG_ENABLE_XCB = 0x4;
+static constexpr uint64_t SWAP_CHAIN_CONFIG_TRANSPARENT         = 0x1;
+static constexpr uint64_t SWAP_CHAIN_CONFIG_READABLE            = 0x2;
+static constexpr uint64_t SWAP_CHAIN_CONFIG_ENABLE_XCB          = 0x4;
 static constexpr uint64_t SWAP_CHAIN_CONFIG_APPLE_CVPIXELBUFFER = 0x8;
 
-static constexpr size_t MAX_VERTEX_ATTRIBUTE_COUNT = 16; // This is guaranteed by OpenGL ES.
-static constexpr size_t MAX_SAMPLER_COUNT = 16;          // Matches the Adreno Vulkan driver.
-static constexpr size_t MAX_VERTEX_BUFFER_COUNT = 16;    // Max number of bound buffer objects.
+static constexpr size_t MAX_VERTEX_ATTRIBUTE_COUNT  = 16;   // This is guaranteed by OpenGL ES.
+static constexpr size_t MAX_VERTEX_SAMPLER_COUNT    = 16;   // This is guaranteed by OpenGL ES.
+static constexpr size_t MAX_FRAGMENT_SAMPLER_COUNT  = 16;   // This is guaranteed by OpenGL ES.
+static constexpr size_t MAX_SAMPLER_COUNT           = 32;   // This is guaranteed by OpenGL ES.
+static constexpr size_t MAX_VERTEX_BUFFER_COUNT     = 16;   // Max number of bound buffer objects.
 
 static_assert(MAX_VERTEX_BUFFER_COUNT <= MAX_VERTEX_ATTRIBUTE_COUNT,
         "The number of buffer objects that can be attached to a VertexBuffer must be "
         "less than or equal to the maximum number of vertex attributes.");
 
-static constexpr size_t CONFIG_BINDING_COUNT = 8;
+static constexpr size_t CONFIG_BINDING_COUNT = 12;  // This is guaranteed by OpenGL ES.
 
 /**
  * Selects which driver a particular Engine should use.
@@ -141,9 +142,9 @@ struct Viewport {
     uint32_t width;     //!< width in pixels
     uint32_t height;    //!< height in pixels
     //! get the right coordinate in window space of the viewport
-    int32_t right() const noexcept { return left + width; }
+    int32_t right() const noexcept { return left + int32_t(width); }
     //! get the top coordinate in window space of the viewport
-    int32_t top() const noexcept { return bottom + height; }
+    int32_t top() const noexcept { return bottom + int32_t(height); }
 };
 
 /**
@@ -159,7 +160,7 @@ struct DepthRange {
  * @see Fence, Fence::wait()
  */
 enum class FenceStatus : int8_t {
-    ERROR = -1,                 //!< An error occured. The Fence condition is not satisfied.
+    ERROR = -1,                 //!< An error occurred. The Fence condition is not satisfied.
     CONDITION_SATISFIED = 0,    //!< The Fence condition is satisfied.
     TIMEOUT_EXPIRED = 1,        //!< wait()'s timeout expired. The Fence condition is not satisfied.
 };
@@ -168,7 +169,7 @@ enum class FenceStatus : int8_t {
  * Status codes for sync objects
  */
 enum class SyncStatus : int8_t {
-    ERROR = -1,          //!< An error occured. The Sync is not signaled.
+    ERROR = -1,          //!< An error occurred. The Sync is not signaled.
     SIGNALED = 0,        //!< The Sync is signaled.
     NOT_SIGNALED = 1,    //!< The Sync is not signaled yet
 };
@@ -683,6 +684,10 @@ enum class TextureCubemapFace : uint8_t {
     NEGATIVE_Z = 5, //!< -z face
 };
 
+inline constexpr int operator +(TextureCubemapFace rhs) noexcept {
+    return int(rhs);
+}
+
 //! Face offsets for all faces of a cubemap
 struct FaceOffsets {
     using size_type = size_t;
@@ -828,7 +833,6 @@ enum class BlendFunction : uint8_t {
 //! Stream for external textures
 enum class StreamType {
     NATIVE,     //!< Not synchronized but copy-free. Good for video.
-    TEXTURE_ID, //!< Synchronized, but GL-only and incurs copies. Good for AR on devices before API 26.
     ACQUIRED,   //!< Synchronized, copy-free, and take a release callback. Good for AR but requires API 26+.
 };
 
@@ -960,6 +964,16 @@ enum ShaderType : uint8_t {
 };
 static constexpr size_t PIPELINE_STAGE_COUNT = 2;
 
+struct ShaderStageFlags {
+    bool vertex : 1;
+    bool fragment : 1;
+    bool hasShaderType(ShaderType type) const {
+        return (vertex && type == ShaderType::VERTEX) ||
+               (fragment && type == ShaderType::FRAGMENT);
+    }
+};
+static constexpr ShaderStageFlags ALL_SHADER_STAGE_FLAGS = { true, true };
+
 /**
  * Selects which buffers to clear at the beginning of the render pass, as well as which buffers
  * can be discarded at the beginning and end of the render pass.
@@ -1008,10 +1022,20 @@ struct RenderPassParams {
      * subpass. If this is zero, the render pass has only one subpass. The least significant bit
      * specifies that the first color attachment in the render target is a subpass input.
      *
-     * For now only 2 subpasses are supported, so only the lower 4 bits are used, one for each color
-     * attachment (see MRT::TARGET_COUNT).
+     * For now only 2 subpasses are supported, so only the lower 8 bits are used, one for each color
+     * attachment (see MRT::MAX_SUPPORTED_RENDER_TARGET_COUNT).
      */
-    uint32_t subpassMask = 0;
+    uint16_t subpassMask = 0;
+
+    /**
+     * This mask makes a promise to the backend about read-only usage of the depth attachment (bit
+     * 0) and the stencil attachment (bit 1). Some backends need to know if writes are disabled in
+     * order to allow sampling from the depth attachment.
+     */
+    uint16_t readOnlyDepthStencil = 0;
+
+    static constexpr uint16_t READONLY_DEPTH = 1 << 0;
+    static constexpr uint16_t READONLY_STENCIL = 1 << 1;
 };
 
 struct PolygonOffset {
@@ -1032,8 +1056,7 @@ enum class Workaround : uint16_t {
     ALLOW_READ_ONLY_ANCILLARY_FEEDBACK_LOOP
 };
 
-} // namespace backend
-} // namespace filament
+} // namespace filament::backend
 
 template<> struct utils::EnableBitMaskOperators<filament::backend::TargetBufferFlags>
         : public std::true_type {};
@@ -1070,6 +1093,7 @@ utils::io::ostream& operator<<(utils::io::ostream& out, const filament::backend:
 utils::io::ostream& operator<<(utils::io::ostream& out, const filament::backend::RasterState& rs);
 utils::io::ostream& operator<<(utils::io::ostream& out, const filament::backend::RenderPassParams& b);
 utils::io::ostream& operator<<(utils::io::ostream& out, const filament::backend::Viewport& v);
+utils::io::ostream& operator<<(utils::io::ostream& out, filament::backend::ShaderStageFlags stageFlags);
 #endif
 
 #endif // TNT_FILAMENT_BACKEND_DRIVERENUMS_H

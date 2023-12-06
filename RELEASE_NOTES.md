@@ -3,7 +3,124 @@
 This file contains one line summaries of commits that are worthy of mentioning in release notes.
 A new header is inserted each time a *tag* is created.
 
-## v1.17.1 (currently main branch)
+## v1.22.2 (currently main branch)
+
+## v1.22.1
+
+- Metal: Shaders now use `half` floating-point arithmetic when possible for improved performance. [⚠️ **Recompile Materials**]
+- engine: add support for presentation time in `Renderer`
+- engine: added guard bands support for screen-space effects
+- gltfio: Add multi-scene support.
+- gltfio: Various glTF-related cleanup and enhancements.
+- gltfio: Add support for KHR_texture_basisu.
+
+## v1.22.0
+
+- engine: Changed UBOs layout [⚠️ **Material breakage**].
+- engine: Improve effects relying on mipmapping
+- engine: Fix assert seen with VSM shadows.
+- WebGL: Fix `isTextureFormatSupported` for ETC2 formats.
+
+## v1.21.3
+
+- Java: Renamed the `KTXLoader` Kotlin class to `KTX1Loader`.  [⚠️ **API Change**].
+- libs: Added `Ktx2Reader` and `BasisEncoder` to support Basis-encoded KTX2 files.
+- engine: Remove deprecated `Stream` APIs, see `Texture::import()` for an alternative [⚠️ **API Change**].
+- tools: Removed KTX1 compression support from mipgen.  [⚠️ **API Change**].
+- tools: Added support for KTX2 to mipgen.
+- gltfio: Added `resetBoneMatrices()` method.
+- gltfio: Introduced `TextureProvider` interface.  [⚠️ **API Change**].
+- gltfio: Fix progress indicator when error occurs.
+- samples: Desktop and Web Suzanne samples now use KTX2 instead of KTX1.
+- samples: Fix regression with sample-gltf-viewer and zip files.
+
+## v1.21.2
+
+- Java: Add Java binding to get skins in `FilamentAsset`.
+- libs: Add libs/ktxreader [⚠️ **API Change**].
+- mipgen: fixups / clarification regarding sRGB.
+- WebGL: fix intermittent 'detached ArrayBuffer' errors.
+
+## v1.21.1
+
+- engine: Allow both screen-space refraction and screen-space reflections on the same object [⚠️ **Material breakage**].
+- engine: Optimizations for screen-space reflections.
+- engine: Remove `Viewport::scale()` [⚠️ **API Change**].
+- engine: Fix 12x overallocation of memory in `MorphTargetBuffer`.
+- Metal: Fix validation error when reading from default `SwapChain`.
+
+## v1.21.0
+
+- engine: OpenGL performance improvements with some drivers.
+- engine: Fix incorrect shadows with some custom projection matrices.
+- engine: Fix low frame rates seen with a lot of morph targets.
+- gltfio: Add support for KHR_materials_variants.
+- gltfio: Add support for KHR_materials_emissive_strength.
+- gltfio: Java now exposes morph target names as an array for consistency [⚠️ **API Change**].
+
+## v1.20.5
+
+- engine: New behavior for MASKED to work with translucent views. [⚠️ **Recompile Materials** to get the fix]
+- engine: Fix screen-space reflections when post-processing and MSAA are off.
+- engine: Update MAX_MORPH_TARGETS constant to 256.
+- engine: Fix point light lighting with ortho projection.
+- libs: BlueGL symbols are now prefixed with `bluegl` on all platforms.
+- gltfio: Add skinning getters to `FilamentAsset`.
+
+## v1.20.4
+
+- gltfio: Java clients must now destroy the MaterialProvider [⚠️ **API Change**].
+- gltfio: Fix, bone pose not applied if glTF model doesn't have animations.
+- libs: Added `math::quat::fromDirectedRotation` [**NEW API**].
+- WebGL: Restore GL state when frame ends.
+
+## v1.20.3
+
+- Java: Fix URI bug in Android Viewer sample when dropping some zips.
+- Vulkan: Fix "uninitialized texture" warnings from the Vulkan backend.
+
+## v1.20.2
+
+- engine: Binary size optimizations.
+- engine: Fix, Mat4 from Quaternion was transposed.
+- Vulkan: Internal bug fixes and robustness improvements.
+- Vulkan: Reduced log spam.
+
+## v1.20.1
+
+- engine: Binary size improvements.
+- engine: Add basic support for instanced renderables [**NEW API**].
+- engine: Fix, first imaged passsed to `Stream::SetAcquiredImage` is ignored and leaked.
+- Vulkan: Robustness improvements.
+- Java: Fix, lookAt z axis negated.
+- gltfio: Be graceful when model has > 4 weights per vert.
+
+## v1.20.0
+
+- engine: Support rough screen-space reflections [⚠️ **Material breakage**].
+- engine: Added `Scene::forEach` API to iterate through a scene's entities.
+- engine: Fix incorrect normals with skinned models.
+- Vulkan: Fix segfault during shutdown.
+- WebGL: Support web apps that have multiple `FilamentViewer`s.
+- gltfio: Performance enhancements when loading models.
+
+## v1.19.0
+
+- engine: Support 256 morph targets.
+- engine: Screen-space reflection improvements.
+- engine: Morphing improvements and bug fixes.
+- gltfio: Generate morphing normals when they are missing.
+- gltfio: Support material extras.
+- Java: Add bindings for new morphing API.
+- Vulkan: Fix segfault on macOS.
+
+## v1.18.0
+
+- engine: Add support separate samplers in fragment and vertex shaders [⚠️ **Material breakage**].
+- engine: Support legacy morphing mode with vertex attributes.
+- engine: Allow more flexible quality settings for the ColorGrading LUT.
+- engine: Improve screen-space reflections quality and allow reflections and refractions together.
+- Vulkan: Bug fixes and improvements.
 
 ## v1.17.0
 
@@ -27,10 +144,10 @@ A new header is inserted each time a *tag* is created.
 
 ## v1.15.2
 
-- engine: add support for PCSS (Percentage Closer Soft Shadows).
-- engine: fix spotlight shadow bias.
-- samples: avoid leaking IBLs in Android sample-gltf-viewer.
-- libs: fix `libibl` on mobile.
+- engine: Add support for PCSS (Percentage Closer Soft Shadows).
+- engine: Fix spotlight shadow bias.
+- samples: Avoid leaking IBLs in Android sample-gltf-viewer.
+- libs: Fix `libibl` on mobile.
 
 ## v1.15.1
 
@@ -365,7 +482,7 @@ devices.
 - engine: Fix RenderTarget NPE when depth is not present.
 - engine: Improvements to Camera APIs. Move focus distance from DofOptions to Camera.
 - engine: VSM shadows now support `shadowMultiplier`.
-- java: Expose severla MaterialInstance APIs (setColorWrite, setDepthWrite, setDepthCulling) that
+- java: Expose several MaterialInstance APIs (setColorWrite, setDepthWrite, setDepthCulling) that
   should have been public.
 - java: fix bug with Texture::setImage buffer size calculation.
 

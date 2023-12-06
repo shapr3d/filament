@@ -79,8 +79,8 @@ public:
     public:
         using value_type = Instance;
         using difference_type = ptrdiff_t;
-        using pointer = value_type*;
-        using reference = value_type&;
+        using pointer = Instance*;
+        using reference = Instance&;
         using iterator_category = std::forward_iterator_tag;
 
         children_iterator& operator++();

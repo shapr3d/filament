@@ -36,14 +36,13 @@
 
 namespace filament {
 namespace backend {
-namespace metal {
 
 class MetalDriver;
 class MetalBlitter;
 class MetalBufferPool;
 class MetalRenderTarget;
 class MetalSwapChain;
-class TimerQueryInterface;
+class MetalTimerQueryInterface;
 struct MetalUniformBuffer;
 struct MetalIndexBuffer;
 struct MetalSamplerGroup;
@@ -122,7 +121,7 @@ struct MetalContext {
     MTLSharedEventListener* eventListener = nil;
     uint64_t signalId = 1;
 
-    TimerQueryInterface* timerQueryImpl;
+    MetalTimerQueryInterface* timerQueryImpl;
 
     std::stack<const char*> groupMarkers;
 
@@ -143,7 +142,6 @@ id<MTLTexture> getOrCreateEmptyTexture(MetalContext* context);
 
 bool isInRenderPass(MetalContext* context);
 
-} // namespace metal
 } // namespace backend
 } // namespace filament
 

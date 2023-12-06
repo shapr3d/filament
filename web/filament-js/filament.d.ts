@@ -123,6 +123,14 @@ export interface View$BloomOptions {
     // TODO: add support for dirt texture in BloomOptions.
 }
 
+export interface View$ScreenSpaceReflectionsOptions {
+    thickness?: number;
+    bias?: number;
+    maxDistance?: number;
+    stride?: number;
+    enabled?: boolean;
+}
+
 export interface View$FogOptions {
     distance?: number;
     maximumOpacity?: number;
@@ -141,6 +149,10 @@ export interface View$VignetteOptions {
     roundness?: number;
     feather?: number;
     color?: float3;
+    enabled?: boolean;
+}
+
+export interface View$GuardBandOptions {
     enabled?: boolean;
 }
 
@@ -521,8 +533,10 @@ export class View {
     public setAmbientOcclusionOptions(options: View$AmbientOcclusionOptions): void;
     public setDepthOfFieldOptions(options: View$DepthOfFieldOptions): void;
     public setBloomOptions(options: View$BloomOptions): void;
+    public setScreenSpaceReflectionsOptions(options: View$ScreenSpaceReflectionsOptions): void;
     public setFogOptions(options: View$FogOptions): void;
     public setVignetteOptions(options: View$VignetteOptions): void;
+    public setGuardBandOptions(options: View$GuardBandOptions): void;
     public setAmbientOcclusion(ambientOcclusion: View$AmbientOcclusion): void;
     public getAmbientOcclusion(): View$AmbientOcclusion;
     public setBlendMode(mode: View$BlendMode): void;
@@ -554,15 +568,18 @@ export class Engine {
     public static create(canvas: HTMLCanvasElement, contextOptions?: object): Engine;
     public execute(): void;
     public createCamera(entity: Entity): Camera;
-    public createIblFromKtx(urlOrBuffer: BufferReference): IndirectLight;
     public createMaterial(urlOrBuffer: BufferReference): Material;
     public createRenderer(): Renderer;
     public createScene(): Scene;
-    public createSkyFromKtx(urlOrBuffer: BufferReference): Skybox;
     public createSwapChain(): SwapChain;
     public createTextureFromJpeg(urlOrBuffer: BufferReference, options?: object): Texture;
     public createTextureFromPng(urlOrBuffer: BufferReference, options?: object): Texture;
-    public createTextureFromKtx(urlOrBuffer: BufferReference, options?: object): Texture;
+
+    public createIblFromKtx1(urlOrBuffer: BufferReference): IndirectLight;
+    public createSkyFromKtx1(urlOrBuffer: BufferReference): Skybox;
+    public createTextureFromKtx1(urlOrBuffer: BufferReference, options?: object): Texture;
+    public createTextureFromKtx2(urlOrBuffer: BufferReference, options?: object): Texture;
+
     public createView(): View;
 
     public createAssetLoader(): gltfio$AssetLoader;
@@ -589,7 +606,14 @@ export class Engine {
     public getSupportedFormatSuffix(suffix: string): void;
     public getTransformManager(): TransformManager;
     public init(assets: string[], onready: () => void): void;
-    public loadFilamesh(urlOrBuffer: BufferReference, definstance: MaterialInstance, matinstances: object): Filamesh;
+    public loadFilamesh(urlOrBuffer: BufferReference, definstance?: MaterialInstance, matinstances?: object): Filamesh;
+}
+
+export class Ktx2Reader {
+    constructor(engine: Engine, quiet: boolean)
+    public requestFormat(format: Texture$InternalFormat): void;
+    public unrequestFormat(format: Texture$InternalFormat): void;
+    public load(urlOrBuffer: BufferReference, transfer: TransferFunction): Texture|null;
 }
 
 export class gltfio$AssetLoader {
@@ -610,6 +634,7 @@ export class gltfio$FilamentAsset {
     public getEntityByName(name: string): Entity;
     public getEntitiesByPrefix(name: string): Entity[];
     public getLightEntities(): Entity[];
+    public getRenderableEntities(): Entity[];
     public getCameraEntities(): Entity[];
     public getRoot(): Entity;
     public popRenderable(): Entity;
@@ -634,6 +659,7 @@ export class gltfio$FilamentInstance {
 export class gltfio$Animator {
     public applyAnimation(index: number): void;
     public updateBoneMatrices(): void;
+    public resetBoneMatrices(): void;
     public getAnimationCount(): number;
     public getAnimationDuration(index: number): number;
     public getAnimationName(index: number): string;
@@ -709,6 +735,10 @@ export enum CompressedPixelDataType {
     DXT1_RGBA,
     DXT3_RGBA,
     DXT5_RGBA,
+    DXT1_SRGB,
+    DXT1_SRGBA,
+    DXT3_SRGBA,
+    DXT5_SRGBA,
     RGBA_ASTC_4x4,
     RGBA_ASTC_5x4,
     RGBA_ASTC_5x5,
@@ -912,6 +942,10 @@ export enum Texture$InternalFormat {
     DXT1_RGBA,
     DXT3_RGBA,
     DXT5_RGBA,
+    DXT1_SRGB,
+    DXT1_SRGBA,
+    DXT3_SRGBA,
+    DXT5_SRGBA,
     RGBA_ASTC_4x4,
     RGBA_ASTC_5x4,
     RGBA_ASTC_5x5,
@@ -992,6 +1026,14 @@ export enum VertexAttribute {
     CUSTOM5 = 13,
     CUSTOM6 = 14,
     CUSTOM7 = 15,
+    MORPH_POSITION_0 = CUSTOM0,
+    MORPH_POSITION_1 = CUSTOM1,
+    MORPH_POSITION_2 = CUSTOM2,
+    MORPH_POSITION_3 = CUSTOM3,
+    MORPH_TANGENTS_0 = CUSTOM4,
+    MORPH_TANGENTS_1 = CUSTOM5,
+    MORPH_TANGENTS_2 = CUSTOM6,
+    MORPH_TANGENTS_3 = CUSTOM7,
 }
 
 export enum VertexBuffer$AttributeType {
@@ -1059,6 +1101,19 @@ export enum WrapMode {
     CLAMP_TO_EDGE,
     REPEAT,
     MIRRORED_REPEAT,
+}
+
+export enum Ktx2Reader$TransferFunction {
+    LINEAR,
+    sRGB,
+}
+
+export enum Ktx2Reader$Result {
+    SUCCESS,
+    COMPRESSED_TRANSCODE_FAILURE,
+    UNCOMPRESSED_TRANSCODE_FAILURE,
+    FORMAT_UNSUPPORTED,
+    FORMAT_ALREADY_REQUESTED,
 }
 
 export function _malloc(size: number): number;

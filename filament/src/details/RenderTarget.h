@@ -55,9 +55,15 @@ public:
         return mAttachmentMask;
     }
 
+    backend::TargetBufferFlags getSampleableAttachmentsMask() const noexcept {
+        return mSampleableAttachmentsMask;
+    }
+
     uint8_t getSupportedColorAttachmentsCount() const noexcept {
         return mSupportedColorAttachmentsCount;
     }
+
+    bool hasSampleableDepth() const noexcept;
 
 private:
     friend class RenderTarget;
@@ -65,6 +71,7 @@ private:
     Attachment mAttachments[ATTACHMENT_COUNT];
     HwHandle mHandle{};
     backend::TargetBufferFlags mAttachmentMask = {};
+    backend::TargetBufferFlags mSampleableAttachmentsMask = {};
     const uint8_t mSupportedColorAttachmentsCount;
 };
 

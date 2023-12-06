@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
- #ifndef TNT_FILAMENT_DRIVER_VULKANHANDLES_H
- #define TNT_FILAMENT_DRIVER_VULKANHANDLES_H
+ #ifndef TNT_FILAMENT_BACKEND_VULKANHANDLES_H
+ #define TNT_FILAMENT_BACKEND_VULKANHANDLES_H
 
 #include "VulkanDriver.h"
 #include "VulkanPipelineCache.h"
@@ -24,8 +24,7 @@
 #include "VulkanTexture.h"
 #include "VulkanUtility.h"
 
-namespace filament {
-namespace backend {
+namespace filament::backend {
 
 struct VulkanProgram : public HwProgram {
     VulkanProgram(VulkanContext& context, const Program& builder) noexcept;
@@ -51,19 +50,20 @@ struct VulkanRenderTarget : private HwRenderTarget {
             VulkanStagePool& stagePool);
 
     // Creates a special "default" render target (i.e. associated with the swap chain)
-    explicit VulkanRenderTarget(VulkanContext& context);
+    explicit VulkanRenderTarget();
 
-    void transformClientRectToPlatform(VulkanSwapChain* currentSurface, VkRect2D* bounds) const;
-    void transformClientRectToPlatform(VulkanSwapChain* currentSurface, VkViewport* bounds) const;
-    VkExtent2D getExtent(VulkanSwapChain* currentSurface) const;
-    VulkanAttachment getColor(VulkanSwapChain* currentSurface, int target) const;
+    void transformClientRectToPlatform(VkRect2D* bounds) const;
+    void transformClientRectToPlatform(VkViewport* bounds) const;
+    VkExtent2D getExtent() const;
+    VulkanAttachment getColor(int target) const;
     VulkanAttachment getMsaaColor(int target) const;
-    VulkanAttachment getDepth(VulkanSwapChain* currentSurface) const;
+    VulkanAttachment getDepth() const;
     VulkanAttachment getMsaaDepth() const;
-    int getColorTargetCount(const VulkanRenderPass& pass) const;
+    uint8_t getColorTargetCount(const VulkanRenderPass& pass) const;
     uint8_t getSamples() const { return mSamples; }
-    bool hasDepth() const { return mDepth.format != VK_FORMAT_UNDEFINED; }
+    bool hasDepth() const { return mDepth.texture; }
     bool isSwapChain() const { return !mOffscreen; }
+    void bindToSwapChain(VulkanSwapChain& surf);
 
 private:
     VulkanAttachment mColor[MRT::MAX_SUPPORTED_RENDER_TARGET_COUNT] = {};
@@ -102,7 +102,7 @@ struct VulkanSamplerGroup : public HwSamplerGroup {
 };
 
 struct VulkanRenderPrimitive : public HwRenderPrimitive {
-    void setPrimitiveType(backend::PrimitiveType pt);
+    void setPrimitiveType(PrimitiveType pt);
     void setBuffers(VulkanVertexBuffer* vertexBuffer, VulkanIndexBuffer* indexBuffer);
     VulkanVertexBuffer* vertexBuffer = nullptr;
     VulkanIndexBuffer* indexBuffer = nullptr;
@@ -143,7 +143,6 @@ inline constexpr VkBufferUsageFlagBits getBufferObjectUsage(
     }
 }
 
-} // namespace filament
-} // namespace backend
+} // namespace filament::backend
 
-#endif // TNT_FILAMENT_DRIVER_VULKANHANDLES_H
+#endif // TNT_FILAMENT_BACKEND_VULKANHANDLES_H

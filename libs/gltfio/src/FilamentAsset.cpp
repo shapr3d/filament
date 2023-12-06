@@ -18,11 +18,13 @@
 
 #include <gltfio/Animator.h>
 
+#include <filament/RenderableManager.h>
+#include <filament/Scene.h>
+
 #include <utils/EntityManager.h>
 #include <utils/Log.h>
 #include <utils/NameComponentManager.h>
 
-#include "MorphHelper.h"
 #include "Wireframe.h"
 
 using namespace filament;
@@ -42,7 +44,6 @@ FFilamentAsset::~FFilamentAsset() {
 
     delete mAnimator;
     delete mWireframe;
-    delete mMorpher;
 
     mEngine->destroy(mRoot);
     mEntityManager->destroy(mRoot);
@@ -54,6 +55,8 @@ FFilamentAsset::~FFilamentAsset() {
         if (mNameManager) {
             mNameManager->removeComponent(entity);
         }
+        // Destroy the node component.
+        mNodeManager->destroy(entity);
         // Destroy the actual entity.
         mEntityManager->destroy(entity);
     }
@@ -72,42 +75,95 @@ FFilamentAsset::~FFilamentAsset() {
     for (auto tx : mTextures) {
         mEngine->destroy(tx);
     }
+    for (auto tb : mMorphTargetBuffers) {
+        mEngine->destroy(tb);
+    }
 }
 
 const char* FFilamentAsset::getExtras(utils::Entity entity) const noexcept {
     if (entity.isNull()) {
         return mAssetExtras.c_str();
     }
-    const auto iter = mNodeExtras.find(entity);
-    return iter == mNodeExtras.cend() ? nullptr : iter->second.c_str();
+    return mNodeManager->getExtras(mNodeManager->getInstance(entity)).c_str();
 }
 
-Animator* FFilamentAsset::getAnimator() noexcept {
-    if (!mAnimator) {
-        if (!mResourcesLoaded) {
-            slog.e << "Cannot create animator before resource loading." << io::endl;
-            return nullptr;
-        }
-        if (!mSourceAsset) {
-            slog.e << "Cannot create animator from frozen asset." << io::endl;
-            return nullptr;
-        }
-        mAnimator = new Animator(this, nullptr);
-    }
-    return mAnimator;
-}
-
-void FFilamentAsset::setMorphWeights(utils::Entity entity, const float* weights, size_t count) noexcept {
-    if (mResourcesLoaded) {
-        mMorpher->setWeights(entity, weights, count);
+void FFilamentAsset::createAnimators() {
+    assert_invariant(mAnimator == nullptr);
+    mAnimator = new Animator(this, nullptr);
+    for (FFilamentInstance* instance : mInstances) {
+        instance->createAnimator();
     }
 }
 
-int FFilamentAsset::getMorphTargetCount(utils::Entity entity) noexcept {
-    if (mResourcesLoaded) {
-        return mMorpher->getTargetCount(entity);
+size_t FFilamentAsset::getSkinCount() const noexcept {
+    return mSkins.size();
+}
+
+const char* FFilamentAsset::getSkinNameAt(size_t skinIndex) const noexcept {
+    if (mSkins.size() <= skinIndex) {
+        return nullptr;
     }
-    return 0;
+    return mSkins[skinIndex].name.c_str();
+}
+
+size_t FFilamentAsset::getJointCountAt(size_t skinIndex) const noexcept {
+    if (mSkins.size() <= skinIndex) {
+        return 0;
+    }
+    return mSkins[skinIndex].joints.size();
+}
+
+const utils::Entity* FFilamentAsset::getJointsAt(size_t skinIndex) const noexcept {
+    if (mSkins.size() <= skinIndex) {
+        return nullptr;
+    }
+    return mSkins[skinIndex].joints.data();
+}
+
+const char* FFilamentAsset::getMorphTargetNameAt(utils::Entity entity,
+        size_t targetIndex) const noexcept {
+    if (!mResourcesLoaded) {
+        return nullptr;
+    }
+
+    const auto& names =  mNodeManager->getMorphTargetNames(mNodeManager->getInstance(entity));
+    if (targetIndex >= names.size()) {
+        return nullptr;
+    }
+
+    return names[targetIndex].c_str();
+}
+
+size_t FFilamentAsset::getMorphTargetCountAt(utils::Entity entity) const noexcept {
+    if (!mResourcesLoaded) {
+        return 0;
+    }
+
+    const auto& names = mNodeManager->getMorphTargetNames(mNodeManager->getInstance(entity));
+    return names.size();
+}
+
+size_t FFilamentAsset::getMaterialVariantCount() const noexcept {
+    return mVariants.size();
+}
+
+const char* FFilamentAsset::getMaterialVariantName(size_t variantIndex) const noexcept {
+    if (variantIndex >= mVariants.size()) {
+        return nullptr;
+    }
+    return mVariants[variantIndex].name.c_str();
+}
+
+void FFilamentAsset::applyMaterialVariant(size_t variantIndex) noexcept {
+    if (variantIndex >= mVariants.size()) {
+        return;
+    }
+    const std::vector<VariantMapping>& mappings = mVariants[variantIndex].mappings;
+    RenderableManager& rm = mEngine->getRenderableManager();
+    for (const auto& mapping : mappings) {
+        auto instance = rm.getInstance(mapping.renderable);
+        rm.setMaterialInstanceAt(instance, mapping.primitiveIndex, mapping.material);
+    }
 }
 
 Entity FFilamentAsset::getWireframe() noexcept {
@@ -201,6 +257,18 @@ size_t FFilamentAsset::getEntitiesByPrefix(const char* prefix, Entity* entities,
     return count;
 }
 
+void FFilamentAsset::addEntitiesToScene(Scene& targetScene, const Entity* entities,
+        size_t count, SceneMask sceneFilter) {
+    auto& nm = *mNodeManager;
+    for (size_t ei = 0; ei < count; ++ei) {
+        const Entity entity = entities[ei];
+        NodeManager::SceneMask mask = nm.getSceneMembership(nm.getInstance(entity));
+        if ((mask & sceneFilter).any()) {
+            targetScene.addEntity(entity);
+        }
+    }
+}
+
 size_t FilamentAsset::getEntityCount() const noexcept {
     return upcast(this)->getEntityCount();
 }
@@ -215,6 +283,14 @@ const Entity* FilamentAsset::getLightEntities() const noexcept {
 
 size_t FilamentAsset::getLightEntityCount() const noexcept {
     return upcast(this)->getLightEntityCount();
+}
+
+const Entity* FilamentAsset::getRenderableEntities() const noexcept {
+    return upcast(this)->getRenderableEntities();
+}
+
+size_t FilamentAsset::getRenderableEntityCount() const noexcept {
+    return upcast(this)->getRenderableEntityCount();
 }
 
 const utils::Entity* FilamentAsset::getCameraEntities() const noexcept {
@@ -285,16 +361,45 @@ const char* FilamentAsset::getExtras(Entity entity) const noexcept {
     return upcast(this)->getExtras(entity);
 }
 
-Animator* FilamentAsset::getAnimator() noexcept {
+Animator* FilamentAsset::getAnimator() const noexcept {
     return upcast(this)->getAnimator();
 }
 
-void FilamentAsset::setMorphWeights(utils::Entity entity, const float* weights, size_t count) {
-    return upcast(this)->setMorphWeights(entity, weights, count);
+size_t FilamentAsset::getSkinCount() const noexcept {
+    return upcast(this)->getSkinCount();
 }
 
-int FilamentAsset::getMorphTargetCount(utils::Entity entity) noexcept {
-    return upcast(this)->getMorphTargetCount(entity);
+const char* FilamentAsset::getSkinNameAt(size_t skinIndex) const noexcept {
+    return upcast(this)->getSkinNameAt(skinIndex);
+}
+
+size_t FilamentAsset::getJointCountAt(size_t skinIndex) const noexcept {
+    return upcast(this)->getJointCountAt(skinIndex);
+}
+
+const utils::Entity* FilamentAsset::getJointsAt(size_t skinIndex) const noexcept {
+    return upcast(this)->getJointsAt(skinIndex);
+}
+
+const char* FilamentAsset::getMorphTargetNameAt(utils::Entity entity,
+        size_t targetIndex) const noexcept {
+    return upcast(this)->getMorphTargetNameAt(entity, targetIndex);
+}
+
+size_t FilamentAsset::getMorphTargetCountAt(utils::Entity entity) const noexcept {
+    return upcast(this)->getMorphTargetCountAt(entity);
+}
+
+const char* FilamentAsset::getMaterialVariantName(size_t variantIndex) const noexcept {
+    return upcast(this)->getMaterialVariantName(variantIndex);
+}
+
+void FilamentAsset::applyMaterialVariant(size_t variantIndex) noexcept {
+    return upcast(this)->applyMaterialVariant(variantIndex);
+}
+
+size_t FilamentAsset::getMaterialVariantCount() const noexcept {
+    return upcast(this)->getMaterialVariantCount();
 }
 
 Entity FilamentAsset::getWireframe() noexcept {
@@ -319,6 +424,19 @@ FilamentInstance** FilamentAsset::getAssetInstances() noexcept {
 
 size_t FilamentAsset::getAssetInstanceCount() const noexcept {
     return upcast(this)->getAssetInstanceCount();
+}
+
+size_t FilamentAsset::getSceneCount() const noexcept {
+    return upcast(this)->getSceneCount();
+}
+
+const char* FilamentAsset::getSceneName(size_t sceneIndex) const noexcept {
+    return upcast(this)->getSceneName(sceneIndex);
+}
+
+void FilamentAsset::addEntitiesToScene(Scene& targetScene, const Entity* entities, size_t count,
+        SceneMask sceneFilter) {
+    upcast(this)->addEntitiesToScene(targetScene, entities, count, sceneFilter);
 }
 
 } // namespace gltfio

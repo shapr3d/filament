@@ -84,6 +84,7 @@ public:
     using VsmShadowOptions = VsmShadowOptions;
     using SoftShadowOptions = SoftShadowOptions;
     using ScreenSpaceReflectionsOptions = ScreenSpaceReflectionsOptions;
+    using GuardBandOptions = GuardBandOptions;
 
     /**
      * Sets the View's name. Only useful for debugging.
@@ -376,6 +377,20 @@ public:
      * @return screen-space reflections options
      */
     ScreenSpaceReflectionsOptions const& getScreenSpaceReflectionsOptions() const noexcept;
+
+    /**
+     * Enables or disable screen-space guard band. Disabled by default.
+     *
+     * @param options guard band options
+     */
+    void setGuardBandOptions(GuardBandOptions options) noexcept;
+
+    /**
+     * Returns screen-space guard band options.
+     *
+     * @return guard band options
+     */
+    GuardBandOptions const& getGuardBandOptions() const noexcept;
 
     /**
      * Enables or disable multi-sample anti-aliasing (MSAA). Disabled by default.
@@ -706,7 +721,7 @@ public:
      * @tparam method   Method to call on T (e.g.: &Foo::bar)
      * @param x         Horizontal coordinate to query in the viewport with origin on the left.
      * @param y         Vertical coordinate to query on the viewport with origin at the bottom.
-     * @param data      A pointer to an instance of T
+     * @param instance  A pointer to an instance of T
      * @param handler   Handler to dispatch the callback or nullptr for the default handler.
      */
     template<typename T, void(T::*method)(PickingQueryResult const&)>
@@ -726,7 +741,7 @@ public:
      * @tparam method   Method to call on T (e.g.: &Foo::bar)
      * @param x         Horizontal coordinate to query in the viewport with origin on the left.
      * @param y         Vertical coordinate to query on the viewport with origin at the bottom.
-     * @param data      An instance of T
+     * @param instance  An instance of T
      * @param handler   Handler to dispatch the callback or nullptr for the default handler.
      */
     template<typename T, void(T::*method)(PickingQueryResult const&)>

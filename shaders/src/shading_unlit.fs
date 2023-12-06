@@ -35,10 +35,16 @@ vec4 evaluateMaterial(const MaterialInputs material) {
     if (color.a <= 0.0) {
         discard;
     }
+
+    // Output 1.0 for translucent view to prevent "punch through" artifacts. We do not do this
+    // for opaque views to enable proper usage of ALPHA_TO_COVERAGE.
+    if (frameUniforms.needsAlphaChannel == 1.0) {
+        color.a = 1.0;
+    }
 #endif
 
-#if defined(HAS_DIRECTIONAL_LIGHTING)
-#if defined(HAS_SHADOWING)
+#if defined(VARIANT_HAS_DIRECTIONAL_LIGHTING)
+#if defined(VARIANT_HAS_SHADOWING)
     float visibility = 1.0;
     uint cascade = getShadowCascade();
     bool cascadeHasVisibleShadows = bool(frameUniforms.cascades & ((1u << cascade) << 8u));
@@ -56,7 +62,7 @@ vec4 evaluateMaterial(const MaterialInputs material) {
 #else
     color = vec4(0.0);
 #endif
-#elif defined(HAS_SHADOW_MULTIPLIER)
+#elif defined(MATERIAL_HAS_SHADOW_MULTIPLIER)
     color = vec4(0.0);
 #endif
 

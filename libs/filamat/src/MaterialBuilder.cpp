@@ -419,7 +419,7 @@ MaterialBuilder& MaterialBuilder::generateDebugInfo(bool generateDebugInfo) noex
     return *this;
 }
 
-MaterialBuilder& MaterialBuilder::variantFilter(uint8_t variantFilter) noexcept {
+MaterialBuilder& MaterialBuilder::variantFilter(filament::UserVariantFilterMask variantFilter) noexcept {
     mVariantFilter = variantFilter;
     return *this;
 }
@@ -453,7 +453,7 @@ void MaterialBuilder::prepareToBuild(MaterialInfo& info) noexcept {
             ibb.add(param.name, param.size, param.uniformType, param.precision);
         } else if (param.isSubpass()) {
             // For now, we only support a single subpass for attachment 0.
-            // Subpasses blong to the "MaterialParams" block.
+            // Subpasses belong to the "MaterialParams" block.
             const uint8_t attachmentIndex = 0;
             const uint8_t binding = 0;
             info.subpass = { utils::CString("MaterialParams"), param.name, param.subpassType,
@@ -503,6 +503,7 @@ void MaterialBuilder::prepareToBuild(MaterialInfo& info) noexcept {
     info.reflectionMode = mReflectionMode;
     info.quality = mShaderQuality;
     info.hasCustomSurfaceShading = mCustomSurfaceShading;
+    info.useLegacyMorphing = mUseLegacyMorphing;
 }
 
 bool MaterialBuilder::findProperties(filament::backend::ShaderType type,
@@ -619,14 +620,14 @@ bool MaterialBuilder::ShaderCode::resolveIncludes(IncludeCallback callback,
     return true;
 }
 
-static void showErrorMessage(const char* materialName, uint8_t variant,
+static void showErrorMessage(const char* materialName, filament::Variant variant,
         MaterialBuilder::TargetApi targetApi, filament::backend::ShaderType shaderType,
         const std::string& shaderCode) {
     using ShaderType = filament::backend::ShaderType;
     using TargetApi = MaterialBuilder::TargetApi;
     utils::slog.e
             << "Error in \"" << materialName << "\""
-            << ", Variant 0x" << io::hex << (int) variant
+            << ", Variant 0x" << io::hex << +variant.key
             << (targetApi == TargetApi::VULKAN ? ", Vulkan.\n" : ", OpenGL.\n")
             << "=========================\n"
             << "Generated "
@@ -707,9 +708,9 @@ bool MaterialBuilder::generateShaders(JobSystem& jobSystem, const std::vector<Va
                 spirvEntry.shaderModel = static_cast<uint8_t>(params.shaderModel);
                 metalEntry.shaderModel = static_cast<uint8_t>(params.shaderModel);
 
-                glslEntry.variant = v.variant;
-                spirvEntry.variant = v.variant;
-                metalEntry.variant = v.variant;
+                glslEntry.variantKey  = v.variant.key;
+                spirvEntry.variantKey = v.variant.key;
+                metalEntry.variantKey = v.variant.key;
 
                 // Generate raw shader code.
                 // The quotes in Google-style line directives cause problems with certain drivers. These
@@ -740,9 +741,12 @@ bool MaterialBuilder::generateShaders(JobSystem& jobSystem, const std::vector<Va
 
 #ifndef FILAMAT_LITE
                 GLSLPostProcessor::Config config{
+                        .variant = v.variant,
+                        .targetApi = targetApi,
                         .shaderType = v.stage,
                         .shaderModel = shaderModel,
                         .domain = mMaterialDomain,
+                        .materialInfo = &info,
                         .glsl = {},
                 };
 
@@ -819,8 +823,10 @@ bool MaterialBuilder::generateShaders(JobSystem& jobSystem, const std::vector<Va
 
     // Sort the variants.
     auto compare = [](const auto& a, const auto& b) {
-        const uint32_t akey = a.shaderModel << 16 | a.variant << 8 | a.stage;
-        const uint32_t bkey = b.shaderModel << 16 | b.variant << 8 | b.stage;
+        static_assert(sizeof(decltype(a.variantKey)) == 1);
+        static_assert(sizeof(decltype(b.variantKey)) == 1);
+        const uint32_t akey = (a.shaderModel << 16) | (a.variantKey << 8) | a.stage;
+        const uint32_t bkey = (b.shaderModel << 16) | (b.variantKey << 8) | b.stage;
         return akey < bkey;
     };
     std::sort(glslEntries.begin(), glslEntries.end(), compare);
@@ -917,6 +923,11 @@ MaterialBuilder& MaterialBuilder::enableFramebufferFetch() noexcept {
     return *this;
 }
 
+MaterialBuilder& MaterialBuilder::useLegacyMorphing() noexcept {
+    mUseLegacyMorphing = true;
+    return *this;
+}
+
 Package MaterialBuilder::build(JobSystem& jobSystem) noexcept {
     if (materialBuilderClients == 0) {
         utils::slog.e << "Error: MaterialBuilder::init() must be called before build()."
@@ -943,7 +954,7 @@ Package MaterialBuilder::build(JobSystem& jobSystem) noexcept {
     }
 
     // prepareToBuild must be called first, to populate mCodeGenPermutations.
-    MaterialInfo info;
+    MaterialInfo info {};
     prepareToBuild(info);
 
     // Run checks, in order.
@@ -963,6 +974,8 @@ Package MaterialBuilder::build(JobSystem& jobSystem) noexcept {
     if (mMaterialDomain == MaterialDomain::SURFACE) {
         writeSurfaceChunks(container);
     }
+
+    info.useLegacyMorphing = mUseLegacyMorphing;
 
     // Generate all shaders and write the shader chunks.
     const auto variants = mMaterialDomain == MaterialDomain::SURFACE ?
@@ -1018,10 +1031,10 @@ std::string MaterialBuilder::peek(filament::backend::ShaderType type,
 
     if (type == filament::backend::ShaderType::VERTEX) {
         return sg.createVertexProgram(ShaderModel(params.shaderModel),
-                params.targetApi, params.targetLanguage, info, 0, mInterpolation, mVertexDomain);
+                params.targetApi, params.targetLanguage, info, {}, mInterpolation, mVertexDomain);
     } else {
         return sg.createFragmentProgram(ShaderModel(params.shaderModel), params.targetApi,
-                params.targetLanguage, info, 0, mInterpolation);
+                params.targetLanguage, info, {}, mInterpolation);
     }
 }
 

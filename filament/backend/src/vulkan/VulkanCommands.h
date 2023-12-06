@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef TNT_FILAMENT_DRIVER_VULKANCOMMANDS_H
-#define TNT_FILAMENT_DRIVER_VULKANCOMMANDS_H
+#ifndef TNT_FILAMENT_BACKEND_VULKANCOMMANDS_H
+#define TNT_FILAMENT_BACKEND_VULKANCOMMANDS_H
 
 #include <bluevk/BlueVK.h>
 
@@ -24,8 +24,7 @@
 #include <utils/Condition.h>
 #include <utils/Mutex.h>
 
-namespace filament {
-namespace backend {
+namespace filament::backend {
 
 // Wrapper to enable use of shared_ptr for implementing shared ownership of low-level Vulkan fences.
 struct VulkanCmdFence {
@@ -50,6 +49,7 @@ struct VulkanCommandBuffer {
     uint32_t index = 0;
 };
 
+// Allows classes to be notified after a new command buffer has been activated.
 class CommandBufferObserver {
 public:
     virtual void onCommandBuffer(const VulkanCommandBuffer& cmdbuffer) = 0;
@@ -106,7 +106,6 @@ class VulkanCommands {
         CommandBufferObserver* mObserver = nullptr;
 };
 
-} // namespace filament
-} // namespace backend
+} // namespace filament::backend
 
-#endif // TNT_FILAMENT_DRIVER_VULKANCOMMANDS_H
+#endif // TNT_FILAMENT_BACKEND_VULKANCOMMANDS_H

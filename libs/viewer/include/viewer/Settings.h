@@ -73,6 +73,7 @@ using MultiSampleAntiAliasingOptions = filament::View::MultiSampleAntiAliasingOp
 using TemporalAntiAliasingOptions = filament::View::TemporalAntiAliasingOptions;
 using VignetteOptions = filament::View::VignetteOptions;
 using VsmShadowOptions = filament::View::VsmShadowOptions;
+using GuardBandOptions = filament::View::GuardBandOptions;
 using LightManager = filament::LightManager;
 
 // These functions push all editable property values to their respective Filament objects.
@@ -172,6 +173,7 @@ struct ViewSettings {
     TemporalAntiAliasingOptions taa;
     VignetteOptions vignette;
     VsmShadowOptions vsmShadowOptions;
+    GuardBandOptions guardBand;
 
     // Custom View Options
     ColorGradingSettings colorGrading;

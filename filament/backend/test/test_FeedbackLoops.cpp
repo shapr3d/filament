@@ -16,8 +16,6 @@
 
 #include "BackendTest.h"
 
-#include <private/filament/EngineEnums.h>
-
 #include "ShaderGenerator.h"
 #include "TrianglePrimitive.h"
 
@@ -117,6 +115,9 @@ static void dumpScreenshot(DriverApi& dapi, Handle<HwRenderTarget> rt) {
     dapi.readPixels(rt, 0, 0, kTexWidth, kTexHeight, std::move(pb));
 }
 
+// TODO: This test needs work to get Metal and OpenGL to agree on results.
+// The problems are caused by both uploading and rendering into the same texture, since the OpenGL
+// backend's readPixels does not work correctly with textures that have image data uploaded.
 TEST_F(BackendTest, FeedbackLoops) {
     auto& api = getDriverApi();
 
@@ -133,7 +134,7 @@ TEST_F(BackendTest, FeedbackLoops) {
             ShaderGenerator shaderGen(fullscreenVs, fullscreenFs, sBackend, sIsMobilePlatform);
             Program prog = shaderGen.getProgram();
             Program::Sampler psamplers[] = { utils::CString("tex"), 0, false };
-            prog.setSamplerGroup(0, psamplers, sizeof(psamplers) / sizeof(psamplers[0]));
+            prog.setSamplerGroup(0, ALL_SHADER_STAGE_FLAGS, psamplers, sizeof(psamplers) / sizeof(psamplers[0]));
             prog.setUniformBlock(1, utils::CString("params"));
             program = api.createProgram(std::move(prog));
         }
@@ -208,7 +209,7 @@ TEST_F(BackendTest, FeedbackLoops) {
                     .sourceLevel = float(sourceLevel),
                 });
                 api.beginRenderPass(renderTargets[targetLevel], params);
-                api.draw(state, triangle.getRenderPrimitive());
+                api.draw(state, triangle.getRenderPrimitive(), 1);
                 api.endRenderPass();
             }
 
@@ -227,7 +228,7 @@ TEST_F(BackendTest, FeedbackLoops) {
                     .sourceLevel = float(sourceLevel),
                 });
                 api.beginRenderPass(renderTargets[targetLevel], params);
-                api.draw(state, triangle.getRenderPrimitive());
+                api.draw(state, triangle.getRenderPrimitive(), 1);
                 api.endRenderPass();
             }
 

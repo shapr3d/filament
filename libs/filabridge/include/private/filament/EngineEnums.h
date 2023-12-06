@@ -42,7 +42,7 @@ namespace BindingPoints {
     constexpr uint8_t FROXEL_RECORDS             = 6;
     constexpr uint8_t PER_MATERIAL_INSTANCE      = 7;    // uniforms/samplers updates per material
     constexpr uint8_t COUNT                      = 8;
-    // These are limited by Program::UNIFORM_BINDING_COUNT (currently 8)
+    // These are limited by CONFIG_BINDING_COUNT (currently 12)
 }
 
 static_assert(BindingPoints::COUNT <= backend::CONFIG_BINDING_COUNT);
@@ -69,9 +69,8 @@ constexpr size_t CONFIG_MAX_BONE_COUNT = 256;
 
 // The maximum number of morph target count.
 // This value is limited by ES3.0, ES3.0 only guarantees 256 layers in an array texture.
-// For morphing, 128 layers are used for the positions and others are used for tangents.
-constexpr int CONFIG_MAX_MORPH_TARGET_COUNT = 128;
+constexpr size_t CONFIG_MAX_MORPH_TARGET_COUNT = 256;
 
 } // namespace filament
 
-#endif // TNT_FILAMENT_driver/EngineEnums.h
+#endif // TNT_FILAMENT_ENGINE_ENUM_H

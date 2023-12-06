@@ -20,6 +20,7 @@
 #include "upcast.h"
 
 #include "Allocators.h"
+#include "DFG.h"
 #include "PostProcessManager.h"
 #include "ResourceList.h"
 
@@ -76,6 +77,7 @@ using MaterialKey = uint32_t;
 
 #include <chrono>
 #include <memory>
+#include <new>
 #include <random>
 #include <unordered_map>
 
@@ -96,7 +98,6 @@ class FScene;
 class FSwapChain;
 class FView;
 
-class DFG;
 class ResourceAllocator;
 
 /*
@@ -147,8 +148,12 @@ public:
     ~FEngine() noexcept;
 
     backend::Driver& getDriver() const noexcept { return *mDriver; }
-    DriverApi& getDriverApi() noexcept { return mCommandStream; }
-    DFG* getDFG() const noexcept { return mDFG.get(); }
+
+    DriverApi& getDriverApi() noexcept {
+        return *std::launder(reinterpret_cast<DriverApi*>(&mDriverApiStorage));
+    }
+
+    DFG const& getDFG() const noexcept { return mDFG; }
 
     // the per-frame Area is used by all Renderer, so they must run in sequence and
     // have freed all allocated memory when done. If this needs to change in the future,
@@ -159,11 +164,12 @@ public:
     uint32_t getMaterialId() const noexcept { return mMaterialId++; }
 
     const FMaterial* getDefaultMaterial() const noexcept { return mDefaultMaterial; }
-    const FMaterial* getShaprMaterial(size_t index) const noexcept;
+    const FMaterial* getShaprMaterial(size_t index) const noexcept { return mShaprGeneralMaterials[index]; }
     const FMaterial* getSkyboxMaterial() const noexcept;
     const FIndirectLight* getDefaultIndirectLight() const noexcept { return mDefaultIbl; }
     const FTexture* getDummyCubemap() const noexcept { return mDefaultIblTexture; }
     const FColorGrading* getDefaultColorGrading() const noexcept { return mDefaultColorGrading; }
+    FMorphTargetBuffer* getDummyMorphTargetBuffer() const { return mDummyMorphTargetBuffer; }
 
     backend::Handle<backend::HwRenderPrimitive> getFullScreenRenderPrimitive() const noexcept {
         return mFullScreenTriangleRph;
@@ -175,6 +181,10 @@ public:
 
     FIndexBuffer* getFullScreenIndexBuffer() const noexcept {
         return mFullScreenTriangleIb;
+    }
+
+    math::mat4f getUvFromClipMatrix() const noexcept {
+        return mUvFromClipMatrix;
     }
 
     PostProcessManager const& getPostProcessManager() const noexcept {
@@ -227,6 +237,10 @@ public:
     Epoch getEngineEpoch() const { return mEngineEpoch; }
     duration getEngineTime() const noexcept {
         return clock::now() - getEngineEpoch();
+    }
+
+    backend::Handle<backend::HwRenderTarget> getDefaultRenderTarget() const noexcept {
+        return mDefaultRenderTarget;
     }
 
     template <typename T>
@@ -333,9 +347,17 @@ public:
         return mRandomEngine;
     }
 
-    void pumpMessageQueues() {
+    void pumpMessageQueues() const {
         getDriver().purge();
     }
+
+    backend::Handle<backend::HwTexture> getOneTexture() const { return mDummyOneTexture; }
+    backend::Handle<backend::HwTexture> getOneDepthTexture() const { return mDummyOneDepthTexture; }
+    backend::Handle<backend::HwTexture> getZeroTexture() const { return mDummyZeroTexture; }
+    backend::Handle<backend::HwTexture> getOneTextureArray() const { return mDummyOneTextureArray; }
+    backend::Handle<backend::HwTexture> getZeroTextureArray() const { return mDummyZeroTextureArray; }
+    backend::Handle<backend::HwTexture> getOneIntegerTextureArray() const { return mDummyOneIntegerTextureArray; }
+    backend::Handle<backend::HwTexture> getOneDepthTextureArray() const { return mDummyOneDepthTextureArray; }
 
 private:
     FEngine(Backend backend, Platform* platform, void* sharedGLContext);
@@ -345,22 +367,29 @@ private:
     int loop();
     void flushCommandBuffer(backend::CommandBufferQueue& commandBufferQueue);
 
-    template<typename T, typename L>
-    bool terminateAndDestroy(const T* p, ResourceList<T, L>& list);
+    template<typename T>
+    bool terminateAndDestroy(const T* p, ResourceList<T>& list);
 
-    template<typename T, typename L>
-    void cleanupResourceList(ResourceList<T, L>& list);
+    template<typename T, typename Lock>
+    bool terminateAndDestroyLocked(Lock& lock, const T* p, ResourceList<T>& list);
+
+    template<typename T>
+    void cleanupResourceList(ResourceList<T>&& list);
+
+    template<typename T, typename Lock>
+    void cleanupResourceListLocked(Lock& lock, ResourceList<T>&& list);
 
     backend::Driver* mDriver = nullptr;
+    backend::Handle<backend::HwRenderTarget> mDefaultRenderTarget;
 
     Backend mBackend;
     Platform* mPlatform = nullptr;
     bool mOwnPlatform = false;
     void* mSharedGLContext = nullptr;
-    bool mTerminated = false;
     backend::Handle<backend::HwRenderPrimitive> mFullScreenTriangleRph;
     FVertexBuffer* mFullScreenTriangleVb = nullptr;
     FIndexBuffer* mFullScreenTriangleIb = nullptr;
+    math::mat4f mUvFromClipMatrix;
 
     PostProcessManager mPostProcessManager;
 
@@ -375,7 +404,6 @@ private:
     ResourceList<FRenderer> mRenderers{ "Renderer" };
     ResourceList<FView> mViews{ "View" };
     ResourceList<FScene> mScenes{ "Scene" };
-    ResourceList<FFence, utils::LockingPolicy::SpinLock> mFences{"Fence"};
     ResourceList<FSwapChain> mSwapChains{ "SwapChain" };
     ResourceList<FStream> mStreams{ "Stream" };
     ResourceList<FIndexBuffer> mIndexBuffers{ "IndexBuffer" };
@@ -389,16 +417,22 @@ private:
     ResourceList<FColorGrading> mColorGradings{ "ColorGrading" };
     ResourceList<FRenderTarget> mRenderTargets{ "RenderTarget" };
 
+    // the fence list is accessed from multiple threads
+    utils::SpinLock mFenceListLock;
+    ResourceList<FFence> mFences{"Fence"};
+
     mutable uint32_t mMaterialId = 0;
 
     // FMaterialInstance are handled directly by FMaterial
     std::unordered_map<const FMaterial*, ResourceList<FMaterialInstance>> mMaterialInstances;
 
-    std::unique_ptr<DFG> mDFG;
+    DFG mDFG;
 
     std::thread mDriverThread;
     backend::CommandBufferQueue mCommandBufferQueue;
-    DriverApi mCommandStream;
+    std::aligned_storage<sizeof(DriverApi), alignof(DriverApi)>::type mDriverApiStorage;
+    static_assert( sizeof(mDriverApiStorage) >= sizeof(DriverApi) );
+
     uint32_t mFlushCounter = 0;
 
     LinearAllocatorArena mPerRenderPassAllocator;
@@ -419,12 +453,21 @@ private:
     mutable FIndirectLight* mDefaultIbl = nullptr;
 
     mutable FColorGrading* mDefaultColorGrading = nullptr;
+    FMorphTargetBuffer* mDummyMorphTargetBuffer = nullptr;
 
     mutable utils::CountDownLatch mDriverBarrier;
 
     mutable filaflat::ShaderBuilder mVertexShaderBuilder;
     mutable filaflat::ShaderBuilder mFragmentShaderBuilder;
     FDebugRegistry mDebugRegistry;
+
+    backend::Handle<backend::HwTexture> mDummyOneTexture;
+    backend::Handle<backend::HwTexture> mDummyOneDepthTexture;
+    backend::Handle<backend::HwTexture> mDummyOneTextureArray;
+    backend::Handle<backend::HwTexture> mDummyZeroTextureArray;
+    backend::Handle<backend::HwTexture> mDummyOneIntegerTextureArray;
+    backend::Handle<backend::HwTexture> mDummyOneDepthTextureArray;
+    backend::Handle<backend::HwTexture> mDummyZeroTexture;
 
     std::thread::id mMainThreadId{};
 
@@ -440,13 +483,6 @@ public:
             float dzn = -1.0f;
             float dzf =  1.0f;
         } shadowmap;
-        struct {
-            bool enabled = true;
-            int sampleCount = 7;
-            int spiralTurns = 1;
-            int kernelSize = 23;
-            float stddev = 8.0f;
-        } ssao;
         struct {
             bool camera_at_origin = true;
             struct {

@@ -25,6 +25,7 @@ set(DIST_HDRS
         ${PUBLIC_HDR_DIR}/${TARGET}/EntityInstance.h
         ${PUBLIC_HDR_DIR}/${TARGET}/EntityManager.h
         ${PUBLIC_HDR_DIR}/${TARGET}/FixedCapacityVector.h
+        ${PUBLIC_HDR_DIR}/${TARGET}/Invocable.h
         ${PUBLIC_HDR_DIR}/${TARGET}/Log.h
         ${PUBLIC_HDR_DIR}/${TARGET}/memalign.h
         ${PUBLIC_HDR_DIR}/${TARGET}/Mutex.h
@@ -32,6 +33,8 @@ set(DIST_HDRS
         ${PUBLIC_HDR_DIR}/${TARGET}/ostream.h
         ${PUBLIC_HDR_DIR}/${TARGET}/Panic.h
         ${PUBLIC_HDR_DIR}/${TARGET}/Path.h
+        ${PUBLIC_HDR_DIR}/${TARGET}/PrivateImplementation.h
+        ${PUBLIC_HDR_DIR}/${TARGET}/PrivateImplementation-impl.h
         ${PUBLIC_HDR_DIR}/${TARGET}/SingleInstanceComponentManager.h
         ${PUBLIC_HDR_DIR}/${TARGET}/Slice.h
         ${PUBLIC_HDR_DIR}/${TARGET}/SpinLock.h
@@ -68,6 +71,7 @@ set(SRCS
         src/sstream.cpp
         src/string.cpp
         src/Systrace.cpp
+        src/ThreadUtils.cpp
 )
 
 if (WIN32)
@@ -138,6 +142,7 @@ set(TEST_SRCS
         test/test_Entity.cpp
         test/test_FixedCapacityVector.cpp
         test/test_JobSystem.cpp
+        test/test_RangeMap.cpp
         test/test_StructureOfArrays.cpp
         test/test_sstream.cpp
         test/test_string.cpp
