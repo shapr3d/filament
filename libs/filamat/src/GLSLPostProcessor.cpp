@@ -62,7 +62,8 @@ std::string addMaybeUnusedToVariables(const std::string& mslShader) {
         "float2 shading_normalizedViewportCoord;",
         "float3 shading_clearCoatNormal;",
         "float filament_lodBias = frameUniforms.lodBias;",
-        "float3 bentNormal = param_8;"
+        "float3 bentNormal = param_8;",
+        "spvUnsafeArray<float2, 64> poissonDisk =",
     };
 
     constexpr std::string_view maybeUnused = "[[maybe_unused]] ";
