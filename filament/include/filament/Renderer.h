@@ -80,8 +80,8 @@ public:
         // refresh-rate of the display in Hz. set to 0 for offscreen or turn off frame-pacing.
         float refreshRate = 60.0f;
 
-        [[deprecated]] uint64_t presentationDeadlineNanos = 0;
-        [[deprecated]] uint64_t vsyncOffsetNanos = 0;
+        UTILS_DEPRECATED uint64_t presentationDeadlineNanos = 0;
+        UTILS_DEPRECATED uint64_t vsyncOffsetNanos = 0;
     };
 
     /**
@@ -117,13 +117,37 @@ public:
      * ClearOptions are used at the beginning of a frame to clear or retain the SwapChain content.
      */
     struct ClearOptions {
-        /** Color to use to clear the SwapChain */
+        /**
+         * Color (sRGB linear) to use to clear the RenderTarget (typically the SwapChain).
+         *
+         * The RenderTarget is cleared using this color, which won't be tone-mapped since
+         * tone-mapping is part of View rendering (this is not).
+         *
+         * When a View is rendered, there are 3 scenarios to consider:
+         * - Pixels rendered by the View replace the clear color (or blend with it in
+         *   `BlendMode::TRANSLUCENT` mode).
+         *
+         * - With blending mode set to `BlendMode::TRANSLUCENT`, Pixels untouched by the View
+         *   are considered fulling transparent and let the clear color show through.
+         *
+         * - With blending mode set to `BlendMode::OPAQUE`, Pixels untouched by the View
+         *   are set to the clear color. However, because it is now used in the context of a View,
+         *   it will go through the post-processing stage, which includes tone-mapping.
+         *
+         * For consistency, it is recommended to always use a Skybox to clear an opaque View's
+         * background, or to use black or fully-transparent (i.e. {0,0,0,0}) as the clear color.
+         */
         math::float4 clearColor = {};
+
+        /** Value to clear the stencil buffer */
+        uint8_t clearStencil = 0u;
+
         /**
          * Whether the SwapChain should be cleared using the clearColor. Use this if translucent
          * View will be drawn, for instance.
          */
         bool clear = false;
+
         /**
          * Whether the SwapChain content should be discarded. clear implies discard. Set this
          * to false (along with clear to false as well) if the SwapChain already has content that
@@ -148,6 +172,12 @@ public:
      * SwapChain content.
      */
     void setClearOptions(const ClearOptions& options);
+
+    /**
+     * Returns the ClearOptions currently set.
+     * @return A reference to a ClearOptions structure.
+     */
+    ClearOptions const& getClearOptions() const noexcept;
 
     /**
      * Get the Engine that created this Renderer.
@@ -554,6 +584,10 @@ public:
      * Performs garbage collection on the Engine
      */
     void engineGC();
+
+protected:
+    // prevent heap allocation
+    ~Renderer() = default;
 };
 
 } // namespace filament

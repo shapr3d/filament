@@ -29,7 +29,8 @@
 #include <filament/Options.h>
 #include <filament/TextureSampler.h>
 
-#include <private/filament/SibGenerator.h>
+#include <private/filament/EngineEnums.h>
+#include <private/filament/SibStructs.h>
 
 #include <math/mat4.h>
 
@@ -39,23 +40,19 @@ using namespace backend;
 using namespace math;
 
 PerViewUniforms::PerViewUniforms(FEngine& engine) noexcept
-        : mEngine(engine),
-          mSamplers(PerViewSib::SAMPLER_COUNT) {
+        : mSamplers(PerViewSib::SAMPLER_COUNT) {
     DriverApi& driver = engine.getDriverApi();
 
-    mSamplerGroupHandle = driver.createSamplerGroup(mSamplers.getSize());
+    mSamplerGroupHandle = driver.createSamplerGroup(
+            mSamplers.getSize(), utils::FixedSizeString<32>("Per-view samplers"));
 
     mUniformBufferHandle = driver.createBufferObject(mUniforms.getSize(),
             BufferObjectBinding::UNIFORM, BufferUsage::DYNAMIC);
 
-    // with a clip-space of [-w, w] ==> z' = -z
-    // with a clip-space of [0,  w] ==> z' = (w - z)/2
-    mClipControl = driver.getClipSpaceParams();
-
     if (engine.getDFG().isValid()) {
         TextureSampler sampler(TextureSampler::MagFilter::LINEAR);
         mSamplers.setSampler(PerViewSib::IBL_DFG_LUT,
-                engine.getDFG().getTexture(), sampler.getSamplerParams());
+                { engine.getDFG().getTexture(), sampler.getSamplerParams() });
     }
 }
 
@@ -64,13 +61,12 @@ void PerViewUniforms::terminate(DriverApi& driver) {
     driver.destroySamplerGroup(mSamplerGroupHandle);
 }
 
-void PerViewUniforms::prepareCamera(const CameraInfo& camera) noexcept {
+void PerViewUniforms::prepareCamera(FEngine& engine, const CameraInfo& camera) noexcept {
     mat4f const& viewFromWorld = camera.view;
     mat4f const& worldFromView = camera.model;
     mat4f const& clipFromView  = camera.projection;
 
     const mat4f viewFromClip{ inverse((mat4)camera.projection) };
-    const mat4f clipFromWorld{ highPrecisionMultiply(clipFromView, viewFromWorld) };
     const mat4f worldFromClip{ highPrecisionMultiply(worldFromView, viewFromClip) };
 
     auto& s = mUniforms.edit();
@@ -78,24 +74,31 @@ void PerViewUniforms::prepareCamera(const CameraInfo& camera) noexcept {
     s.worldFromViewMatrix = worldFromView;    // model
     s.clipFromViewMatrix  = clipFromView;     // projection
     s.viewFromClipMatrix  = viewFromClip;     // 1/projection
-    s.clipFromWorldMatrix = clipFromWorld;    // projection * view
     s.worldFromClipMatrix = worldFromClip;    // 1/(projection * view)
-    s.cameraPosition = float3{ camera.getPosition() };
-    s.worldOffset = camera.getWorldOffset();
+    s.userWorldFromWorldMatrix = mat4f(inverse(camera.worldTransform));
+    s.clipTransform = camera.clipTransform;
     s.cameraFar = camera.zf;
     s.oneOverFarMinusNear = 1.0f / (camera.zf - camera.zn);
     s.nearOverFarMinusNear = camera.zn / (camera.zf - camera.zn);
-    s.clipControl = mClipControl;
+
+    mat4f const& headFromWorld = camera.view;
+    Engine::Config const& config = engine.getConfig();
+    for (int i = 0; i < config.stereoscopicEyeCount; i++) {
+        mat4f const& eyeFromHead = camera.eyeFromView[i];   // identity for monoscopic rendering
+        mat4f const& clipFromEye = camera.eyeProjection[i];
+        // clipFromEye * eyeFromHead * headFromWorld
+        s.clipFromWorldMatrix[i] = highPrecisionMultiply(
+                clipFromEye, highPrecisionMultiply(eyeFromHead, headFromWorld));
+    }
+
+    // with a clip-space of [-w, w] ==> z' = -z
+    // with a clip-space of [0,  w] ==> z' = (w - z)/2
+    s.clipControl = engine.getDriverApi().getClipSpaceParams();
 }
 
-void PerViewUniforms::prepareUpscaler(math::float2 scale,
-        DynamicResolutionOptions const& options) noexcept {
+void PerViewUniforms::prepareLodBias(float bias) noexcept {
     auto& s = mUniforms.edit();
-    if (options.quality >= QualityLevel::HIGH) {
-        s.lodBias = std::log2(std::min(scale.x, scale.y));
-    } else {
-        s.lodBias = 0.0f;
-    }
+    s.lodBias = bias;
 }
 
 void PerViewUniforms::prepareExposure(float ev100) noexcept {
@@ -105,51 +108,109 @@ void PerViewUniforms::prepareExposure(float ev100) noexcept {
     s.ev100 = ev100;
 }
 
-void PerViewUniforms::prepareViewport(const filament::Viewport& viewport,
-        uint32_t xoffset, uint32_t yoffset) noexcept {
-    const float w = float(viewport.width);
-    const float h = float(viewport.height);
+void PerViewUniforms::prepareViewport(
+        const filament::Viewport& physicalViewport,
+        const filament::Viewport& logicalViewport) noexcept {
+    float4 const physical{ physicalViewport.left, physicalViewport.bottom,
+                           physicalViewport.width, physicalViewport.height };
+    float4 const logical{ logicalViewport.left, logicalViewport.bottom,
+                          logicalViewport.width, logicalViewport.height };
     auto& s = mUniforms.edit();
-    s.resolution = float4{ w, h, 1.0f / w, 1.0f / h };
-    s.origin = float2{ viewport.left, viewport.bottom };
-    s.offset = float2{ xoffset, yoffset };
+    s.resolution = { physical.zw, 1.0f / physical.zw };
+    s.logicalViewportScale = physical.zw / logical.zw;
+    s.logicalViewportOffset = -logical.xy / logical.zw;
 }
 
-void PerViewUniforms::prepareTime(math::float4 const& userTime) noexcept {
+void PerViewUniforms::prepareTime(FEngine& engine, math::float4 const& userTime) noexcept {
     auto& s = mUniforms.edit();
-    const uint64_t oneSecondRemainder = mEngine.getEngineTime().count() % 1000000000;
+    const uint64_t oneSecondRemainder = engine.getEngineTime().count() % 1000000000;
     const float fraction = float(double(oneSecondRemainder) / 1000000000.0);
     s.time = fraction;
     s.userTime = userTime;
 }
 
-void PerViewUniforms::prepareTemporalNoise(TemporalAntiAliasingOptions const& options) noexcept {
+void PerViewUniforms::prepareTemporalNoise(FEngine& engine,
+        TemporalAntiAliasingOptions const& options) noexcept {
+    std::uniform_real_distribution<float> uniformDistribution{ 0.0f, 1.0f };
     auto& s = mUniforms.edit();
-    const float temporalNoise = mUniformDistribution(mEngine.getRandomEngine());
+    const float temporalNoise = uniformDistribution(engine.getRandomEngine());
     s.temporalNoise = options.enabled ? temporalNoise : 0.0f;
 }
 
-void PerViewUniforms::prepareFog(float3 const& cameraPosition, FogOptions const& options) noexcept {
-    // this can't be too high because we need density / heightFalloff to produce something
-    // close to fogOptions.density in the fragment shader which use 16-bits floats.
-    constexpr float epsilon = 0.001f;
-    const float heightFalloff = std::max(epsilon, options.heightFalloff);
+void PerViewUniforms::prepareFog(FEngine& engine, const CameraInfo& cameraInfo,
+        mat4 const& userWorldFromFog, FogOptions const& options, FIndirectLight const* ibl) noexcept {
 
-    // precalculate the constant part of density  integral and correct for exp2() in the shader
-    const float density = ((options.density / heightFalloff) *
-            std::exp(-heightFalloff * (cameraPosition.y - options.height)))
-                    * float(1.0f / F_LN2);
+    auto packHalf2x16 = [](math::half2 v) -> uint32_t {
+        short2 s;
+        memcpy(&s[0], &v[0], sizeof(s));
+        return s.y << 16 | s.x;
+    };
+
+    // Fog should be calculated in the "user's world coordinates" so that it's not
+    // affected by the IBL rotation.
+    // fogFromWorldMatrix below is only used to transform the view vector in the shader, which is
+    // why we store the cofactor matrix.
+
+    mat4f const viewFromWorld       = cameraInfo.view;
+    mat4 const worldFromUserWorld   = cameraInfo.worldTransform;
+    mat4 const worldFromFog         = worldFromUserWorld * userWorldFromFog;
+    mat4 const viewFromFog          = viewFromWorld * worldFromFog;
+
+    mat4 const fogFromView          = inverse(viewFromFog);
+    mat3 const fogFromWorld         = inverse(worldFromFog.upperLeft());
+
+    // camera position relative to the fog's origin
+    auto const userCameraPosition = fogFromView[3].xyz;
+
+    const float heightFalloff = std::max(0.0f, options.heightFalloff);
+
+    // precalculate the constant part of density integral
+    const float density = -float(heightFalloff * (userCameraPosition.y - options.height));
 
     auto& s = mUniforms.edit();
+
+    // note: this code is written so that near/far/minLod/maxLod could be user settable
+    //       currently they're inferred.
+    Handle<HwTexture> fogColorTextureHandle;
+    if (options.skyColor) {
+        fogColorTextureHandle = downcast(options.skyColor)->getHwHandle();
+        math::half2 const minMaxMip{ 0.0f, float(options.skyColor->getLevels()) - 1.0f };
+        s.fogMinMaxMip = packHalf2x16(minMaxMip);
+        s.fogOneOverFarMinusNear = 1.0f / (cameraInfo.zf - cameraInfo.zn);
+        s.fogNearOverFarMinusNear = cameraInfo.zn / (cameraInfo.zf - cameraInfo.zn);
+    }
+    if (!fogColorTextureHandle && options.fogColorFromIbl) {
+        if (ibl) {
+            // When using the IBL, because we don't have mip levels, we don't have a mop to
+            // select based on the distance. However, we can cheat a little and use
+            // mip_roughnessOne-1 as the horizon base color and mip_roughnessOne as the near
+            // camera base color. This will give a distant fog that's a bit too sharp, but it
+            // improves the effect overall.
+            fogColorTextureHandle = ibl->getReflectionHwHandle();
+            float const levelCount = float(ibl->getLevelCount());
+            math::half2 const minMaxMip{ levelCount - 2.0f, levelCount - 1.0f };
+            s.fogMinMaxMip = packHalf2x16(minMaxMip);
+            s.fogOneOverFarMinusNear = 1.0f / (cameraInfo.zf - cameraInfo.zn);
+            s.fogNearOverFarMinusNear = cameraInfo.zn / (cameraInfo.zf - cameraInfo.zn);
+        }
+    }
+
+    mSamplers.setSampler(PerViewSib::FOG, {
+            fogColorTextureHandle ? fogColorTextureHandle : engine.getDummyCubemap()->getHwHandle(), {
+                    .filterMag = SamplerMagFilter::LINEAR,
+                    .filterMin = SamplerMinFilter::LINEAR_MIPMAP_LINEAR
+            }});
+
     s.fogStart             = options.distance;
     s.fogMaxOpacity        = options.maximumOpacity;
-    s.fogHeight            = options.height;
     s.fogHeightFalloff     = heightFalloff;
+    s.fogCutOffDistance    = options.cutOffDistance;
     s.fogColor             = options.color;
-    s.fogDensity           = density;
+    s.fogDensity           = { options.density, density, options.density * std::exp(density) };
     s.fogInscatteringStart = options.inScatteringStart;
     s.fogInscatteringSize  = options.inScatteringSize;
-    s.fogColorFromIbl      = options.fogColorFromIbl ? 1.0f : 0.0f;
+    s.fogColorFromIbl      = fogColorTextureHandle ? 1.0f : 0.0f;
+    s.fogFromWorldMatrix   = mat3f{ cof(fogFromWorld) };
 }
 
 void PerViewUniforms::prepareSSAO(Handle<HwTexture> ssao,
@@ -160,15 +221,15 @@ void PerViewUniforms::prepareSSAO(Handle<HwTexture> ssao,
             && options.resolution < 1.0f;
 
     // LINEAR filtering is only needed when AO is enabled and low-quality upsampling is used.
-    mSamplers.setSampler(PerViewSib::SSAO, ssao, {
+    mSamplers.setSampler(PerViewSib::SSAO, { ssao, {
         .filterMag = options.enabled && !highQualitySampling ?
                 SamplerMagFilter::LINEAR : SamplerMagFilter::NEAREST
-    });
+    }});
 
     const float edgeDistance = 1.0f / options.bilateralThreshold;
     auto& s = mUniforms.edit();
     s.aoSamplingQualityAndEdgeDistance =
-            options.enabled && highQualitySampling ? edgeDistance : 0.0f;
+            options.enabled ? (highQualitySampling ? edgeDistance : 0.0f) : -1.0f;
     s.aoBentNormals = options.enabled && options.bentNormals ? 1.0f : 0.0f;
 }
 
@@ -176,18 +237,27 @@ void PerViewUniforms::prepareBlending(bool needsAlphaChannel) noexcept {
     mUniforms.edit().needsAlphaChannel = needsAlphaChannel ? 1.0f : 0.0f;
 }
 
+void PerViewUniforms::prepareMaterialGlobals(
+        std::array<math::float4, 4> const& materialGlobals) noexcept {
+    mUniforms.edit().custom[0] = materialGlobals[0];
+    mUniforms.edit().custom[1] = materialGlobals[1];
+    mUniforms.edit().custom[2] = materialGlobals[2];
+    mUniforms.edit().custom[3] = materialGlobals[3];
+}
+
 void PerViewUniforms::prepareSSR(Handle<HwTexture> ssr,
+        bool disableSSR,
         float refractionLodOffset,
         ScreenSpaceReflectionsOptions const& ssrOptions) noexcept {
 
-    mSamplers.setSampler(PerViewSib::SSR, ssr, {
+    mSamplers.setSampler(PerViewSib::SSR, { ssr, {
         .filterMag = SamplerMagFilter::LINEAR,
         .filterMin = SamplerMinFilter::LINEAR_MIPMAP_LINEAR
-    });
+    }});
 
     auto& s = mUniforms.edit();
     s.refractionLodOffset = refractionLodOffset;
-    s.ssrDistance = ssrOptions.enabled ? ssrOptions.maxDistance : 0.0f;
+    s.ssrDistance = (ssrOptions.enabled && !disableSSR) ? ssrOptions.maxDistance : 0.0f;
 }
 
 void PerViewUniforms::prepareHistorySSR(Handle<HwTexture> ssr,
@@ -195,10 +265,10 @@ void PerViewUniforms::prepareHistorySSR(Handle<HwTexture> ssr,
         math::mat4f const& uvFromViewMatrix,
         ScreenSpaceReflectionsOptions const& ssrOptions) noexcept {
 
-    mSamplers.setSampler(PerViewSib::SSR, ssr, {
+    mSamplers.setSampler(PerViewSib::SSR, { ssr, {
         .filterMag = SamplerMagFilter::LINEAR,
         .filterMin = SamplerMinFilter::LINEAR
-    });
+    }});
 
     auto& s = mUniforms.edit();
     s.ssrReprojection = historyProjection;
@@ -211,15 +281,20 @@ void PerViewUniforms::prepareHistorySSR(Handle<HwTexture> ssr,
 
 void PerViewUniforms::prepareStructure(Handle<HwTexture> structure) noexcept {
     // sampler must be NEAREST
-    mSamplers.setSampler(PerViewSib::STRUCTURE, structure, {});
+    mSamplers.setSampler(PerViewSib::STRUCTURE, { structure, {}});
 }
 
-void PerViewUniforms::prepareDirectionalLight(
+void PerViewUniforms::prepareDirectionalLight(FEngine& engine,
         float exposure,
         float3 const& sceneSpaceDirection,
         PerViewUniforms::LightManagerInstance directionalLight) noexcept {
-    FLightManager& lcm = mEngine.getLightManager();
+    FLightManager const& lcm = engine.getLightManager();
     auto& s = mUniforms.edit();
+
+    float const shadowFar = lcm.getShadowFar(directionalLight);
+    // TODO: make the falloff rate a parameter
+    s.shadowFarAttenuationParams = shadowFar > 0.0f ?
+            0.5f * float2{ 10.0f, 10.0f / (shadowFar * shadowFar) } : float2{ 1.0f, 0.0f };
 
     const float3 l = -sceneSpaceDirection; // guaranteed normalized
 
@@ -235,11 +310,11 @@ void PerViewUniforms::prepareDirectionalLight(
         // The last parameter must be < 0.0f for regular directional lights
         float4 sun{ 0.0f, 0.0f, 0.0f, -1.0f };
         if (UTILS_UNLIKELY(isSun && colorIntensity.w > 0.0f)) {
-            // currently we have only a single directional light, so it's probably likely that it's
+            // Currently we have only a single directional light, so it's probably likely that it's
             // also the Sun. However, conceptually, most directional lights won't be sun lights.
-            float radius = lcm.getSunAngularRadius(directionalLight);
-            float haloSize = lcm.getSunHaloSize(directionalLight);
-            float haloFalloff = lcm.getSunHaloFalloff(directionalLight);
+            float const radius = lcm.getSunAngularRadius(directionalLight);
+            float const haloSize = lcm.getSunHaloSize(directionalLight);
+            float const haloFalloff = lcm.getSunHaloFalloff(directionalLight);
             sun.x = std::cos(radius);
             sun.y = std::sin(radius);
             sun.z = 1.0f / (std::cos(radius * haloSize) - sun.x);
@@ -260,13 +335,12 @@ void PerViewUniforms::prepareIblLight(const IblOptions& options) noexcept {
     s.iblTintAndIntensity = options.iblTintAndIntensity;
 }
 
-void PerViewUniforms::prepareAmbientLight(FIndirectLight const& ibl,
+void PerViewUniforms::prepareAmbientLight(FEngine& engine, FIndirectLight const& ibl,
         float intensity, float exposure) noexcept {
-    auto& engine = mEngine;
     auto& s = mUniforms.edit();
 
     // Set up uniforms and sampler for the IBL, guaranteed to be non-null at this point.
-    float iblRoughnessOneLevel = ibl.getLevelCount() - 1.0f;
+    float const iblRoughnessOneLevel = ibl.getLevelCount() - 1.0f;
     s.iblRoughnessOneLevel = iblRoughnessOneLevel;
     s.iblLuminance = intensity * exposure;
     s.iblRotation = math::mat4f(ibl.getRotation());
@@ -289,22 +363,21 @@ void PerViewUniforms::prepareAmbientLight(FIndirectLight const& ibl,
 void PerViewUniforms::prepareDynamicLights(Froxelizer& froxelizer) noexcept {
     auto& s = mUniforms.edit();
     froxelizer.updateUniforms(s);
-    float f = froxelizer.getLightFar();
-    mSamplers.setSampler(PerViewSib::FROXELS, { froxelizer.getFroxelTexture() });
+    float const f = froxelizer.getLightFar();
+    // TODO: make the falloff rate a parameter
     s.lightFarAttenuationParams = 0.5f * float2{ 10.0f, 10.0f / (f * f) };
 }
 
-void PerViewUniforms::prepareShadowMapping() noexcept {
+void PerViewUniforms::prepareShadowMapping(bool highPrecision) noexcept {
     auto& s = mUniforms.edit();
-    s.vsmExponent = 5.54f;  // fp16: max 5.54f, fp32: max 42.0
+    constexpr float low  = 5.54f; // ~ std::log(std::numeric_limits<math::half>::max()) * 0.5f;
+    constexpr float high = 42.0f; // ~ std::log(std::numeric_limits<float>::max()) * 0.5f;
+    s.vsmExponent = highPrecision ? high : low;
 }
 
 void PerViewUniforms::prepareShadowSampling(PerViewUib& uniforms,
         ShadowMappingUniforms const& shadowMappingUniforms) noexcept {
-    uniforms.lightFromWorldMatrix       = shadowMappingUniforms.lightFromWorldMatrix;
     uniforms.cascadeSplits              = shadowMappingUniforms.cascadeSplits;
-    uniforms.shadowBulbRadiusLs         = shadowMappingUniforms.shadowBulbRadiusLs;
-    uniforms.shadowBias                 = shadowMappingUniforms.shadowBias;
     uniforms.ssContactShadowDistance    = shadowMappingUniforms.ssContactShadowDistance;
     uniforms.directionalShadows         = shadowMappingUniforms.directionalShadows;
     uniforms.cascades                   = shadowMappingUniforms.cascades;
@@ -313,6 +386,8 @@ void PerViewUniforms::prepareShadowSampling(PerViewUib& uniforms,
 void PerViewUniforms::prepareShadowVSM(Handle<HwTexture> texture,
         ShadowMappingUniforms const& shadowMappingUniforms,
         VsmShadowOptions const& options) noexcept {
+    constexpr float low  = 5.54f; // ~ std::log(std::numeric_limits<math::half>::max()) * 0.5f;
+    constexpr float high = 42.0f; // ~ std::log(std::numeric_limits<float>::max()) * 0.5f;
     SamplerMinFilter filterMin = SamplerMinFilter::LINEAR;
     if (options.anisotropy > 0 || options.mipmapping) {
         filterMin = SamplerMinFilter::LINEAR_MIPMAP_LINEAR;
@@ -324,8 +399,8 @@ void PerViewUniforms::prepareShadowVSM(Handle<HwTexture> texture,
                     .anisotropyLog2 = options.anisotropy,
             }});
     auto& s = mUniforms.edit();
-    s.shadowSamplingType = SHADOW_SAMPLING_RUNTIME_VSM;
-    s.vsmExponent = 5.54f;  // fp16: max 5.54f, fp32: max 42.0
+    s.shadowSamplingType = SHADOW_SAMPLING_RUNTIME_EVSM;
+    s.vsmExponent = options.highPrecision ? high : low;
     s.vsmDepthScale = options.minVarianceScale * 0.01f * s.vsmExponent;
     s.vsmLightBleedReduction = options.lightBleedReduction;
     PerViewUniforms::prepareShadowSampling(s, shadowMappingUniforms);
@@ -365,18 +440,29 @@ void PerViewUniforms::prepareShadowPCSS(Handle<HwTexture> texture,
     PerViewUniforms::prepareShadowSampling(s, shadowMappingUniforms);
 }
 
+void PerViewUniforms::prepareShadowPCFDebug(Handle<HwTexture> texture,
+        ShadowMappingUniforms const& shadowMappingUniforms) noexcept {
+    mSamplers.setSampler(PerViewSib::SHADOW_MAP, { texture, {
+            .filterMag = SamplerMagFilter::NEAREST,
+            .filterMin = SamplerMinFilter::NEAREST
+    }});
+    auto& s = mUniforms.edit();
+    s.shadowSamplingType = SHADOW_SAMPLING_RUNTIME_PCF;
+    PerViewUniforms::prepareShadowSampling(s, shadowMappingUniforms);
+}
+
 void PerViewUniforms::commit(backend::DriverApi& driver) noexcept {
     if (mUniforms.isDirty()) {
         driver.updateBufferObject(mUniformBufferHandle, mUniforms.toBufferDescriptor(driver), 0);
     }
     if (mSamplers.isDirty()) {
-        driver.updateSamplerGroup(mSamplerGroupHandle, std::move(mSamplers.toCommandStream()));
+        driver.updateSamplerGroup(mSamplerGroupHandle, mSamplers.toBufferDescriptor(driver));
     }
 }
 
 void PerViewUniforms::bind(backend::DriverApi& driver) noexcept {
-    driver.bindUniformBuffer(BindingPoints::PER_VIEW, mUniformBufferHandle);
-    driver.bindSamplers(BindingPoints::PER_VIEW, mSamplerGroupHandle);
+    driver.bindUniformBuffer(+UniformBindingPoints::PER_VIEW, mUniformBufferHandle);
+    driver.bindSamplers(+SamplerBindingPoints::PER_VIEW, mSamplerGroupHandle);
 }
 
 void PerViewUniforms::unbindSamplers() noexcept {

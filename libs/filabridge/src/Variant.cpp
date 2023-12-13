@@ -16,33 +16,43 @@
 
 #include <private/filament/Variant.h>
 
+#include <array>
+
 namespace filament {
 
 Variant Variant::filterUserVariant(
         Variant variant, UserVariantFilterMask filterMask) noexcept {
     // these are easy to filter by just removing the corresponding bit
     if (filterMask & (uint32_t)UserVariantFilterBit::DIRECTIONAL_LIGHTING) {
-        variant.key &= ~(filterMask & DIR);
+        variant.key &= ~DIR;
     }
     if (filterMask & (uint32_t)UserVariantFilterBit::DYNAMIC_LIGHTING) {
-        variant.key &= ~(filterMask & DYN);
+        variant.key &= ~DYN;
     }
     if (filterMask & (uint32_t)UserVariantFilterBit::SKINNING) {
-        variant.key &= ~(filterMask & SKN);
+        variant.key &= ~SKN;
+    }
+    if (filterMask & (uint32_t)UserVariantFilterBit::STE) {
+        variant.key &= ~(filterMask & STE);
     }
     if (!isValidDepthVariant(variant)) {
         // we can't remove FOG from depth variants, this would, in fact, remove picking
         if (filterMask & (uint32_t)UserVariantFilterBit::FOG) {
-            variant.key &= ~(filterMask & FOG);
+            variant.key &= ~FOG;
+        }
+    } else {
+        // depth variants can have their VSM bit filtered
+        if (filterMask & (uint32_t)UserVariantFilterBit::VSM) {
+            variant.key &= ~VSM;
         }
     }
     if (!isSSRVariant(variant)) {
         // SSR variant needs to be handled separately
         if (filterMask & (uint32_t)UserVariantFilterBit::SHADOW_RECEIVER) {
-            variant.key &= ~(filterMask & SRE);
+            variant.key &= ~SRE;
         }
         if (filterMask & (uint32_t)UserVariantFilterBit::VSM) {
-            variant.key &= ~(filterMask & VSM);
+            variant.key &= ~VSM;
         }
     } else {
         // see if we need to filter out the SSR variants
@@ -53,17 +63,51 @@ Variant Variant::filterUserVariant(
     return variant;
 }
 
-
-
 namespace details {
 
-// compile time sanity-check tests
+// Compile-time variant count for lit and unlit
+constexpr inline size_t variant_count(bool lit) noexcept {
+    size_t count = 0;
+    for (size_t i = 0; i < VARIANT_COUNT; i++) {
+        Variant variant(i);
+        if (!Variant::isValid(variant)) {
+            continue;
+        }
+        variant = Variant::filterVariant(variant, lit);
+        if (i == variant.key) {
+            count++;
+        }
+    }
+    return count;
+}
 
+// Compile-time variant list for lit and unlit
+template<bool LIT>
+constexpr auto get_variants() noexcept {
+    std::array<Variant, variant_count(LIT)> variants;
+    size_t count = 0;
+    for (size_t i = 0; i < VARIANT_COUNT; i++) {
+        Variant variant(i);
+        if (Variant::isReserved(variant)) {
+            continue;
+        }
+        variant = Variant::filterVariant(variant, LIT);
+        if (i == variant.key) {
+            variants[count++] = variant;
+        }
+    }
+    return variants;
+}
+static auto const gLitVariants{ details::get_variants<true>() };
+static auto const gUnlitVariants{ details::get_variants<false>() };
+
+
+// Below are compile time sanity-check tests
 constexpr inline bool reserved_is_not_valid() noexcept {
-    for (Variant::type_t i = 0; i < VARIANT_COUNT; i++) {
+    for (size_t i = 0; i < VARIANT_COUNT; i++) {
         const Variant variant(i);
-        bool is_valid = Variant::isValid(variant);
-        bool is_reserved = Variant::isReserved(variant);
+        bool const is_valid = Variant::isValid(variant);
+        bool const is_reserved = Variant::isReserved(variant);
         if (is_valid == is_reserved) {
             return false;
         }
@@ -73,7 +117,7 @@ constexpr inline bool reserved_is_not_valid() noexcept {
 
 constexpr inline size_t reserved_variant_count() noexcept {
     size_t count = 0;
-    for (Variant::type_t i = 0; i < VARIANT_COUNT; i++) {
+    for (size_t i = 0; i < VARIANT_COUNT; i++) {
         const Variant variant(i);
         if (Variant::isReserved(variant)) {
             count++;
@@ -84,7 +128,7 @@ constexpr inline size_t reserved_variant_count() noexcept {
 
 constexpr inline size_t valid_variant_count() noexcept {
     size_t count = 0;
-    for (Variant::type_t i = 0; i < VARIANT_COUNT; i++) {
+    for (size_t i = 0; i < VARIANT_COUNT; i++) {
         const Variant variant(i);
         if (Variant::isValid(variant)) {
             count++;
@@ -95,7 +139,7 @@ constexpr inline size_t valid_variant_count() noexcept {
 
 constexpr inline size_t vertex_variant_count() noexcept {
     size_t count = 0;
-    for (Variant::type_t i = 0; i < VARIANT_COUNT; i++) {
+    for (size_t i = 0; i < VARIANT_COUNT; i++) {
         const Variant variant(i);
         if (Variant::isValid(variant)) {
             if (Variant::isVertexVariant(variant)) {
@@ -108,7 +152,7 @@ constexpr inline size_t vertex_variant_count() noexcept {
 
 constexpr inline size_t fragment_variant_count() noexcept {
     size_t count = 0;
-    for (Variant::type_t i = 0; i < VARIANT_COUNT; i++) {
+    for (size_t i = 0; i < VARIANT_COUNT; i++) {
         const Variant variant(i);
         if (Variant::isValid(variant)) {
             if (Variant::isFragmentVariant(variant)) {
@@ -120,11 +164,24 @@ constexpr inline size_t fragment_variant_count() noexcept {
 }
 
 static_assert(reserved_is_not_valid());
-static_assert(reserved_variant_count() == 80);
-static_assert(valid_variant_count() == 48);
-static_assert(vertex_variant_count() == 16 - (2 + 0) + 4 - 0);        // 18
+static_assert(reserved_variant_count() == 160);
+static_assert(valid_variant_count() == 96);
+static_assert(vertex_variant_count() == 32 - (4 + 0) + 8 - 0);        // 36
 static_assert(fragment_variant_count() == 33 - (2 + 2 + 8) + 4 - 1);    // 24
 
 } // namespace details
+
+
+namespace VariantUtils {
+
+utils::Slice<Variant> getLitVariants() noexcept {
+    return { details::gLitVariants.data(), details::gLitVariants.size() };
+}
+
+utils::Slice<Variant> getUnlitVariants() noexcept {
+    return { details::gUnlitVariants.data(), details::gUnlitVariants.size() };
+}
+
+}; // VariantUtils
 
 } // namespace filament

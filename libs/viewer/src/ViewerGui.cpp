@@ -218,6 +218,9 @@ static void computeToneMapPlot(ColorGradingSettings& settings, float* plot) {
         case ToneMapping::FILMIC:
             mapper = new FilmicToneMapper;
             break;
+        case ToneMapping::AGX:
+            mapper = new AgxToneMapper(settings.agxToneMapper.look);
+            break;
         case ToneMapping::GENERIC:
             mapper = new GenericToneMapper(
                     settings.genericToneMapper.contrast,
@@ -272,9 +275,13 @@ static void colorGradingUI(Settings& settings, float* rangePlot, float* curvePlo
         ImGui::Combo("Quality##colorGradingQuality", &quality, "Low\0Medium\0High\0Ultra\0\0");
         colorGrading.quality = (decltype(colorGrading.quality)) quality;
 
+        int colorspace = (colorGrading.colorspace == Rec709-Linear-D65) ? 0 : 1;
+        ImGui::Combo("Output color space", &colorspace, "Rec709-Linear-D65\0Rec709-sRGB-D65\0\0");
+        colorGrading.colorspace = (colorspace == 0) ? Rec709-Linear-D65 : Rec709-sRGB-D65;
+
         int toneMapping = (int) colorGrading.toneMapping;
         ImGui::Combo("Tone-mapping", &toneMapping,
-                "Linear\0ACES (legacy)\0ACES\0Filmic\0Generic\0Display Range\0\0");
+                "Linear\0ACES (legacy)\0ACES\0Filmic\0AgX\0Generic\0Display Range\0\0");
         colorGrading.toneMapping = (decltype(colorGrading.toneMapping)) toneMapping;
         if (colorGrading.toneMapping == ToneMapping::GENERIC) {
             if (ImGui::CollapsingHeader("Tonemap parameters")) {
@@ -284,6 +291,11 @@ static void colorGradingUI(Settings& settings, float* rangePlot, float* curvePlo
                 ImGui::SliderFloat("Mid-gray out##genericToneMapper", &generic.midGrayOut, 0.0f, 1.0f);
                 ImGui::SliderFloat("HDR max", &generic.hdrMax, 1.0f, 64.0f);
             }
+        }
+        if (colorGrading.toneMapping == ToneMapping::AGX) {
+            int agxLook = (int) colorGrading.agxToneMapper.look;
+            ImGui::Combo("AgX Look", &agxLook, "None\0Punchy\0Golden\0\0");
+            colorGrading.agxToneMapper.look = (decltype(colorGrading.agxToneMapper.look)) agxLook;
         }
 
         computeToneMapPlot(colorGrading, toneMapPlot);
@@ -463,9 +475,9 @@ ViewerGui::ViewerGui(filament::Engine* engine, filament::Scene* scene, filament:
         .intensity(mSettings.lighting.sunlightIntensity)
         .direction(normalize(mSettings.lighting.sunlightDirection))
         .castShadows(true)
-        .sunAngularRadius(1.0f)
-        .sunHaloSize(2.0f)
-        .sunHaloFalloff(80.0f)
+        .sunAngularRadius(mSettings.lighting.sunlightAngularRadius)
+        .sunHaloSize(mSettings.lighting.sunlightHaloSize)
+        .sunHaloFalloff(mSettings.lighting.sunlightHaloFalloff)
         .build(*engine, mSunlight);
     if (mSettings.lighting.enableSunlight) {
         mScene->addEntity(mSunlight);
@@ -486,25 +498,28 @@ ViewerGui::~ViewerGui() {
     delete mImGuiHelper;
 }
 
-void ViewerGui::setAsset(FilamentAsset* asset,  FilamentInstance* instanceToAnimate) {
-    if (mAsset != asset) {
+void ViewerGui::setAsset(FilamentAsset* asset, FilamentInstance* instance) {
+    if (mInstance != instance || mAsset != asset) {
         removeAsset();
+
+        // We keep a non-const reference to the asset for popRenderables and getWireframe.
         mAsset = asset;
+        mInstance = instance;
+
         mVisibleScenes.reset();
         mVisibleScenes.set(0);
         mCurrentCamera = 0;
-        if (!asset) {
-            mAnimator = nullptr;
+        if (!mAsset) {
+            mAsset = nullptr;
+            mInstance = nullptr;
             return;
         }
-        mAnimator = instanceToAnimate ? instanceToAnimate->getAnimator() : asset->getAnimator();
-        assert_invariant(mAnimator && "Call loadResources or asyncBeginLoad before setAsset.");
         updateRootTransform();
         mScene->addEntities(asset->getLightEntities(), asset->getLightEntityCount());
-        auto& tcm = mEngine->getRenderableManager();
+        auto& rcm = mEngine->getRenderableManager();
         for (size_t i = 0, n = asset->getRenderableEntityCount(); i < n; i++) {
-            auto ri = tcm.getInstance(asset->getRenderableEntities()[i]);
-            tcm.setScreenSpaceContactShadows(ri, true);
+            auto ri = rcm.getInstance(asset->getRenderableEntities()[i]);
+            rcm.setScreenSpaceContactShadows(ri, true);
         }
     }
 }
@@ -521,8 +536,17 @@ void ViewerGui::removeAsset() {
     if (!isRemoteMode()) {
         mScene->removeEntities(mAsset->getEntities(), mAsset->getEntityCount());
         mAsset = nullptr;
-        mAnimator = nullptr;
     }
+}
+
+UTILS_NOINLINE
+static bool notequal(float a, float b) noexcept {
+    return a != b;
+}
+
+// we do this to circumvent -ffast-math ignoring NaNs
+static bool is_not_a_number(float v) noexcept {
+    return notequal(v, v);
 }
 
 void ViewerGui::setIndirectLight(filament::IndirectLight* ibl,
@@ -539,13 +563,14 @@ void ViewerGui::setIndirectLight(filament::IndirectLight* ibl,
 void ViewerGui::setSunlightFromIbl() {
     using namespace filament::math;
     if (mIbl && mSh3) {
-        float3 d = filament::IndirectLight::getDirectionEstimate(mSh3);
-        float4 c = filament::IndirectLight::getColorEstimate(mSh3, d);
-        if (!std::isnan(d.x * d.y * d.z)) {
+        float3 const d = filament::IndirectLight::getDirectionEstimate(mSh3);
+        float4 const c = filament::IndirectLight::getColorEstimate(mSh3, d);
+        bool const dIsValid = std::none_of(std::begin(d.v), std::end(d.v), is_not_a_number);
+        bool const cIsValid = std::none_of(std::begin(c.v), std::end(c.v), is_not_a_number);
+        if (dIsValid && cIsValid) {
             mSettings.lighting.sunlightDirection = mIbl->getRotation() * d;
             mSettings.lighting.sunlightColor = c.rgb;
             mSettings.lighting.sunlightIntensity = c[3] * mIbl->getIntensity();
-            updateIndirectLight();
         }
     }
 }
@@ -558,22 +583,12 @@ void ViewerGui::updateRootTransform() {
     auto root = tcm.getInstance(mAsset->getRoot());
     filament::math::mat4f transform;
     if (mSettings.viewer.autoScaleEnabled) {
-        transform = fitIntoUnitCube(mAsset->getBoundingBox(), 4);
+        FilamentInstance* instance = mAsset->getInstance();
+        Aabb aabb = instance ? instance->getBoundingBox() : mAsset->getBoundingBox();
+        transform = fitIntoUnitCube(aabb, 4);
     }
     transform *= filament::math::mat4f::rotation(filament::math::F_PI_2, filament::math::vec3<float>(-1, 0, 0));
     tcm.setTransform(root, transform);
-}
-
-void ViewerGui::updateIndirectLight() {
-    using namespace filament::math;
-    if (mIndirectLight) {
-        mIndirectLight->setIntensity(mSettings.lighting.iblIntensity);
-        mIndirectLight->setRotation(mat3f::rotation(mSettings.lighting.iblRotation, float3{ 0, 1, 0 }));
-    }
-    if (mScene->getSkybox()) {
-        mScene->getSkybox()->setIntensity(mSettings.lighting.skyIntensity);
-        mScene->getSkybox()->setType(mSettings.lighting.skyboxType);
-    }
 }
 
 void ViewerGui::sceneSelectionUI() {
@@ -604,24 +619,38 @@ void ViewerGui::sceneSelectionUI() {
     }
 }
 
-void ViewerGui::applyAnimation(double currentTime) {
+void ViewerGui::applyAnimation(double currentTime, FilamentInstance* instance) {
+    instance = instance ? instance : mInstance;
     assert_invariant(!isRemoteMode());
-    static double startTime = 0;
-    const size_t numAnimations = mAnimator->getAnimationCount();
+    if (instance == nullptr) {
+        return;
+    }
+    Animator& animator = *instance->getAnimator();
+    const size_t animationCount = animator.getAnimationCount();
     if (mResetAnimation) {
-        startTime = currentTime;
-        for (size_t i = 0; i < numAnimations; i++) {
-            mAnimator->applyAnimation(i, 0);
-        }
+        mPreviousStartTime = mCurrentStartTime;
+        mCurrentStartTime = currentTime;
         mResetAnimation = false;
     }
-    if (numAnimations > 0 && mCurrentAnimation > 0) {
-        mAnimator->applyAnimation(mCurrentAnimation - 1, currentTime - startTime);
+    const double elapsedSeconds = currentTime - mCurrentStartTime;
+    if (animationCount > 0 && mCurrentAnimation >= 0) {
+        if (mCurrentAnimation == animationCount) {
+            for (size_t i = 0; i < animationCount; i++) {
+                animator.applyAnimation(i, elapsedSeconds);
+            }
+        } else {
+            animator.applyAnimation(mCurrentAnimation, elapsedSeconds);
+        }
+        if (elapsedSeconds < mCrossFadeDuration && mPreviousAnimation >= 0 && mPreviousAnimation != animationCount) {
+            const double previousSeconds = currentTime - mPreviousStartTime;
+            const float lerpFactor = elapsedSeconds / mCrossFadeDuration;
+            animator.applyCrossFade(mPreviousAnimation, previousSeconds, lerpFactor);
+        }
     }
     if (mShowingRestPose) {
-        mAnimator->resetBoneMatrices();
+        animator.resetBoneMatrices();
     } else {
-        mAnimator->updateBoneMatrices();
+        animator.updateBoneMatrices();
     }
 }
 
@@ -1386,8 +1415,6 @@ void ViewerGui::updateUserInterface() {
             ImGui::Checkbox("Dithering", &dither);
             enableDithering(dither);
             ImGui::Checkbox("Bloom", &mSettings.view.bloom.enabled);
-            ImGui::Checkbox("Flare", &mSettings.view.bloom.lensFlare);
-
             ImGui::Checkbox("TAA", &mSettings.view.taa.enabled);
             // this clutters the UI and isn't that useful (except when working on TAA)
             //ImGui::Indent();
@@ -1406,12 +1433,34 @@ void ViewerGui::updateUserInterface() {
         ImGui::Unindent();
 
         ImGui::Checkbox("SSAO", &mSettings.view.ssao.enabled);
-        if (ImGui::CollapsingHeader("SSAO Options")) {
-            auto& ssao = mSettings.view.ssao;
 
-            int quality = (int) ssao.quality;
-            int lowpass = (int) ssao.lowPassFilter;
-            bool upsampling = ssao.upsampling != View::QualityLevel::LOW;
+        ImGui::Checkbox("Screen-space reflections", &mSettings.view.screenSpaceReflections.enabled);
+        ImGui::Unindent();
+
+        ImGui::Checkbox("Screen-space Guard Band", &mSettings.view.guardBand.enabled);
+    }
+
+    if (ImGui::CollapsingHeader("Bloom Options")) {
+        ImGui::SliderFloat("Strength", &mSettings.view.bloom.strength, 0.0f, 1.0f);
+        ImGui::Checkbox("Threshold", &mSettings.view.bloom.threshold);
+
+        int levels = mSettings.view.bloom.levels;
+        ImGui::SliderInt("Levels", &levels, 3, 11);
+        mSettings.view.bloom.levels = levels;
+
+        int quality = (int) mSettings.view.bloom.quality;
+        ImGui::SliderInt("Bloom Quality", &quality, 0, 3);
+        mSettings.view.bloom.quality = (View::QualityLevel) quality;
+
+        ImGui::Checkbox("Lens Flare", &mSettings.view.bloom.lensFlare);
+    }
+
+    if (ImGui::CollapsingHeader("SSAO Options")) {
+        auto& ssao = mSettings.view.ssao;
+
+        int quality = (int) ssao.quality;
+        int lowpass = (int) ssao.lowPassFilter;
+        bool upsampling = ssao.upsampling != View::QualityLevel::LOW;
 
             ImGui::SliderFloat("SSAO power (contrast)", &ssao.power, 0.0f, 8.0f);
             ImGui::SliderFloat("SSAO intensity", &ssao.intensity, 0.0f, 2.0f);
@@ -1423,47 +1472,41 @@ void ViewerGui::updateUserInterface() {
             ImGui::RadioButton("SSAO fullresolution", &ssaoRes, 2);
             ssao.resolution = ssaoRes * 0.5f;
 
-            bool halfRes = ssao.resolution == 1.0f ? false : true;
-            ImGui::SliderInt("Quality", &quality, 0, 3);
-            ImGui::SliderInt("Low Pass", &lowpass, 0, 2);
-            ImGui::Checkbox("Bent Normals", &ssao.bentNormals);
-            ImGui::Checkbox("High quality upsampling", &upsampling);
-            ImGui::SliderFloat("Min Horizon angle", &ssao.minHorizonAngleRad, 0.0f, (float)M_PI_4);
-            ImGui::SliderFloat("Bilateral Threshold", &ssao.bilateralThreshold, 0.0f, 0.1f);
-            ImGui::Checkbox("Half resolution", &halfRes);
-            ssao.resolution = halfRes ? 0.5f : 1.0f;
+        bool halfRes = ssao.resolution != 1.0f;
+        ImGui::SliderInt("Quality", &quality, 0, 3);
+        ImGui::SliderInt("Low Pass", &lowpass, 0, 2);
+        ImGui::Checkbox("Bent Normals", &ssao.bentNormals);
+        ImGui::Checkbox("High quality upsampling", &upsampling);
+        ImGui::SliderFloat("Min Horizon angle", &ssao.minHorizonAngleRad, 0.0f, (float)M_PI_4);
+        ImGui::SliderFloat("Bilateral Threshold", &ssao.bilateralThreshold, 0.0f, 0.1f);
+        ImGui::Checkbox("Half resolution", &halfRes);
+        ssao.resolution = halfRes ? 0.5f : 1.0f;
 
+        ssao.upsampling = upsampling ? View::QualityLevel::HIGH : View::QualityLevel::LOW;
+        ssao.lowPassFilter = (View::QualityLevel) lowpass;
+        ssao.quality = (View::QualityLevel) quality;
 
-            ssao.upsampling = upsampling ? View::QualityLevel::HIGH : View::QualityLevel::LOW;
-            ssao.lowPassFilter = (View::QualityLevel) lowpass;
-            ssao.quality = (View::QualityLevel) quality;
-
-            if (ImGui::CollapsingHeader("Dominant Light Shadows (experimental)")) {
-                int sampleCount = ssao.ssct.sampleCount;
-                ImGui::Checkbox("Enabled##dls", &ssao.ssct.enabled);
-                ImGui::SliderFloat("Cone angle", &ssao.ssct.lightConeRad, 0.0f, (float)M_PI_2);
-                ImGui::SliderFloat("Shadow Distance", &ssao.ssct.shadowDistance, 0.0f, 10.0f);
-                ImGui::SliderFloat("Contact dist max", &ssao.ssct.contactDistanceMax, 0.0f, 100.0f);
-                ImGui::SliderFloat("Intensity##dls", &ssao.ssct.intensity, 0.0f, 10.0f);
-                ImGui::SliderFloat("Depth bias", &ssao.ssct.depthBias, 0.0f, 1.0f);
-                ImGui::SliderFloat("Depth slope bias", &ssao.ssct.depthSlopeBias, 0.0f, 1.0f);
-                ImGui::SliderInt("Sample Count", &sampleCount, 1, 32);
-                ImGuiExt::DirectionWidget("Direction##dls", ssao.ssct.lightDirection.v);
-                ssao.ssct.sampleCount = sampleCount;
-            }
+        if (ImGui::CollapsingHeader("Dominant Light Shadows (experimental)")) {
+            int sampleCount = ssao.ssct.sampleCount;
+            ImGui::Checkbox("Enabled##dls", &ssao.ssct.enabled);
+            ImGui::SliderFloat("Cone angle", &ssao.ssct.lightConeRad, 0.0f, (float)M_PI_2);
+            ImGui::SliderFloat("Shadow Distance", &ssao.ssct.shadowDistance, 0.0f, 10.0f);
+            ImGui::SliderFloat("Contact dist max", &ssao.ssct.contactDistanceMax, 0.0f, 100.0f);
+            ImGui::SliderFloat("Intensity##dls", &ssao.ssct.intensity, 0.0f, 10.0f);
+            ImGui::SliderFloat("Depth bias", &ssao.ssct.depthBias, 0.0f, 1.0f);
+            ImGui::SliderFloat("Depth slope bias", &ssao.ssct.depthSlopeBias, 0.0f, 1.0f);
+            ImGui::SliderInt("Sample Count", &sampleCount, 1, 32);
+            ImGuiExt::DirectionWidget("Direction##dls", ssao.ssct.lightDirection.v);
+            ssao.ssct.sampleCount = sampleCount;
         }
+    }
 
-        ImGui::Checkbox("Screen-space reflections", &mSettings.view.screenSpaceReflections.enabled);
-        if (ImGui::CollapsingHeader("Screen-space reflections Options")) {
-            auto& ssrefl = mSettings.view.screenSpaceReflections;
-            ImGui::SliderFloat("Ray thickness", &ssrefl.thickness, 0.001f, 0.2f);
-            ImGui::SliderFloat("Bias", &ssrefl.bias, 0.001f, 0.5f);
-            ImGui::SliderFloat("Max distance", &ssrefl.maxDistance, 0.1, 10.0f);
-            ImGui::SliderFloat("Stride", &ssrefl.stride, 1.0, 10.0f);
-        }
-        ImGui::Unindent();
-
-        ImGui::Checkbox("Screen-space Guard Band", &mSettings.view.guardBand.enabled);
+    if (ImGui::CollapsingHeader("Screen-space reflections Options")) {
+        auto& ssrefl = mSettings.view.screenSpaceReflections;
+        ImGui::SliderFloat("Ray thickness", &ssrefl.thickness, 0.001f, 0.2f);
+        ImGui::SliderFloat("Bias", &ssrefl.bias, 0.001f, 0.5f);
+        ImGui::SliderFloat("Max distance", &ssrefl.maxDistance, 0.1, 10.0f);
+        ImGui::SliderFloat("Stride", &ssrefl.stride, 1.0, 10.0f);
     }
 
     if (ImGui::CollapsingHeader("Dynamic Resolution")) {
@@ -1526,27 +1569,46 @@ void ViewerGui::updateUserInterface() {
         }
         if (ImGui::CollapsingHeader("Sunlight")) {
             ImGui::Checkbox("Enable sunlight", &light.enableSunlight);
-            ImGui::SliderFloat("Sun intensity", &light.sunlightIntensity, 1000.0, 150000.0f);
+            ImGui::SliderFloat("Sun intensity", &light.sunlightIntensity, 0.0f, 150000.0f);
+            ImGui::SliderFloat("Halo size", &light.sunlightHaloSize, 1.01f, 40.0f);
+            ImGui::SliderFloat("Halo falloff", &light.sunlightHaloFalloff, 4.0f, 1024.0f);
+            ImGui::SliderFloat("Sun radius", &light.sunlightAngularRadius, 0.1f, 10.0f);
             ImGuiExt::DirectionWidget("Sun direction", light.sunlightDirection.v);
             ImGui::ColorEdit3("Sun color", light.sunlightColor.v);
             if (ImGui::Button("Reset Sunlight from IBL")) setSunlightFromIbl();
+
+            ImGui::SliderFloat("Shadow Far", &light.shadowOptions.shadowFar, 0.0f,
+                    mSettings.viewer.cameraFar);
+
+            if (ImGui::CollapsingHeader("Shadow direction")) {
+                float3 shadowDirection = light.shadowOptions.transform * light.sunlightDirection;
+                ImGuiExt::DirectionWidget("Shadow direction", shadowDirection.v);
+                light.shadowOptions.transform = normalize(quatf{
+                        cross(light.sunlightDirection, shadowDirection),
+                        sqrt(length2(light.sunlightDirection) * length2(shadowDirection))
+                        + dot(light.sunlightDirection, shadowDirection)
+                });
+            }
         }
-        if (ImGui::CollapsingHeader("All lights")) {
+        if (ImGui::CollapsingHeader("Shadows")) {
             ImGui::Checkbox("Enable shadows", &light.enableShadows);
             int mapSize = light.shadowOptions.mapSize;
             ImGui::SliderInt("Shadow map size", &mapSize, 32, 4096);
             light.shadowOptions.mapSize = mapSize;
-
+            ImGui::Checkbox("Stable Shadows", &light.shadowOptions.stable);
+            ImGui::Checkbox("Enable LiSPSM", &light.shadowOptions.lispsm);
 
             int shadowType = (int)mSettings.view.shadowType;
-            ImGui::Combo("Shadow type", &shadowType, "PCF\0VSM\0DPCF\0PCSS\0\0");
+            ImGui::Combo("Shadow type", &shadowType, "PCF\0VSM\0DPCF\0PCSS\0PCFd\0\0");
             mSettings.view.shadowType = (ShadowType)shadowType;
 
             if (mSettings.view.shadowType == ShadowType::VSM) {
+                ImGui::Checkbox("High precision", &mSettings.view.vsmShadowOptions.highPrecision);
+                ImGui::Checkbox("ELVSM", &mSettings.lighting.shadowOptions.vsm.elvsm);
                 char label[32];
                 snprintf(label, 32, "%d", 1 << mVsmMsaaSamplesLog2);
                 ImGui::SliderInt("VSM MSAA samples", &mVsmMsaaSamplesLog2, 0, 3, label);
-                light.shadowOptions.vsm.msaaSamples =
+                mSettings.view.vsmShadowOptions.msaaSamples =
                         static_cast<uint8_t>(1u << mVsmMsaaSamplesLog2);
 
                 int vsmAnisotropy = mSettings.view.vsmShadowOptions.anisotropy;
@@ -1579,17 +1641,42 @@ void ViewerGui::updateUserInterface() {
     }
 
     if (ImGui::CollapsingHeader("Fog")) {
+        int fogColorSource = 0;
+        if (mSettings.view.fog.skyColor) {
+            fogColorSource = 2;
+        } else if (mSettings.view.fog.fogColorFromIbl) {
+            fogColorSource = 1;
+        }
+
+        bool excludeSkybox = !std::isinf(mSettings.view.fog.cutOffDistance);
         ImGui::Indent();
-        ImGui::Checkbox("Enable fog", &mSettings.view.fog.enabled);
-        ImGui::SliderFloat("Start", &mSettings.view.fog.distance, 0.0f, 100.0f);
-        ImGui::SliderFloat("Density", &mSettings.view.fog.density, 0.0f, 1.0f);
-        ImGui::SliderFloat("Height", &mSettings.view.fog.height, 0.0f, 100.0f);
-        ImGui::SliderFloat("Height falloff", &mSettings.view.fog.heightFalloff, 0.0f, 10.0f);
-        ImGui::SliderFloat("Scattering start", &mSettings.view.fog.inScatteringStart, 0.0f, 100.0f);
-        ImGui::SliderFloat("Scattering size", &mSettings.view.fog.inScatteringSize, 0.1f, 100.0f);
-        ImGui::Checkbox("Color from IBL", &mSettings.view.fog.fogColorFromIbl);
+        ImGui::Checkbox("Enable large-scale fog", &mSettings.view.fog.enabled);
+        ImGui::SliderFloat("Start [m]", &mSettings.view.fog.distance, 0.0f, 100.0f);
+        ImGui::SliderFloat("Extinction [1/m]", &mSettings.view.fog.density, 0.0f, 1.0f);
+        ImGui::SliderFloat("Floor [m]", &mSettings.view.fog.height, 0.0f, 100.0f);
+        ImGui::SliderFloat("Height falloff [1/m]", &mSettings.view.fog.heightFalloff, 0.0f, 4.0f);
+        ImGui::SliderFloat("Sun Scattering start [m]", &mSettings.view.fog.inScatteringStart, 0.0f, 100.0f);
+        ImGui::SliderFloat("Sun Scattering size", &mSettings.view.fog.inScatteringSize, 0.1f, 100.0f);
+        ImGui::Checkbox("Exclude Skybox", &excludeSkybox);
+        ImGui::Combo("Color##fogColor", &fogColorSource, "Constant\0IBL\0Skybox\0\0");
         ImGui::ColorPicker3("Color", mSettings.view.fog.color.v);
         ImGui::Unindent();
+        mSettings.view.fog.cutOffDistance =
+                excludeSkybox ? 1e6f : std::numeric_limits<float>::infinity();
+        switch (fogColorSource) {
+            case 0:
+                mSettings.view.fog.skyColor = nullptr;
+                mSettings.view.fog.fogColorFromIbl = false;
+                break;
+            case 1:
+                mSettings.view.fog.skyColor = nullptr;
+                mSettings.view.fog.fogColorFromIbl = true;
+                break;
+            case 2:
+                mSettings.view.fog.skyColor = mSettings.view.fogSettings.fogColorTexture;
+                mSettings.view.fog.fogColorFromIbl = false;
+                break;
+        }
     }
 
     if (ImGui::CollapsingHeader("Scene")) {
@@ -1598,6 +1685,8 @@ void ViewerGui::updateUserInterface() {
         if (ImGui::Checkbox("Scale to unit cube", &mSettings.viewer.autoScaleEnabled)) {
             updateRootTransform();
         }
+
+        ImGui::Checkbox("Automatic instancing", &mSettings.viewer.autoInstancingEnabled);
 
         int skyboxType = (int)mSettings.lighting.skyboxType;
         ImGui::Combo("Skybox type", &skyboxType,
@@ -1624,34 +1713,35 @@ void ViewerGui::updateUserInterface() {
     if (ImGui::CollapsingHeader("Camera")) {
         ImGui::Indent();
 
-        ImGui::SliderFloat("Focal length (mm)", &mSettings.viewer.cameraFocalLength,
-                16.0f, 90.0f);
-
-        bool dofMedian = mSettings.view.dof.filter == View::DepthOfFieldOptions::Filter::MEDIAN;
-        int dofRingCount = mSettings.view.dof.fastGatherRingCount;
-        int dofMaxCoC = mSettings.view.dof.maxForegroundCOC;
-        if (!dofRingCount) dofRingCount = 5;
-        if (!dofMaxCoC) dofMaxCoC = 32;
-
+        ImGui::SliderFloat("Focal length (mm)", &mSettings.viewer.cameraFocalLength, 16.0f, 90.0f);
         ImGui::SliderFloat("Aperture", &mSettings.viewer.cameraAperture, 1.0f, 32.0f);
         ImGui::SliderFloat("Speed (1/s)", &mSettings.viewer.cameraSpeed, 1000.0f, 1.0f);
         ImGui::SliderFloat("ISO", &mSettings.viewer.cameraISO, 25.0f, 6400.0f);
-        ImGui::Checkbox("DoF", &mSettings.view.dof.enabled);
-        ImGui::SliderFloat("Focus distance", &mSettings.viewer.cameraFocusDistance, 0.0f, 30.0f);
-        ImGui::SliderFloat("Blur scale", &mSettings.view.dof.cocScale, 0.1f, 10.0f);
-        ImGui::SliderInt("Ring count", &dofRingCount, 1, 17);
-        ImGui::SliderInt("Max CoC", &dofMaxCoC, 1, 32);
-        ImGui::Checkbox("Native Resolution", &mSettings.view.dof.nativeResolution);
-        ImGui::Checkbox("Median Filter", &dofMedian);
+        ImGui::SliderFloat("Near", &mSettings.viewer.cameraNear, 0.001f, 1.0f);
+        ImGui::SliderFloat("Far", &mSettings.viewer.cameraFar, 1.0f, 10000.0f);
 
-        mSettings.view.dof.filter = dofMedian ?
-                                    View::DepthOfFieldOptions::Filter::MEDIAN :
-                                    View::DepthOfFieldOptions::Filter::NONE;
-        mSettings.view.dof.backgroundRingCount = dofRingCount;
-        mSettings.view.dof.foregroundRingCount = dofRingCount;
-        mSettings.view.dof.fastGatherRingCount = dofRingCount;
-        mSettings.view.dof.maxForegroundCOC = dofMaxCoC;
-        mSettings.view.dof.maxBackgroundCOC = dofMaxCoC;
+        if (ImGui::CollapsingHeader("DoF")) {
+            bool dofMedian = mSettings.view.dof.filter == View::DepthOfFieldOptions::Filter::MEDIAN;
+            int dofRingCount = mSettings.view.dof.fastGatherRingCount;
+            int dofMaxCoC = mSettings.view.dof.maxForegroundCOC;
+            if (!dofRingCount) dofRingCount = 5;
+            if (!dofMaxCoC) dofMaxCoC = 32;
+            ImGui::Checkbox("Enabled##dofEnabled", &mSettings.view.dof.enabled);
+            ImGui::SliderFloat("Focus distance", &mSettings.viewer.cameraFocusDistance, 0.0f, 30.0f);
+            ImGui::SliderFloat("Blur scale", &mSettings.view.dof.cocScale, 0.1f, 10.0f);
+            ImGui::SliderInt("Ring count", &dofRingCount, 1, 17);
+            ImGui::SliderInt("Max CoC", &dofMaxCoC, 1, 32);
+            ImGui::Checkbox("Native Resolution", &mSettings.view.dof.nativeResolution);
+            ImGui::Checkbox("Median Filter", &dofMedian);
+            mSettings.view.dof.filter = dofMedian ?
+                                        View::DepthOfFieldOptions::Filter::MEDIAN :
+                                        View::DepthOfFieldOptions::Filter::NONE;
+            mSettings.view.dof.backgroundRingCount = dofRingCount;
+            mSettings.view.dof.foregroundRingCount = dofRingCount;
+            mSettings.view.dof.fastGatherRingCount = dofRingCount;
+            mSettings.view.dof.maxForegroundCOC = dofMaxCoC;
+            mSettings.view.dof.maxBackgroundCOC = dofMaxCoC;
+        }
 
         if (ImGui::CollapsingHeader("Vignette")) {
             ImGui::Checkbox("Enabled##vignetteEnabled", &mSettings.view.vignette.enabled);
@@ -1670,7 +1760,7 @@ void ViewerGui::updateUserInterface() {
 
             std::vector<std::string> names;
             names.reserve(cameraCount + 1);
-            names.push_back("Free camera");
+            names.emplace_back("Free camera");
             int c = 0;
             for (size_t i = 0; i < cameraCount; i++) {
                 const char* n = mAsset->getName(cameras[i]);
@@ -1685,12 +1775,16 @@ void ViewerGui::updateUserInterface() {
 
             std::vector<const char*> cstrings;
             cstrings.reserve(names.size());
-            for (size_t i = 0; i < names.size(); i++) {
-                cstrings.push_back(names[i].c_str());
+            for (const auto & name : names) {
+                cstrings.push_back(name.c_str());
             }
 
             ImGui::ListBox("Cameras", &mCurrentCamera, cstrings.data(), cstrings.size());
         }
+
+        ImGui::Checkbox("Instanced stereo", &mSettings.view.stereoscopicOptions.enabled);
+        ImGui::SliderFloat(
+                "Ocular distance", &mSettings.viewer.cameraEyeOcularDistance, 0.0f, 1.0f);
 
         ImGui::Unindent();
     }
@@ -1699,32 +1793,23 @@ void ViewerGui::updateUserInterface() {
 
     // At this point, all View settings have been modified,
     //  so we can now push them into the Filament View.
-    applySettings(mSettings.view, mView);
+    applySettings(mEngine, mSettings.view, mView);
 
-    mView->setSoftShadowOptions(mSettings.lighting.softShadowOptions);
+    auto lights = utils::FixedCapacityVector<utils::Entity>::with_capacity(mScene->getEntityCount());
+    mScene->forEach([&](utils::Entity entity) {
+        if (lm.hasComponent(entity)) {
+            lights.push_back(entity);
+        }
+    });
+
+    applySettings(mEngine, mSettings.lighting, mIndirectLight, mSunlight,
+            lights.data(), lights.size(), &lm, mScene, mView);
 
     // Set IBL options
     {        
         filament::math::float3 linearBgColor = filament::Color::toLinear(mSettings.viewer.backgroundColor);
         mSettings.lighting.iblOptions.iblTintAndIntensity.rgb = linearBgColor;
     }
-
-    if (light.enableSunlight) {
-        mScene->addEntity(mSunlight);
-        auto sun = lm.getInstance(mSunlight);
-        lm.setIntensity(sun, light.sunlightIntensity);
-        lm.setDirection(sun, normalize(light.sunlightDirection));
-        lm.setColor(sun, light.sunlightColor);
-        lm.setShadowCaster(sun, light.enableShadows);
-        lm.setShadowOptions(sun, light.shadowOptions);
-    } else {
-        mScene->remove(mSunlight);
-    }
-
-    lm.forEachComponent([this, &lm, &light](utils::Entity e, LightManager::Instance ci) {
-        lm.setShadowOptions(ci, light.shadowOptions);
-        lm.setShadowCaster(ci, light.enableShadows);
-    });
 
     // TODO(prideout): add support for hierarchy, animation and variant selection in remote mode. To
     // support these features, we will need to send a message (list of strings) from DebugServer to
@@ -1748,32 +1833,38 @@ void ViewerGui::updateUserInterface() {
 
         applyMaterialSettingsInTree(mAsset->getRoot());
 
-        if (mAsset->getMaterialVariantCount() > 0 && ImGui::CollapsingHeader("Variants")) {
+        if (mInstance->getMaterialVariantCount() > 0 && ImGui::CollapsingHeader("Variants")) {
             ImGui::Indent();
             int selectedVariant = mCurrentVariant;
-            for (size_t i = 0, count = mAsset->getMaterialVariantCount(); i < count; ++i) {
-                const char* label = mAsset->getMaterialVariantName(i);
+            for (size_t i = 0, count = mInstance->getMaterialVariantCount(); i < count; ++i) {
+                const char* label = mInstance->getMaterialVariantName(i);
                 ImGui::RadioButton(label, &selectedVariant, i);
             }
             if (selectedVariant != mCurrentVariant) {
                 mCurrentVariant = selectedVariant;
-                mAsset->applyMaterialVariant(mCurrentVariant);
+                mInstance->applyMaterialVariant(mCurrentVariant);
             }
             ImGui::Unindent();
         }
 
-        if (mAnimator->getAnimationCount() > 0 && ImGui::CollapsingHeader("Animation")) {
+        Animator& animator = *mInstance->getAnimator();
+        const size_t animationCount = animator.getAnimationCount();
+        if (animationCount > 0 && ImGui::CollapsingHeader("Animation")) {
             ImGui::Indent();
             int selectedAnimation = mCurrentAnimation;
-            ImGui::RadioButton("Disable", &selectedAnimation, 0);
-            for (size_t i = 0, count = mAnimator->getAnimationCount(); i < count; ++i) {
-                std::string label = mAnimator->getAnimationName(i);
+            ImGui::RadioButton("Disable", &selectedAnimation, -1);
+            ImGui::RadioButton("Apply all animations", &selectedAnimation, animationCount);
+            ImGui::SliderFloat("Cross fade", &mCrossFadeDuration, 0.0f, 2.0f,
+                    "%4.2f seconds", ImGuiSliderFlags_AlwaysClamp);
+            for (size_t i = 0; i < animationCount; ++i) {
+                std::string label = animator.getAnimationName(i);
                 if (label.empty()) {
                     label = "Unnamed " + std::to_string(i);
                 }
-                ImGui::RadioButton(label.c_str(), &selectedAnimation, i + 1);
+                ImGui::RadioButton(label.c_str(), &selectedAnimation, i);
             }
             if (selectedAnimation != mCurrentAnimation) {
+                mPreviousAnimation = mCurrentAnimation;
                 mCurrentAnimation = selectedAnimation;
                 mResetAnimation = true;
             }
@@ -1782,7 +1873,7 @@ void ViewerGui::updateUserInterface() {
         }
 
         if (mCurrentMorphingEntity && ImGui::CollapsingHeader("Morphing")) {
-            const bool isAnimating = mCurrentAnimation > 0 && mAnimator->getAnimationCount() > 0;
+            const bool isAnimating = mCurrentAnimation > 0 && animator.getAnimationCount() > 0;
             if (isAnimating) {
                 ImGui::BeginDisabled();
             }
@@ -1848,8 +1939,6 @@ void ViewerGui::updateUserInterface() {
     }
     mSidebarWidth = ImGui::GetWindowWidth();
     ImGui::End();
-
-    updateIndirectLight();
 }
 
 // This loads the last saved (or loaded) material from file, to its entity

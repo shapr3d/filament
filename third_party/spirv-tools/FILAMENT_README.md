@@ -1,30 +1,20 @@
-When updating spirv-tools to a new version, make sure to preserve all the changes marked with
-the following in `CMakeLists.txt` and `source/CMakeLists.txt`:
-
-`# Filament specific changes`
-
-You can easily apply these changes by running the following command at Filament's root:
+When updating SPIRV-Tools to a new version, run the following from *this* directory
 
 ```
-git apply third_party/spirv-tools/filament-specific-changes.patch
+bash filament-update.sh [git commit hash]
 ```
 
-The following procedure can be used to update spirv-tools. Note that there is a secondary repository
-that needs to be downloaded (spirv-headers).
+This will pull in the updated source for SPRIV-Tools and pull in the right version of SPIRV-Headers.
+The script will also try to apply Filament specific changes to the `CMakeLists.txt`.  It could be
+that the diff application will fail, in which case, the updater will need to resolve the difference
+manually and update `filament-specific-changes.patch`.
+
+The above script will bring in the changes, but you would still need to add it to a git commit
+(i.e. pull request) by doing
 
 ```
-curl -L https://github.com/KhronosGroup/spirv-tools/archive/master.zip > master.zip
-unzip master.zip
-rsync -r SPIRV-Tools-master/ spirv-tools/ --delete
-rm -rf SPIRV-Tools-master master.zip
-curl -L https://github.com/KhronosGroup/spirv-headers/archive/master.zip > master.zip
-unzip master.zip
-mv SPIRV-Headers-master/ spirv-tools/external/spirv-headers
-rm master.zip
-
-git add spirv-tools
+git add -u third_party/spriv-tools third_party/spirv-headers
 ```
 
-Edit the .gitignore so it doesn't prevent `spirv-headers` from being committed.
+from the Filament source root.
 
-Finally, remember to bring back the Filament-specific changes in CMakeLists.

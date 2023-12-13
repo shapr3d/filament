@@ -120,6 +120,14 @@ Java_com_google_android_filament_RenderableManager_nBuilderBlendOrder(JNIEnv*, j
     builder->blendOrder((size_t) index, (uint16_t) blendOrder);
 }
 
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_google_android_filament_RenderableManager_nBuilderGlobalBlendOrderEnabled(JNIEnv*, jclass,
+        jlong nativeBuilder, jint index, jboolean enabled) {
+    RenderableManager::Builder *builder = (RenderableManager::Builder *) nativeBuilder;
+    builder->globalBlendOrderEnabled((size_t) index, (bool) enabled);
+}
+
 extern "C" JNIEXPORT void JNICALL
 Java_com_google_android_filament_RenderableManager_nBuilderBoundingBox(JNIEnv*, jclass,
         jlong nativeBuilder, jfloat cx, jfloat cy, jfloat cz, jfloat ex, jfloat ey, jfloat ez) {
@@ -140,6 +148,13 @@ Java_com_google_android_filament_RenderableManager_nBuilderPriority(JNIEnv*, jcl
         jlong nativeBuilder, jint priority) {
     RenderableManager::Builder *builder = (RenderableManager::Builder *) nativeBuilder;
     builder->priority((uint8_t) priority);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_google_android_filament_RenderableManager_nBuilderChannel(JNIEnv*, jclass,
+        jlong nativeBuilder, jint channel) {
+    RenderableManager::Builder *builder = (RenderableManager::Builder *) nativeBuilder;
+    builder->channel((uint8_t) channel);
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -186,10 +201,17 @@ Java_com_google_android_filament_RenderableManager_nBuilderSkinning(JNIEnv*, jcl
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_google_android_filament_RenderableManager_nEnableSkinningBuffers(JNIEnv*, jclass,
+Java_com_google_android_filament_RenderableManager_nBuilderEnableSkinningBuffers(JNIEnv*, jclass,
         jlong nativeBuilder, jboolean enabled) {
     RenderableManager::Builder *builder = (RenderableManager::Builder *) nativeBuilder;
     builder->enableSkinningBuffers(enabled);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_google_android_filament_RenderableManager_nBuilderFog(JNIEnv*, jclass,
+        jlong nativeBuilder, jboolean enabled) {
+    RenderableManager::Builder *builder = (RenderableManager::Builder *) nativeBuilder;
+    builder->fog(enabled);
 }
 
 extern "C" JNIEXPORT jint JNICALL
@@ -332,10 +354,31 @@ Java_com_google_android_filament_RenderableManager_nSetPriority(JNIEnv*, jclass,
 }
 
 extern "C" JNIEXPORT void JNICALL
+Java_com_google_android_filament_RenderableManager_nSetChannel(JNIEnv*, jclass,
+        jlong nativeRenderableManager, jint i, jint channel) {
+    RenderableManager *rm = (RenderableManager *) nativeRenderableManager;
+    rm->setChannel((RenderableManager::Instance) i, (uint8_t) channel);
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_com_google_android_filament_RenderableManager_nSetCulling(JNIEnv*, jclass,
         jlong nativeRenderableManager, jint i, jboolean enabled) {
     RenderableManager *rm = (RenderableManager *) nativeRenderableManager;
     rm->setCulling((RenderableManager::Instance) i, enabled);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_google_android_filament_RenderableManager_nSetFogEnabled(JNIEnv*, jclass,
+        jlong nativeRenderableManager, jint i, jboolean enabled) {
+    RenderableManager *rm = (RenderableManager *) nativeRenderableManager;
+    rm->setFogEnabled((RenderableManager::Instance) i, enabled);
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_google_android_filament_RenderableManager_nGetFogEnabled(JNIEnv*, jclass,
+        jlong nativeRenderableManager, jint i) {
+    RenderableManager *rm = (RenderableManager *) nativeRenderableManager;
+    return (jboolean)rm->getFogEnabled((RenderableManager::Instance) i);
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -423,20 +466,19 @@ Java_com_google_android_filament_RenderableManager_nSetGeometryAt__JIIIJJII(JNIE
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_google_android_filament_RenderableManager_nSetGeometryAt__JIIIII(JNIEnv*, jclass,
-        jlong nativeRenderableManager, jint i, jint primitiveIndex, jint primitiveType, jint offset,
-        jint count) {
-    RenderableManager *rm = (RenderableManager *) nativeRenderableManager;
-    rm->setGeometryAt((RenderableManager::Instance) i, (size_t) primitiveIndex,
-            (RenderableManager::PrimitiveType) primitiveType, (size_t) offset, (size_t) count);
-}
-
-extern "C" JNIEXPORT void JNICALL
 Java_com_google_android_filament_RenderableManager_nSetBlendOrderAt(JNIEnv*, jclass,
         jlong nativeRenderableManager, jint i, jint primitiveIndex, jint blendOrder) {
     RenderableManager *rm = (RenderableManager *) nativeRenderableManager;
     rm->setBlendOrderAt((RenderableManager::Instance) i, (size_t) primitiveIndex,
             (uint16_t) blendOrder);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_google_android_filament_RenderableManager_nSetGlobalBlendOrderEnabledAt(JNIEnv*, jclass,
+        jlong nativeRenderableManager, jint i, jint primitiveIndex, jboolean enabled) {
+    RenderableManager *rm = (RenderableManager *) nativeRenderableManager;
+    rm->setGlobalBlendOrderEnabledAt((RenderableManager::Instance) i, (size_t) primitiveIndex,
+            (bool) enabled);
 }
 
 extern "C" JNIEXPORT jint JNICALL

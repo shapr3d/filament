@@ -17,7 +17,7 @@
 #ifndef TNT_FILAMENT_COMPONENTS_TRANSFORMMANAGER_H
 #define TNT_FILAMENT_COMPONENTS_TRANSFORMMANAGER_H
 
-#include "upcast.h"
+#include "downcast.h"
 
 #include <filament/TransformManager.h>
 
@@ -50,7 +50,23 @@ public:
     }
 
     Instance getInstance(utils::Entity e) const noexcept {
-        return Instance(mManager.getInstance(e));
+        return { mManager.getInstance(e) };
+    }
+
+    size_t getComponentCount() const noexcept {
+        return mManager.getComponentCount();
+    }
+
+    bool empty() const noexcept {
+        return mManager.empty();
+    }
+
+    utils::Entity getEntity(Instance i) const noexcept {
+        return mManager.getEntity(i);
+    }
+
+    utils::Entity const* getEntities() const noexcept {
+        return mManager.getEntities();
     }
 
     void setAccurateTranslationsEnabled(bool enable) noexcept;
@@ -103,7 +119,7 @@ public:
 
     math::mat4 getTransformAccurate(Instance ci) const noexcept {
         math::mat4f const& local = mManager[ci].local;
-        math::float3 localTranslationLo = mManager[ci].localTranslationLo;
+        math::float3 const localTranslationLo = mManager[ci].localTranslationLo;
         math::mat4 r(local);
         r[3].xyz += localTranslationLo;
         return r;
@@ -111,7 +127,7 @@ public:
 
     math::mat4 getWorldTransformAccurate(Instance ci) const noexcept {
         math::mat4f const& world = mManager[ci].world;
-        math::float3 worldTranslationLo = mManager[ci].worldTranslationLo;
+        math::float3 const worldTranslationLo = mManager[ci].worldTranslationLo;
         math::mat4 r(world);
         r[3].xyz += worldTranslationLo;
         return r;
@@ -157,7 +173,7 @@ private:
 
     void computeAllWorldTransforms() noexcept;
 
-    void computeWorldTransform(math::mat4f& outWorld, math::float3& inoutWorldTranslationLo,
+    static void computeWorldTransform(math::mat4f& outWorld, math::float3& inoutWorldTranslationLo,
             math::mat4f const& pt, math::mat4f const& local,
             math::float3 const& ptTranslationLo, math::float3 const& localTranslationLo,
             bool accurate);
@@ -207,7 +223,7 @@ private:
         typename Base::SoA& getSoA() { return mData; }
 
         struct Proxy {
-            // all of this gets inlined
+            // all of these gets inlined
             UTILS_ALWAYS_INLINE
             Proxy(Base& sim, utils::EntityInstanceBase::Type i) noexcept
                     : local{ sim, i } { }
@@ -243,7 +259,7 @@ private:
     bool mAccurateTranslations = false;
 };
 
-FILAMENT_UPCAST(TransformManager)
+FILAMENT_DOWNCAST(TransformManager)
 
 } // namespace filament
 

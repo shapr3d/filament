@@ -404,6 +404,10 @@ public:
     /** @deprecated use static versions instead */
     UTILS_DEPRECATED
     math::float4 getColorEstimate(math::float3 direction) const noexcept;
+
+protected:
+    // prevent heap allocation
+    ~IndirectLight() = default;
 };
 
 } // namespace filament

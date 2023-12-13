@@ -30,14 +30,12 @@ namespace matdbg {
 struct ShaderInfo {
     backend::ShaderModel shaderModel;
     Variant variant;
-    backend::ShaderType pipelineStage;
+    backend::ShaderStage pipelineStage;
     uint32_t offset;
 };
 
-size_t getShaderCount(filaflat::ChunkContainer container, filamat::ChunkType type);
-bool getMetalShaderInfo(filaflat::ChunkContainer container, ShaderInfo* info);
-bool getGlShaderInfo(filaflat::ChunkContainer container, ShaderInfo* info);
-bool getVkShaderInfo(filaflat::ChunkContainer container, ShaderInfo* info);
+size_t getShaderCount(const filaflat::ChunkContainer& container, filamat::ChunkType type);
+bool getShaderInfo(const filaflat::ChunkContainer& container, ShaderInfo* info, filamat::ChunkType chunkType);
 
 } // namespace matdbg
 } // namespace filament

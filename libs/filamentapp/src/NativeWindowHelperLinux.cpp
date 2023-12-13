@@ -32,7 +32,25 @@ void* getNativeWindow(SDL_Window* sdlWindow) {
     }
     else if (wmi.subsystem == SDL_SYSWM_WAYLAND) {
 #if defined(FILAMENT_SUPPORTS_WAYLAND)
-        return wmi.info.wl.display;
+        int width = 0;
+        int height = 0;
+        SDL_GetWindowSize(sdlWindow, &width, &height);
+
+        // Static is used here to allocate the struct pointer for the lifetime of the program.
+        // Without static the valid struct quickyly goes out of scope, and ends with seemingly
+        // random segfaults.
+        static struct {
+            struct wl_display *display;
+            struct wl_surface *surface;
+            uint32_t width;
+            uint32_t height;
+        } wayland {
+            wmi.info.wl.display,
+            wmi.info.wl.surface,
+            static_cast<uint32_t>(width),
+            static_cast<uint32_t>(height)
+        };
+        return (void *) &wayland;
 #endif
     }
     return nullptr;

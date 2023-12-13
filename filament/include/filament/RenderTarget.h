@@ -91,8 +91,6 @@ public:
         /**
          * Sets a texture to a given attachment point.
          *
-         * All RenderTargets must have a non-null COLOR attachment.
-         *
          * When using a DEPTH attachment, it is important to always disable post-processing
          * in the View. Failing to do so will cause the DEPTH attachment to be ignored in most
          * cases.
@@ -182,6 +180,10 @@ public:
      * @return Number of color attachments usable in a render target.
      */
     uint8_t getSupportedColorAttachmentsCount() const noexcept;
+
+protected:
+    // prevent heap allocation
+    ~RenderTarget() = default;
 };
 
 } // namespace filament

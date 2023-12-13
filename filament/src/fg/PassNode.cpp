@@ -76,28 +76,28 @@ void RenderPassNode::execute(FrameGraphResources const& resources, DriverApi& dr
     }
 }
 
-uint32_t RenderPassNode::declareRenderTarget(FrameGraph& fg, FrameGraph::Builder& builder,
+uint32_t RenderPassNode::declareRenderTarget(FrameGraph& fg, FrameGraph::Builder&,
         const char* name, FrameGraphRenderPass::Descriptor const& descriptor) {
 
     RenderPassData data;
     data.name = name;
     data.descriptor = descriptor;
-    FrameGraphRenderPass::Attachments& attachments = data.descriptor.attachments;
 
     // retrieve the ResourceNode of the attachments coming to us -- this will be used later
     // to compute the discard flags.
 
     DependencyGraph const& dependencyGraph = fg.getGraph();
     auto incomingEdges = dependencyGraph.getIncomingEdges(this);
-    auto outgoingEdges = dependencyGraph.getOutgoingEdges(this);
 
     for (size_t i = 0; i < RenderPassData::ATTACHMENT_COUNT; i++) {
-        if (descriptor.attachments.array[i]) {
-            data.attachmentInfo[i] = attachments.array[i];
+        FrameGraphId<FrameGraphTexture> const& handle =
+                data.descriptor.attachments.array[i];
+        if (handle) {
+            data.attachmentInfo[i] = handle;
 
             // TODO: this is not very efficient
             auto incomingPos = std::find_if(incomingEdges.begin(), incomingEdges.end(),
-                    [&dependencyGraph, handle = descriptor.attachments.array[i]]
+                    [&dependencyGraph, handle]
                             (DependencyGraph::Edge const* edge) {
                         ResourceNode const* node = static_cast<ResourceNode const*>(
                                 dependencyGraph.getNode(edge->from));
@@ -111,14 +111,14 @@ uint32_t RenderPassNode::declareRenderTarget(FrameGraph& fg, FrameGraph::Builder
             }
 
             // this could be either outgoing or incoming (if there are no outgoing)
-            data.outgoing[i] = fg.getActiveResourceNode(descriptor.attachments.array[i]);
+            data.outgoing[i] = fg.getActiveResourceNode(handle);
             if (data.outgoing[i] == data.incoming[i]) {
                 data.outgoing[i] = nullptr;
             }
         }
     }
 
-    uint32_t id = mRenderTargetData.size();
+    uint32_t const id = mRenderTargetData.size();
     mRenderTargetData.push_back(data);
     return id;
 }
@@ -151,7 +151,12 @@ void RenderPassNode::resolve() noexcept {
 
                 rt.targetBufferFlags |= target;
 
-                if (!rt.outgoing[i] || !rt.outgoing[i]->hasActiveReaders()) {
+                // Discard at the end only if we are writing to this attachment AND later reading
+                // from it. (in particular, don't discard if we're not writing at all, because this
+                // attachment might have other readers after us).
+                // TODO: we could set the discard flag if we are the last reader, i.e.
+                //       if rt->incoming[i] last reader is us.
+                if (rt.outgoing[i] && !rt.outgoing[i]->hasActiveReaders()) {
                     rt.backend.params.flags.discardEnd |= target;
                 }
                 if (!rt.outgoing[i] || !rt.outgoing[i]->hasWriterPass()) {
@@ -161,10 +166,10 @@ void RenderPassNode::resolve() noexcept {
                         rt.backend.params.readOnlyDepthStencil |= RenderPassParams::READONLY_STENCIL;
                     }
                 }
+                // Discard at the start if this attachment has no prior writer
                 if (!rt.incoming[i] || !rt.incoming[i]->hasActiveWriters()) {
                     rt.backend.params.flags.discardStart |= target;
                 }
-
                 VirtualResource* pResource = mFrameGraph.getResource(rt.descriptor.attachments.array[i]);
                 Resource<FrameGraphTexture>* pTextureResource = static_cast<Resource<FrameGraphTexture>*>(pResource);
 
@@ -190,12 +195,14 @@ void RenderPassNode::resolve() noexcept {
                     rt.descriptor.clearFlags & rt.targetBufferFlags);
         }
 
+        assert_invariant(minWidth == maxWidth);
+        assert_invariant(minHeight == maxHeight);
         assert_invariant(any(rt.targetBufferFlags));
 
         // of all attachments size matches there are no ambiguity about the RT size.
         // if they don't match however, we select a size that will accommodate all attachments.
-        uint32_t width = maxWidth;
-        uint32_t height = maxHeight;
+        uint32_t const width = maxWidth;
+        uint32_t const height = maxHeight;
 
         // Update the descriptor if no size was specified (auto mode)
         if (!rt.descriptor.viewport.width) {
@@ -270,7 +277,7 @@ void RenderPassNode::RenderPassData::devirtualize(FrameGraph& fg,
 }
 
 void RenderPassNode::RenderPassData::destroy(
-        ResourceAllocatorInterface& resourceAllocator) noexcept {
+        ResourceAllocatorInterface& resourceAllocator) const noexcept {
     if (UTILS_LIKELY(!imported)) {
         resourceAllocator.destroyRenderTarget(backend.target);
     }
@@ -281,11 +288,12 @@ RenderPassNode::RenderPassData const* RenderPassNode::getRenderPassData(uint32_t
 }
 
 utils::CString RenderPassNode::graphvizify() const noexcept {
+#ifndef NDEBUG
     std::string s;
 
-    uint32_t id = getId();
+    uint32_t const id = getId();
     const char* const nodeName = getName();
-    uint32_t refCount = getRefCount();
+    uint32_t const refCount = getRefCount();
 
     s.append("[label=\"");
     s.append(nodeName);
@@ -310,6 +318,9 @@ utils::CString RenderPassNode::graphvizify() const noexcept {
     s.append("]");
 
     return utils::CString{ s.c_str() };
+#else
+    return {};
+#endif
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -325,14 +336,18 @@ char const* PresentPassNode::getName() const noexcept {
 }
 
 utils::CString PresentPassNode::graphvizify() const noexcept {
+#ifndef NDEBUG
     std::string s;
     s.reserve(128);
-    uint32_t id = getId();
+    uint32_t const id = getId();
     s.append("[label=\"Present , id: ");
     s.append(std::to_string(id));
     s.append("\", style=filled, fillcolor=red3]");
     s.shrink_to_fit();
     return utils::CString{ s.c_str() };
+#else
+    return {};
+#endif
 }
 
 void PresentPassNode::execute(FrameGraphResources const&, DriverApi&) noexcept {

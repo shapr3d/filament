@@ -17,7 +17,7 @@
 #ifndef TNT_FILAMENT_POSTPROCESSMANAGER_H
 #define TNT_FILAMENT_POSTPROCESSMANAGER_H
 
-#include "private/backend/DriverApiForward.h"
+#include "backend/DriverApiForward.h"
 
 #include "FrameHistory.h"
 
@@ -32,10 +32,13 @@
 #include <private/filament/Variant.h>
 
 #include <utils/CString.h>
+#include <utils/FixedCapacityVector.h>
 
 #include <tsl/robin_map.h>
 
 #include <random>
+#include <string_view>
+#include <variant>
 
 namespace filament {
 
@@ -50,6 +53,19 @@ struct CameraInfo;
 
 class PostProcessManager {
 public:
+
+    struct ConstantInfo {
+        std::string_view name;
+        std::variant<int32_t, float, bool> value;
+    };
+
+    struct MaterialInfo {
+        std::string_view name;
+        uint8_t const* data;
+        int size;
+        utils::FixedCapacityVector<ConstantInfo> constants = {};
+    };
+
     struct ColorGradingConfig {
         bool asSubpass{};
         bool customResolve{};
@@ -211,10 +227,15 @@ public:
             FrameGraphTexture::Descriptor const& outDesc,
             backend::SamplerMagFilter filter = backend::SamplerMagFilter::LINEAR) noexcept;
 
-    FrameGraphId<FrameGraphTexture> blendBlit(
-            FrameGraph& fg, bool translucent, DynamicResolutionOptions dsrOptions,
+    FrameGraphId<FrameGraphTexture> upscale(FrameGraph& fg, bool translucent,
+            DynamicResolutionOptions dsrOptions, FrameGraphId<FrameGraphTexture> input,
+            filament::Viewport const& vp, FrameGraphTexture::Descriptor const& outDesc,
+            backend::SamplerMagFilter filter = backend::SamplerMagFilter::LINEAR) noexcept;
+
+    FrameGraphId<FrameGraphTexture> blit(FrameGraph& fg, bool translucent,
             FrameGraphId<FrameGraphTexture> input, filament::Viewport const& vp,
-            FrameGraphTexture::Descriptor const& outDesc) noexcept;
+            FrameGraphTexture::Descriptor const& outDesc,
+            backend::SamplerMagFilter filter = backend::SamplerMagFilter::LINEAR) noexcept;
 
     // resolve base level of input and outputs a 1-level texture
     FrameGraphId<FrameGraphTexture> resolveBaseLevel(FrameGraph& fg,
@@ -236,6 +257,10 @@ public:
             FrameGraphId<FrameGraphTexture> input,
             FrameGraphId<FrameGraphTexture> output,
             bool reinhard, size_t kernelWidth, float sigma) noexcept;
+
+    FrameGraphId<FrameGraphTexture> debugShadowCascades(FrameGraph& fg,
+            FrameGraphId<FrameGraphTexture> input,
+            FrameGraphId<FrameGraphTexture> depth) noexcept;
 
     backend::Handle<backend::HwTexture> getOneTexture() const;
     backend::Handle<backend::HwTexture> getOneDepthTexture() const;
@@ -269,6 +294,11 @@ private:
             FrameGraphId<FrameGraphTexture> input, backend::TextureFormat outFormat,
             BloomOptions& inoutBloomOptions, math::float2 scale) noexcept;
 
+    FrameGraphId<FrameGraphTexture> downscalePass(FrameGraph& fg,
+            FrameGraphId<FrameGraphTexture> input,
+            FrameGraphTexture::Descriptor const& outDesc,
+            bool threshold, float highlight, bool fireflies) noexcept;
+
     void commitAndRender(FrameGraphResources::RenderPassInfo const& out,
             PostProcessMaterial const& material, uint8_t variant,
             backend::DriverApi& driver) const noexcept;
@@ -284,7 +314,7 @@ private:
     class PostProcessMaterial {
     public:
         PostProcessMaterial() noexcept;
-        PostProcessMaterial(FEngine& engine, uint8_t const* data, int size) noexcept;
+        PostProcessMaterial(MaterialInfo const& info) noexcept;
 
         PostProcessMaterial(PostProcessMaterial const& rhs) = delete;
         PostProcessMaterial& operator=(PostProcessMaterial const& rhs) = delete;
@@ -311,12 +341,17 @@ private:
         };
         uint32_t mSize{};
         mutable bool mHasMaterial{};
+        utils::FixedCapacityVector<ConstantInfo> mConstants{};
     };
 
-    tsl::robin_map<utils::StaticString, PostProcessMaterial> mMaterialRegistry;
+    using MaterialRegistryMap = tsl::robin_map<
+            std::string_view,
+            PostProcessMaterial>;
 
-    void registerPostProcessMaterial(utils::StaticString name, uint8_t const* data, int size);
-    PostProcessMaterial& getPostProcessMaterial(utils::StaticString name) noexcept;
+    MaterialRegistryMap mMaterialRegistry;
+
+    void registerPostProcessMaterial(std::string_view name, MaterialInfo const& info);
+    PostProcessMaterial& getPostProcessMaterial(std::string_view name) noexcept;
 
     backend::Handle<backend::HwTexture> mStarburstTexture;
 

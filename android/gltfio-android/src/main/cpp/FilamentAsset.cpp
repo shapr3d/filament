@@ -20,7 +20,7 @@
 
 using namespace filament;
 using namespace filament::math;
-using namespace gltfio;
+using namespace filament::gltfio;
 using namespace utils;
 
 extern "C" JNIEXPORT jint JNICALL
@@ -172,27 +172,6 @@ Java_com_google_android_filament_gltfio_FilamentAsset_nGetCameraEntityCount(JNIE
     return asset->getCameraEntityCount();
 }
 
-extern "C" JNIEXPORT jint JNICALL
-Java_com_google_android_filament_gltfio_FilamentAsset_nGetMaterialInstanceCount(JNIEnv*, jclass,
-        jlong nativeAsset) {
-    FilamentAsset* asset = (FilamentAsset*) nativeAsset;
-    return asset->getMaterialInstanceCount();
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_google_android_filament_gltfio_FilamentAsset_nGetMaterialInstances(JNIEnv* env, jclass,
-        jlong nativeAsset, jlongArray result) {
-    FilamentAsset* asset = (FilamentAsset*) nativeAsset;
-    jsize available = env->GetArrayLength(result);
-    jsize count = std::min(available, (jsize) asset->getMaterialInstanceCount());
-    jlong* dst = env->GetLongArrayElements(result, nullptr);
-    const MaterialInstance * const* src = asset->getMaterialInstances();
-    for (jsize i = 0; i < count; i++) {
-        dst[i] = (jlong) src[i];
-    }
-    env->ReleaseLongArrayElements(result, dst, 0);
-}
-
 extern "C" JNIEXPORT void JNICALL
 Java_com_google_android_filament_gltfio_FilamentAsset_nGetBoundingBox(JNIEnv* env, jclass,
         jlong nativeAsset, jfloatArray result) {
@@ -228,49 +207,11 @@ Java_com_google_android_filament_gltfio_FilamentAsset_nGetExtras(JNIEnv* env, jc
     return val ? env->NewStringUTF(val) : nullptr;
 }
 
-extern "C" JNIEXPORT jint JNICALL
-Java_com_google_android_filament_gltfio_FilamentAsset_nGetSkinCount(JNIEnv* , jclass,
-        jlong nativeAsset) {
-    FilamentAsset* asset = (FilamentAsset*) nativeAsset;
-    return (jint) asset->getSkinCount();
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_google_android_filament_gltfio_FilamentAsset_nGetSkinNames(JNIEnv* env, jclass,
-        jlong nativeAsset, jobjectArray result) {
-    FilamentAsset* asset = (FilamentAsset*) nativeAsset;
-    jsize available = env->GetArrayLength(result);
-    for (int i = 0; i < available; ++i) {
-        const char* name = asset->getSkinNameAt(i);
-        if (name) {
-            env->SetObjectArrayElement(result, (jsize) i, env->NewStringUTF(name));
-        }
-    }
-}
-
-extern "C" JNIEXPORT jint JNICALL
-Java_com_google_android_filament_gltfio_FilamentAsset_nGetJointCountAt(JNIEnv* , jclass,
-        jlong nativeAsset, jint skinIndex) {
-    FilamentAsset* asset = (FilamentAsset*) nativeAsset;
-    return (jint) asset->getJointCountAt(skinIndex);
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_google_android_filament_gltfio_FilamentAsset_nGetJointsAt(JNIEnv* env, jclass,
-        jlong nativeAsset, jint skinIndex, jintArray result) {
-    FilamentAsset* asset = (FilamentAsset*) nativeAsset;
-    jsize available = env->GetArrayLength(result);
-    Entity* entities = (Entity*) env->GetIntArrayElements(result, nullptr);
-    std::copy_n(asset->getJointsAt(skinIndex),
-        std::min(available, (jsize) asset->getJointCountAt(skinIndex)), entities);
-    env->ReleaseIntArrayElements(result, (jint*) entities, 0);
-}
-
 extern "C" JNIEXPORT jlong JNICALL
-Java_com_google_android_filament_gltfio_FilamentAsset_nGetAnimator(JNIEnv* , jclass,
+Java_com_google_android_filament_gltfio_FilamentAsset_nGetInstance(JNIEnv* , jclass,
         jlong nativeAsset) {
     FilamentAsset* asset = (FilamentAsset*) nativeAsset;
-    return (jlong) asset->getAnimator();
+    return (jlong) asset->getInstance();
 }
 
 extern "C" JNIEXPORT jint JNICALL
@@ -308,30 +249,6 @@ Java_com_google_android_filament_gltfio_FilamentAsset_nGetMorphTargetNames(JNIEn
         const char* name = asset->getMorphTargetNameAt(entity, i);
         env->SetObjectArrayElement(result, (jsize) i, env->NewStringUTF(name));
     }
-}
-
-extern "C" JNIEXPORT jint JNICALL
-Java_com_google_android_filament_gltfio_FilamentAsset_nGetMaterialVariantCount(JNIEnv*, jclass,
-        jlong nativeAsset) {
-    FilamentAsset* asset = (FilamentAsset*) nativeAsset;
-    return (jint) asset->getMaterialVariantCount();
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_google_android_filament_gltfio_FilamentAsset_nGetMaterialVariantNames(JNIEnv* env, jclass,
-        jlong nativeAsset, jobjectArray result) {
-    FilamentAsset* asset = (FilamentAsset*) nativeAsset;
-    for (int i = 0; i < asset->getMaterialVariantCount(); ++i) {
-        const char* name = asset->getMaterialVariantName(i);
-        env->SetObjectArrayElement(result, (jsize) i, env->NewStringUTF(name));
-    }
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_google_android_filament_gltfio_FilamentAsset_nApplyMaterialVariant(JNIEnv* env, jclass,
-        jlong nativeAsset, jint variantIndex) {
-    FilamentAsset* asset = (FilamentAsset*) nativeAsset;
-    asset->applyMaterialVariant(variantIndex);
 }
 
 extern "C" JNIEXPORT void JNICALL

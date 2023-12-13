@@ -16,14 +16,13 @@
 
 #include "details/MorphTargetBuffer.h"
 
-#include "private/filament/SibGenerator.h"
+#include <private/filament/SibStructs.h>
 
-#include "details/Engine.h"
+#include <details/Engine.h>
 
 #include "FilamentAPI-impl.h"
 
 #include <math/mat4.h>
-
 #include <math/norm.h>
 
 namespace filament {
@@ -55,7 +54,7 @@ MorphTargetBuffer::Builder& MorphTargetBuffer::Builder::count(size_t count) noex
 }
 
 MorphTargetBuffer* MorphTargetBuffer::Builder::build(Engine& engine) {
-    return upcast(engine).createMorphTargetBuffer(*this);
+    return downcast(engine).createMorphTargetBuffer(*this);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -103,6 +102,11 @@ FMorphTargetBuffer::EmptyMorphTargetBuilder::EmptyMorphTargetBuilder() {
 FMorphTargetBuffer::FMorphTargetBuffer(FEngine& engine, const Builder& builder)
         : mVertexCount(builder->mVertexCount),
           mCount(builder->mCount) {
+
+    if (UTILS_UNLIKELY(engine.getActiveFeatureLevel() == FeatureLevel::FEATURE_LEVEL_0)) {
+        return;
+    }
+
     FEngine::DriverApi& driver = engine.getDriverApi();
 
     // create buffer (here a texture) to store the morphing vertex data
@@ -121,18 +125,25 @@ FMorphTargetBuffer::FMorphTargetBuffer(FEngine& engine, const Builder& builder)
             TextureUsage::DEFAULT);
 
     // create and update sampler group
-    mSbHandle = driver.createSamplerGroup(PerRenderPrimitiveMorphingSib::SAMPLER_COUNT);
+    mSbHandle = driver.createSamplerGroup(PerRenderPrimitiveMorphingSib::SAMPLER_COUNT,
+            utils::FixedSizeString<32>("Morph target samplers"));
     SamplerGroup samplerGroup(PerRenderPrimitiveMorphingSib::SAMPLER_COUNT);
-    samplerGroup.setSampler(PerRenderPrimitiveMorphingSib::POSITIONS, mPbHandle, {});
-    samplerGroup.setSampler(PerRenderPrimitiveMorphingSib::TANGENTS, mTbHandle, {});
-    driver.updateSamplerGroup(mSbHandle, std::move(samplerGroup.toCommandStream()));
+    samplerGroup.setSampler(PerRenderPrimitiveMorphingSib::POSITIONS, { mPbHandle, {}});
+    samplerGroup.setSampler(PerRenderPrimitiveMorphingSib::TANGENTS, { mTbHandle, {}});
+    driver.updateSamplerGroup(mSbHandle, samplerGroup.toBufferDescriptor(driver));
 }
 
 void FMorphTargetBuffer::terminate(FEngine& engine) {
     FEngine::DriverApi& driver = engine.getDriverApi();
-    driver.destroySamplerGroup(mSbHandle);
-    driver.destroyTexture(mTbHandle);
-    driver.destroyTexture(mPbHandle);
+    if (UTILS_LIKELY(mSbHandle)) {
+        driver.destroySamplerGroup(mSbHandle);
+    }
+    if (UTILS_LIKELY(mTbHandle)) {
+        driver.destroyTexture(mTbHandle);
+    }
+    if (UTILS_LIKELY(mPbHandle)) {
+        driver.destroyTexture(mPbHandle);
+    }
 }
 
 void FMorphTargetBuffer::setPositionsAt(FEngine& engine, size_t targetIndex,
@@ -221,7 +232,7 @@ void FMorphTargetBuffer::updateDataAt(backend::DriverApi& driver,
     // 'out' buffer is going to be used up to 3 times, so for simplicity we use a shared_buffer
     // to manage its lifetime. One side effect of this is that the callbacks below will allocate
     // a small object on the heap.
-    std::shared_ptr<void> allocation((void*)out, ::free);
+    std::shared_ptr<void> const allocation((void*)out, ::free);
 
     // Note: because the texture width is up to 2048, we're expecting that most of the time
     // only a single texture update call will be necessary (i.e. that there are no more

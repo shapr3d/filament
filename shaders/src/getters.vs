@@ -2,24 +2,26 @@
 // Uniforms access
 //------------------------------------------------------------------------------
 
-mat4 getLightFromWorldMatrix() {
-    return frameUniforms.lightFromWorldMatrix[0];
-}
-
 /** @public-api */
 mat4 getWorldFromModelMatrix() {
-    return objectUniforms.worldFromModelMatrix;
+    return object_uniforms_worldFromModelMatrix;
 }
 
 /** @public-api */
 mat3 getWorldFromModelNormalMatrix() {
-    return objectUniforms.worldFromModelNormalMatrix;
+    return object_uniforms_worldFromModelNormalMatrix;
+}
+
+/** sort-of public */
+float getObjectUserData() {
+    return object_uniforms_userData;
 }
 
 //------------------------------------------------------------------------------
 // Attributes access
 //------------------------------------------------------------------------------
 
+#if __VERSION__ >= 300
 /** @public-api */
 int getVertexIndex() {
 #if defined(TARGET_METAL_ENVIRONMENT) || defined(TARGET_VULKAN_ENVIRONMENT)
@@ -28,17 +30,10 @@ int getVertexIndex() {
     return gl_VertexID;
 #endif
 }
-
-/** @public-api */
-int getInstanceIndex() {
-#if defined(TARGET_METAL_ENVIRONMENT) || defined(TARGET_VULKAN_ENVIRONMENT)
-    return gl_InstanceIndex;
-#else
-    return gl_InstanceID;
 #endif
-}
 
 #if defined(VARIANT_HAS_SKINNING_OR_MORPHING)
+#define MAX_SKINNING_BUFFER_WIDTH 2048u
 vec3 mulBoneNormal(vec3 n, uint i) {
 
     highp mat3 cof;
@@ -68,43 +63,112 @@ vec3 mulBoneVertex(vec3 v, uint i) {
     return v.x * m[0].xyz + (v.y * m[1].xyz + (v.z * m[2].xyz + m[3].xyz));
 }
 
-void skinNormal(inout vec3 n, const uvec4 ids, const vec4 weights) {
-    n =   mulBoneNormal(n, ids.x) * weights.x
-        + mulBoneNormal(n, ids.y) * weights.y
-        + mulBoneNormal(n, ids.z) * weights.z
-        + mulBoneNormal(n, ids.w) * weights.w;
+void skinPosition(inout vec3 p, const uvec4 ids, const vec4 weights) {
+    // standard skinning for 4 weights, some of them could be zero
+    if (weights.w >= 0.0) {
+        p = weights.x * mulBoneVertex(p, uint(ids.x))
+            + weights.y * mulBoneVertex(p, uint(ids.y))
+            + weights.z * mulBoneVertex(p, uint(ids.z))
+            + weights.w * mulBoneVertex(p, uint(ids.w));
+        return;
+    }
+    // skinning for >4 weights
+    vec3 posSum = weights.x * mulBoneVertex(p, uint(ids.x));
+    posSum += weights.y * mulBoneVertex(p, uint(ids.y));
+    posSum += weights.z * mulBoneVertex(p, uint(ids.z));
+    uint pairIndex = uint(-weights.w - 1.);
+    uint pairStop = pairIndex + uint(ids.w - 3u);
+    for (uint i = pairIndex; i < pairStop; ++i) {
+        ivec2 texcoord = ivec2(i % MAX_SKINNING_BUFFER_WIDTH, i / MAX_SKINNING_BUFFER_WIDTH);
+        vec2 indexWeight = texelFetch(bonesBuffer_indicesAndWeights, texcoord, 0).rg;
+        posSum += mulBoneVertex(p, uint(indexWeight.r)) * indexWeight.g;
+    }
+    p = posSum;
 }
 
-void skinPosition(inout vec3 p, const uvec4 ids, const vec4 weights) {
-    p =   mulBoneVertex(p, ids.x) * weights.x
-        + mulBoneVertex(p, ids.y) * weights.y
-        + mulBoneVertex(p, ids.z) * weights.z
-        + mulBoneVertex(p, ids.w) * weights.w;
+void skinNormal(inout vec3 n, const uvec4 ids, const vec4 weights) {
+    // standard skinning for 4 weights, some of them could be zero
+    if (weights.w >= 0.0) {
+        n = weights.x * mulBoneNormal(n, uint(ids.x))
+            + weights.y * mulBoneNormal(n, uint(ids.y))
+            + weights.z * mulBoneNormal(n, uint(ids.z))
+            + weights.w * mulBoneNormal(n, uint(ids.w));
+        return;
+    }
+    // skinning for >4 weights
+    vec3 normSum = weights.x * mulBoneNormal(n, uint(ids.x));
+    normSum += weights.y * mulBoneNormal(n, uint(ids.y));
+    normSum += weights.z * mulBoneNormal(n, uint(ids.z));
+    uint pairIndex = uint(-weights.w - 1.);
+    uint pairStop = pairIndex + uint(ids.w - 3u);
+    for (uint i = pairIndex; i < pairStop; i = i + 1u) {
+        ivec2 texcoord = ivec2(i % MAX_SKINNING_BUFFER_WIDTH, i / MAX_SKINNING_BUFFER_WIDTH);
+        vec2 indexWeight = texelFetch(bonesBuffer_indicesAndWeights, texcoord, 0).rg;
+
+        normSum += mulBoneNormal(n, uint(indexWeight.r)) * indexWeight.g;
+    }
+    n = normSum;
+}
+
+void skinNormalTangent(inout vec3 n, inout vec3 t, const uvec4 ids, const vec4 weights) {
+    // standard skinning for 4 weights, some of them could be zero
+    if (weights.w >= 0.0) {
+        n = weights.x * mulBoneNormal(n, uint(ids.x))
+            + weights.y * mulBoneNormal(n, uint(ids.y))
+            + weights.z * mulBoneNormal(n, uint(ids.z))
+            + weights.w * mulBoneNormal(n, uint(ids.w));
+        t = weights.x * mulBoneNormal(t, uint(ids.x))
+            + weights.y * mulBoneNormal(t, uint(ids.y))
+            + weights.z * mulBoneNormal(t, uint(ids.z))
+            + weights.w * mulBoneNormal(t, uint(ids.w));
+        return;
+    }
+    // skinning for >4 weights
+    vec3 normSum = weights.x * mulBoneNormal(n, uint(ids.x));
+    normSum += weights.y * mulBoneNormal(n, uint(ids.y)) ;
+    normSum += weights.z * mulBoneNormal(n, uint(ids.z));
+    vec3 tangSum = weights.x * mulBoneNormal(t, uint(ids.x));
+    tangSum += weights.y * mulBoneNormal(t, uint(ids.y));
+    tangSum += weights.z * mulBoneNormal(t, uint(ids.z));
+    uint pairIndex = uint(-weights.w - 1.);
+    uint pairStop = pairIndex + uint(ids.w - 3u);
+    for (uint i = pairIndex; i < pairStop; i = i + 1u) {
+        ivec2 texcoord = ivec2(i % MAX_SKINNING_BUFFER_WIDTH, i / MAX_SKINNING_BUFFER_WIDTH);
+        vec2 indexWeight = texelFetch(bonesBuffer_indicesAndWeights, texcoord, 0).rg;
+
+        normSum += mulBoneNormal(n, uint(indexWeight.r)) * indexWeight.g;
+        tangSum += mulBoneNormal(t, uint(indexWeight.r)) * indexWeight.g;
+    }
+    n = normSum;
+    t = tangSum;
 }
 
 #define MAX_MORPH_TARGET_BUFFER_WIDTH 2048
 
 void morphPosition(inout vec4 p) {
     ivec3 texcoord = ivec3(getVertexIndex() % MAX_MORPH_TARGET_BUFFER_WIDTH, getVertexIndex() / MAX_MORPH_TARGET_BUFFER_WIDTH, 0);
-    for (uint i = 0u; i < objectUniforms.morphTargetCount; ++i) {
+    int c = object_uniforms_morphTargetCount;
+    for (int i = 0; i < c; ++i) {
         float w = morphingUniforms.weights[i][0];
         if (w != 0.0) {
-            texcoord.z = int(i);
+            texcoord.z = i;
             p += w * texelFetch(morphTargetBuffer_positions, texcoord, 0);
         }
     }
 }
 
 void morphNormal(inout vec3 n) {
+    vec3 baseNormal = n;
     ivec3 texcoord = ivec3(getVertexIndex() % MAX_MORPH_TARGET_BUFFER_WIDTH, getVertexIndex() / MAX_MORPH_TARGET_BUFFER_WIDTH, 0);
-    for (uint i = 0u; i < objectUniforms.morphTargetCount; ++i) {
+    int c = object_uniforms_morphTargetCount;
+    for (int i = 0; i < c; ++i) {
         float w = morphingUniforms.weights[i][0];
         if (w != 0.0) {
-            texcoord.z = int(i);
+            texcoord.z = i;
             ivec4 tangent = texelFetch(morphTargetBuffer_tangents, texcoord, 0);
             vec3 normal;
             toTangentFrame(float4(tangent) * (1.0 / 32767.0), normal);
-            n += w * normal;
+            n += w * (normal - baseNormal);
         }
     }
 }
@@ -116,18 +180,18 @@ vec4 getPosition() {
 
 #if defined(VARIANT_HAS_SKINNING_OR_MORPHING)
 
-    if ((objectUniforms.flags & FILAMENT_OBJECT_MORPHING_ENABLED_BIT) != 0u) {
-        #if defined(LEGACY_MORPHING)
+    if ((object_uniforms_flagsChannels & FILAMENT_OBJECT_MORPHING_ENABLED_BIT) != 0) {
+#if defined(LEGACY_MORPHING)
         pos += morphingUniforms.weights[0] * mesh_custom0;
         pos += morphingUniforms.weights[1] * mesh_custom1;
         pos += morphingUniforms.weights[2] * mesh_custom2;
         pos += morphingUniforms.weights[3] * mesh_custom3;
-        #else
+#else
         morphPosition(pos);
-        #endif
+#endif
     }
 
-    if ((objectUniforms.flags & FILAMENT_OBJECT_SKINNING_ENABLED_BIT) != 0u) {
+    if ((object_uniforms_flagsChannels & FILAMENT_OBJECT_SKINNING_ENABLED_BIT) != 0) {
         skinPosition(pos.xyz, mesh_bone_indices, mesh_bone_weights);
     }
 
@@ -190,8 +254,12 @@ vec4 computeWorldPosition() {
     // GL convention to inverted DX convention
     p.z = p.z * -0.5 + 0.5;
     vec4 position = transform * p;
-    if (abs(position.w) < MEDIUMP_FLT_MIN) {
-        position.w = position.w < 0.0 ? -MEDIUMP_FLT_MIN : MEDIUMP_FLT_MIN;
+    // w could be zero (e.g.: with the skybox) which corresponds to an infinite distance in
+    // world-space. However, we want to avoid infinites and divides-by-zero, so we use a very
+    // small number instead in that case (2^-63 seem to work well).
+    const highp float ALMOST_ZERO_FLT = 1.08420217249e-19;
+    if (abs(position.w) < ALMOST_ZERO_FLT) {
+        position.w = position.w < 0.0 ? -ALMOST_ZERO_FLT : ALMOST_ZERO_FLT;
     }
     return position * (1.0 / position.w);
 #else

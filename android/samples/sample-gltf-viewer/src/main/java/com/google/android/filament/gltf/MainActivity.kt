@@ -26,8 +26,10 @@ import android.widget.TextView
 import android.widget.Toast
 import com.google.android.filament.Fence
 import com.google.android.filament.IndirectLight
+import com.google.android.filament.Material
 import com.google.android.filament.Skybox
 import com.google.android.filament.View
+import com.google.android.filament.View.OnPickCallback
 import com.google.android.filament.utils.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -56,7 +58,9 @@ class MainActivity : Activity() {
     private lateinit var modelViewer: ModelViewer
     private lateinit var titlebarHint: TextView
     private val doubleTapListener = DoubleTapListener()
+    private val singleTapListener = SingleTapListener()
     private lateinit var doubleTapDetector: GestureDetector
+    private lateinit var singleTapDetector: GestureDetector
     private var remoteServer: RemoteServer? = null
     private var statusToast: Toast? = null
     private var statusText: String? = null
@@ -77,6 +81,7 @@ class MainActivity : Activity() {
         choreographer = Choreographer.getInstance()
 
         doubleTapDetector = GestureDetector(applicationContext, doubleTapListener)
+        singleTapDetector = GestureDetector(applicationContext, singleTapListener)
 
         modelViewer = ModelViewer(surfaceView)
         viewerContent.view = modelViewer.view
@@ -88,6 +93,7 @@ class MainActivity : Activity() {
         surfaceView.setOnTouchListener { _, event ->
             modelViewer.onTouchEvent(event)
             doubleTapDetector.onTouchEvent(event)
+            singleTapDetector.onTouchEvent(event)
             true
         }
 
@@ -229,6 +235,7 @@ class MainActivity : Activity() {
                 modelViewer.scene.skybox = sky
                 modelViewer.scene.indirectLight = ibl
                 viewerContent.indirectLight = ibl
+
             }
         }
     }
@@ -337,6 +344,11 @@ class MainActivity : Activity() {
         remoteServer?.close()
     }
 
+    override fun onBackPressed() {
+        super.onBackPressed()
+        finish()
+    }
+
     fun loadModelData(message: RemoteServer.ReceivedMessage) {
         Log.i(TAG, "Downloaded model ${message.label} (${message.buffer.capacity()} bytes)")
         clearStatusText()
@@ -353,9 +365,11 @@ class MainActivity : Activity() {
     fun loadSettings(message: RemoteServer.ReceivedMessage) {
         val json = StandardCharsets.UTF_8.decode(message.buffer).toString()
         viewerContent.assetLights = modelViewer.asset?.lightEntities
-        automation.applySettings(json, viewerContent)
+        automation.applySettings(modelViewer.engine, json, viewerContent)
         modelViewer.view.colorGrading = automation.getColorGrading(modelViewer.engine)
         modelViewer.cameraFocalLength = automation.viewerOptions.cameraFocalLength
+        modelViewer.cameraNear = automation.viewerOptions.cameraNear
+        modelViewer.cameraFar = automation.viewerOptions.cameraFar
         updateRootTransform()
     }
 
@@ -379,6 +393,36 @@ class MainActivity : Activity() {
                     Log.i(TAG, "The Filament backend took $total ms to load the model geometry.")
                     modelViewer.engine.destroyFence(it)
                     loadStartFence = null
+
+                    val materials = mutableSetOf<Material>()
+                    val rcm = modelViewer.engine.renderableManager
+                    modelViewer.scene.forEach {
+                        val entity = it
+                        if (rcm.hasComponent(entity)) {
+                            val ri = rcm.getInstance(entity)
+                            val c = rcm.getPrimitiveCount(ri)
+                            for (i in 0 until c) {
+                                val mi = rcm.getMaterialInstanceAt(ri, i)
+                                val ma = mi.material
+                                materials.add(ma)
+                            }
+                        }
+                    }
+                    materials.forEach {
+                        it.compile(
+                            Material.CompilerPriorityQueue.HIGH,
+                            Material.UserVariantFilterBit.DIRECTIONAL_LIGHTING or
+                            Material.UserVariantFilterBit.DYNAMIC_LIGHTING or
+                            Material.UserVariantFilterBit.SHADOW_RECEIVER,
+                            null, null)
+                        it.compile(
+                            Material.CompilerPriorityQueue.LOW,
+                            Material.UserVariantFilterBit.FOG or
+                            Material.UserVariantFilterBit.SKINNING or
+                            Material.UserVariantFilterBit.SSR or
+                            Material.UserVariantFilterBit.VSM,
+                            null, null)
+                    }
                 }
             }
 
@@ -417,10 +461,25 @@ class MainActivity : Activity() {
 
     // Just for testing purposes, this releases the current model and reloads the default model.
     inner class DoubleTapListener : GestureDetector.SimpleOnGestureListener() {
-        override fun onDoubleTap(e: MotionEvent?): Boolean {
+        override fun onDoubleTap(e: MotionEvent): Boolean {
             modelViewer.destroyModel()
             createDefaultRenderables()
             return super.onDoubleTap(e)
+        }
+    }
+
+    // Just for testing purposes
+    inner class SingleTapListener : GestureDetector.SimpleOnGestureListener() {
+        override fun onSingleTapUp(event: MotionEvent): Boolean {
+            modelViewer.view.pick(
+                event.x.toInt(),
+                surfaceView.height - event.y.toInt(),
+                surfaceView.handler, {
+                    val name = modelViewer.asset!!.getName(it.renderable)
+                    Log.v("Filament", "Picked ${it.renderable}: " + name)
+                },
+            )
+            return super.onSingleTapUp(event)
         }
     }
 }

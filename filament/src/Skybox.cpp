@@ -21,47 +21,47 @@
 namespace filament {
 
 void Skybox::setLayerMask(uint8_t select, uint8_t values) noexcept {
-    upcast(this)->setLayerMask(select, values);
+    downcast(this)->setLayerMask(select, values);
 }
 
 uint8_t Skybox::getLayerMask() const noexcept {
-    return upcast(this)->getLayerMask();
+    return downcast(this)->getLayerMask();
 }
 
 float Skybox::getIntensity() const noexcept {
-    return upcast(this)->getIntensity();
+    return downcast(this)->getIntensity();
 }
 
 void Skybox::setIntensity(float intensity) noexcept {
-    upcast(this)->setIntensity(intensity);
+    downcast(this)->setIntensity(intensity);
 }
 
 void Skybox::setColor(math::float4 color) noexcept {
-    upcast(this)->setColor(color);
+    downcast(this)->setColor(color);
 }
 
 void Skybox::setType(SkyboxType type) noexcept {
-    upcast(this)->setType(type);
+    downcast(this)->setType(type);
 }
 
 void Skybox::setUiScale(float scale) noexcept {
-    upcast(this)->setUiScale(scale);
+    downcast(this)->setUiScale(scale);
 }
 
 void Skybox::setUpDirectionAxis(UpDirectionAxis axis) noexcept {
-    upcast(this)->setUpDirectionAxis(axis);
+    downcast(this)->setUpDirectionAxis(axis);
 }
 
 void Skybox::setCheckerboardGrays(math::float2 grays) noexcept {
-    upcast(this)->setCheckerboardGrays(grays);
+    downcast(this)->setCheckerboardGrays(grays);
 }
 
 void Skybox::setPriority(uint8_t priority) noexcept {
-    upcast(this)->setPriority(priority);
+    downcast(this)->setPriority(priority);
 }
 
 Texture const* Skybox::getTexture() const noexcept {
-    return upcast(this)->getTexture();
+    return downcast(this)->getTexture();
 }
 
 } // namespace filament

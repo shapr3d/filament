@@ -7,7 +7,9 @@ material {
             type : float,
             name : direction,
             precision: low
-        },
+        }
+    ],
+    subpasses : [
         {
             type : subpassInput,
             format : float,
@@ -30,12 +32,6 @@ material {
     depthCulling : false,
     domain: postprocess,
     framebufferFetch: true
-}
-
-vertex {
-    void postProcessVertex(inout PostProcessVertexInputs postProcess) {
-        postProcess.vertex.xy = postProcess.normalizedUV;
-    }
 }
 
 fragment {

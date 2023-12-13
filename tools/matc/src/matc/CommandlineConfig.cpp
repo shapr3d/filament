@@ -34,6 +34,11 @@ static void usage(char* name) {
     std::string exec_name(utils::Path(name).getName());
     std::string usage(
             "MATC is a command-line tool to compile material definition.\n"
+            "\n"
+            "Caution! MATC was designed to operate on trusted inputs. To minimize the risk of\n"
+            "triggering memory corruption vulnerabilities, please make sure that the files passed\n"
+            "to MATC come from a trusted source, or run MATC in a sandboxed environment.\n"
+            "\n"
             "Usages:\n"
             "    MATC [options] <input-file>\n"
             "\n"
@@ -55,16 +60,26 @@ static void usage(char* name) {
             "       Specify the target API: opengl (default), vulkan, metal, or all\n"
             "       This flag can be repeated to individually select APIs for inclusion:\n"
             "           MATC --api opengl --api metal ...\n\n"
+            "   --feature-level, -l\n"
+            "       Specify the maximum feature level allowed (default is 3).\n\n"
+            "   --no-essl1, -1\n"
+            "       Don't generate ESSL 1.0 code even for Feature Level 0 mobile shaders.\n"
+            "       Shaders are still validated against ESSL 1.0.\n\n"
             "   --define, -D\n"
             "       Add a preprocessor define macro via <macro>=<value>. <value> defaults to 1 if omitted.\n"
             "       Can be repeated to specify multiple definitions:\n"
             "           MATC -Dfoo=1 -Dbar -Dbuzz=100 ...\n\n"
+            "   --template <macro>=<string>, -T<macro>=<string>\n"
+            "       Replaces ${MACRO} with specified string before parsing\n"
+            "       Unlike --define, this applies to the material specification, not GLSL.\n"
+            "       Can be repeated to specify multiple macros:\n"
+            "           MATC -TBLENDING=fade -TDOUBLESIDED=false ...\n\n"
             "   --reflect, -r\n"
             "       Reflect the specified metadata as JSON: parameters\n\n"
             "   --variant-filter=<filter>, -V <filter>\n"
             "       Filter out specified comma-separated variants:\n"
             "           directionalLighting, dynamicLighting, shadowReceiver, skinning, vsm, fog,"
-            "           ssr (screen-space reflections)\n"
+            "           ssr (screen-space reflections), stereo\n"
             "       This variant filter is merged with the filter from the material, if any\n\n"
             "   --version, -v\n"
             "       Print the material version number\n\n"
@@ -79,6 +94,8 @@ static void usage(char* name) {
             "       Specify output format: blob (default) or header\n\n"
             "   --debug, -d\n"
             "       Generate extra data for debugging\n\n"
+            "   --no-sampler-validation, -F\n"
+            "       Skip validation of number of sampler used\n\n"
             "   --print, -t\n"
             "       Print generated shaders for debugging\n\n"
     );
@@ -119,6 +136,8 @@ static filament::UserVariantFilterMask parseVariantFilter(const std::string& arg
             variantFilter |= (uint32_t) filament::UserVariantFilterBit::FOG;
         } else if (item == "ssr") {
             variantFilter |= (uint32_t) filament::UserVariantFilterBit::SSR;
+        } else if (item == "stereo") {
+            variantFilter |= (uint32_t) filament::UserVariantFilterBit::STE;
         }
     }
     return variantFilter;
@@ -128,8 +147,7 @@ CommandlineConfig::CommandlineConfig(int argc, char** argv) : Config(), mArgc(ar
     mIsValid = parse();
 }
 
-static void parseDefine(std::string defineString,
-        std::unordered_map<std::string, std::string>& defines) {
+static void parseDefine(std::string defineString, Config::StringReplacementMap& defines) {
     const char* const defineArg = defineString.c_str();
     const size_t length = defineString.length();
 
@@ -156,10 +174,10 @@ static void parseDefine(std::string defineString,
 }
 
 bool CommandlineConfig::parse() {
-    static constexpr const char* OPTSTR = "hlxo:f:dm:a:p:D:OSEr:vV:gtw";
+    static constexpr const char* OPTSTR = "hLxo:f:dm:a:l:p:D:T:OSEr:vV:gtwF1";
     static const struct option OPTIONS[] = {
             { "help",                    no_argument, nullptr, 'h' },
-            { "license",                 no_argument, nullptr, 'l' },
+            { "license",                 no_argument, nullptr, 'L' },
             { "output",            required_argument, nullptr, 'o' },
             { "output-format",     required_argument, nullptr, 'f' },
             { "debug",                   no_argument, nullptr, 'd' },
@@ -171,11 +189,15 @@ bool CommandlineConfig::parse() {
             { "optimize-none",           no_argument, nullptr, 'g' },
             { "preprocessor-only",       no_argument, nullptr, 'E' },
             { "api",               required_argument, nullptr, 'a' },
+            { "feature-level",     required_argument, nullptr, 'l' },
+            { "no-essl1",                no_argument, nullptr, '1' },
             { "define",            required_argument, nullptr, 'D' },
+            { "template",          required_argument, nullptr, 'T' },
             { "reflect",           required_argument, nullptr, 'r' },
             { "print",                   no_argument, nullptr, 't' },
             { "version",                 no_argument, nullptr, 'v' },
             { "raw",                     no_argument, nullptr, 'w' },
+            { "no-sampler-validation",   no_argument, nullptr, 'F' },
             { nullptr, 0, nullptr, 0 }  // termination of the option list
     };
 
@@ -190,7 +212,7 @@ bool CommandlineConfig::parse() {
                 usage(mArgv[0]);
                 exit(0);
                 break;
-            case 'l':
+            case 'L':
                 license();
                 exit(0);
                 break;
@@ -239,8 +261,27 @@ bool CommandlineConfig::parse() {
                     return false;
                 }
                 break;
+            case 'l': {
+                auto featureLevel = filament::backend::FeatureLevel(std::atoi(arg.c_str()));
+                mFeatureLevel = filament::backend::FeatureLevel::FEATURE_LEVEL_3;
+                switch (featureLevel) {
+                    case filament::backend::FeatureLevel::FEATURE_LEVEL_0:
+                    case filament::backend::FeatureLevel::FEATURE_LEVEL_1:
+                    case filament::backend::FeatureLevel::FEATURE_LEVEL_2:
+                    case filament::backend::FeatureLevel::FEATURE_LEVEL_3:
+                        mFeatureLevel = featureLevel;
+                        break;
+                }
+                break;
+            }
+            case '1':
+                mIncludeEssl1 = false;
+                break;
             case 'D':
                 parseDefine(arg, mDefines);
+                break;
+            case 'T':
+                parseDefine(arg, mTemplateMap);
                 break;
             case 'v':
                 // Similar to --help, the --version command does an early exit in order to avoid
@@ -273,6 +314,9 @@ bool CommandlineConfig::parse() {
                 break;
             case 'w':
                 mRawShaderMode = true;
+                break;
+            case 'F':
+                mNoSamplerValidation = true;
                 break;
         }
     }

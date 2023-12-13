@@ -12,7 +12,10 @@
 //     When set, support for Vulkan will be excluded.
 //
 // com.google.android.filament.matdbg
-//     When set, enables matdbg, disables shader optimizations
+//     When set, enables matdbg
+//
+// com.google.android.filament.matnopt
+//     When set, disable shader optimizations.
 //
 // com.google.android.filament.skip-samples
 //     Exclude samples from the project. Useful to speed up compilation.
@@ -29,15 +32,12 @@
 
 // Publishing to Maven Central:
 //   - Build and upload artifacts with ./gradlew publish
-//   - Close and release staging repo on Nexus with ./gradlew closeAndReleaseRepository
+//   - Close and release staging repo on Nexus with ./gradlew closeAndReleaseStagingRepository
 //
 // The following is needed in ~/gradle/gradle.properties:
 //
-//     SONATYPE_NEXUS_USERNAME=nexus_user
-//     SONATYPE_NEXUS_PASSWORD=nexus_password
-//
-//     nexusUsername=nexus_user
-//     nexusPassword=nexus_password
+//     sonatypeUsername=nexus_user
+//     sonatypePassword=nexus_password
 //
 //     signing.keyId=pgp_key_id
 //     signing.password=pgp_key_password
@@ -47,7 +47,7 @@
 buildscript {
     def path = providers
             .gradleProperty("com.google.android.filament.dist-dir")
-            .forUseAtConfigurationTime().get()
+            .get()
 
     def directory = objects.fileProperty().fileValue(new File(path)).getAsFile().get()
     def filamentPath = directory.absolutePath
@@ -59,18 +59,19 @@ buildscript {
     // Warning: changing this property does not work well with incremental builds.
     def excludeVulkan = providers
             .gradleProperty("com.google.android.filament.exclude-vulkan")
-            .forUseAtConfigurationTime()
             .isPresent()
 
     def matdbg = providers
             .gradleProperty("com.google.android.filament.matdbg")
-            .forUseAtConfigurationTime()
+            .isPresent()
+
+    def matnopt = providers
+            .gradleProperty("com.google.android.filament.matnopt")
             .isPresent()
 
     def abis = ["arm64-v8a", "armeabi-v7a", "x86_64", "x86"]
     def newAbis = providers
             .gradleProperty("com.google.android.filament.abis")
-            .forUseAtConfigurationTime()
             .get()
             .split(',')
     if (!newAbis.contains("all")) {
@@ -78,19 +79,22 @@ buildscript {
     }
 
     ext.versions = [
+        'jdk': 17,
         'minSdk': 19,
-        'targetSdk': 31,
-        'compileSdk': 31,
-        'kotlin': '1.6.21',
-        'kotlin_coroutines': '1.6.1',
-        'buildTools': '32.0.0',
-        'ndk': '24.0.8215888'
+        'targetSdk': 33,
+        'compileSdk': 33,
+        'kotlin': '1.9.0',
+        'kotlin_coroutines': '1.7.2',
+        'buildTools': '34.0.0',
+        'ndk': '25.1.8937393',
+        'androidx_core': '1.10.1',
+        'androidx_annotations': '1.6.0'
     ]
 
     ext.deps = [
         'androidx': [
-            'annotations': "androidx.annotation:annotation:1.3.0",
-            'core': "androidx.core:core:1.7.0",
+            'annotations': "androidx.annotation:annotation:${versions.androidx_annotations}",
+            'core': "androidx.core:core:${versions.androidx_core}",
         ],
         'kotlin': "org.jetbrains.kotlin:kotlin-stdlib-jdk8:${versions.kotlin}",
         'coroutines': [
@@ -100,39 +104,43 @@ buildscript {
     ]
 
     dependencies {
-        // NOTE: See TODO in gradle.properties once we move to Gradle 7.4
-        classpath 'com.android.tools.build:gradle:7.2.0'
+        classpath 'com.android.tools.build:gradle:8.1.0'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${versions.kotlin}"
     }
 
     ext.cmakeArgs = [
+        "--no-warn-unused-cli",
         "-DANDROID_PIE=ON",
         "-DANDROID_PLATFORM=21",
         "-DANDROID_STL=c++_static",
         "-DFILAMENT_DIST_DIR=${filamentPath}".toString(),
         "-DFILAMENT_SUPPORTS_VULKAN=${excludeVulkan ? 'OFF' : 'ON'}".toString(),
         "-DFILAMENT_ENABLE_MATDBG=${matdbg ? 'ON' : 'OFF'}".toString(),
-        "-DFILAMENT_DISABLE_MATOPT=${matdbg ? 'ON' : 'OFF'}".toString()
+        "-DFILAMENT_DISABLE_MATOPT=${matnopt ? 'ON' : 'OFF'}".toString()
     ]
 
     ext.cppFlags = [
         "-std=c++17",
-        "-Wno-unused-command-line-argument",
-        "-Wl,--hash-style=both", // Required to support API levels below 23
         "-fno-stack-protector",
         "-fno-exceptions",
         "-fno-unwind-tables",
         "-fno-asynchronous-unwind-tables",
         "-fno-rtti",
         "-ffast-math",
+        "-fno-finite-math-only",
         "-ffp-contract=fast",
         "-fvisibility-inlines-hidden",
         "-fvisibility=hidden",
         "-fomit-frame-pointer",
         "-ffunction-sections",
         "-fdata-sections",
+        "-no-canonical-prefixes",
+        "-Wformat",
+        "-Werror=format-security",
+        "-Wno-unused-command-line-argument",
         "-Wl,--gc-sections",
         "-Wl,-Bsymbolic-functions",
+        "-Wl,--hash-style=both", // Required to support API levels below 23
     ]
 
     ext.abis = abis
@@ -144,14 +152,18 @@ buildscript {
 }
 
 plugins {
-    id 'io.codearte.nexus-staging' version '0.30.0'
+    id "io.github.gradle-nexus.publish-plugin" version "1.3.0"
 }
 
-// Nexus Staging configuration
-// See https://github.com/Codearte/gradle-nexus-staging-plugin/
-nexusStaging {
+// See https://github.com/gradle-nexus/publish-plugin
+// Publish to https://oss.sonatype.org/ (not s01)
+nexusPublishing {
     packageGroup = 'com.google.android'
-    stagingProfileId = '9a75a224a4f17b'
+    repositories {
+        sonatype {
+            stagingProfileId = '9a75a224a4f17b'
+        }
+    }
 }
 
 subprojects {
@@ -183,6 +195,7 @@ subprojects {
                 }
 
                 ndk {
+                    //noinspection ChromeOsAbiSupport
                     abiFilters(*rootProject.ext.abis)
                 }
 
@@ -203,8 +216,8 @@ subprojects {
             }
 
             compileOptions {
-                sourceCompatibility JavaVersion.VERSION_1_8
-                targetCompatibility JavaVersion.VERSION_1_8
+                sourceCompatibility versions.jdk
+                targetCompatibility versions.jdk
             }
         }
     }

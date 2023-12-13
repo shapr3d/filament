@@ -53,7 +53,7 @@ IndexBuffer::Builder& IndexBuffer::Builder::enableBufferObject(bool enabled) noe
 }
 
 IndexBuffer* IndexBuffer::Builder::build(Engine& engine) {
-    return upcast(engine).createIndexBuffer(*this);
+    return downcast(engine).createIndexBuffer(*this);
 }
 
 // ------------------------------------------------------------------------------------------------

@@ -60,6 +60,7 @@ struct Optimizer::Impl {
 
   spv_target_env target_env;      // Target environment.
   opt::PassManager pass_manager;  // Internal implementation pass manager.
+  std::unordered_set<uint32_t> live_locs;  // Arg to debug dead output passes
 };
 
 Optimizer::Optimizer(spv_target_env env) : impl_(new Impl(env)) {
@@ -288,6 +289,8 @@ bool Optimizer::RegisterPassFromFlag(const std::string& flag) {
     RegisterPass(CreateStripDebugInfoPass());
   } else if (pass_name == "strip-reflect") {
     RegisterPass(CreateStripReflectInfoPass());
+  } else if (pass_name == "strip-nonsemantic") {
+    RegisterPass(CreateStripNonSemanticInfoPass());
   } else if (pass_name == "set-spec-const-default-value") {
     if (pass_args.size() > 0) {
       auto spec_ids_vals =
@@ -322,6 +325,8 @@ bool Optimizer::RegisterPassFromFlag(const std::string& flag) {
     RegisterPass(CreateLocalAccessChainConvertPass());
   } else if (pass_name == "replace-desc-array-access-using-var-index") {
     RegisterPass(CreateReplaceDescArrayAccessUsingVarIndexPass());
+  } else if (pass_name == "spread-volatile-semantics") {
+    RegisterPass(CreateSpreadVolatileSemanticsPass());
   } else if (pass_name == "descriptor-scalar-replacement") {
     RegisterPass(CreateDescriptorScalarReplacementPass());
   } else if (pass_name == "eliminate-dead-code-aggressive") {
@@ -517,6 +522,12 @@ bool Optimizer::RegisterPassFromFlag(const std::string& flag) {
     RegisterPass(CreateAmdExtToKhrPass());
   } else if (pass_name == "interpolate-fixup") {
     RegisterPass(CreateInterpolateFixupPass());
+  } else if (pass_name == "remove-dont-inline") {
+    RegisterPass(CreateRemoveDontInlinePass());
+  } else if (pass_name == "eliminate-dead-input-components") {
+    RegisterPass(CreateEliminateDeadInputComponentsSafePass());
+  } else if (pass_name == "fix-func-call-param") {
+    RegisterPass(CreateFixFuncCallArgumentsPass());
   } else if (pass_name == "convert-to-sampled-image") {
     if (pass_args.size() > 0) {
       auto descriptor_set_binding_pairs =
@@ -613,10 +624,16 @@ bool Optimizer::Run(const uint32_t* original_binary,
     assert(optimized_binary_with_nop.size() == original_binary_size &&
            "Binary size unexpectedly changed despite the optimizer saying "
            "there was no change");
-    assert(memcmp(optimized_binary_with_nop.data(), original_binary,
-                  original_binary_size) == 0 &&
-           "Binary content unexpectedly changed despite the optimizer saying "
-           "there was no change");
+
+    // Compare the magic number to make sure the binaries were encoded in the
+    // endianness.  If not, the contents of the binaries will be different, so
+    // do not check the contents.
+    if (optimized_binary_with_nop[0] == original_binary[0]) {
+      assert(memcmp(optimized_binary_with_nop.data(), original_binary,
+                    original_binary_size) == 0 &&
+             "Binary content unexpectedly changed despite the optimizer saying "
+             "there was no change");
+    }
   }
 #endif  // !NDEBUG
 
@@ -653,8 +670,12 @@ Optimizer::PassToken CreateStripDebugInfoPass() {
 }
 
 Optimizer::PassToken CreateStripReflectInfoPass() {
+  return CreateStripNonSemanticInfoPass();
+}
+
+Optimizer::PassToken CreateStripNonSemanticInfoPass() {
   return MakeUnique<Optimizer::PassToken::Impl>(
-      MakeUnique<opt::StripReflectInfoPass>());
+      MakeUnique<opt::StripNonSemanticInfoPass>());
 }
 
 Optimizer::PassToken CreateEliminateDeadFunctionsPass() {
@@ -764,9 +785,10 @@ Optimizer::PassToken CreateLocalMultiStoreElimPass() {
       MakeUnique<opt::SSARewritePass>());
 }
 
-Optimizer::PassToken CreateAggressiveDCEPass(bool preserve_interface) {
+Optimizer::PassToken CreateAggressiveDCEPass(bool preserve_interface,
+                                             bool remove_outputs) {
   return MakeUnique<Optimizer::PassToken::Impl>(
-      MakeUnique<opt::AggressiveDCEPass>(preserve_interface));
+      MakeUnique<opt::AggressiveDCEPass>(preserve_interface, remove_outputs));
 }
 
 Optimizer::PassToken CreateRemoveUnusedInterfaceVariablesPass() {
@@ -965,6 +987,11 @@ Optimizer::PassToken CreateReplaceDescArrayAccessUsingVarIndexPass() {
       MakeUnique<opt::ReplaceDescArrayAccessUsingVarIndex>());
 }
 
+Optimizer::PassToken CreateSpreadVolatileSemanticsPass() {
+  return MakeUnique<Optimizer::PassToken::Impl>(
+      MakeUnique<opt::SpreadVolatileSemantics>());
+}
+
 Optimizer::PassToken CreateDescriptorScalarReplacementPass() {
   return MakeUnique<Optimizer::PassToken::Impl>(
       MakeUnique<opt::DescriptorScalarReplacement>());
@@ -984,6 +1011,38 @@ Optimizer::PassToken CreateInterpolateFixupPass() {
       MakeUnique<opt::InterpFixupPass>());
 }
 
+Optimizer::PassToken CreateEliminateDeadInputComponentsPass() {
+  return MakeUnique<Optimizer::PassToken::Impl>(
+      MakeUnique<opt::EliminateDeadIOComponentsPass>(spv::StorageClass::Input,
+                                                     /* safe_mode */ false));
+}
+
+Optimizer::PassToken CreateEliminateDeadOutputComponentsPass() {
+  return MakeUnique<Optimizer::PassToken::Impl>(
+      MakeUnique<opt::EliminateDeadIOComponentsPass>(spv::StorageClass::Output,
+                                                     /* safe_mode */ false));
+}
+
+Optimizer::PassToken CreateEliminateDeadInputComponentsSafePass() {
+  return MakeUnique<Optimizer::PassToken::Impl>(
+      MakeUnique<opt::EliminateDeadIOComponentsPass>(spv::StorageClass::Input,
+                                                     /* safe_mode */ true));
+}
+
+Optimizer::PassToken CreateAnalyzeLiveInputPass(
+    std::unordered_set<uint32_t>* live_locs,
+    std::unordered_set<uint32_t>* live_builtins) {
+  return MakeUnique<Optimizer::PassToken::Impl>(
+      MakeUnique<opt::AnalyzeLiveInputPass>(live_locs, live_builtins));
+}
+
+Optimizer::PassToken CreateEliminateDeadOutputStoresPass(
+    std::unordered_set<uint32_t>* live_locs,
+    std::unordered_set<uint32_t>* live_builtins) {
+  return MakeUnique<Optimizer::PassToken::Impl>(
+      MakeUnique<opt::EliminateDeadOutputStoresPass>(live_locs, live_builtins));
+}
+
 Optimizer::PassToken CreateConvertToSampledImagePass(
     const std::vector<opt::DescriptorSetAndBinding>&
         descriptor_set_binding_pairs) {
@@ -991,4 +1050,18 @@ Optimizer::PassToken CreateConvertToSampledImagePass(
       MakeUnique<opt::ConvertToSampledImagePass>(descriptor_set_binding_pairs));
 }
 
+Optimizer::PassToken CreateInterfaceVariableScalarReplacementPass() {
+  return MakeUnique<Optimizer::PassToken::Impl>(
+      MakeUnique<opt::InterfaceVariableScalarReplacement>());
+}
+
+Optimizer::PassToken CreateRemoveDontInlinePass() {
+  return MakeUnique<Optimizer::PassToken::Impl>(
+      MakeUnique<opt::RemoveDontInline>());
+}
+
+Optimizer::PassToken CreateFixFuncCallArgumentsPass() {
+  return MakeUnique<Optimizer::PassToken::Impl>(
+      MakeUnique<opt::FixFuncCallArgumentsPass>());
+}
 }  // namespace spvtools

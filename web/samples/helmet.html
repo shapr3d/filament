@@ -10,7 +10,7 @@ html, body { height: 100%; }
 body       { margin: 0; overflow: hidden; }
 #container { position: relative; height: 100%; }
 canvas     { position: absolute; width: 100%; height: 100%; }
-#messages  { position: absolute; width: 100%; height: 100%; padding-left: 10px; color:white; }
+#messages  { position: absolute; width: 100%; height: 100%; padding-left: 10px; color:blue; pointer-events: none; }
 </style>
 </head>
 <body>
@@ -20,7 +20,7 @@ canvas     { position: absolute; width: 100%; height: 100%; }
 </div>
 <script src="filament.js"></script>
 <script src="gl-matrix-min.js"></script>
-<script src="https://unpkg.com/gltumble"></script>
+<script src="gltumble.min.js"></script>
 <script>
 
 const env = 'default_env';
@@ -42,6 +42,18 @@ class App {
         const engine = this.engine = Filament.Engine.create(this.canvas);
         const scene = this.scene = engine.createScene();
         this.trackball = new Trackball(canvas, {startSpin: 0.035});
+
+        const messages = document.getElementById('messages');
+
+        canvas.addEventListener('pointerdown', evt => {
+            const x = evt.clientX;
+            const y = this.canvas.getBoundingClientRect().height - 1 - evt.clientY;
+            const dpr = window.devicePixelRatio;
+            this.view.pick(x * dpr, y * dpr, (results) => {
+                const name = this.asset.getName(results.renderable);
+                messages.innerText = name ? ('Picked ' + name) : '';
+            });
+        });
 
         const indirectLight = this.ibl = engine.createIblFromKtx1(ibl_url);
         this.scene.setIndirectLight(indirectLight);
@@ -76,10 +88,8 @@ class App {
         const loader = this.loader = engine.createAssetLoader();
 
         this.allowRefresh = false;
-        const asset = this.asset = loader.createAssetFromJson(mesh_url);
+        const asset = this.asset = loader.createAsset(mesh_url);
         this.assetRoot = this.asset.getRoot();
-
-        const messages = document.getElementById('messages');
 
         // Crudely indicate progress by printing the URI of each resource as it is loaded.
         const onFetched = (uri) => messages.innerText += `Downloaded ${uri}\n`;
@@ -87,8 +97,8 @@ class App {
         const onDone = () => {
             this.allowRefresh = true;
 
-            // Hide the HUD.
-            messages.remove();
+            // Clear the progress indication messages.
+            messages.innerText = "";
         };
         asset.loadResources(onDone, onFetched);
 
@@ -128,7 +138,7 @@ class App {
         this.allowRefresh = false;
         this.scene.removeEntities(this.asset.getEntities());
         this.loader.destroyAsset(this.asset);
-        this.asset = this.loader.createAssetFromJson(mesh_url);
+        this.asset = this.loader.createAsset(mesh_url);
         const onDone = () => { this.allowRefresh = true; }
         this.asset.loadResources(onDone);
     }

@@ -17,6 +17,7 @@ set(PUBLIC_HDRS
         include/filament/Camera.h
         include/filament/Color.h
         include/filament/ColorGrading.h
+        include/filament/ColorSpace.h
         include/filament/DebugRegistry.h
         include/filament/Engine.h
         include/filament/Exposure.h
@@ -25,6 +26,7 @@ set(PUBLIC_HDRS
         include/filament/Frustum.h
         include/filament/IndexBuffer.h
         include/filament/IndirectLight.h
+        include/filament/InstanceBuffer.h
         include/filament/LightManager.h
         include/filament/Material.h
         include/filament/MaterialInstance.h
@@ -48,11 +50,11 @@ set(PUBLIC_HDRS
 )
 
 set(SRCS
-        src/Box.cpp
+        src/AtlasAllocator.cpp
         src/BufferObject.cpp
         src/Camera.cpp
         src/Color.cpp
-        src/ColorSpace.cpp
+        src/ColorSpaceUtils.cpp
         src/Culler.cpp
         src/DFG.cpp
         src/DebugRegistry.cpp
@@ -63,14 +65,17 @@ set(SRCS
         src/FrameSkipper.cpp
         src/Froxelizer.cpp
         src/Frustum.cpp
+        src/HwRenderPrimitiveFactory.cpp
         src/IndexBuffer.cpp
         src/IndirectLight.cpp
+        src/InstanceBuffer.cpp
         src/LightManager.cpp
         src/Material.cpp
         src/MaterialInstance.cpp
         src/MaterialParser.cpp
         src/MorphTargetBuffer.cpp
         src/PerViewUniforms.cpp
+        src/PerShadowMapUniforms.cpp
         src/PostProcessManager.cpp
         src/RenderPass.cpp
         src/RenderPrimitive.cpp
@@ -105,6 +110,7 @@ set(SRCS
         src/details/Fence.cpp
         src/details/IndexBuffer.cpp
         src/details/IndirectLight.cpp
+        src/details/InstanceBuffer.cpp
         src/details/Material.cpp
         src/details/MaterialInstance.cpp
         src/details/MorphTargetBuffer.cpp
@@ -131,7 +137,8 @@ set(SRCS
 
 set(PRIVATE_HDRS
         src/Allocators.h
-        src/ColorSpace.h
+        src/BufferPoolAllocator.h
+        src/ColorSpaceUtils.h
         src/Culler.h
         src/DFG.h
         src/FilamentAPI-impl.h
@@ -139,9 +146,11 @@ set(PRIVATE_HDRS
         src/FrameInfo.h
         src/FrameSkipper.h
         src/Froxelizer.h
+        src/HwRenderPrimitiveFactory.h
         src/Intersections.h
         src/MaterialParser.h
         src/PerViewUniforms.h
+        src/PerShadowMapUniforms.h
         src/PIDController.h
         src/PostProcessManager.h
         src/RendererUtils.h
@@ -165,6 +174,7 @@ set(PRIVATE_HDRS
         src/details/Fence.h
         src/details/IndexBuffer.h
         src/details/IndirectLight.h
+        src/details/InstanceBuffer.h
         src/details/Material.h
         src/details/MaterialInstance.h
         src/details/MorphTargetBuffer.h
@@ -195,7 +205,7 @@ set(PRIVATE_HDRS
         src/materials/fsr/ffx_a.h
         src/materials/fsr/ffx_fsr1.h
         src/materials/fsr/ffx_fsr1_mobile.fs
-        src/upcast.h
+        src/downcast.h
 )
 
 set(MATERIAL_SRCS
@@ -206,6 +216,7 @@ set(MATERIAL_SRCS
         src/materials/colorGrading/colorGrading.mat
         src/materials/colorGrading/colorGradingAsSubpass.mat
         src/materials/colorGrading/customResolveAsSubpass.mat
+        src/materials/debugShadowCascades.mat
         src/materials/defaultMaterial.mat
         src/materials/Opaque.mat
         src/materials/Transparent.mat
@@ -222,8 +233,9 @@ set(MATERIAL_SRCS
         src/materials/dof/dofMipmap.mat
         src/materials/dof/dofMedian.mat
         src/materials/flare/flare.mat
-        src/materials/blitLow.mat
         src/materials/bloom/bloomDownsample.mat
+        src/materials/bloom/bloomDownsample2x.mat
+        src/materials/bloom/bloomDownsample9.mat
         src/materials/bloom/bloomUpsample.mat
         src/materials/ssao/bilateralBlur.mat
         src/materials/ssao/bilateralBlurBentNormals.mat
@@ -231,17 +243,16 @@ set(MATERIAL_SRCS
         src/materials/skybox.mat
         src/materials/ssao/sao.mat
         src/materials/ssao/saoBentNormals.mat
-        src/materials/separableGaussianBlur1.mat
-        src/materials/separableGaussianBlur2.mat
-        src/materials/separableGaussianBlur3.mat
-        src/materials/separableGaussianBlur4.mat
-        src/materials/separableGaussianBlur1L.mat
-        src/materials/separableGaussianBlur2L.mat
-        src/materials/separableGaussianBlur3L.mat
-        src/materials/separableGaussianBlur4L.mat
+        src/materials/separableGaussianBlur.mat
         src/materials/antiAliasing/fxaa.mat
         src/materials/antiAliasing/taa.mat
         src/materials/vsmMipmap.mat
+        src/materials/blitLow.mat
+)
+
+set(MATERIAL_FL0_SRCS
+        src/materials/defaultMaterial0.mat
+        src/materials/skybox0.mat
 )
 
 # Embed the binary resource blob for materials.
@@ -267,6 +278,11 @@ if (NOT DFG_LUT_SIZE)
     endif()
 endif()
 message(STATUS "DFG LUT size set to ${DFG_LUT_SIZE}x${DFG_LUT_SIZE}")
+
+# Whether to include FL0 materials.
+if (FILAMENT_ENABLE_FEATURE_LEVEL_0)
+    add_definitions(-DFILAMENT_ENABLE_FEATURE_LEVEL_0)
+endif()
 
 # ==================================================================================================
 # Definitions
@@ -308,6 +324,23 @@ foreach (mat_src ${MATERIAL_SRCS})
     )
     list(APPEND MATERIAL_BINS ${output_path})
 endforeach()
+
+if (FILAMENT_ENABLE_FEATURE_LEVEL_0 AND FILAMENT_SUPPORTS_OPENGL)
+    foreach (mat_src ${MATERIAL_FL0_SRCS})
+        get_filename_component(localname "${mat_src}" NAME_WE)
+        get_filename_component(fullname "${mat_src}" ABSOLUTE)
+        set(output_path "${MATERIAL_DIR}/${localname}.filamat")
+
+        add_custom_command(
+                OUTPUT ${output_path}
+                COMMAND matc -a opengl -p ${MATC_TARGET} ${MATC_OPT_FLAGS} -o ${output_path} ${fullname}
+                MAIN_DEPENDENCY ${fullname}
+                DEPENDS matc
+                COMMENT "Compiling material ${mat_src} to ${output_path}"
+        )
+        list(APPEND MATERIAL_BINS ${output_path})
+    endforeach ()
+endif ()
 
 # Additional dependencies on included files for materials
 
@@ -373,8 +406,8 @@ add_custom_command(
         OUTPUT "${MATERIAL_DIR}/sao.filamat"
         DEPENDS src/materials/ssao/ssaoUtils.fs
         DEPENDS src/materials/ssao/ssct.fs
-        DEPENDS src/materials/ssao/depthUtils.fs
-        DEPENDS src/materials/ssao/geometry.fs
+        DEPENDS src/materials/utils/depthUtils.fs
+        DEPENDS src/materials/utils/geometry.fs
         DEPENDS src/materials/ssao/saoImpl.fs
         DEPENDS src/materials/ssao/ssctImpl.fs
         APPEND
@@ -384,8 +417,8 @@ add_custom_command(
         OUTPUT "${MATERIAL_DIR}/saoBentNormals.filamat"
         DEPENDS src/materials/ssao/ssaoUtils.fs
         DEPENDS src/materials/ssao/ssct.fs
-        DEPENDS src/materials/ssao/depthUtils.fs
-        DEPENDS src/materials/ssao/geometry.fs
+        DEPENDS src/materials/utils/depthUtils.fs
+        DEPENDS src/materials/utils/geometry.fs
         DEPENDS src/materials/ssao/saoImpl.fs
         DEPENDS src/materials/ssao/ssctImpl.fs
         APPEND
@@ -434,28 +467,7 @@ add_custom_command(
 )
 
 add_custom_command(
-        OUTPUT "${MATERIAL_DIR}/separableGaussianBlur1.filamat"
-        DEPENDS src/materials/separableGaussianBlur.vs
-        DEPENDS src/materials/separableGaussianBlur.fs
-        APPEND
-)
-
-add_custom_command(
-        OUTPUT "${MATERIAL_DIR}/separableGaussianBlur2.filamat"
-        DEPENDS src/materials/separableGaussianBlur.vs
-        DEPENDS src/materials/separableGaussianBlur.fs
-        APPEND
-)
-
-add_custom_command(
-        OUTPUT "${MATERIAL_DIR}/separableGaussianBlur3.filamat"
-        DEPENDS src/materials/separableGaussianBlur.vs
-        DEPENDS src/materials/separableGaussianBlur.fs
-        APPEND
-)
-
-add_custom_command(
-        OUTPUT "${MATERIAL_DIR}/separableGaussianBlur4.filamat"
+        OUTPUT "${MATERIAL_DIR}/separableGaussianBlur.filamat"
         DEPENDS src/materials/separableGaussianBlur.vs
         DEPENDS src/materials/separableGaussianBlur.fs
         APPEND
@@ -497,6 +509,9 @@ add_library(${TARGET} STATIC ${PRIVATE_HDRS} ${PUBLIC_HDRS} ${SRCS} ${DATA_BINS}
 # specify where the public headers of this library are
 target_include_directories(${TARGET} PUBLIC ${PUBLIC_HDR_DIR})
 
+# add this subproject to the Filament folder
+set_target_properties(${TARGET} PROPERTIES FOLDER Filament)
+
 # ==================================================================================================
 # Dependencies
 # ==================================================================================================
@@ -532,6 +547,7 @@ elseif(WEBGL)
 else()
     set(OPTIMIZATION_FLAGS
         -ffast-math
+        -fno-finite-math-only
         -ffp-contract=fast
         # TODO: aggressive vectorization is currently broken on Android
         #        -fslp-vectorize-aggressive
@@ -551,11 +567,12 @@ if (MSVC)
     set(FILAMENT_WARNINGS /W3)
 else()
     set(FILAMENT_WARNINGS
-            -Wall -Wextra -Wno-unused-parameter
+            -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers
             -Wextra-semi -Wnewline-eof -Wdeprecated -Wundef
             -Wgnu-conditional-omitted-operand
             -Wweak-vtables -Wnon-virtual-dtor -Wclass-varargs -Wimplicit-fallthrough
             -Wover-aligned
+            -Werror
     )
 endif()
 

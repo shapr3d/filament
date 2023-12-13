@@ -39,6 +39,7 @@ foreach (mat_src ${MATERIAL_SRCS})
     get_filename_component(localname "${mat_src}" NAME_WE)
     get_filename_component(fullname "${mat_src}" ABSOLUTE)
     set(output_path "${MATERIAL_DIR}/${localname}.filamat")
+
     add_custom_command(
             OUTPUT ${output_path}
             COMMAND matc ${MATC_BASE_FLAGS} -o ${output_path} ${fullname}
@@ -83,6 +84,7 @@ add_library(${TARGET} STATIC ${PUBLIC_HDRS} ${SRCS} ${RESGEN_SOURCE})
 target_link_libraries(${TARGET} PUBLIC imgui filament)
 
 target_include_directories(${TARGET} PUBLIC ${PUBLIC_HDR_DIR})
+set_target_properties(${TARGET} PROPERTIES FOLDER Libs)
 
 # ==================================================================================================
 # Compiler flags
@@ -90,6 +92,5 @@ target_include_directories(${TARGET} PUBLIC ${PUBLIC_HDR_DIR})
 if (NOT MSVC)
     target_compile_options(${TARGET} PRIVATE
             -Wno-deprecated-register
-            $<$<CONFIG:Release>:-ffast-math>
     )
 endif()

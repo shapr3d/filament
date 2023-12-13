@@ -27,7 +27,7 @@ static constexpr filament::math::float2 gVertices[3] = {
     { -1.0,  1.0 }
 };
 
-static constexpr short gIndices[3] = { 0, 1, 2 };
+static constexpr TrianglePrimitive::index_type gIndices[3] = { 0, 1, 2 };
 
 TrianglePrimitive::TrianglePrimitive(filament::backend::DriverApi& driverApi,
         bool allocateLargeBuffers) : mDriverApi(driverApi) {
@@ -53,17 +53,17 @@ TrianglePrimitive::TrianglePrimitive(filament::backend::DriverApi& driverApi,
     BufferDescriptor vertexBufferDesc(gVertices, vertexBufferSize);
     mDriverApi.updateBufferObject(mVertexBufferObject, std::move(vertexBufferDesc), 0);
 
-    const size_t indexBufferSize = sizeof(short) * 3;
+    ElementType elementType = ElementType::UINT;
+    static_assert(sizeof(index_type) == 4);
+    const size_t indexBufferSize = sizeof(index_type) * 3;
     mIndexBufferObject = mDriverApi.createBufferObject(indexBufferSize, BufferObjectBinding::INDEX, BufferUsage::STATIC);
-    mIndexBuffer = mDriverApi.createIndexBuffer(ElementType::SHORT, mIndexCount);
+    mIndexBuffer = mDriverApi.createIndexBuffer(elementType, mIndexCount);
     mDriverApi.setIndexBufferObject(mIndexBuffer, mIndexBufferObject);
     BufferDescriptor indexBufferDesc(gIndices, indexBufferSize);
     mDriverApi.updateBufferObject(mIndexBufferObject, std::move(indexBufferDesc), 0);
 
-    mRenderPrimitive = mDriverApi.createRenderPrimitive(0);
-
-    mDriverApi.setRenderPrimitiveBuffer(mRenderPrimitive, mVertexBuffer, mIndexBuffer);
-    mDriverApi.setRenderPrimitiveRange(mRenderPrimitive, PrimitiveType::TRIANGLES, 0, 0, 2, 3);
+    mRenderPrimitive = mDriverApi.createRenderPrimitive(
+            mVertexBuffer, mIndexBuffer, PrimitiveType::TRIANGLES, 0, 0, 2, 3);
 }
 
 void TrianglePrimitive::updateVertices(const filament::math::float2 vertices[3]) noexcept {
@@ -78,28 +78,28 @@ void TrianglePrimitive::updateVertices(const filament::math::float2 vertices[3])
     mDriverApi.updateBufferObject(mVertexBufferObject, std::move(vBuffer), 0);
 }
 
-void TrianglePrimitive::updateIndices(const short indices[3]) noexcept {
-    void* buffer = malloc(sizeof(short) * mIndexCount);
-    short* indexBuffer = (short*) buffer;
+void TrianglePrimitive::updateIndices(const index_type indices[3]) noexcept {
+    void* buffer = malloc(sizeof(index_type) * mIndexCount);
+    index_type* indexBuffer = (index_type*) buffer;
     std::copy(indices, indices + 3, indexBuffer);
 
-    BufferDescriptor bufferDesc(indexBuffer, sizeof(short) * mIndexCount,
+    BufferDescriptor bufferDesc(indexBuffer, sizeof(index_type) * mIndexCount,
             [] (void* buffer, size_t size, void* user) {
         free(buffer);
     });
     mDriverApi.updateBufferObject(mIndexBufferObject, std::move(bufferDesc), 0);
 }
 
-void TrianglePrimitive::updateIndices(const short* indices, int count, int offset) noexcept {
-    void* buffer = malloc(sizeof(short) * count);
-    short* indexBuffer = (short*) buffer;
+void TrianglePrimitive::updateIndices(const index_type* indices, int count, int offset) noexcept {
+    void* buffer = malloc(sizeof(index_type) * count);
+    index_type* indexBuffer = (index_type*) buffer;
     std::copy(indices, indices + count, indexBuffer);
 
-    BufferDescriptor bufferDesc(indexBuffer, sizeof(short) * count,
+    BufferDescriptor bufferDesc(indexBuffer, sizeof(index_type) * count,
             [] (void* buffer, size_t size, void* user) {
         free(buffer);
     });
-    mDriverApi.updateBufferObject(mIndexBufferObject, std::move(bufferDesc), offset * sizeof(short));
+    mDriverApi.updateBufferObject(mIndexBufferObject, std::move(bufferDesc), offset * sizeof(index_type));
 }
 
 TrianglePrimitive::~TrianglePrimitive() {

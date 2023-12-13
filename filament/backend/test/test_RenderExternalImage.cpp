@@ -19,6 +19,8 @@
 #include "ShaderGenerator.h"
 #include "TrianglePrimitive.h"
 
+#include "private/backend/SamplerGroup.h"
+
 #include <CoreVideo/CoreVideo.h>
 
 namespace {
@@ -43,10 +45,10 @@ std::string fragment (R"(#version 450 core
 layout(location = 0) out vec4 fragColor;
 layout(location = 0) in vec2 uv;
 
-layout(set = 1, binding = 6) uniform sampler2D tex;
+layout(location = 0, set = 1) uniform sampler2D test_tex;
 
 void main() {
-    fragColor = texture(tex, uv);
+    fragColor = texture(test_tex, uv);
 }
 )");
 
@@ -63,12 +65,17 @@ TEST_F(BackendTest, RenderExternalImageWithoutSet) {
 
     auto swapChain = createSwapChain();
 
-    ShaderGenerator shaderGen(vertex, fragment, sBackend, sIsMobilePlatform);
+    SamplerInterfaceBlock sib = filament::SamplerInterfaceBlock::Builder()
+            .name("Test")
+            .stageFlags(backend::ShaderStageFlags::ALL_SHADER_STAGE_FLAGS)
+            .add( {{"tex", SamplerType::SAMPLER_EXTERNAL, SamplerFormat::FLOAT, Precision::HIGH }} )
+            .build();
+    ShaderGenerator shaderGen(vertex, fragment, sBackend, sIsMobilePlatform, &sib);
 
     // Create a program that samples a texture.
-    Program p = shaderGen.getProgram();
-    Program::Sampler sampler { utils::CString("tex"), 6 };
-    p.setSamplerGroup(0, ALL_SHADER_STAGE_FLAGS, &sampler, 1);
+    Program p = shaderGen.getProgram(getDriverApi());
+    Program::Sampler sampler { utils::CString("test_tex"), 0 };
+    p.setSamplerGroup(0, ShaderStageFlags::ALL_SHADER_STAGE_FLAGS, &sampler, 1);
     backend::Handle<HwProgram> program = getDriverApi().createProgram(std::move(p));
 
     backend::Handle<HwRenderTarget> defaultRenderTarget = getDriverApi().createDefaultRenderTarget(0);
@@ -104,10 +111,11 @@ TEST_F(BackendTest, RenderExternalImageWithoutSet) {
     getDriverApi().makeCurrent(swapChain, swapChain);
     getDriverApi().beginFrame(0, 0);
 
-    SamplerGroup mSamplers(1);
-    mSamplers.setSampler(0, { texture, {} });
-    backend::Handle<HwSamplerGroup> samplerGroup = getDriverApi().createSamplerGroup(1);
-    getDriverApi().updateSamplerGroup(samplerGroup, std::move(mSamplers.toCommandStream()));
+    SamplerGroup samplers(1);
+    samplers.setSampler(0, { texture, {} });
+    backend::Handle<HwSamplerGroup> samplerGroup =
+            getDriverApi().createSamplerGroup(1, utils::FixedSizeString<32>("Test"));
+    getDriverApi().updateSamplerGroup(samplerGroup, samplers.toBufferDescriptor(getDriverApi()));
     getDriverApi().bindSamplers(0, samplerGroup);
 
     // Render a triangle.
@@ -137,12 +145,17 @@ TEST_F(BackendTest, RenderExternalImage) {
 
     auto swapChain = createSwapChain();
 
-    ShaderGenerator shaderGen(vertex, fragment, sBackend, sIsMobilePlatform);
+    SamplerInterfaceBlock sib = filament::SamplerInterfaceBlock::Builder()
+            .name("Test")
+            .stageFlags(backend::ShaderStageFlags::ALL_SHADER_STAGE_FLAGS)
+            .add( {{"tex", SamplerType::SAMPLER_EXTERNAL, SamplerFormat::FLOAT, Precision::HIGH }} )
+            .build();
+    ShaderGenerator shaderGen(vertex, fragment, sBackend, sIsMobilePlatform, &sib);
 
     // Create a program that samples a texture.
-    Program p = shaderGen.getProgram();
-    Program::Sampler sampler { utils::CString("tex"), 6 };
-    p.setSamplerGroup(0, ALL_SHADER_STAGE_FLAGS, &sampler, 1);
+    Program p = shaderGen.getProgram(getDriverApi());
+    Program::Sampler sampler { utils::CString("test_tex"), 0 };
+    p.setSamplerGroup(0, ShaderStageFlags::ALL_SHADER_STAGE_FLAGS, &sampler, 1);
     auto program = getDriverApi().createProgram(std::move(p));
 
     backend::Handle<HwRenderTarget> defaultRenderTarget = getDriverApi().createDefaultRenderTarget(0);
@@ -220,10 +233,11 @@ TEST_F(BackendTest, RenderExternalImage) {
     getDriverApi().makeCurrent(swapChain, swapChain);
     getDriverApi().beginFrame(0, 0);
 
-    SamplerGroup mSamplers(1);
-    mSamplers.setSampler(0, { texture, {} });
-    backend::Handle<HwSamplerGroup> samplerGroup = getDriverApi().createSamplerGroup(1);
-    getDriverApi().updateSamplerGroup(samplerGroup, std::move(mSamplers.toCommandStream()));
+    SamplerGroup samplers(1);
+    samplers.setSampler(0, { texture, {} });
+    backend::Handle<HwSamplerGroup> samplerGroup =
+            getDriverApi().createSamplerGroup(1, utils::FixedSizeString<32>("Test"));
+    getDriverApi().updateSamplerGroup(samplerGroup, samplers.toBufferDescriptor(getDriverApi()));
     getDriverApi().bindSamplers(0, samplerGroup);
 
     // Render a triangle.

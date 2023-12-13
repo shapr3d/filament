@@ -66,25 +66,26 @@ class Viewport;
  */
 class UTILS_PUBLIC View : public FilamentAPI {
 public:
-    using QualityLevel = QualityLevel;
-    using BlendMode = BlendMode;
-    using AntiAliasing = AntiAliasing;
-    using Dithering = Dithering;
-    using ShadowType = ShadowType;
+    using QualityLevel = filament::QualityLevel;
+    using BlendMode = filament::BlendMode;
+    using AntiAliasing = filament::AntiAliasing;
+    using Dithering = filament::Dithering;
+    using ShadowType = filament::ShadowType;
 
-    using DynamicResolutionOptions = DynamicResolutionOptions;
-    using BloomOptions = BloomOptions;
-    using FogOptions = FogOptions;
-    using DepthOfFieldOptions = DepthOfFieldOptions;
-    using VignetteOptions = VignetteOptions;
-    using RenderQuality = RenderQuality;
-    using AmbientOcclusionOptions = AmbientOcclusionOptions;
-    using TemporalAntiAliasingOptions = TemporalAntiAliasingOptions;
-    using MultiSampleAntiAliasingOptions = MultiSampleAntiAliasingOptions;
-    using VsmShadowOptions = VsmShadowOptions;
-    using SoftShadowOptions = SoftShadowOptions;
-    using ScreenSpaceReflectionsOptions = ScreenSpaceReflectionsOptions;
-    using GuardBandOptions = GuardBandOptions;
+    using DynamicResolutionOptions = filament::DynamicResolutionOptions;
+    using BloomOptions = filament::BloomOptions;
+    using FogOptions = filament::FogOptions;
+    using DepthOfFieldOptions = filament::DepthOfFieldOptions;
+    using VignetteOptions = filament::VignetteOptions;
+    using RenderQuality = filament::RenderQuality;
+    using AmbientOcclusionOptions = filament::AmbientOcclusionOptions;
+    using TemporalAntiAliasingOptions = filament::TemporalAntiAliasingOptions;
+    using MultiSampleAntiAliasingOptions = filament::MultiSampleAntiAliasingOptions;
+    using VsmShadowOptions = filament::VsmShadowOptions;
+    using SoftShadowOptions = filament::SoftShadowOptions;
+    using ScreenSpaceReflectionsOptions = filament::ScreenSpaceReflectionsOptions;
+    using GuardBandOptions = filament::GuardBandOptions;
+    using StereoscopicOptions = filament::StereoscopicOptions;
 
     /**
      * Sets the View's name. Only useful for debugging.
@@ -220,7 +221,6 @@ public:
      *
      * Renderable objects can have one or several layers associated to them. Layers are
      * represented with an 8-bits bitmask, where each bit corresponds to a layer.
-     * @see RenderableManager::setLayerMask().
      *
      * This call sets which of those layers are visible. Renderables in invisible layers won't be
      * rendered.
@@ -229,10 +229,23 @@ public:
      * @param values    a bitmask where each bit sets the visibility of the corresponding layer
      *                  (1: visible, 0: invisible), only layers in \p select are affected.
      *
-     * @note By default all layers are visible.
+     * @see RenderableManager::setLayerMask().
+     *
+     * @note By default only layer 0 (bitmask 0x01) is visible.
      * @note This is a convenient way to quickly show or hide sets of Renderable objects.
      */
     void setVisibleLayers(uint8_t select, uint8_t values) noexcept;
+
+    /**
+     * Helper function to enable or disable a visibility layer.
+     * @param layer     layer between 0 and 7 to enable or disable
+     * @param enabled   true to enable the layer, false to disable it
+     * @see RenderableManager::setVisibleLayers()
+     */
+    inline void setLayerEnabled(size_t layer, bool enabled) noexcept {
+        const uint8_t mask = 1u << layer;
+        setVisibleLayers(mask, enabled ? mask : 0);
+    }
 
     /**
      * Get the visible layers.
@@ -637,6 +650,61 @@ public:
      */
     bool isFrontFaceWindingInverted() const noexcept;
 
+    /**
+     * Enables use of the stencil buffer.
+     *
+     * The stencil buffer is an 8-bit, per-fragment unsigned integer stored alongside the depth
+     * buffer. The stencil buffer is cleared at the beginning of a frame and discarded after the
+     * color pass.
+     *
+     * Each fragment's stencil value is set during rasterization by specifying stencil operations on
+     * a Material. The stencil buffer can be used as a mask for later rendering by setting a
+     * Material's stencil comparison function and reference value. Fragments that don't pass the
+     * stencil test are then discarded.
+     *
+     * If post-processing is disabled, then the SwapChain must have the CONFIG_HAS_STENCIL_BUFFER
+     * flag set in order to use the stencil buffer.
+     *
+     * A renderable's priority (see RenderableManager::setPriority) is useful to control the order
+     * in which primitives are drawn.
+     *
+     * @param enabled True to enable the stencil buffer, false disables it (default)
+     */
+    void setStencilBufferEnabled(bool enabled) noexcept;
+
+    /**
+     * Returns true if the stencil buffer is enabled.
+     * See setStencilBufferEnabled() for more information.
+     */
+    bool isStencilBufferEnabled() const noexcept;
+
+    /**
+     * Sets the stereoscopic rendering options for this view.
+     *
+     * Currently, only one type of stereoscopic rendering is supported: side-by-side.
+     * Side-by-side stereo rendering splits the viewport into two halves: a left and right half.
+     * Eye 0 will render to the left half, while Eye 1 will render into the right half.
+     *
+     * Currently, the following features are not supported with stereoscopic rendering:
+     * - post-processing
+     * - shadowing
+     * - punctual lights
+     *
+     * Stereo rendering depends on device and platform support. To check if stereo rendering is
+     * supported, use Engine::isStereoSupported(). If stereo rendering is not supported, then the
+     * stereoscopic options have no effect.
+     *
+     * @param options The stereoscopic options to use on this view
+     */
+    void setStereoscopicOptions(StereoscopicOptions const& options) noexcept;
+
+    /**
+     * Returns the stereoscopic options associated with this View.
+     *
+     * @return value set by setStereoscopicOptions().
+     */
+    StereoscopicOptions const& getStereoscopicOptions() const noexcept;
+
     // for debugging...
 
     //! debugging: allows to entirely disable frustum culling. (culling enabled by default).
@@ -668,6 +736,9 @@ public:
          * The viewport, projection and model matrices can be obtained from Camera. Because
          * pick() has some latency, it might be more accurate to obtain these values at the
          * time the View::pick() call is made.
+         *
+         * Note: if the Engine is running at FEATURE_LEVEL_0, the precision or `depth` and
+         *       `fragCoords.z` is only 8-bits.
          */
         math::float3 fragCoords;        //! screen space coordinates in GL convention
     };
@@ -693,11 +764,11 @@ public:
      * @param handler   Handler to dispatch the callback or nullptr for the default handler.
      */
     template<typename T, void(T::*method)(PickingQueryResult const&)>
-    void pick(uint32_t x, uint32_t y, T* instance, backend::CallbackHandler* handler = nullptr) noexcept {
+    void pick(uint32_t x, uint32_t y, T* instance,
+            backend::CallbackHandler* handler = nullptr) noexcept {
         PickingQuery& query = pick(x, y, [](PickingQueryResult const& result, PickingQuery* pq) {
-            void* user = pq->storage;
-            (*static_cast<T**>(user)->*method)(result);
-        });
+            (static_cast<T*>(pq->storage[0])->*method)(result);
+        }, handler);
         query.storage[0] = instance;
     }
 
@@ -713,14 +784,14 @@ public:
      * @param handler   Handler to dispatch the callback or nullptr for the default handler.
      */
     template<typename T, void(T::*method)(PickingQueryResult const&)>
-    void pick(uint32_t x, uint32_t y, T instance, backend::CallbackHandler* handler = nullptr) noexcept {
+    void pick(uint32_t x, uint32_t y, T instance,
+            backend::CallbackHandler* handler = nullptr) noexcept {
         static_assert(sizeof(instance) <= sizeof(PickingQuery::storage), "user data too large");
         PickingQuery& query = pick(x, y, [](PickingQueryResult const& result, PickingQuery* pq) {
-            void* user = pq->storage;
-            T* that = static_cast<T*>(user);
+            T* const that = static_cast<T*>(reinterpret_cast<void*>(pq->storage));
             (that->*method)(result);
             that->~T();
-        });
+        }, handler);
         new(query.storage) T(std::move(instance));
     }
 
@@ -734,15 +805,15 @@ public:
      * @param handler   Handler to dispatch the callback or nullptr for the default handler.
      */
     template<typename T>
-    void pick(uint32_t x, uint32_t y, T functor, backend::CallbackHandler* handler = nullptr) noexcept {
+    void pick(uint32_t x, uint32_t y, T functor,
+            backend::CallbackHandler* handler = nullptr) noexcept {
         static_assert(sizeof(functor) <= sizeof(PickingQuery::storage), "functor too large");
         PickingQuery& query = pick(x, y, handler,
                 (PickingQueryResultCallback)[](PickingQueryResult const& result, PickingQuery* pq) {
-            void* user = pq->storage;
-            T& that = *static_cast<T*>(user);
-            that(result);
-            that.~T();
-        });
+                    T* const that = static_cast<T*>(reinterpret_cast<void*>(pq->storage));
+                    that->operator()(result);
+                    that->~T();
+                });
         new(query.storage) T(std::move(functor));
     }
 
@@ -764,6 +835,37 @@ public:
     PickingQuery& pick(uint32_t x, uint32_t y, backend::CallbackHandler* handler,
             PickingQueryResultCallback callback) noexcept;
 
+    /**
+     * Set the value of material global variables. There are up-to four such variable each of
+     * type float4. These variables can be read in a user Material with
+     * `getMaterialGlobal{0|1|2|3}()`. All variable start with a default value of { 0, 0, 0, 1 }
+     *
+     * @param index index of the variable to set between 0 and 3.
+     * @param value new value for the variable.
+     * @see getMaterialGlobal
+     */
+    void setMaterialGlobal(uint32_t index, math::float4 const& value);
+
+    /**
+     * Get the value of the material global variables.
+     * All variable start with a default value of { 0, 0, 0, 1 }
+     *
+     * @param index index of the variable to set between 0 and 3.
+     * @return current value of the variable.
+     * @see setMaterialGlobal
+     */
+    math::float4 getMaterialGlobal(uint32_t index) const;
+
+    /**
+     * Get an Entity representing the large scale fog object.
+     * This entity is always inherited by the View's Scene.
+     *
+     * It is for example possible to create a TransformManager component with this
+     * Entity and apply a transformation globally on the fog.
+     *
+     * @return an Entity representing the large scale fog object.
+     */
+    utils::Entity getFogEntity() const noexcept;
 
     /**
      * List of available ambient occlusion techniques
@@ -793,6 +895,10 @@ public:
      */
     UTILS_DEPRECATED
     AmbientOcclusion getAmbientOcclusion() const noexcept;
+
+protected:
+    // prevent heap allocation
+    ~View() = default;
 };
 
 } // namespace filament

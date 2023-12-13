@@ -42,22 +42,80 @@
  */
 namespace filament::backend {
 
+/**
+ * Requests a SwapChain with an alpha channel.
+ */
 static constexpr uint64_t SWAP_CHAIN_CONFIG_TRANSPARENT         = 0x1;
+
+/**
+ * This flag indicates that the swap chain may be used as a source surface
+ * for reading back render results.  This config flag must be set when creating
+ * any SwapChain that will be used as the source for a blit operation.
+ */
 static constexpr uint64_t SWAP_CHAIN_CONFIG_READABLE            = 0x2;
+
+/**
+ * Indicates that the native X11 window is an XCB window rather than an XLIB window.
+ * This is ignored on non-Linux platforms and in builds that support only one X11 API.
+ */
 static constexpr uint64_t SWAP_CHAIN_CONFIG_ENABLE_XCB          = 0x4;
+
+/**
+ * Indicates that the native window is a CVPixelBufferRef.
+ *
+ * This is only supported by the Metal backend. The CVPixelBuffer must be in the
+ * kCVPixelFormatType_32BGRA format.
+ *
+ * It is not necessary to add an additional retain call before passing the pixel buffer to
+ * Filament. Filament will call CVPixelBufferRetain during Engine::createSwapChain, and
+ * CVPixelBufferRelease when the swap chain is destroyed.
+ */
 static constexpr uint64_t SWAP_CHAIN_CONFIG_APPLE_CVPIXELBUFFER = 0x8;
 
+/**
+ * Indicates that the SwapChain must automatically perform linear to srgb encoding.
+ */
+static constexpr uint64_t SWAP_CHAIN_CONFIG_SRGB_COLORSPACE     = 0x10;
+
+/**
+ * Indicates that the SwapChain should also contain a stencil component.
+ */
+static constexpr uint64_t SWAP_CHAIN_HAS_STENCIL_BUFFER         = 0x20;
+
+
 static constexpr size_t MAX_VERTEX_ATTRIBUTE_COUNT  = 16;   // This is guaranteed by OpenGL ES.
-static constexpr size_t MAX_VERTEX_SAMPLER_COUNT    = 16;   // This is guaranteed by OpenGL ES.
-static constexpr size_t MAX_FRAGMENT_SAMPLER_COUNT  = 16;   // This is guaranteed by OpenGL ES.
-static constexpr size_t MAX_SAMPLER_COUNT           = 32;   // This is guaranteed by OpenGL ES.
+static constexpr size_t MAX_SAMPLER_COUNT           = 62;   // Maximum needed at feature level 3.
 static constexpr size_t MAX_VERTEX_BUFFER_COUNT     = 16;   // Max number of bound buffer objects.
+static constexpr size_t MAX_SSBO_COUNT              = 4;    // This is guaranteed by OpenGL ES.
+
+// Per feature level caps
+// Use (int)FeatureLevel to index this array
+static constexpr struct {
+    const size_t MAX_VERTEX_SAMPLER_COUNT;
+    const size_t MAX_FRAGMENT_SAMPLER_COUNT;
+} FEATURE_LEVEL_CAPS[4] = {
+        {  0,  0 }, // do not use
+        { 16, 16 }, // guaranteed by OpenGL ES, Vulkan and Metal
+        { 16, 16 }, // guaranteed by OpenGL ES, Vulkan and Metal
+        { 31, 31 }, // guaranteed by Metal
+};
 
 static_assert(MAX_VERTEX_BUFFER_COUNT <= MAX_VERTEX_ATTRIBUTE_COUNT,
         "The number of buffer objects that can be attached to a VertexBuffer must be "
         "less than or equal to the maximum number of vertex attributes.");
 
-static constexpr size_t CONFIG_BINDING_COUNT = 12;  // This is guaranteed by OpenGL ES.
+static constexpr size_t CONFIG_UNIFORM_BINDING_COUNT = 10;  // This is guaranteed by OpenGL ES.
+static constexpr size_t CONFIG_SAMPLER_BINDING_COUNT = 4;   // This is guaranteed by OpenGL ES.
+
+/**
+ * Defines the backend's feature levels.
+ */
+enum class FeatureLevel : uint8_t {
+    FEATURE_LEVEL_0 = 0,  //!< OpenGL ES 2.0 features
+    FEATURE_LEVEL_1,      //!< OpenGL ES 3.0 features (default)
+    FEATURE_LEVEL_2,      //!< OpenGL ES 3.1 features + 16 textures units + cubemap arrays
+    FEATURE_LEVEL_3       //!< OpenGL ES 3.1 features + 31 textures units + cubemap arrays
+};
 
 /**
  * Selects which driver a particular Engine should use.
@@ -82,6 +140,30 @@ static constexpr const char* backendToString(Backend backend) {
             return "Metal";
         default:
             return "Unknown";
+    }
+}
+
+/**
+ * Defines the shader language. Similar to the above backend enum, but the OpenGL backend can select
+ * between two shader languages: ESSL 1.0 and ESSL 3.0.
+ */
+enum class ShaderLanguage {
+    ESSL1 = 0,
+    ESSL3 = 1,
+    SPIRV = 2,
+    MSL = 3,
+};
+
+static constexpr const char* shaderLanguageToString(ShaderLanguage shaderLanguage) {
+    switch (shaderLanguage) {
+        case ShaderLanguage::ESSL1:
+            return "ESSL 1.0";
+        case ShaderLanguage::ESSL3:
+            return "ESSL 3.0";
+        case ShaderLanguage::SPIRV:
+            return "SPIR-V";
+        case ShaderLanguage::MSL:
+            return "MSL";
     }
 }
 
@@ -128,7 +210,6 @@ inline constexpr TargetBufferFlags getTargetBufferFlagsAt(size_t index) noexcept
 enum class BufferUsage : uint8_t {
     STATIC,      //!< content modified once, used many times
     DYNAMIC,     //!< content modified frequently, used many times
-    STREAM,      //!< content invalidated and modified frequently, used many times
 };
 
 /**
@@ -178,16 +259,18 @@ static constexpr uint64_t FENCE_WAIT_FOR_EVER = uint64_t(-1);
 /**
  * Shader model.
  *
- * These enumerants are used across all backends and refer to a level of functionality, rather
- * than to an OpenGL specific shader model.
+ * These enumerants are used across all backends and refer to a level of functionality and quality.
+ *
+ * For example, the OpenGL backend returns `MOBILE` if it supports OpenGL ES, or `DESKTOP` if it
+ * supports Desktop OpenGL, this is later used to select the proper shader.
+ *
+ * Shader quality vs. performance is also affected by ShaderModel.
  */
 enum class ShaderModel : uint8_t {
-    //! For testing
-    UNKNOWN    = 0,
-    GL_ES_30   = 1,    //!< Mobile level functionality
-    GL_CORE_41 = 2,    //!< Desktop level functionality
+    MOBILE  = 1,    //!< Mobile level functionality
+    DESKTOP = 2,    //!< Desktop level functionality
 };
-static constexpr size_t SHADER_MODEL_COUNT = 3;
+static constexpr size_t SHADER_MODEL_COUNT = 2;
 
 /**
  * Primitive types
@@ -198,8 +281,7 @@ enum class PrimitiveType : uint8_t {
     LINES          = 1,    //!< lines
     LINE_STRIP     = 3,    //!< line strip
     TRIANGLES      = 4,    //!< triangles
-    TRIANGLE_STRIP = 5,    //!< triangle strip
-    NONE           = 0xFF
+    TRIANGLE_STRIP = 5     //!< triangle strip
 };
 
 /**
@@ -227,6 +309,15 @@ enum class UniformType : uint8_t {
     STRUCT
 };
 
+/**
+ * Supported constant parameter types
+ */
+ enum class ConstantType : uint8_t {
+  INT,
+  FLOAT,
+  BOOL
+};
+
 enum class Precision : uint8_t {
     LOW,
     MEDIUM,
@@ -234,13 +325,22 @@ enum class Precision : uint8_t {
     DEFAULT
 };
 
+/**
+ * Shader compiler priority queue
+ */
+enum class CompilerPriorityQueue : uint8_t {
+    HIGH,
+    LOW
+};
+
 //! Texture sampler type
 enum class SamplerType : uint8_t {
-    SAMPLER_2D,         //!< 2D texture
-    SAMPLER_2D_ARRAY,   //!< 2D array texture
-    SAMPLER_CUBEMAP,    //!< Cube map texture
-    SAMPLER_EXTERNAL,   //!< External texture
-    SAMPLER_3D,         //!< 3D texture
+    SAMPLER_2D,             //!< 2D texture
+    SAMPLER_2D_ARRAY,       //!< 2D array texture
+    SAMPLER_CUBEMAP,        //!< Cube map texture
+    SAMPLER_EXTERNAL,       //!< External texture
+    SAMPLER_3D,             //!< 3D texture
+    SAMPLER_CUBEMAP_ARRAY,  //!< Cube map array texture (feature level 2)
 };
 
 //! Subpass type
@@ -292,7 +392,8 @@ enum class ElementType : uint8_t {
 enum class BufferObjectBinding : uint8_t {
     VERTEX,
     INDEX,
-    UNIFORM
+    UNIFORM,
+    SHADER_STORAGE
 };
 
 //! Face culling Mode
@@ -347,18 +448,6 @@ enum class CompressedPixelDataType : uint16_t {
     DXT1_RGB, DXT1_RGBA, DXT3_RGBA, DXT5_RGBA,
     DXT1_SRGB, DXT1_SRGBA, DXT3_SRGBA, DXT5_SRGBA,
 
-    // RGTC formats available with a GLES extension
-    RED_RGTC1,              // BC4 unsigned
-    SIGNED_RED_RGTC1,       // BC4 signed
-    RED_GREEN_RGTC2,        // BC5 unsigned
-    SIGNED_RED_GREEN_RGTC2, // BC5 signed
-
-    // BPTC formats available with a GLES extension
-    RGB_BPTC_SIGNED_FLOAT,  // BC6H signed
-    RGB_BPTC_UNSIGNED_FLOAT,// BC6H unsigned
-    RGBA_BPTC_UNORM,        // BC7
-    SRGB_ALPHA_BPTC_UNORM,  // BC7 sRGB
-
     // ASTC formats are available with a GLES extension
     RGBA_ASTC_4x4,
     RGBA_ASTC_5x4,
@@ -388,6 +477,18 @@ enum class CompressedPixelDataType : uint16_t {
     SRGB8_ALPHA8_ASTC_10x10,
     SRGB8_ALPHA8_ASTC_12x10,
     SRGB8_ALPHA8_ASTC_12x12,
+
+    // RGTC formats available with a GLES extension
+    RED_RGTC1,              // BC4 unsigned
+    SIGNED_RED_RGTC1,       // BC4 signed
+    RED_GREEN_RGTC2,        // BC5 unsigned
+    SIGNED_RED_GREEN_RGTC2, // BC5 signed
+
+    // BPTC formats available with a GLES extension
+    RGB_BPTC_SIGNED_FLOAT,  // BC6H signed
+    RGB_BPTC_UNSIGNED_FLOAT,// BC6H unsigned
+    RGBA_BPTC_UNORM,        // BC7
+    SRGB_ALPHA_BPTC_UNORM,  // BC7 sRGB
 };
 
 /** Supported texel formats
@@ -513,18 +614,6 @@ enum class TextureFormat : uint16_t {
     DXT1_RGB, DXT1_RGBA, DXT3_RGBA, DXT5_RGBA,
     DXT1_SRGB, DXT1_SRGBA, DXT3_SRGBA, DXT5_SRGBA,
 
-    // RGTC formats available with a GLES extension
-    RED_RGTC1,              // BC4 unsigned
-    SIGNED_RED_RGTC1,       // BC4 signed
-    RED_GREEN_RGTC2,        // BC5 unsigned
-    SIGNED_RED_GREEN_RGTC2, // BC5 signed
-
-    // BPTC formats available with a GLES extension
-    RGB_BPTC_SIGNED_FLOAT,  // BC6H signed
-    RGB_BPTC_UNSIGNED_FLOAT,// BC6H unsigned
-    RGBA_BPTC_UNORM,        // BC7
-    SRGB_ALPHA_BPTC_UNORM,  // BC7 sRGB
-
     // ASTC formats are available with a GLES extension
     RGBA_ASTC_4x4,
     RGBA_ASTC_5x4,
@@ -554,6 +643,18 @@ enum class TextureFormat : uint16_t {
     SRGB8_ALPHA8_ASTC_10x10,
     SRGB8_ALPHA8_ASTC_12x10,
     SRGB8_ALPHA8_ASTC_12x12,
+
+    // RGTC formats available with a GLES extension
+    RED_RGTC1,              // BC4 unsigned
+    SIGNED_RED_RGTC1,       // BC4 signed
+    RED_GREEN_RGTC2,        // BC5 unsigned
+    SIGNED_RED_GREEN_RGTC2, // BC5 signed
+
+    // BPTC formats available with a GLES extension
+    RGB_BPTC_SIGNED_FLOAT,  // BC6H signed
+    RGB_BPTC_UNSIGNED_FLOAT,// BC6H unsigned
+    RGBA_BPTC_UNORM,        // BC7
+    SRGB_ALPHA_BPTC_UNORM,  // BC7 sRGB
 };
 
 //! Bitmask describing the intended Texture Usage
@@ -663,6 +764,10 @@ static constexpr bool isBPTCCompression(TextureFormat format) noexcept {
     return format >= TextureFormat::RGB_BPTC_SIGNED_FLOAT && format <= TextureFormat::SRGB_ALPHA_BPTC_UNORM;
 }
 
+static constexpr bool isASTCCompression(TextureFormat format) noexcept {
+    return format >= TextureFormat::RGBA_ASTC_4x4 && format <= TextureFormat::SRGB8_ALPHA8_ASTC_12x12;
+}
+
 //! Texture Cubemap Face
 enum class TextureCubemapFace : uint8_t {
     // don't change the enums values
@@ -672,54 +777,6 @@ enum class TextureCubemapFace : uint8_t {
     NEGATIVE_Y = 3, //!< -y face
     POSITIVE_Z = 4, //!< +z face
     NEGATIVE_Z = 5, //!< -z face
-};
-
-inline constexpr int operator +(TextureCubemapFace rhs) noexcept {
-    return int(rhs);
-}
-
-//! Face offsets for all faces of a cubemap
-struct FaceOffsets {
-    using size_type = size_t;
-    union {
-        struct {
-            size_type px;   //!< +x face offset in bytes
-            size_type nx;   //!< -x face offset in bytes
-            size_type py;   //!< +y face offset in bytes
-            size_type ny;   //!< -y face offset in bytes
-            size_type pz;   //!< +z face offset in bytes
-            size_type nz;   //!< -z face offset in bytes
-        };
-        size_type offsets[6];
-    };
-    size_type  operator[](size_t n) const noexcept { return offsets[n]; }
-    size_type& operator[](size_t n) { return offsets[n]; }
-    FaceOffsets() noexcept = default;
-    explicit FaceOffsets(size_type faceSize) noexcept {
-        px = faceSize * 0;
-        nx = faceSize * 1;
-        py = faceSize * 2;
-        ny = faceSize * 3;
-        pz = faceSize * 4;
-        nz = faceSize * 5;
-    }
-    FaceOffsets(const FaceOffsets& rhs) noexcept {
-        px = rhs.px;
-        nx = rhs.nx;
-        py = rhs.py;
-        ny = rhs.ny;
-        pz = rhs.pz;
-        nz = rhs.nz;
-    }
-    FaceOffsets& operator=(const FaceOffsets& rhs) noexcept {
-        px = rhs.px;
-        nx = rhs.nx;
-        py = rhs.py;
-        ny = rhs.ny;
-        pz = rhs.pz;
-        nz = rhs.nz;
-        return *this;
-    }
 };
 
 //! Sampler Wrap mode
@@ -754,7 +811,7 @@ enum class SamplerCompareMode : uint8_t {
     COMPARE_TO_TEXTURE = 1
 };
 
-//! comparison function for the depth sampler
+//! comparison function for the depth / stencil sampler
 enum class SamplerCompareFunc : uint8_t {
     // don't change the enums values
     LE = 0,     //!< Less or equal
@@ -763,38 +820,60 @@ enum class SamplerCompareFunc : uint8_t {
     G,          //!< Strictly greater than
     E,          //!< Equal
     NE,         //!< Not equal
-    A,          //!< Always. Depth testing is deactivated.
-    N           //!< Never. The depth test always fails.
+    A,          //!< Always. Depth / stencil testing is deactivated.
+    N           //!< Never. The depth / stencil test always fails.
 };
 
-//! Sampler paramters
+//! Sampler parameters
 struct SamplerParams { // NOLINT
-    union {
-        struct {
-            SamplerMagFilter filterMag      : 1;    //!< magnification filter (NEAREST)
-            SamplerMinFilter filterMin      : 3;    //!< minification filter  (NEAREST)
-            SamplerWrapMode wrapS           : 2;    //!< s-coordinate wrap mode (CLAMP_TO_EDGE)
-            SamplerWrapMode wrapT           : 2;    //!< t-coordinate wrap mode (CLAMP_TO_EDGE)
+    SamplerMagFilter filterMag      : 1;    //!< magnification filter (NEAREST)
+    SamplerMinFilter filterMin      : 3;    //!< minification filter  (NEAREST)
+    SamplerWrapMode wrapS           : 2;    //!< s-coordinate wrap mode (CLAMP_TO_EDGE)
+    SamplerWrapMode wrapT           : 2;    //!< t-coordinate wrap mode (CLAMP_TO_EDGE)
 
-            SamplerWrapMode wrapR           : 2;    //!< r-coordinate wrap mode (CLAMP_TO_EDGE)
-            uint8_t anisotropyLog2          : 3;    //!< anisotropy level (0)
-            SamplerCompareMode compareMode  : 1;    //!< sampler compare mode (NONE)
-            uint8_t padding0                : 2;    //!< reserved. must be 0.
+    SamplerWrapMode wrapR           : 2;    //!< r-coordinate wrap mode (CLAMP_TO_EDGE)
+    uint8_t anisotropyLog2          : 3;    //!< anisotropy level (0)
+    SamplerCompareMode compareMode  : 1;    //!< sampler compare mode (NONE)
+    uint8_t padding0                : 2;    //!< reserved. must be 0.
 
-            SamplerCompareFunc compareFunc  : 3;    //!< sampler comparison function (LE)
-            uint8_t padding1                : 5;    //!< reserved. must be 0.
+    SamplerCompareFunc compareFunc  : 3;    //!< sampler comparison function (LE)
+    uint8_t padding1                : 5;    //!< reserved. must be 0.
+    uint8_t padding2                : 8;    //!< reserved. must be 0.
 
-            uint8_t padding2                : 8;    //!< reserved. must be 0.
-        };
-        uint32_t u;
+    struct Hasher {
+        size_t operator()(SamplerParams p) const noexcept {
+            // we don't use std::hash<> here, so we don't have to include <functional>
+            return *reinterpret_cast<uint32_t const*>(reinterpret_cast<char const*>(&p));
+        }
     };
+
+    struct EqualTo {
+        bool operator()(SamplerParams lhs, SamplerParams rhs) const noexcept {
+            auto* pLhs = reinterpret_cast<uint32_t const*>(reinterpret_cast<char const*>(&lhs));
+            auto* pRhs = reinterpret_cast<uint32_t const*>(reinterpret_cast<char const*>(&rhs));
+            return *pLhs == *pRhs;
+        }
+    };
+
+    struct LessThan {
+        bool operator()(SamplerParams lhs, SamplerParams rhs) const noexcept {
+            auto* pLhs = reinterpret_cast<uint32_t const*>(reinterpret_cast<char const*>(&lhs));
+            auto* pRhs = reinterpret_cast<uint32_t const*>(reinterpret_cast<char const*>(&rhs));
+            return *pLhs == *pRhs;
+        }
+    };
+
 private:
-    friend inline bool operator < (SamplerParams lhs, SamplerParams rhs) {
-        return lhs.u < rhs.u;
+    friend inline bool operator < (SamplerParams lhs, SamplerParams rhs) noexcept {
+        return SamplerParams::LessThan{}(lhs, rhs);
     }
 };
+static_assert(sizeof(SamplerParams) == 4);
 
-static_assert(sizeof(SamplerParams) == sizeof(uint32_t), "SamplerParams must be 32 bits");
+// The limitation to 64-bits max comes from how we store a SamplerParams in our JNI code
+// see android/.../TextureSampler.cpp
+static_assert(sizeof(SamplerParams) <= sizeof(uint64_t),
+        "SamplerParams must be no more than 64 bits");
 
 //! blending equation function
 enum class BlendEquation : uint8_t {
@@ -818,6 +897,25 @@ enum class BlendFunction : uint8_t {
     DST_ALPHA,              //!< f(src, dst) = dst.a
     ONE_MINUS_DST_ALPHA,    //!< f(src, dst) = 1-dst.a
     SRC_ALPHA_SATURATE      //!< f(src, dst) = (1,1,1) * min(src.a, 1 - dst.a), 1
+};
+
+//! stencil operation
+enum class StencilOperation : uint8_t {
+    KEEP,                   //!< Keeps the current value.
+    ZERO,                   //!< Sets the value to 0.
+    REPLACE,                //!< Sets the value to the stencil reference value.
+    INCR,                   //!< Increments the current value. Clamps to the maximum representable unsigned value.
+    INCR_WRAP,              //!< Increments the current value. Wraps value to zero when incrementing the maximum representable unsigned value.
+    DECR,                   //!< Decrements the current value. Clamps to 0.
+    DECR_WRAP,              //!< Decrements the current value. Wraps value to the maximum representable unsigned value when decrementing a value of zero.
+    INVERT,                 //!< Bitwise inverts the current value.
+};
+
+//! stencil faces
+enum class StencilFace : uint8_t {
+    FRONT               = 0x1,              //!< Update stencil state for front-facing polygons.
+    BACK                = 0x2,              //!< Update stencil state for back-facing polygons.
+    FRONT_AND_BACK      = FRONT | BACK,     //!< Update stencil state for all polygons.
 };
 
 //! Stream for external textures
@@ -891,38 +989,38 @@ struct RasterState {
     union {
         struct {
             //! culling mode
-            CullingMode culling                 : 2;        //  2
+            CullingMode culling                         : 2;        //  2
 
             //! blend equation for the red, green and blue components
-            BlendEquation blendEquationRGB      : 3;        //  5
+            BlendEquation blendEquationRGB              : 3;        //  5
             //! blend equation for the alpha component
-            BlendEquation blendEquationAlpha    : 3;        //  8
+            BlendEquation blendEquationAlpha            : 3;        //  8
 
             //! blending function for the source color
-            BlendFunction blendFunctionSrcRGB   : 4;        // 12
+            BlendFunction blendFunctionSrcRGB           : 4;        // 12
             //! blending function for the source alpha
-            BlendFunction blendFunctionSrcAlpha : 4;        // 16
+            BlendFunction blendFunctionSrcAlpha         : 4;        // 16
             //! blending function for the destination color
-            BlendFunction blendFunctionDstRGB   : 4;        // 20
+            BlendFunction blendFunctionDstRGB           : 4;        // 20
             //! blending function for the destination alpha
-            BlendFunction blendFunctionDstAlpha : 4;        // 24
+            BlendFunction blendFunctionDstAlpha         : 4;        // 24
 
             //! Whether depth-buffer writes are enabled
-            bool depthWrite                     : 1;        // 25
+            bool depthWrite                             : 1;        // 25
             //! Depth test function
-            DepthFunc depthFunc                 : 3;        // 28
+            DepthFunc depthFunc                         : 3;        // 28
 
             //! Whether color-buffer writes are enabled
-            bool colorWrite                     : 1;        // 29
+            bool colorWrite                             : 1;        // 29
 
             //! use alpha-channel as coverage mask for anti-aliasing
-            bool alphaToCoverage                : 1;        // 30
+            bool alphaToCoverage                        : 1;        // 30
 
             //! whether front face winding direction must be inverted
-            bool inverseFrontFaces              : 1;        // 31
+            bool inverseFrontFaces                      : 1;        // 31
 
             //! padding, must be 0
-            uint8_t padding                     : 1;        // 32
+            uint8_t padding                             : 1;        // 32
         };
         uint32_t u = 0;
     };
@@ -933,21 +1031,31 @@ struct RasterState {
  * \privatesection
  */
 
-enum ShaderType : uint8_t {
+enum class ShaderStage : uint8_t {
     VERTEX = 0,
-    FRAGMENT = 1
+    FRAGMENT = 1,
+    COMPUTE = 2
 };
-static constexpr size_t PIPELINE_STAGE_COUNT = 2;
 
-struct ShaderStageFlags {
-    bool vertex : 1;
-    bool fragment : 1;
-    bool hasShaderType(ShaderType type) const {
-        return (vertex && type == ShaderType::VERTEX) ||
-               (fragment && type == ShaderType::FRAGMENT);
-    }
+static constexpr size_t PIPELINE_STAGE_COUNT = 2;
+enum class ShaderStageFlags : uint8_t {
+    NONE        =    0,
+    VERTEX      =    0x1,
+    FRAGMENT    =    0x2,
+    COMPUTE     =    0x4,
+    ALL_SHADER_STAGE_FLAGS = VERTEX | FRAGMENT | COMPUTE
 };
-static constexpr ShaderStageFlags ALL_SHADER_STAGE_FLAGS = { true, true };
+
+static inline constexpr bool hasShaderType(ShaderStageFlags flags, ShaderStage type) noexcept {
+    switch (type) {
+        case ShaderStage::VERTEX:
+            return bool(uint8_t(flags) & uint8_t(ShaderStageFlags::VERTEX));
+        case ShaderStage::FRAGMENT:
+            return bool(uint8_t(flags) & uint8_t(ShaderStageFlags::FRAGMENT));
+        case ShaderStage::COMPUTE:
+            return bool(uint8_t(flags) & uint8_t(ShaderStageFlags::COMPUTE));
+    }
+}
 
 /**
  * Selects which buffers to clear at the beginning of the render pass, as well as which buffers
@@ -1018,26 +1126,92 @@ struct PolygonOffset {
     float constant = 0;     // units in GL-speak
 };
 
+struct StencilState {
+    using StencilFunction = SamplerCompareFunc;
+
+    struct StencilOperations {
+        //! Stencil test function
+        StencilFunction stencilFunc                     : 3;                    // 3
+
+        //! Stencil operation when stencil test fails
+        StencilOperation stencilOpStencilFail           : 3;                    // 6
+
+        uint8_t padding0                                : 2;                    // 8
+
+        //! Stencil operation when stencil test passes but depth test fails
+        StencilOperation stencilOpDepthFail             : 3;                    // 11
+
+        //! Stencil operation when both stencil and depth test pass
+        StencilOperation stencilOpDepthStencilPass      : 3;                    // 14
+
+        uint8_t padding1                                : 2;                    // 16
+
+        //! Reference value for stencil comparison tests and updates
+        uint8_t ref;                                                            // 24
+
+        //! Masks the bits of the stencil values participating in the stencil comparison test.
+        uint8_t readMask;                                                       // 32
+
+        //! Masks the bits of the stencil values updated by the stencil test.
+        uint8_t writeMask;                                                      // 40
+    };
+
+    //! Stencil operations for front-facing polygons
+    StencilOperations front = {
+            .stencilFunc = StencilFunction::A, .ref = 0, .readMask = 0xff, .writeMask = 0xff };
+
+    //! Stencil operations for back-facing polygons
+    StencilOperations back  = {
+            .stencilFunc = StencilFunction::A, .ref = 0, .readMask = 0xff, .writeMask = 0xff };
+
+    //! Whether stencil-buffer writes are enabled
+    bool stencilWrite = false;
+
+    uint8_t padding = 0;
+};
+
+static_assert(sizeof(StencilState::StencilOperations) == 5u,
+        "StencilOperations size not what was intended");
+
+static_assert(sizeof(StencilState) == 12u,
+        "StencilState size not what was intended");
 
 using FrameScheduledCallback = void(*)(PresentCallable callable, void* user);
-
-using FrameCompletedCallback = void(*)(void* user);
 
 enum class Workaround : uint16_t {
     // The EASU pass must split because shader compiler flattens early-exit branch
     SPLIT_EASU,
-    // Backend allows feedback loop with ancillary buffers (depth/stencil) as long as they're read-only for
-    // the whole render pass.
-    ALLOW_READ_ONLY_ANCILLARY_FEEDBACK_LOOP
+    // Backend allows feedback loop with ancillary buffers (depth/stencil) as long as they're
+    // read-only for the whole render pass.
+    ALLOW_READ_ONLY_ANCILLARY_FEEDBACK_LOOP,
+    // for some uniform arrays, it's needed to do an initialization to avoid crash on adreno gpu
+    ADRENO_UNIFORM_ARRAY_CRASH,
+    // Workaround a Metal pipeline compilation error with the message:
+    // "Could not statically determine the target of a texture". See light_indirect.fs
+    A8X_STATIC_TEXTURE_TARGET_ERROR,
+    // Adreno drivers sometimes aren't able to blit into a layer of a texture array.
+    DISABLE_BLIT_INTO_TEXTURE_ARRAY,
+    // Multiple workarounds needed for PowerVR GPUs
+    POWER_VR_SHADER_WORKAROUNDS,
+    // The driver has some threads pinned, and we can't easily know on which core, it can hurt
+    // performance more if we end-up pinned on the same one.
+    DISABLE_THREAD_AFFINITY
 };
 
 } // namespace filament::backend
 
+template<> struct utils::EnableBitMaskOperators<filament::backend::ShaderStageFlags>
+        : public std::true_type {};
 template<> struct utils::EnableBitMaskOperators<filament::backend::TargetBufferFlags>
         : public std::true_type {};
 template<> struct utils::EnableBitMaskOperators<filament::backend::TextureUsage>
         : public std::true_type {};
-
+template<> struct utils::EnableBitMaskOperators<filament::backend::StencilFace>
+        : public std::true_type {};
+template<> struct utils::EnableIntegerOperators<filament::backend::TextureCubemapFace>
+        : public std::true_type {};
+template<> struct utils::EnableIntegerOperators<filament::backend::FeatureLevel>
+        : public std::true_type {};
 
 #if !defined(NDEBUG)
 utils::io::ostream& operator<<(utils::io::ostream& out, filament::backend::BufferUsage usage);
@@ -1063,7 +1237,6 @@ utils::io::ostream& operator<<(utils::io::ostream& out, filament::backend::Textu
 utils::io::ostream& operator<<(utils::io::ostream& out, filament::backend::BufferObjectBinding binding);
 utils::io::ostream& operator<<(utils::io::ostream& out, filament::backend::TextureSwizzle swizzle);
 utils::io::ostream& operator<<(utils::io::ostream& out, const filament::backend::AttributeArray& type);
-utils::io::ostream& operator<<(utils::io::ostream& out, const filament::backend::FaceOffsets& type);
 utils::io::ostream& operator<<(utils::io::ostream& out, const filament::backend::PolygonOffset& po);
 utils::io::ostream& operator<<(utils::io::ostream& out, const filament::backend::RasterState& rs);
 utils::io::ostream& operator<<(utils::io::ostream& out, const filament::backend::RenderPassParams& b);

@@ -21,27 +21,19 @@ namespace utils {
 
 static constexpr size_t NAME = 0;
 
-NameComponentManager::NameComponentManager(EntityManager& em) {
+NameComponentManager::NameComponentManager(EntityManager&) {
 }
 
 NameComponentManager::~NameComponentManager() = default;
 
 void NameComponentManager::setName(Instance instance, const char* name) noexcept {
     if (instance) {
-        elementAt<NAME>(instance) = details::SafeString{ name };
+        elementAt<NAME>(instance) = CString{ name };
     }
 }
 
 const char* NameComponentManager::getName(Instance instance) const noexcept {
     return elementAt<NAME>(instance).c_str();
-}
-
-size_t NameComponentManager::getComponentCount() const noexcept {
-    return SingleInstanceComponentManager::getComponentCount();
-}
-
-Entity const* NameComponentManager::getEntities() const noexcept {
-    return SingleInstanceComponentManager::getEntities();
 }
 
 void NameComponentManager::addComponent(Entity e) {
@@ -50,10 +42,6 @@ void NameComponentManager::addComponent(Entity e) {
 
 void NameComponentManager::removeComponent(Entity e) {
     SingleInstanceComponentManager::removeComponent(e);
-}
-
-void NameComponentManager::gc(const EntityManager& em, size_t ratio) noexcept {
-    SingleInstanceComponentManager::gc(em, ratio);
 }
 
 } // namespace utils

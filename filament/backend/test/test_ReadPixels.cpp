@@ -18,10 +18,12 @@
 
 #include "ShaderGenerator.h"
 #include "TrianglePrimitive.h"
+#include "BackendTestUtils.h"
 
 #include <utils/Hash.h>
 
 #include <fstream>
+#include <algorithm>
 
 using namespace filament;
 using namespace filament::backend;
@@ -106,7 +108,7 @@ TEST_F(ReadPixelsTest, ReadPixels) {
 
         // The size of the actual render target, taking mip level into account;
         size_t getRenderTargetSize () const {
-            return renderTargetBaseSize >> mipLevel;
+            return std::max(size_t(1), renderTargetBaseSize >> mipLevel);
         }
 
         // The rect that read pixels will read from.
@@ -168,7 +170,7 @@ TEST_F(ReadPixelsTest, ReadPixels) {
 
     // The normative read pixels test case. Render a white triangle over a blue background and read
     // the full viewport into a pixel buffer.
-    TestCase t;
+    TestCase const t0;
 
     // Check that a subregion of the render target can be read into a pixel buffer.
     TestCase t2;
@@ -232,18 +234,18 @@ TEST_F(ReadPixelsTest, ReadPixels) {
     t8.testName = "readPixels_swapchain";
     t8.useDefaultRT = true;
 
-    TestCase testCases[] = { t, t2, t3, t4, t5, t6, t7, t8 };
+    TestCase const testCases[] = { t0, t2, t3, t4, t5, t6, t7, t8 };
 
     // Create programs.
     Handle<HwProgram> programFloat, programUint;
     {
         ShaderGenerator shaderGen(vertex, fragmentFloat, sBackend, sIsMobilePlatform);
-        Program p = shaderGen.getProgram();
+        Program p = shaderGen.getProgram(getDriverApi());
         programFloat = getDriverApi().createProgram(std::move(p));
     }
     {
         ShaderGenerator shaderGen(vertex, fragmentUint, sBackend, sIsMobilePlatform);
-        Program p = shaderGen.getProgram();
+        Program p = shaderGen.getProgram(getDriverApi());
         programUint = getDriverApi().createProgram(std::move(p));
     }
 
@@ -263,7 +265,7 @@ TEST_F(ReadPixelsTest, ReadPixels) {
 
         // Create a Texture and RenderTarget to render into.
         auto usage = TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLEABLE;
-        Handle<HwTexture> texture = getDriverApi().createTexture(SamplerType::SAMPLER_2D,
+        Handle<HwTexture> const texture = getDriverApi().createTexture(SamplerType::SAMPLER_2D,
                 t.mipLevels, t.textureFormat, 1, renderTargetBaseSize, renderTargetBaseSize, 1,
                 usage);
 
@@ -281,7 +283,7 @@ TEST_F(ReadPixelsTest, ReadPixels) {
                     {});
         }
 
-        TrianglePrimitive triangle(getDriverApi());
+        TrianglePrimitive const triangle(getDriverApi());
 
         RenderPassParams params = {};
         fullViewport(params);
@@ -355,7 +357,6 @@ TEST_F(ReadPixelsTest, ReadPixels) {
         getDriverApi().beginRenderPass(renderTarget, params);
         getDriverApi().endRenderPass();
 
-        getDriverApi().flush();
         getDriverApi().commit(swapChain);
         getDriverApi().endFrame(0);
 
@@ -368,11 +369,7 @@ TEST_F(ReadPixelsTest, ReadPixels) {
     getDriverApi().destroyProgram(programUint);
 
     // This ensures all driver commands have finished before exiting the test.
-    getDriverApi().finish();
-
-    executeCommands();
-
-    getDriver().purge();
+    flushAndWait();
 }
 
 TEST_F(ReadPixelsTest, ReadPixelsPerformance) {
@@ -385,7 +382,7 @@ TEST_F(ReadPixelsTest, ReadPixelsPerformance) {
 
     // Create a program.
     ShaderGenerator shaderGen(vertex, fragmentFloat, sBackend, sIsMobilePlatform);
-    Program p = shaderGen.getProgram();
+    Program p = shaderGen.getProgram(getDriverApi());
     auto program = getDriverApi().createProgram(std::move(p));
 
     // Create a Texture and RenderTarget to render into.

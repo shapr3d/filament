@@ -7,6 +7,32 @@
  */
 
 void main() {
+#if defined(FILAMENT_HAS_FEATURE_INSTANCING)
+#   if defined(TARGET_METAL_ENVIRONMENT) || defined(TARGET_VULKAN_ENVIRONMENT)
+    instance_index = gl_InstanceIndex;
+#   else
+    // PowerVR drivers don't initialize gl_InstanceID correctly if it's assigned to the varying
+    // directly and early in the shader. Adding a bit of extra integer math, works around it.
+    // Using an intermediate variable doesn't work because of spirv-opt.
+    if (CONFIG_POWER_VR_SHADER_WORKAROUNDS) {
+        instance_index = (1 + gl_InstanceID) - 1;
+    } else {
+        instance_index = gl_InstanceID;
+    }
+#   endif
+    logical_instance_index = instance_index;
+#endif
+
+#if defined(VARIANT_HAS_INSTANCED_STEREO)
+#if !defined(FILAMENT_HAS_FEATURE_INSTANCING)
+#error Instanced stereo not supported at this feature level
+#endif
+    // Calculate the logical instance index, which is the instance index within a single eye.
+    logical_instance_index = instance_index / CONFIG_STEREO_EYE_COUNT;
+#endif
+
+    initObjectUniforms();
+
     // Initialize the inputs to sensible default values, see material_inputs.vs
 #if defined(USE_OPTIMIZED_DEPTH_VERTEX_SHADER)
 
@@ -35,26 +61,26 @@ void main() {
         toTangentFrame(mesh_tangents, material.worldNormal, vertex_worldTangent.xyz);
 
         #if defined(VARIANT_HAS_SKINNING_OR_MORPHING)
-        if ((objectUniforms.flags & FILAMENT_OBJECT_MORPHING_ENABLED_BIT) != 0u) {
+        if ((object_uniforms_flagsChannels & FILAMENT_OBJECT_MORPHING_ENABLED_BIT) != 0) {
             #if defined(LEGACY_MORPHING)
             vec3 normal0, normal1, normal2, normal3;
             toTangentFrame(mesh_custom4, normal0);
             toTangentFrame(mesh_custom5, normal1);
             toTangentFrame(mesh_custom6, normal2);
             toTangentFrame(mesh_custom7, normal3);
-            material.worldNormal += morphingUniforms.weights[0].xyz * normal0;
-            material.worldNormal += morphingUniforms.weights[1].xyz * normal1;
-            material.worldNormal += morphingUniforms.weights[2].xyz * normal2;
-            material.worldNormal += morphingUniforms.weights[3].xyz * normal3;
+            vec3 baseNormal = material.worldNormal;
+            material.worldNormal += morphingUniforms.weights[0].xyz * (normal0 - baseNormal);
+            material.worldNormal += morphingUniforms.weights[1].xyz * (normal1 - baseNormal);
+            material.worldNormal += morphingUniforms.weights[2].xyz * (normal2 - baseNormal);
+            material.worldNormal += morphingUniforms.weights[3].xyz * (normal3 - baseNormal);
             #else
             morphNormal(material.worldNormal);
             material.worldNormal = normalize(material.worldNormal);
             #endif
         }
 
-        if ((objectUniforms.flags & FILAMENT_OBJECT_SKINNING_ENABLED_BIT) != 0u) {
-            skinNormal(material.worldNormal, mesh_bone_indices, mesh_bone_weights);
-            skinNormal(vertex_worldTangent.xyz, mesh_bone_indices, mesh_bone_weights);
+        if ((object_uniforms_flagsChannels & FILAMENT_OBJECT_SKINNING_ENABLED_BIT) != 0) {
+            skinNormalTangent(material.worldNormal, vertex_worldTangent.xyz, mesh_bone_indices, mesh_bone_weights);
         }
         #endif
 
@@ -63,10 +89,10 @@ void main() {
         // all its components are < 1.0. This prevents the bitangent to exceed the range of fp16
         // in the fragment shader, where we renormalize after interpolation
         #if defined(IN_SHAPR_SHADER)
-        vertex_worldTangent.xyz = objectUniforms.worldFromModelNormalMatrix * vertex_worldTangent.xyz;
+        vertex_worldTangent.xyz = getWorldFromModelNormalMatrix() * vertex_worldTangent.xyz;
         #endif
         vertex_worldTangent.w = mesh_tangents.w;
-        material.worldNormal = objectUniforms.worldFromModelNormalMatrix * material.worldNormal;
+        material.worldNormal = getWorldFromModelNormalMatrix() * material.worldNormal;
 
         #if !defined(IN_SHAPR_SHADER)
         // Compute the tangent according to Frisvad's paper
@@ -87,12 +113,30 @@ void main() {
         toTangentFrame(mesh_tangents, material.worldNormal);
 
         #if defined(VARIANT_HAS_SKINNING_OR_MORPHING)
-            if ((objectUniforms.flags & FILAMENT_OBJECT_SKINNING_ENABLED_BIT) != 0u) {
-                skinNormal(material.worldNormal, mesh_bone_indices, mesh_bone_weights);
-            }
+        if ((object_uniforms_flagsChannels & FILAMENT_OBJECT_MORPHING_ENABLED_BIT) != 0) {
+            #if defined(LEGACY_MORPHING)
+            vec3 normal0, normal1, normal2, normal3;
+            toTangentFrame(mesh_custom4, normal0);
+            toTangentFrame(mesh_custom5, normal1);
+            toTangentFrame(mesh_custom6, normal2);
+            toTangentFrame(mesh_custom7, normal3);
+            vec3 baseNormal = material.worldNormal;
+            material.worldNormal += morphingUniforms.weights[0].xyz * (normal0 - baseNormal);
+            material.worldNormal += morphingUniforms.weights[1].xyz * (normal1 - baseNormal);
+            material.worldNormal += morphingUniforms.weights[2].xyz * (normal2 - baseNormal);
+            material.worldNormal += morphingUniforms.weights[3].xyz * (normal3 - baseNormal);
+            #else
+            morphNormal(material.worldNormal);
+            material.worldNormal = normalize(material.worldNormal);
+            #endif
+        }
+
+        if ((object_uniforms_flagsChannels & FILAMENT_OBJECT_SKINNING_ENABLED_BIT) != 0) {
+            skinNormal(material.worldNormal, mesh_bone_indices, mesh_bone_weights);
+        }
         #endif
 
-        material.worldNormal = objectUniforms.worldFromModelNormalMatrix * material.worldNormal;
+        material.worldNormal = getWorldFromModelNormalMatrix() * material.worldNormal;
 
     #endif // MATERIAL_HAS_ANISOTROPY || MATERIAL_HAS_NORMAL || MATERIAL_HAS_CLEAR_COAT_NORMAL
 #endif // HAS_ATTRIBUTE_TANGENTS
@@ -135,28 +179,36 @@ void main() {
 #if defined(VARIANT_HAS_SHADOWING) && defined(VARIANT_HAS_DIRECTIONAL_LIGHTING)
     vertex_lightSpacePosition = computeLightSpacePosition(
             vertex_worldPosition.xyz, vertex_worldNormal,
-            frameUniforms.lightDirection, frameUniforms.shadowBias, getLightFromWorldMatrix());
+            frameUniforms.lightDirection,
+            shadowUniforms.shadows[0].normalBias,
+            shadowUniforms.shadows[0].lightFromWorldMatrix);
 #endif
 
 #endif // !defined(USE_OPTIMIZED_DEPTH_VERTEX_SHADER)
 
+    vec4 position;
 
 #if defined(VERTEX_DOMAIN_DEVICE)
     // The other vertex domains are handled in initMaterialVertex()->computeWorldPosition()
-    gl_Position = getPosition();
-#else
-    gl_Position = getClipFromWorldMatrix() * getWorldPosition(material);
-#endif
+    position = getPosition();
 
 #if !defined(USE_OPTIMIZED_DEPTH_VERTEX_SHADER)
 #if defined(MATERIAL_HAS_CLIP_SPACE_TRANSFORM)
-    gl_Position = getClipSpaceTransform(material) * gl_Position;
+    position = getMaterialClipSpaceTransform(material) * position;
 #endif
 #endif // !USE_OPTIMIZED_DEPTH_VERTEX_SHADER
 
+#if defined(MATERIAL_HAS_VERTEX_DOMAIN_DEVICE_JITTERED)
+    // Apply the clip-space transform which is normally part of the projection
+    position.xy = position.xy * frameUniforms.clipTransform.xy + (position.w * frameUniforms.clipTransform.zw);
+#endif
+#else
+    position = getClipFromWorldMatrix() * getWorldPosition(material);
+#endif
+
 #if defined(VERTEX_DOMAIN_DEVICE)
     // GL convention to inverted DX convention (must happen after clipSpaceTransform)
-    gl_Position.z = gl_Position.z * -0.5 + 0.5;
+    position.z = position.z * -0.5 + 0.5;
 #endif
 
 #if defined(VARIANT_HAS_VSM)
@@ -171,22 +223,55 @@ void main() {
     // rescale [near, far] to [0, 1]
     highp float depth = -z * frameUniforms.oneOverFarMinusNear - frameUniforms.nearOverFarMinusNear;
 
-    // EVSM pre-mapping
-    depth = frameUniforms.vsmExponent * (depth * 2.0 - 1.0);
+    // remap depth between -1 and 1
+    depth = depth * 2.0 - 1.0;
 
     vertex_worldPosition.w = depth;
 #endif
 
     // this must happen before we compensate for vulkan below
-    vertex_position = gl_Position;
+    vertex_position = position;
+
+#if defined(VARIANT_HAS_INSTANCED_STEREO)
+    // We're transforming a vertex whose x coordinate is within the range (-w to w).
+    // To move it to the correct portion of the viewport, we need to modify the x coordinate.
+    // It's important to do this after computing vertex_position.
+    int eyeIndex = instance_index % CONFIG_STEREO_EYE_COUNT;
+
+    float ndcViewportWidth = 2.0 / float(CONFIG_STEREO_EYE_COUNT);  // the width of ndc space is 2
+    float eyeZeroMidpoint = -1.0f + ndcViewportWidth / 2.0;
+
+    float transform = eyeZeroMidpoint + ndcViewportWidth * float(eyeIndex);
+    position.x *= 1.0 / float(CONFIG_STEREO_EYE_COUNT);
+    position.x += transform * position.w;
+
+    // A fragment is clipped when gl_ClipDistance is negative (outside the clip plane).
+
+    float leftClip  = position.x +
+            (1.0 - ndcViewportWidth * float(eyeIndex)) * position.w;
+    float rightClip = position.x +
+            (1.0 - ndcViewportWidth * float(eyeIndex + 1)) * position.w;
+    FILAMENT_CLIPDISTANCE[0] =  leftClip;
+    FILAMENT_CLIPDISTANCE[1] = -rightClip;
+#endif
 
 #if defined(TARGET_VULKAN_ENVIRONMENT)
     // In Vulkan, clip space is Y-down. In OpenGL and Metal, clip space is Y-up.
-    gl_Position.y = -gl_Position.y;
+    position.y = -position.y;
 #endif
 
 #if !defined(TARGET_VULKAN_ENVIRONMENT) && !defined(TARGET_METAL_ENVIRONMENT)
     // This is not needed in Vulkan or Metal because clipControl is always (1, 0)
-    gl_Position.z = dot(gl_Position.zw, frameUniforms.clipControl);
+    // (We don't use a dot() here because it workaround a spirv-opt optimization that in turn
+    //  causes a crash on PowerVR, see #5118)
+    position.z = position.z * frameUniforms.clipControl.x + position.w * frameUniforms.clipControl.y;
+#endif
+
+    // some PowerVR drivers crash when gl_Position is written more than once
+    gl_Position = position;
+
+#if defined(VARIANT_HAS_INSTANCED_STEREO)
+    // Fragment shaders filter out the stereo variant, so we need to set instance_index here.
+    instance_index = logical_instance_index;
 #endif
 }

@@ -20,13 +20,16 @@
 #include "DriverBase.h"
 #include "GLUtils.h"
 #include "OpenGLContext.h"
+#include "ShaderCompilerService.h"
 
-#include "private/backend/AcquiredImage.h"
 #include "private/backend/Driver.h"
 #include "private/backend/HandleAllocator.h"
-#include "private/backend/Program.h"
 
-#include "backend/TargetBufferInfo.h"
+#include <backend/platforms/OpenGLPlatform.h>
+
+#include <backend/AcquiredImage.h>
+#include <backend/Program.h>
+#include <backend/TargetBufferInfo.h>
 
 #include <utils/compiler.h>
 #include <utils/Allocator.h>
@@ -48,16 +51,15 @@ class PixelBufferDescriptor;
 struct TargetBufferInfo;
 
 class OpenGLProgram;
-class OpenGLBlitter;
 class OpenGLTimerQueryInterface;
 
 class OpenGLDriver final : public DriverBase {
-    inline explicit OpenGLDriver(OpenGLPlatform* platform) noexcept;
+    inline explicit OpenGLDriver(OpenGLPlatform* platform, const Platform::DriverConfig& driverConfig) noexcept;
     ~OpenGLDriver() noexcept final;
     Dispatcher getDispatcher() const noexcept final;
 
 public:
-    static Driver* create(OpenGLPlatform* platform, void* sharedGLContext) noexcept;
+    static Driver* create(OpenGLPlatform* platform, void* sharedGLContext, const Platform::DriverConfig& driverConfig) noexcept;
 
     class DebugMarker {
         OpenGLDriver& driver;
@@ -68,20 +70,28 @@ public:
 
     // OpenGLDriver specific fields
 
+    struct GLSwapChain : public HwSwapChain {
+        using HwSwapChain::HwSwapChain;
+        bool rec709 = false;
+    };
+
     struct GLBufferObject : public HwBufferObject {
         using HwBufferObject::HwBufferObject;
         GLBufferObject(uint32_t size,
                 BufferObjectBinding bindingType, BufferUsage usage) noexcept
-                : HwBufferObject(size), usage(usage) {
-            gl.binding = GLUtils::getBufferBindingType(bindingType);
+                : HwBufferObject(size), usage(usage), bindingType(bindingType) {
         }
+
         struct {
-            GLuint id = 0;
-            GLenum binding = 0;
+            GLuint id;
+            union {
+                GLenum binding;
+                void* buffer;
+            };
         } gl;
-        uint32_t base = 0;
-        uint32_t size = 0;
-        BufferUsage usage = {};
+        BufferUsage usage;
+        BufferObjectBinding bindingType;
+        uint16_t age = 0;
     };
 
     struct GLVertexBuffer : public HwVertexBuffer {
@@ -99,8 +109,15 @@ public:
         } gl;
     };
 
+    struct GLTexture;
     struct GLSamplerGroup : public HwSamplerGroup {
         using HwSamplerGroup::HwSamplerGroup;
+        struct Entry {
+            GLTexture const* texture = nullptr;
+            GLuint sampler = 0u;
+        };
+        utils::FixedCapacityVector<Entry> textureUnitEntries;
+        explicit GLSamplerGroup(size_t size) noexcept : textureUnitEntries(size) { }
     };
 
     struct GLRenderPrimitive : public HwRenderPrimitive {
@@ -116,7 +133,6 @@ public:
             GLenum target = 0;
             GLenum internalFormat = 0;
             GLuint sidecarRenderBufferMS = 0;  // multi-sample sidecar renderbuffer
-            mutable GLsync fence = {};
 
             // texture parameters go here too
             GLfloat anisotropy = 1.0;
@@ -127,27 +143,22 @@ public:
             uint8_t reserved        : 4;
         } gl;
 
-        void* platformPImpl = nullptr;
+        OpenGLPlatform::ExternalTexture* externalTexture = nullptr;
     };
 
     struct GLTimerQuery : public HwTimerQuery {
         struct State {
-            std::atomic<uint64_t> elapsed{};
-            std::atomic_bool available{};
+            struct {
+                GLuint query;
+            } gl;
+            std::atomic<int64_t> elapsed{};
         };
-        struct {
-            GLuint query = 0;
-            std::shared_ptr<State> emulation;
-        } gl;
-        // 0 means not available, otherwise query result in ns.
-        std::atomic<uint64_t> elapsed{};
+        std::shared_ptr<State> state;
     };
 
     struct GLStream : public HwStream {
         using HwStream::HwStream;
         struct Info {
-            // storage for the read/write textures below
-            Platform::ExternalTexture* ets = nullptr;
             GLuint width = 0;
             GLuint height = 0;
         };
@@ -174,28 +185,36 @@ public:
             mutable GLuint fbo_read = 0;
             mutable TargetBufferFlags resolve = TargetBufferFlags::NONE; // attachments in fbo_draw to resolve
             uint8_t samples = 1;
+            bool isDefault = false;
         } gl;
         TargetBufferFlags targets = {};
     };
 
-    struct GLSync : public HwSync {
-        using HwSync::HwSync;
+    struct GLFence : public HwFence {
+        using HwFence::HwFence;
         struct State {
-            std::atomic<GLenum> status{ GL_TIMEOUT_EXPIRED };
+            std::mutex lock;
+            std::condition_variable cond;
+            FenceStatus status{ FenceStatus::TIMEOUT_EXPIRED };
         };
-        struct {
-            GLsync sync;
-        } gl;
-        std::shared_ptr<State> result{ std::make_shared<GLSync::State>() };
+        std::shared_ptr<State> state{ std::make_shared<GLFence::State>() };
     };
 
     OpenGLDriver(OpenGLDriver const&) = delete;
     OpenGLDriver& operator=(OpenGLDriver const&) = delete;
 
 private:
+    OpenGLPlatform& mPlatform;
     OpenGLContext mContext;
+    ShaderCompilerService mShaderCompilerService;
 
+    friend class OpenGLTimerQueryFactory;
+    friend class TimerQueryNative;
     OpenGLContext& getContext() noexcept { return mContext; }
+
+    ShaderCompilerService& getShaderCompilerService() noexcept {
+        return mShaderCompilerService;
+    }
 
     ShaderModel getShaderModel() const noexcept final;
 
@@ -257,6 +276,7 @@ private:
     }
 
     friend class OpenGLProgram;
+    friend class ShaderCompilerService;
 
     /* Extension management... */
 
@@ -271,26 +291,21 @@ private:
     void framebufferTexture(TargetBufferInfo const& binfo,
             GLRenderTarget const* rt, GLenum attachment) noexcept;
 
-    void setRasterStateSlow(RasterState rs) noexcept;
-    void setRasterState(RasterState rs) noexcept {
-        mRenderPassColorWrite |= rs.colorWrite;
-        mRenderPassDepthWrite |= rs.depthWrite;
-        if (UTILS_UNLIKELY(rs != mRasterState)) {
-            setRasterStateSlow(rs);
-        }
-    }
+    void setRasterState(RasterState rs) noexcept;
+
+    void setStencilState(StencilState ss) noexcept;
 
     void setTextureData(GLTexture* t,
             uint32_t level,
             uint32_t xoffset, uint32_t yoffset, uint32_t zoffset,
             uint32_t width, uint32_t height, uint32_t depth,
-            PixelBufferDescriptor&& data, FaceOffsets const* faceOffsets);
+            PixelBufferDescriptor&& p);
 
     void setCompressedTextureData(GLTexture* t,
             uint32_t level,
             uint32_t xoffset, uint32_t yoffset, uint32_t zoffset,
             uint32_t width, uint32_t height, uint32_t depth,
-            PixelBufferDescriptor&& data, FaceOffsets const* faceOffsets);
+            PixelBufferDescriptor&& p);
 
     void renderBufferStorage(GLuint rbo, GLenum internalformat, uint32_t width,
             uint32_t height, uint8_t samples) const noexcept;
@@ -301,13 +316,14 @@ private:
     /* State tracking GL wrappers... */
 
            void bindTexture(GLuint unit, GLTexture const* t) noexcept;
-           void bindSampler(GLuint unit, SamplerParams params) noexcept;
-    inline void useProgram(OpenGLProgram* p) noexcept;
+           void bindSampler(GLuint unit, GLuint sampler) noexcept;
+    inline bool useProgram(OpenGLProgram* p) noexcept;
 
     enum class ResolveAction { LOAD, STORE };
     void resolvePass(ResolveAction action, GLRenderTarget const* rt,
             TargetBufferFlags discardFlags) noexcept;
 
+#ifndef FILAMENT_SILENCE_NOT_SUPPORTED_BY_ES2
     GLuint getSamplerSlow(SamplerParams sp) const noexcept;
 
     inline GLuint getSampler(SamplerParams sp) const noexcept {
@@ -315,14 +331,15 @@ private:
         assert_invariant(!sp.padding1);
         assert_invariant(!sp.padding2);
         auto& samplerMap = mSamplerMap;
-        auto pos = samplerMap.find(sp.u);
+        auto pos = samplerMap.find(sp);
         if (UTILS_UNLIKELY(pos == samplerMap.end())) {
             return getSamplerSlow(sp);
         }
         return pos->second;
     }
+#endif
 
-    const std::array<HwSamplerGroup*, Program::BINDING_COUNT>& getSamplerBindings() const {
+    const std::array<GLSamplerGroup*, Program::SAMPLER_BINDING_COUNT>& getSamplerBindings() const {
         return mSamplerBindings;
     }
 
@@ -330,56 +347,61 @@ private:
     static GLsizei getAttachments(AttachmentArray& attachments,
             GLRenderTarget const* rt, TargetBufferFlags buffers) noexcept;
 
-    RasterState mRasterState;
-
     // state required to represent the current render pass
     Handle<HwRenderTarget> mRenderPassTarget;
     RenderPassParams mRenderPassParams;
     GLboolean mRenderPassColorWrite{};
     GLboolean mRenderPassDepthWrite{};
+    GLboolean mRenderPassStencilWrite{};
 
     void clearWithRasterPipe(TargetBufferFlags clearFlags,
             math::float4 const& linearColor, GLfloat depth, GLint stencil) noexcept;
 
-    void setViewportScissor(Viewport const& viewportScissor) noexcept;
+    void setScissor(Viewport const& scissor) noexcept;
+
+    // ES2 only. Uniform buffer emulation binding points
+    GLuint mLastAssignedEmulatedUboId = 0;
+    std::array<std::tuple<GLuint, void const*, uint16_t>, Program::UNIFORM_BINDING_COUNT> mUniformBindings = {};
 
     // sampler buffer binding points (nullptr if not used)
-    std::array<HwSamplerGroup*, Program::BINDING_COUNT> mSamplerBindings = {};   // 12 pointers
+    std::array<GLSamplerGroup*, Program::SAMPLER_BINDING_COUNT> mSamplerBindings = {};   // 4 pointers
 
-    mutable tsl::robin_map<uint32_t, GLuint> mSamplerMap;
-    mutable std::vector<GLTexture*> mExternalStreams;
+    mutable tsl::robin_map<SamplerParams, GLuint,
+            SamplerParams::Hasher, SamplerParams::EqualTo> mSamplerMap;
+
+    // this must be accessed from the driver thread only
+    std::vector<GLTexture*> mTexturesWithStreamsAttached;
+
+    // the must be accessed from the user thread only
+    std::vector<GLStream*> mStreamsWithPendingAcquiredImage;
 
     void attachStream(GLTexture* t, GLStream* stream) noexcept;
     void detachStream(GLTexture* t) noexcept;
     void replaceStream(GLTexture* t, GLStream* stream) noexcept;
 
-    OpenGLPlatform& mPlatform;
-
-    void updateStreamAcquired(GLTexture* t, DriverApi* driver) noexcept;
-    void updateBuffer(GLBufferObject* buffer, BufferDescriptor const& p,
-            uint32_t byteOffset, uint32_t alignment = 16) noexcept;
     void updateTextureLodRange(GLTexture* texture, int8_t targetLevel) noexcept;
 
-    void setExternalTexture(GLTexture* t, void* image);
-
+#ifndef FILAMENT_SILENCE_NOT_SUPPORTED_BY_ES2
     // tasks executed on the main thread after the fence signaled
-    void whenGpuCommandsComplete(std::function<void()> fn) noexcept;
+    void whenGpuCommandsComplete(const std::function<void()>& fn) noexcept;
     void executeGpuCommandsCompleteOps() noexcept;
     std::vector<std::pair<GLsync, std::function<void()>>> mGpuCommandCompleteOps;
+
+    void whenFrameComplete(const std::function<void()>& fn) noexcept;
+    std::vector<std::function<void()>> mFrameCompleteOps;
+#endif
 
     // tasks regularly executed on the main thread at until they return true
     void runEveryNowAndThen(std::function<bool()> fn) noexcept;
     void executeEveryNowAndThenOps() noexcept;
     std::vector<std::function<bool()>> mEveryNowAndThenOps;
 
-    void runAtNextRenderPass(void* token, std::function<void()> fn) noexcept;
-    void executeRenderPassOps() noexcept;
-    void cancelRunAtNextPassOp(void* token) noexcept;
-    tsl::robin_map<void*, std::function<void()>> mRunAtNextRenderPassOps;
-
     // timer query implementation
     OpenGLTimerQueryInterface* mTimerQueryImpl = nullptr;
-    bool mFrameTimeSupported = false;
+
+    // for ES2 sRGB support
+    GLSwapChain* mCurrentDrawSwapChain = nullptr;
+    bool mRec709OutputColorspace = false;
 };
 
 // ------------------------------------------------------------------------------------------------

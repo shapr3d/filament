@@ -76,10 +76,11 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_google_android_filament_LightManager_nBuilderShadowOptions(JNIEnv* env, jclass,
         jlong nativeBuilder, jint mapSize, jint cascades, jfloatArray splitPositions,
         jfloat constantBias, jfloat normalBias, jfloat shadowFar, jfloat shadowNearHint,
-        jfloat shadowFarHint, jboolean stable,
+        jfloat shadowFarHint, jboolean stable, jboolean lispsm,
         jfloat polygonOffsetConstant, jfloat polygonOffsetSlope,
         jboolean screenSpaceContactShadows, jint stepCount,
-        jfloat maxShadowDistance, jint vsmMsaaSamples, jfloat blurWidth, jfloat shadowBulbRadius) {
+        jfloat maxShadowDistance, jboolean elvsm, jfloat blurWidth, jfloat shadowBulbRadius,
+        jfloatArray transform) {
     LightManager::Builder *builder = (LightManager::Builder *) nativeBuilder;
     LightManager::ShadowOptions shadowOptions {
             .mapSize = (uint32_t)mapSize,
@@ -90,23 +91,30 @@ Java_com_google_android_filament_LightManager_nBuilderShadowOptions(JNIEnv* env,
             .shadowNearHint = shadowNearHint,
             .shadowFarHint = shadowFarHint,
             .stable = (bool)stable,
+            .lispsm = (bool)lispsm,
             .polygonOffsetConstant = polygonOffsetConstant,
             .polygonOffsetSlope = polygonOffsetConstant,
             .screenSpaceContactShadows = (bool)screenSpaceContactShadows,
             .stepCount = uint8_t(stepCount),
             .maxShadowDistance = maxShadowDistance,
             .vsm = {
-                    .msaaSamples = (uint8_t) vsmMsaaSamples,
+                    .elvsm = (bool)elvsm,
                     .blurWidth = blurWidth
             },
             .shadowBulbRadius = shadowBulbRadius
     };
+
     jfloat *nativeSplits = env->GetFloatArrayElements(splitPositions, NULL);
     const jsize splitCount = std::min((jsize) 3, env->GetArrayLength(splitPositions));
-    for (jsize i = 0; i < splitCount; i++) {
-        shadowOptions.cascadeSplitPositions[i] = nativeSplits[i];
-    }
+    std::copy_n(nativeSplits, splitCount, shadowOptions.cascadeSplitPositions);
     env->ReleaseFloatArrayElements(splitPositions, nativeSplits, 0);
+
+    jfloat* nativeTransform = env->GetFloatArrayElements(transform, NULL);
+    std::copy_n(nativeTransform,
+                std::min(4, env->GetArrayLength(transform)),
+                shadowOptions.transform.xyzw.v);
+    env->ReleaseFloatArrayElements(transform, nativeTransform, 0);
+
     builder->shadowOptions(shadowOptions);
 }
 

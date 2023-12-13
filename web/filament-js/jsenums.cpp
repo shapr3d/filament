@@ -120,34 +120,11 @@ enum_<RenderableManager::PrimitiveType>("RenderableManager$PrimitiveType")
     .value("LINES", RenderableManager::PrimitiveType::LINES)
     .value("LINE_STRIP", RenderableManager::PrimitiveType::LINE_STRIP)
     .value("TRIANGLES", RenderableManager::PrimitiveType::TRIANGLES)
-    .value("TRIANGLE_STRIP", RenderableManager::PrimitiveType::TRIANGLE_STRIP)
-    .value("NONE", RenderableManager::PrimitiveType::NONE);
-
-enum_<View::QualityLevel>("View$QualityLevel")
-    .value("LOW", View::QualityLevel::LOW)
-    .value("MEDIUM", View::QualityLevel::MEDIUM)
-    .value("HIGH", View::QualityLevel::HIGH)
-    .value("ULTRA", View::QualityLevel::ULTRA);
+    .value("TRIANGLE_STRIP", RenderableManager::PrimitiveType::TRIANGLE_STRIP);
 
 enum_<View::AmbientOcclusion>("View$AmbientOcclusion")
     .value("NONE", View::AmbientOcclusion::NONE)
     .value("SSAO", View::AmbientOcclusion::SSAO);
-
-enum_<View::BlendMode>("View$BlendMode")
-    .value("OPAQUE", View::BlendMode::OPAQUE)
-    .value("TRANSLUCENT", View::BlendMode::TRANSLUCENT);
-
-enum_<View::BloomOptions::BlendMode>("View$BloomOptions$BlendMode")
-    .value("ADD", View::BloomOptions::BlendMode::ADD)
-    .value("INTERPOLATE", View::BloomOptions::BlendMode::INTERPOLATE);
-
-enum_<View::AntiAliasing>("View$AntiAliasing")
-    .value("NONE", View::AntiAliasing::NONE)
-    .value("FXAA", View::AntiAliasing::FXAA);
-
-enum_<View::DepthOfFieldOptions::Filter>("View$DepthOfFieldOptions$Filter")
-    .value("NONE", View::DepthOfFieldOptions::Filter::NONE)
-    .value("MEDIAN", View::DepthOfFieldOptions::Filter::MEDIAN);
 
 enum_<Camera::Fov>("Camera$Fov")
     .value("VERTICAL", Camera::Fov::VERTICAL)
@@ -169,6 +146,10 @@ enum_<ColorGrading::ToneMapping>("ColorGrading$ToneMapping")
     .value("ACES", ColorGrading::ToneMapping::ACES)
     .value("FILMIC", ColorGrading::ToneMapping::FILMIC)
     .value("DISPLAY_RANGE", ColorGrading::ToneMapping::DISPLAY_RANGE);
+
+enum_<ColorGrading::LutFormat>("ColorGrading$LutFormat")
+    .value("INTEGER", ColorGrading::LutFormat::INTEGER)
+    .value("FLOAT", ColorGrading::LutFormat::FLOAT);
 
 enum_<Frustum::Plane>("Frustum$Plane")
     .value("LEFT", Frustum::Plane::LEFT)
@@ -420,6 +401,30 @@ enum_<backend::CullingMode>("CullingMode")
     .value("FRONT", backend::CullingMode::FRONT)
     .value("BACK", backend::CullingMode::BACK)
     .value("FRONT_AND_BACK", backend::CullingMode::FRONT_AND_BACK);
+
+enum_<filament::TransparencyMode>("TransparencyMode")
+    .value("DEFAULT", filament::TransparencyMode::DEFAULT)
+    .value("TWO_PASSES_ONE_SIDE", filament::TransparencyMode::TWO_PASSES_ONE_SIDE)
+    .value("TWO_PASSES_TWO_SIDES", filament::TransparencyMode::TWO_PASSES_TWO_SIDES);
+
+enum_<backend::FeatureLevel>("FeatureLevel")
+    .value("FEATURE_LEVEL_1", backend::FeatureLevel::FEATURE_LEVEL_1)
+    .value("FEATURE_LEVEL_2", backend::FeatureLevel::FEATURE_LEVEL_2);
+
+enum_<backend::StencilOperation>("StencilOperation")
+    .value("KEEP", backend::StencilOperation::KEEP)
+    .value("ZERO", backend::StencilOperation::ZERO)
+    .value("REPLACE", backend::StencilOperation::REPLACE)
+    .value("INCR_CLAMP", backend::StencilOperation::INCR)
+    .value("INCR_WRAP", backend::StencilOperation::INCR_WRAP)
+    .value("DECR_CLAMP", backend::StencilOperation::DECR)
+    .value("DECR_WRAP", backend::StencilOperation::DECR_WRAP)
+    .value("INVERT", backend::StencilOperation::INVERT);
+
+enum_<backend::StencilFace>("StencilFace")
+    .value("FRONT", backend::StencilFace::FRONT)
+    .value("BACK", backend::StencilFace::BACK)
+    .value("FRONT_AND_BACK", backend::StencilFace::FRONT_AND_BACK);
 
 enum_<ktxreader::Ktx2Reader::TransferFunction>("Ktx2Reader$TransferFunction")
     .value("LINEAR", ktxreader::Ktx2Reader::TransferFunction::LINEAR)

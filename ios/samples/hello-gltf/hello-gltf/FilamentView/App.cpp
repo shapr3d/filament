@@ -23,6 +23,8 @@
 #include <ktxreader/Ktx1Reader.h>
 #include <gltfio/AssetLoader.h>
 #include <gltfio/ResourceLoader.h>
+#include <gltfio/TextureProvider.h>
+#include <gltfio/materials/uberarchive.h>
 
 #include <fstream>
 #include <iostream>
@@ -61,7 +63,7 @@ App::~App() {
     app.assetLoader->destroyAsset(app.asset);
     app.materialProvider->destroyMaterials();
     delete app.materialProvider;
-    gltfio::AssetLoader::destroy(&app.assetLoader);
+    filament::gltfio::AssetLoader::destroy(&app.assetLoader);
 
     engine->destroy(renderer);
     engine->destroy(scene);
@@ -122,8 +124,9 @@ void App::setupIbl() {
 }
 
 void App::setupMesh() {
-    app.materialProvider = gltfio::createUbershaderLoader(engine);
-    app.assetLoader = gltfio::AssetLoader::create({engine, app.materialProvider, nullptr});
+    app.materialProvider = filament::gltfio::createUbershaderProvider(engine,
+            UBERARCHIVE_DEFAULT_DATA, UBERARCHIVE_DEFAULT_SIZE);
+    app.assetLoader = filament::gltfio::AssetLoader::create({engine, app.materialProvider, nullptr});
 
     // Load the glTF file.
     std::ifstream in(resourcePath.concat(utils::Path("DamagedHelmet.glb")), std::ifstream::in);
@@ -132,16 +135,26 @@ void App::setupMesh() {
     in.seekg(0);
     std::vector<uint8_t> buffer(size);
     if (!in.read((char*) buffer.data(), size)) {
-        std::cerr << "Unable to read scene.gltf" << std::endl;
+        std::cerr << "Unable to read glTF" << std::endl;
         exit(1);
     }
-    app.asset = app.assetLoader->createAssetFromBinary(buffer.data(), static_cast<uint32_t>(size));
+    app.asset = app.assetLoader->createAsset(buffer.data(), static_cast<uint32_t>(size));
 
-    gltfio::ResourceLoader({
+    auto resourceLoader = new filament::gltfio::ResourceLoader({
         .engine = engine,
-        .normalizeSkinningWeights = true,
-        .recomputeBoundingBoxes = false
-    }).loadResources(app.asset);
+        .normalizeSkinningWeights = true
+    });
+    auto stbDecoder = filament::gltfio::createStbProvider(engine);
+    auto ktxDecoder = filament::gltfio::createKtx2Provider(engine);
+
+    resourceLoader->addTextureProvider("image/png", stbDecoder);
+    resourceLoader->addTextureProvider("image/jpeg", stbDecoder);
+    resourceLoader->addTextureProvider("image/ktx2", ktxDecoder);
+    resourceLoader->loadResources(app.asset);
+
+    delete resourceLoader;
+    delete stbDecoder;
+    delete ktxDecoder;
 
     scene->addEntities(app.asset->getEntities(), app.asset->getEntityCount());
 }

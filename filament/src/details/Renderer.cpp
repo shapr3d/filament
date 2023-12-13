@@ -55,7 +55,7 @@ using namespace backend;
 
 FRenderer::FRenderer(FEngine& engine) :
         mEngine(engine),
-        mFrameSkipper(1u),
+        mFrameSkipper(),
         mRenderTargetHandle(engine.getDefaultRenderTarget()),
         mFrameInfoManager(engine.getDriverApi()),
         mHdrTranslucent(TextureFormat::RGBA16F),
@@ -68,6 +68,8 @@ FRenderer::FRenderer(FEngine& engine) :
     FDebugRegistry& debugRegistry = engine.getDebugRegistry();
     debugRegistry.registerProperty("d.renderer.doFrameCapture",
             &engine.debug.renderer.doFrameCapture);
+    debugRegistry.registerProperty("d.renderer.disable_buffer_padding",
+            &engine.debug.renderer.disable_buffer_padding);
 
     DriverApi& driver = engine.getDriverApi();
 
@@ -103,8 +105,8 @@ FRenderer::~FRenderer() noexcept {
     // There shouldn't be any resource left when we get here, but if there is, make sure
     // to free what we can (it would probably mean something when wrong).
 #ifndef NDEBUG
-    size_t wm = getCommandsHighWatermark();
-    size_t wmpct = wm / (CONFIG_PER_FRAME_COMMANDS_SIZE / 100);
+    size_t const wm = getCommandsHighWatermark();
+    size_t const wmpct = wm / (mEngine.getPerFrameCommandsSize() / 100);
     slog.d << "Renderer: Commands High watermark "
     << wm / 1024 << " KiB (" << wmpct << "%), "
     << wm / sizeof(Command) << " commands, " << sizeof(Command) << " bytes/command"
@@ -113,15 +115,15 @@ FRenderer::~FRenderer() noexcept {
 }
 
 void FRenderer::terminate(FEngine& engine) {
-    // Here we would cleanly free resources we've allocated or we own, in particular we would
+    // Here we would cleanly free resources we've allocated, or we own, in particular we would
     // shut down threads if we created any.
     DriverApi& driver = engine.getDriverApi();
 
-    // before we can destroy this Renderer's resources, we must make sure
+    // Before we can destroy this Renderer's resources, we must make sure
     // that all pending commands have been executed (as they could reference data in this
     // instance, e.g. Fences, Callbacks, etc...)
     if (FILAMENT_THREADING_MODE == FILAMENT_THREADING_MODE_ASYNCHRONOUS_DRIVER) {
-        Fence::waitAndDestroy(engine.createFence(FFence::Type::SOFT));
+        Fence::waitAndDestroy(engine.createFence());
     } else {
         // In single threaded/synchronous mode, allow recently-created objects (e.g. no-op fences in Skipper)
         // to initialize themselves, otherwise the engine tries to destroy invalid handles.
@@ -154,25 +156,30 @@ TextureFormat FRenderer::getLdrFormat(bool translucent) const noexcept {
     return (translucent || !mIsRGB8Supported) ? TextureFormat::RGBA8 : TextureFormat::RGB8;
 }
 
-void FRenderer::getRenderTarget(FView const& view,
-        TargetBufferFlags& outAttachementMask, Handle<HwRenderTarget>& outTarget) const noexcept {
-    outTarget = view.getRenderTargetHandle();
-    outAttachementMask = view.getRenderTargetAttachmentMask();
+std::pair<Handle<HwRenderTarget>, TargetBufferFlags>
+        FRenderer::getRenderTarget(FView const& view) const noexcept {
+    Handle<HwRenderTarget> outTarget = view.getRenderTargetHandle();
+    TargetBufferFlags outAttachmentMask = view.getRenderTargetAttachmentMask();
     if (!outTarget) {
         outTarget = mRenderTargetHandle;
-        outAttachementMask = TargetBufferFlags::COLOR0 | TargetBufferFlags::DEPTH;
+        outAttachmentMask = TargetBufferFlags::COLOR0 | TargetBufferFlags::DEPTH;
     }
+    return { outTarget, outAttachmentMask };
 }
 
-void FRenderer::initializeClearFlags() {
+backend::TargetBufferFlags FRenderer::getClearFlags() const noexcept {
+    return (mClearOptions.clear ? TargetBufferFlags::COLOR : TargetBufferFlags::NONE)
+           | TargetBufferFlags::DEPTH_AND_STENCIL;
+}
+
+void FRenderer::initializeClearFlags() noexcept {
     // We always discard and clear the depth+stencil buffers -- we don't allow sharing these
     // across views (clear implies discard)
     mDiscardStartFlags = ((mClearOptions.discard || mClearOptions.clear) ?
                           TargetBufferFlags::COLOR : TargetBufferFlags::NONE)
                          | TargetBufferFlags::DEPTH_AND_STENCIL;
 
-    mClearFlags = (mClearOptions.clear ? TargetBufferFlags::COLOR : TargetBufferFlags::NONE)
-                  | TargetBufferFlags::DEPTH_AND_STENCIL;
+    mClearFlags = getClearFlags();
 }
 
 void FRenderer::setPresentationTime(int64_t monotonic_clock_ns) {
@@ -192,12 +199,9 @@ bool FRenderer::beginFrame(FSwapChain* swapChain, uint64_t vsyncSteadyClockTimeN
     const time_point<steady_clock> appVsync(vsyncSteadyClockTimeNano ? userVsync : now);
 
     mFrameId++;
+    mViewRenderedCount = 0;
 
-    { // scope for frame id trace
-        char buf[64];
-        snprintf(buf, 64, "frame %u", mFrameId);
-        SYSTRACE_NAME(buf);
-    }
+    SYSTRACE_FRAME_ID(mFrameId);
 
     FEngine& engine = mEngine;
     FEngine::DriverApi& driver = engine.getDriverApi();
@@ -208,9 +212,9 @@ bool FRenderer::beginFrame(FSwapChain* swapChain, uint64_t vsyncSteadyClockTimeN
     }
 
     // latch the frame time
-    std::chrono::duration<double> time(appVsync - mUserEpoch);
-    float h = float(time.count());
-    float l = float(time.count() - h);
+    std::chrono::duration<double> const time(appVsync - mUserEpoch);
+    float const h = float(time.count());
+    float const l = float(time.count() - h);
     mShaderUserTime = { h, l, 0, 0 };
 
     mPreviousRenderTargets.clear();
@@ -223,12 +227,13 @@ bool FRenderer::beginFrame(FSwapChain* swapChain, uint64_t vsyncSteadyClockTimeN
     // NOTE: this makes synchronous calls to the driver
     driver.updateStreams(&driver);
 
-    // gives the backend a chance to execute periodic tasks
+    // Gives the backend a chance to execute periodic tasks. This must be called before
+    // the frame skipper.
     driver.tick();
 
     /*
     * From this point, we can't do any more work in beginFrame() because the user could choose
-    * to ignore the return value and render the frame anyways -- which is perfectly fine.
+    * to ignore the return value and render the frame anyway -- which is perfectly fine.
     * The remaining work will be done when the first render() call is made.
     */
     auto beginFrameInternal = [this, appVsync]() {
@@ -255,7 +260,7 @@ bool FRenderer::beginFrame(FSwapChain* swapChain, uint64_t vsyncSteadyClockTimeN
         return true;
     }
 
-    // however, if we return false, the user is allowed to ignore us and render a frame anyways,
+    // however, if we return false, the user is allowed to ignore us and render a frame anyway,
     // so we need to delay this work until that happens.
     mBeginFrameInternal = beginFrameInternal;
 
@@ -277,18 +282,18 @@ void FRenderer::endFrame() {
     FEngine::DriverApi& driver = engine.getDriverApi();
 
     if (FILAMENT_THREADING_MODE != FILAMENT_THREADING_MODE_SINGLE_THREADED) {
-        // on debug builds this helps catching cases where we're writing to
+        // on debug builds this helps to catch cases where we're writing to
         // the buffer form another thread, which is currently not allowed.
         driver.debugThreading();
     }
-
-    mFrameInfoManager.endFrame(driver);
-    mFrameSkipper.endFrame(driver);
 
     if (mSwapChain) {
         mSwapChain->commit(driver);
         mSwapChain = nullptr;
     }
+
+    mFrameInfoManager.endFrame(driver);
+    mFrameSkipper.endFrame(driver);
 
     driver.endFrame(mFrameId);
 
@@ -426,9 +431,13 @@ void FRenderer::render(FView const* view) {
     }
 
     if (UTILS_LIKELY(view && view->getScene())) {
-        // NOTE: in the past we tried to kick the GPU here with a flush (b2cdf9f), but this
-        // was problematic on certain devices. b/232224942
+        if (mViewRenderedCount) {
+            // this is a good place to kick the GPU, since we've rendered a View before,
+            // and we're about to render another one.
+            mEngine.getDriverApi().flush();
+        }
         renderInternal(view);
+        mViewRenderedCount++;
     }
 }
 
@@ -462,6 +471,7 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
     driver.debugThreading();
 
     const bool hasPostProcess = view.hasPostProcessPass();
+    bool hasScreenSpaceRefraction = false;
     bool hasColorGrading = hasPostProcess;
     bool hasDithering = view.getDithering() == Dithering::TEMPORAL;
     bool hasFXAA = view.getAntiAliasing() == AntiAliasing::FXAA;
@@ -542,10 +552,11 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
     // a very fast rendering path -- in this case, we would need an extra blit to "resolve" the
     // buffer padding (because there are no other pass that can do it as a side effect).
     // In this case, it is better to skip the padding, which won't be helping much.
-    const bool noBufferPadding = colorGradingConfig.asSubpass && !hasFXAA && !scaled;
+    const bool noBufferPadding = (colorGradingConfig.asSubpass && !hasFXAA && !scaled)
+            || engine.debug.renderer.disable_buffer_padding;
 
     // guardBand must be a multiple of 16 to guarantee the same exact rendering up to 4 mip levels.
-    float guardBand = guardBandOptions.enabled ? 16.0f : 0.0f;
+    float const guardBand = guardBandOptions.enabled ? 16.0f : 0.0f;
 
     if (hasPostProcess && !noBufferPadding) {
         // We always pad the rendering viewport to dimensions multiple of 16, this guarantees
@@ -554,8 +565,6 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
         // There is a small performance cost for dimensions that are not already multiple of 16.
         // But, this a no-op in common resolutions, in particular in 720p.
         // The origin of rendering is not modified, the padding is added to the right/top.
-        //
-        // TODO: use this feature to implement guard-bands
         //
         // TODO: Should we enable when we don't have post-processing?
         //       Without post-processing, we usually draw directly into
@@ -593,6 +602,10 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
         // update the camera projection
         cameraInfo.projection = highPrecisionMultiply(ts, cameraInfo.projection);
 
+        // VERTEX_DOMAIN_DEVICE doesn't apply the projection, but it still needs this
+        // clip transform, so we apply it separately (see main.vs)
+        cameraInfo.clipTransform = { ts[0][0], ts[1][1], ts[3].x, ts[3].y };
+
         // adjust svp to the new, larger, rendering dimensions
         svp.width  = uint32_t(width);
         svp.height = uint32_t(height);
@@ -604,14 +617,6 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
 
     view.prepareUpscaler(scale);
 
-    // start froxelization immediately, it has no dependencies
-    JobSystem::Job* jobFroxelize = nullptr;
-    if (view.hasDynamicLighting()) {
-        jobFroxelize = js.runAndRetain(js.createJob(nullptr,
-                [&engine, &view, &viewMatrix = cameraInfo.view](JobSystem&, JobSystem::Job*) {
-                    view.froxelize(engine, viewMatrix); }));
-    }
-
     /*
      * Allocate command buffer
      */
@@ -620,13 +625,15 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
 
     // Allocate some space for our commands in the per-frame Arena, and use that space as
     // an Arena for commands. All this space is released when we exit this method.
-    void* const arenaBegin = arena.allocate(FEngine::CONFIG_PER_FRAME_COMMANDS_SIZE, CACHELINE_SIZE);
-    void* const arenaEnd = pointermath::add(arenaBegin, FEngine::CONFIG_PER_FRAME_COMMANDS_SIZE);
+    size_t const perFrameCommandsSize = engine.getPerFrameCommandsSize();
+    void* const arenaBegin = arena.allocate(perFrameCommandsSize, CACHELINE_SIZE);
+    void* const arenaEnd = pointermath::add(arenaBegin, perFrameCommandsSize);
     RenderPass::Arena commandArena("Command Arena", { arenaBegin, arenaEnd });
 
     RenderPass::RenderFlags renderFlags = 0;
     if (view.hasShadowing())                renderFlags |= RenderPass::HAS_SHADOWING;
     if (view.isFrontFaceWindingInverted())  renderFlags |= RenderPass::HAS_INVERSE_FRONT_FACES;
+    if (view.hasInstancedStereo())          renderFlags |= RenderPass::IS_STEREOSCOPIC;
 
     RenderPass pass(engine, commandArena);
     pass.setRenderFlags(renderFlags);
@@ -636,6 +643,7 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
     variant.setDynamicLighting(view.hasDynamicLighting());
     variant.setFog(view.hasFog());
     variant.setVsm(view.hasShadowing() && view.getShadowType() != ShadowType::PCF);
+    variant.setStereo(view.hasInstancedStereo());
 
     /*
      * Frame graph
@@ -654,7 +662,7 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
 
         RenderPass shadowPass(pass);
         shadowPass.setVariant(shadowVariant);
-        auto shadows = view.renderShadowMaps(fg, engine, driver, shadowPass);
+        auto shadows = view.renderShadowMaps(engine, fg, cameraInfo, mShaderUserTime, shadowPass);
         blackboard["shadows"] = shadows;
     }
 
@@ -662,17 +670,24 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
     // recorded in the list of targets already rendered into -- this ensures that
     // initializeClearFlags() is called only once for the default RenderTarget.
     auto& previousRenderTargets = mPreviousRenderTargets;
-    FRenderTarget* const currentRenderTarget = upcast(view.getRenderTarget());
+    FRenderTarget* const currentRenderTarget = downcast(view.getRenderTarget());
     if (UTILS_LIKELY(
             previousRenderTargets.find(currentRenderTarget) == previousRenderTargets.end())) {
         previousRenderTargets.insert(currentRenderTarget);
         initializeClearFlags();
     }
 
+    // Note:  it is not well-defined what colorspace this clearColor is defined into. This leads
+    //        to inconsistent colors depending on enabled features. When the clear is performed
+    //        into a temporary buffer (common case), the clearColor is color-graded. A problem
+    //        arises when transparent views are used, in this case the clear color is not
+    //        color-graded.
     const float4 clearColor = mClearOptions.clearColor;
+
+    const uint8_t clearStencil = mClearOptions.clearStencil;
     const TargetBufferFlags clearFlags = mClearFlags;
     const TargetBufferFlags discardStartFlags = mDiscardStartFlags;
-    TargetBufferFlags keepOverrideStartFlags = TargetBufferFlags::ALL & ~discardStartFlags;
+    const TargetBufferFlags keepOverrideStartFlags = TargetBufferFlags::ALL & ~discardStartFlags;
     TargetBufferFlags keepOverrideEndFlags = TargetBufferFlags::NONE;
 
     if (currentRenderTarget) {
@@ -688,35 +703,40 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
     mDiscardStartFlags &= ~TargetBufferFlags::COLOR;
     mClearFlags &= ~TargetBufferFlags::COLOR;
 
-    Handle<HwRenderTarget> viewRenderTarget;
-    TargetBufferFlags attachmentMask;
-    getRenderTarget(view, attachmentMask, viewRenderTarget);
-    FrameGraphId<FrameGraphTexture> fgViewRenderTarget = fg.import("viewRenderTarget",
-            {
-                    .attachments = attachmentMask,
-                    .viewport = DEBUG_DYNAMIC_SCALING ? svp : vp,
-                    .clearColor = clearColor,
-                    .samples = 0,
-                    .clearFlags = clearFlags,
-                    .keepOverrideStart = keepOverrideStartFlags,
-                    .keepOverrideEnd = keepOverrideEndFlags
-            }, viewRenderTarget);
+    // the clearFlags and clearColor set below are "sticky" to the imported target, meaning
+    // they will apply anytime we render into this target, THIS INCLUDES when this target
+    // is "replacing" another one. E.g. typically when the color pass ends-up drawing directly
+    // here.
+    auto [viewRenderTarget, attachmentMask] = getRenderTarget(view);
+    FrameGraphId<FrameGraphTexture> const fgViewRenderTarget = fg.import("viewRenderTarget", {
+            .attachments = attachmentMask,
+            .viewport = DEBUG_DYNAMIC_SCALING ? svp : vp,
+            .clearColor = clearColor,
+            .samples = 0,
+            .clearFlags = clearFlags,
+            .keepOverrideStart = keepOverrideStartFlags,
+            .keepOverrideEnd = keepOverrideEndFlags
+    }, viewRenderTarget);
 
-    const bool blending = blendModeTranslucent;
     const TextureFormat hdrFormat = getHdrFormat(view, needsAlphaChannel);
 
+    // the clearFlags and clearColor specified below will only apply when rendering into the
+    // temporary color buffer. In particular, they won't apply when rendering into the main
+    // swapchain (imported render target above)
     RendererUtils::ColorPassConfig config{
-            .width = svp.width,
-            .height = svp.height,
-            .xoffset = (uint32_t)xvp.left,
-            .yoffset = (uint32_t)xvp.bottom,
+            .physicalViewport = svp,
+            .logicalViewport = xvp,
             .scale = scale,
             .hdrFormat = hdrFormat,
             .msaa = msaaSampleCount,
-            .clearFlags = clearFlags,
+            .clearFlags = getClearFlags(),
             .clearColor = clearColor,
+            .clearStencil = clearStencil,
             .ssrLodOffset = 0.0f,
-            .hasContactShadows = scene.hasContactShadows()
+            .hasContactShadows = scene.hasContactShadows(),
+            // at this point we don't know if we have refraction, but that's handled later
+            .hasScreenSpaceReflectionsOrRefractions = ssReflectionsOptions.enabled,
+            .enabledStencilBuffer = view.isStencilBufferEnabled()
     };
 
     /*
@@ -733,8 +753,8 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
 
     // view set-ups that need to happen before rendering
     fg.addTrivialSideEffectPass("Prepare View Uniforms",
-            [=, &uniforms = view.getPerViewUniforms()](DriverApi& driver) {
-                uniforms.prepareCamera(cameraInfo);
+            [=, &view, &engine](DriverApi& driver) {
+                view.prepareCamera(engine, cameraInfo);
 
                 // The code here is a little fragile. In theory, we need to call prepareViewport()
                 // for each render pass, because the viewport parameters depend on the resolution.
@@ -744,7 +764,7 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
                 // So here we set the parameters for the structure pass and SSAO passes which
                 // are always done first. The SSR pass will also use these parameters which
                 // is wrong if it doesn't run at the same resolution as SSAO.
-                // preapreViewport() is called again during the color pass, which resets the
+                // prepareViewport() is called again during the color pass, which resets the
                 // values correctly for the Color pass, however, this will be again wrong
                 // for passes that come after the Color pass, such as DoF.
                 //
@@ -754,11 +774,19 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
                 // The reason why this bug is acceptable is that the viewport parameters are
                 // currently only used for generating noise, so it's not too bad.
 
-                uniforms.prepareViewport(svp,
-                        xvp.left   * aoOptions.resolution,
-                        xvp.bottom * aoOptions.resolution);
+                // note: aoOptions.resolution is either 1.0 or 0.5, and the result is then
+                // guaranteed to be an integer (because xvp is a multiple of 16).
+                view.prepareViewport(svp,
+                        filament::Viewport{
+                             int32_t(float(xvp.left  ) * aoOptions.resolution),
+                             int32_t(float(xvp.bottom) * aoOptions.resolution),
+                            uint32_t(float(xvp.width ) * aoOptions.resolution),
+                            uint32_t(float(xvp.height) * aoOptions.resolution)});
 
-                uniforms.commit(driver);
+                view.commitUniforms(driver);
+
+                // set uniforms and samplers for the color passes
+                view.bindPerViewUniformsAndSamplers(driver);
             });
 
     // --------------------------------------------------------------------------------------------
@@ -789,7 +817,7 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
                     builder.sideEffect();
                 },
                 [=, &view](FrameGraphResources const& resources,
-                        auto const& data, DriverApi& driver) mutable {
+                        auto const&, DriverApi& driver) mutable {
                     auto out = resources.getRenderPassInfo();
                     view.executePickingQueries(driver, out.target, aoOptions.resolution);
                 });
@@ -817,7 +845,7 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
     const TextureFormat format = (ssReflectionsOptions.enabled || view.getBlendMode() == BlendMode::TRANSLUCENT)
             ? mHdrTranslucent
             : mHdrQualityMedium;
-    PostProcessManager::ScreenSpaceRefConfig ssrConfig = PostProcessManager::prepareMipmapSSR(
+    PostProcessManager::ScreenSpaceRefConfig const ssrConfig = PostProcessManager::prepareMipmapSSR(
             fg, svp.width, svp.height, format,
             view.getCameraUser().getFieldOfView(Camera::Fov::VERTICAL), config.scale);
     config.ssrLodOffset = ssrConfig.lodOffset;
@@ -834,9 +862,12 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
                 ssReflectionsOptions,
                 { .width = svp.width, .height = svp.height });
 
-        // generate the mipchain
-        reflections = PostProcessManager::generateMipmapSSR(ppm, fg,
-                reflections, ssrConfig.reflection, false, ssrConfig);
+        if (UTILS_LIKELY(reflections)) {
+            // generate the mipchain
+            PostProcessManager::generateMipmapSSR(ppm, fg,
+                    reflections, ssrConfig.reflection, false, ssrConfig);
+        }
+        config.screenSpaceReflectionHistoryNotReady = !reflections;
     }
 
     // --------------------------------------------------------------------------------------------
@@ -845,12 +876,44 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
     // This one doesn't need to be a FrameGraph pass because it always happens by construction
     // (i.e. it won't be culled, unless everything is culled), so no need to complexify things.
     pass.setVariant(variant);
-    pass.appendCommands(RenderPass::COLOR);
-    pass.sortCommands();
+    pass.appendCommands(engine, RenderPass::COLOR);
 
-    FrameGraphTexture::Descriptor desc = {
-            .width = config.width,
-            .height = config.height,
+    // color-grading as subpass is done either by the color pass or the TAA pass if any
+    auto colorGradingConfigForColor = colorGradingConfig;
+    colorGradingConfigForColor.asSubpass = colorGradingConfigForColor.asSubpass && !taaOptions.enabled;
+
+    if (colorGradingConfigForColor.asSubpass) {
+        // append color grading subpass after all other passes
+        pass.appendCustomCommand(3,
+                RenderPass::Pass::BLENDED,
+                RenderPass::CustomCommand::EPILOG,
+                0, [&ppm, &driver, colorGradingConfigForColor]() {
+                    ppm.colorGradingSubpass(driver, colorGradingConfigForColor);
+                });
+    } else if (colorGradingConfig.customResolve) {
+        // append custom resolve subpass after all other passes
+        pass.appendCustomCommand(3,
+                RenderPass::Pass::BLENDED,
+                RenderPass::CustomCommand::EPILOG,
+                0, [&ppm, &driver]() {
+                    ppm.customResolveSubpass(driver);
+                });
+    }
+
+    // sort commands once we're done adding commands
+    pass.sortCommands(engine);
+
+
+    // this makes the viewport relative to xvp
+    // FIXME: we should use 'vp' when rendering directly into the swapchain, but that's hard to
+    //        know at this point. This will usually be the case when post-process is disabled.
+    // FIXME: we probably should take the dynamic scaling into account too
+    pass.setScissorViewport(hasPostProcess ? xvp : vp);
+
+
+    FrameGraphTexture::Descriptor const desc = {
+            .width = config.physicalViewport.width,
+            .height = config.physicalViewport.height,
             .format = config.hdrFormat
     };
 
@@ -861,7 +924,7 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
                 if (colorGradingConfig.asSubpass) {
                     ppm.colorGradingPrepareSubpass(driver,
                             colorGrading, colorGradingConfig, vignetteOptions,
-                            config.width, config.height);
+                            desc.width, desc.height);
                 } else if (colorGradingConfig.customResolve) {
                     ppm.customResolvePrepareSubpass(driver,
                             PostProcessManager::CustomResolveOp::COMPRESS);
@@ -869,35 +932,13 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
 
                 // We use a framegraph pass to wait for froxelization to finish (so it can be done
                 // in parallel with .compile()
-                if (jobFroxelize) {
-                    auto *sync = jobFroxelize;
+                auto sync = view.getFroxelizerSync();
+                if (sync) {
                     js.waitAndRelease(sync);
                     view.commitFroxels(driver);
                 }
             }
     );
-
-    // color-grading as subpass is done either by the color pass or the TAA pass if any
-    auto colorGradingConfigForColor = colorGradingConfig;
-    colorGradingConfigForColor.asSubpass = colorGradingConfigForColor.asSubpass && !taaOptions.enabled;
-
-    if (colorGradingConfigForColor.asSubpass) {
-        // append color grading subpass after all other passes
-        pass.appendCustomCommand(
-                RenderPass::Pass::BLENDED,
-                RenderPass::CustomCommand::EPILOG,
-                0, [&ppm, &driver, colorGradingConfigForColor]() {
-                    ppm.colorGradingSubpass(driver, colorGradingConfigForColor);
-                });
-    } if (colorGradingConfig.customResolve) {
-        // append custom resolve subpass after all other passes
-        pass.appendCustomCommand(
-                RenderPass::Pass::BLENDED,
-                RenderPass::CustomCommand::EPILOG,
-                0, [&ppm, &driver]() {
-                    ppm.customResolveSubpass(driver);
-                });
-    }
 
     // the color pass itself + color-grading as subpass if needed
     auto colorPassOutput = RendererUtils::colorPass(fg, "Color Pass", mEngine, view,
@@ -906,12 +947,14 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
     if (view.isScreenSpaceRefractionEnabled() && !pass.empty()) {
         // this cancels the colorPass() call above if refraction is active.
         // the color pass + refraction + color-grading as subpass if needed
-        colorPassOutput = RendererUtils::refractionPass(fg, mEngine, view,
+        const auto [output, enabled] = RendererUtils::refractionPass(fg, mEngine, view,
                 config, ssrConfig, colorGradingConfigForColor, pass);
+        colorPassOutput = output;
+        hasScreenSpaceRefraction = enabled;
     }
 
     if (colorGradingConfig.customResolve) {
-        // TODO: we have to "uncompress" (i.e. detonemap) the color buffer here because it's  used
+        // TODO: we have to "uncompress" (i.e. detonemap) the color buffer here because it's used
         //       by many other passes (Bloom, TAA, DoF, etc...). We could make this more
         //       efficient by using ARM_shader_framebuffer_fetch. We use a load/store (i.e.
         //       subpass) here because it's more convenient.
@@ -924,7 +967,7 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
             FrameGraphId<FrameGraphTexture> history;
         };
         // FIXME: should we use the TAA-modified cameraInfo here or not? (we are).
-        auto projection = mat4f{ cameraInfo.projection * cameraInfo.getUserViewMatrix() };
+        mat4 const projection = cameraInfo.projection * cameraInfo.getUserViewMatrix();
         fg.addPass<ExportSSRHistoryData>("Export SSR history",
                 [&](FrameGraph::Builder& builder, auto& data) {
                     // We need to use sideEffect here to ensure this pass won't be culled.
@@ -954,6 +997,12 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
     auto const depth = ppm.resolveBaseLevel(fg, "Resolved Depth Buffer",
             blackboard.get<FrameGraphTexture>("depth"));
 
+    // Debug: CSM visualisation
+    if (UTILS_UNLIKELY(engine.debug.shadowmap.visualize_cascades &&
+                       view.hasShadowing() && view.hasDirectionalLight())) {
+        input = ppm.debugShadowCascades(fg, input, depth);
+    }
+
     // TODO: DoF should be applied here, before TAA -- but if we do this it'll result in a lot of
     //       fireflies due to the instability of the highlights. This can be fixed with a
     //       dedicated TAA pass for the DoF, as explained in
@@ -978,7 +1027,7 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
             // The bokeh height is always correct regardless of the dynamic resolution scaling.
             // (because the CoC is calculated w.r.t. the height), so we only need to adjust
             // the width.
-            float bokehAspectRatio = scale.x / scale.y;
+            float const bokehAspectRatio = scale.x / scale.y;
             input = ppm.dof(fg, input, depth, cameraInfo, needsAlphaChannel,
                     bokehAspectRatio, dofOptions);
         }
@@ -1014,15 +1063,9 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
         if (scaled) {
             mightNeedFinalBlit = false;
             auto viewport = DEBUG_DYNAMIC_SCALING ? xvp : vp;
-            if (UTILS_LIKELY(!blending && dsrOptions.quality == QualityLevel::LOW)) {
-                input = ppm.opaqueBlit(fg, input, xvp, {
-                        .width = viewport.width, .height = viewport.height,
-                        .format = colorGradingConfig.ldrFormat }, SamplerMagFilter::LINEAR);
-            } else {
-                input = ppm.blendBlit(fg, blending, dsrOptions, input, xvp, {
-                        .width = viewport.width, .height = viewport.height,
-                        .format = colorGradingConfig.ldrFormat });
-            }
+            input = ppm.upscale(fg, needsAlphaChannel, dsrOptions, input, xvp, {
+                    .width = viewport.width, .height = viewport.height,
+                    .format = colorGradingConfig.ldrFormat });
             xvp.left = xvp.bottom = 0;
             svp = xvp;
         }
@@ -1039,32 +1082,34 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
     //   as a subpass)
     // * And we also can't use the default rendertarget if frame history is needed (e.g. with
     //   screen-space reflections)
+    // * And we also can't use the default rendertarget with refractions, which need to reuse
+    //   the rendertarget due to how the clear flags work.
     // * We also need an extra blit if we haven't yet handled "xvp"
     //   TODO: in that specific scenario it would be better to just not use xvp
     // The intermediate buffer is accomplished with a "fake" opaqueBlit (i.e. blit) operation.
 
     const bool outputIsSwapChain = (input == colorPassOutput) && (viewRenderTarget == mRenderTargetHandle);
     if (mightNeedFinalBlit) {
-        if (blending ||
+        if (blendModeTranslucent ||
             xvp != svp ||
             (outputIsSwapChain &&
                     (msaaSampleCount > 1 ||
                     colorGradingConfig.asSubpass ||
-                    ssReflectionsOptions.enabled)))
-        {
+                    hasScreenSpaceRefraction ||
+                    ssReflectionsOptions.enabled))) {
             assert_invariant(!scaled);
-            if (UTILS_LIKELY(!blending)) {
-                input = ppm.opaqueBlit(fg, input, xvp, {
-                        .width = vp.width, .height = vp.height,
-                        .format = colorGradingConfig.ldrFormat }, SamplerMagFilter::NEAREST);
-            } else {
-                input = ppm.blendBlit(fg, blending, { .quality = QualityLevel::LOW }, input, xvp, {
-                        .width = vp.width, .height = vp.height,
-                        .format = colorGradingConfig.ldrFormat});
-            }
+            input = ppm.blit(fg, blendModeTranslucent, input, xvp, {
+                    .width = vp.width, .height = vp.height,
+                    .format = colorGradingConfig.ldrFormat }, SamplerMagFilter::NEAREST);
         }
     }
 
+    if (UTILS_UNLIKELY(outputIsSwapChain && view.isStencilBufferEnabled())) {
+        assert_invariant(mSwapChain);
+        ASSERT_PRECONDITION(mSwapChain->hasStencilBuffer(),
+                "View has stencil buffer enabled, but SwapChain does not have "
+                "SwapChain::CONFIG_HAS_STENCIL_BUFFER flag set.");
+    }
 
 //    auto debug = structure
 //    fg.forwardResource(fgViewRenderTarget, debug ? debug : input);

@@ -32,7 +32,7 @@
 #include <filament/Material.h>
 #include <filament/Engine.h>
 
-#include <private/filament/UniformInterfaceBlock.h>
+#include <private/filament/BufferInterfaceBlock.h>
 #include <private/filament/UibStructs.h>
 #include <private/backend/BackendUtils.h>
 
@@ -181,6 +181,7 @@ TEST(FilamentTest, SkinningMath) {
 
 TEST(FilamentTest, TransformManager) {
     filament::FTransformManager tcm;
+    tcm.setAccurateTranslationsEnabled(true);
     EntityManager& em = EntityManager::get();
     std::array<Entity, 3> entities;
     em.create(entities.size(), entities.data());
@@ -245,8 +246,9 @@ TEST(FilamentTest, TransformManager) {
     EXPECT_LT(tcm.getInstance(entities[1]), tcm.getInstance(entities[2]));
 
     // local transaction reorders parent/child
+    auto const t = mat4::translation(double3(1.0 / 3.0));
     tcm.openLocalTransformTransaction();
-    tcm.setTransform(newParent, mat4f{ float4{ 8 }});
+    tcm.setTransform(newParent, t);
     tcm.commitLocalTransformTransaction();
 
     // local transaction invalidates Instances
@@ -258,10 +260,14 @@ TEST(FilamentTest, TransformManager) {
     EXPECT_GT(child, newParent);
 
     // check transform propagation
-    EXPECT_EQ(tcm.getTransform(newParent), mat4f{ float4{ 8 }});
-    EXPECT_EQ(tcm.getWorldTransform(newParent), mat4f{ float4{ 8 }});
-    EXPECT_EQ(tcm.getTransform(child), mat4f{ float4{ 1 }});
-    EXPECT_EQ(tcm.getWorldTransform(child), mat4f{ float4{ 8 }});
+
+    // our "high precision" mode only preserves 48 bits of the double mantissa (out of 53).
+    // This constant loses 5 bits out of 1/3
+    const mat4 PRECISION_KILLER_5BITS = mat4::translation(double3(16.0));
+    EXPECT_EQ(tcm.getTransformAccurate(newParent)      + PRECISION_KILLER_5BITS, t + PRECISION_KILLER_5BITS);
+    EXPECT_EQ(tcm.getWorldTransformAccurate(newParent) + PRECISION_KILLER_5BITS, t + PRECISION_KILLER_5BITS);
+    EXPECT_EQ(tcm.getWorldTransformAccurate(child)     + PRECISION_KILLER_5BITS, t + PRECISION_KILLER_5BITS);
+    EXPECT_EQ(tcm.getTransformAccurate(child), mat4{ 1.0 });
 
     // check children iterators
     size_t c = 0;
@@ -279,28 +285,30 @@ TEST(FilamentTest, TransformManager) {
 
 TEST(FilamentTest, UniformInterfaceBlock) {
 
-    UniformInterfaceBlock::Builder b;
+    BufferInterfaceBlock::Builder b;
 
     b.name("TestUniformInterfaceBlock");
-    b.add("a_float_0", 1, UniformInterfaceBlock::Type::FLOAT);
-    b.add("a_float_1", 1, UniformInterfaceBlock::Type::FLOAT);
-    b.add("a_float_2", 1, UniformInterfaceBlock::Type::FLOAT);
-    b.add("a_float_3", 1, UniformInterfaceBlock::Type::FLOAT);
-    b.add("a_vec4_0",  1, UniformInterfaceBlock::Type::FLOAT4);
-    b.add("a_float_4", 1, UniformInterfaceBlock::Type::FLOAT);
-    b.add("a_float_5", 1, UniformInterfaceBlock::Type::FLOAT);
-    b.add("a_float_6", 1, UniformInterfaceBlock::Type::FLOAT);
-    b.add("a_vec3_0",  1, UniformInterfaceBlock::Type::FLOAT3);
-    b.add("a_float_7", 1, UniformInterfaceBlock::Type::FLOAT);
-    b.add("a_float[3]",3, UniformInterfaceBlock::Type::FLOAT);
-    b.add("a_float_8", 1, UniformInterfaceBlock::Type::FLOAT);
-    b.add("a_mat3_0",  1, UniformInterfaceBlock::Type::MAT3);
-    b.add("a_mat4_0",  1, UniformInterfaceBlock::Type::MAT4);
-    b.add("a_mat3[3]", 3, UniformInterfaceBlock::Type::MAT3);
+    b.add({
+            { "a_float_0",  0, BufferInterfaceBlock::Type::FLOAT },
+            { "a_float_1",  0, BufferInterfaceBlock::Type::FLOAT },
+            { "a_float_2",  0, BufferInterfaceBlock::Type::FLOAT },
+            { "a_float_3",  0, BufferInterfaceBlock::Type::FLOAT },
+            { "a_vec4_0",   0, BufferInterfaceBlock::Type::FLOAT4 },
+            { "a_float_4",  0, BufferInterfaceBlock::Type::FLOAT },
+            { "a_float_5",  0, BufferInterfaceBlock::Type::FLOAT },
+            { "a_float_6",  0, BufferInterfaceBlock::Type::FLOAT },
+            { "a_vec3_0",   0, BufferInterfaceBlock::Type::FLOAT3 },
+            { "a_float_7",  0, BufferInterfaceBlock::Type::FLOAT },
+            { "a_float[3]", 3, BufferInterfaceBlock::Type::FLOAT },
+            { "a_float_8",  0, BufferInterfaceBlock::Type::FLOAT },
+            { "a_mat3_0",   0, BufferInterfaceBlock::Type::MAT3 },
+            { "a_mat4_0",   0, BufferInterfaceBlock::Type::MAT4 },
+            { "a_mat3[3]",  3, BufferInterfaceBlock::Type::MAT3 }
+        });
 
 
-    UniformInterfaceBlock ib(b.build());
-    auto const& info = ib.getUniformInfoList();
+    BufferInterfaceBlock ib(b.build());
+    auto const& info = ib.getFieldInfoList();
 
     // test that 4 floats are packed together
     EXPECT_EQ(0, info[0].offset);
@@ -400,25 +408,27 @@ TEST(FilamentTest, UniformBuffer) {
         EXPECT_EQ(offsetof(ubo, m1)/4, info[13].offset);
     };
 
-    UniformInterfaceBlock::Builder b;
+    BufferInterfaceBlock::Builder b;
     b.name("TestUniformBuffer");
-    b.add("a_float_0", 1, UniformInterfaceBlock::Type::FLOAT);
-    b.add("a_float_1", 1, UniformInterfaceBlock::Type::FLOAT);
-    b.add("a_float_2", 1, UniformInterfaceBlock::Type::FLOAT);
-    b.add("a_float_3", 1, UniformInterfaceBlock::Type::FLOAT);
-    b.add("a_vec4_0",  1, UniformInterfaceBlock::Type::FLOAT4);
-    b.add("a_float_4", 1, UniformInterfaceBlock::Type::FLOAT);
-    b.add("a_float_5", 1, UniformInterfaceBlock::Type::FLOAT);
-    b.add("a_float_6", 1, UniformInterfaceBlock::Type::FLOAT);
-    b.add("a_vec3_0",  1, UniformInterfaceBlock::Type::FLOAT3);
-    b.add("a_float_7", 1, UniformInterfaceBlock::Type::FLOAT);
-    b.add("a_float[3]",3, UniformInterfaceBlock::Type::FLOAT);
-    b.add("a_float_8", 1, UniformInterfaceBlock::Type::FLOAT);
-    b.add("a_mat3_0",  1, UniformInterfaceBlock::Type::MAT3);
-    b.add("a_mat4_0",  1, UniformInterfaceBlock::Type::MAT4);
-    UniformInterfaceBlock ib(b.build());
+    b.add({
+        { "a_float_0", 0, BufferInterfaceBlock::Type::FLOAT },
+        { "a_float_1", 0, BufferInterfaceBlock::Type::FLOAT },
+        { "a_float_2", 0, BufferInterfaceBlock::Type::FLOAT },
+        { "a_float_3", 0, BufferInterfaceBlock::Type::FLOAT },
+        { "a_vec4_0",  0, BufferInterfaceBlock::Type::FLOAT4 },
+        { "a_float_4", 0, BufferInterfaceBlock::Type::FLOAT },
+        { "a_float_5", 0, BufferInterfaceBlock::Type::FLOAT },
+        { "a_float_6", 0, BufferInterfaceBlock::Type::FLOAT },
+        { "a_vec3_0",  0, BufferInterfaceBlock::Type::FLOAT3 },
+        { "a_float_7", 0, BufferInterfaceBlock::Type::FLOAT },
+        { "a_float[3]",3, BufferInterfaceBlock::Type::FLOAT },
+        { "a_float_8", 0, BufferInterfaceBlock::Type::FLOAT },
+        { "a_mat3_0",  0, BufferInterfaceBlock::Type::MAT3 },
+        { "a_mat4_0",  0, BufferInterfaceBlock::Type::MAT4 },
+    });
+    BufferInterfaceBlock ib(b.build());
 
-    CHECK2(ib.getUniformInfoList());
+    CHECK2(ib.getFieldInfoList());
 
     EXPECT_EQ(sizeof(ubo), ib.getSize());
 
@@ -448,54 +458,58 @@ TEST(FilamentTest, UniformBuffer) {
     CHECK(data);
     CHECK(&copy);
 
-    ubo move(std::move(copy));
+    ubo move(copy);
     CHECK(&move);
 
     copy = *data;
     CHECK(data);
     CHECK(&copy);
 
-    move = std::move(copy);
+    move = copy;
     CHECK(&move);
 }
 
 TEST(FilamentTest, UniformBufferSize1) {
-    UniformInterfaceBlock::Builder b;
+    BufferInterfaceBlock::Builder b;
     b.name("UniformBufferSize1");
-    b.add("f4a", 1, UniformInterfaceBlock::Type::FLOAT4); // offset = 0
-    b.add("f4b", 1, UniformInterfaceBlock::Type::FLOAT4); // offset = 16
-    b.add("f1a", 1, UniformInterfaceBlock::Type::FLOAT);  // offset = 32
-    b.add("f1b", 1, UniformInterfaceBlock::Type::FLOAT);  // offset = 36
-    UniformInterfaceBlock uib(b.build());
+    b.add({
+            { "f4a", 0, BufferInterfaceBlock::Type::FLOAT4 }, // offset = 0
+            { "f4b", 0, BufferInterfaceBlock::Type::FLOAT4 }, // offset = 16
+            { "f1a", 0, BufferInterfaceBlock::Type::FLOAT },  // offset = 32
+            { "f1b", 0, BufferInterfaceBlock::Type::FLOAT },  // offset = 36
+    });
+    BufferInterfaceBlock uib(b.build());
     UniformBuffer buffer(uib.getSize());
 
     float4 f4(1.0f);
-    ssize_t f4_offset = uib.getUniformOffset("f4a", 0);
+    ssize_t f4_offset = uib.getFieldOffset("f4a", 0);
     buffer.setUniformArray(f4_offset, &f4, 1);
 
     float f1(1.0f);
-    ssize_t f1_offset = uib.getUniformOffset("f1b", 0);
+    ssize_t f1_offset = uib.getFieldOffset("f1b", 0);
     buffer.setUniformArray(f1_offset, &f1, 1);
 
     buffer.invalidate();
 }
 
 TEST(FilamentTest, UniformBufferSize2) {
-    UniformInterfaceBlock::Builder b;
+    BufferInterfaceBlock::Builder b;
     b.name("UniformBufferSize2");
-    b.add("f4a", 1, UniformInterfaceBlock::Type::FLOAT4); // offset = 0
-    b.add("f4b", 1, UniformInterfaceBlock::Type::FLOAT4); // offset = 16
-    b.add("f1a", 1, UniformInterfaceBlock::Type::FLOAT);  // offset = 32
-    b.add("f2a", 1, UniformInterfaceBlock::Type::FLOAT2); // offset = 36
-    UniformInterfaceBlock uib(b.build());
+    b.add({
+            { "f4a", 0, BufferInterfaceBlock::Type::FLOAT4 }, // offset = 0
+            { "f4b", 0, BufferInterfaceBlock::Type::FLOAT4 }, // offset = 16
+            { "f1a", 0, BufferInterfaceBlock::Type::FLOAT },  // offset = 32
+            { "f2a", 0, BufferInterfaceBlock::Type::FLOAT2 }, // offset = 36
+    });
+    BufferInterfaceBlock uib(b.build());
     UniformBuffer buffer(uib.getSize());
 
     float4 f4(1.0f);
-    ssize_t f4_offset = uib.getUniformOffset("f4a", 0);
+    ssize_t f4_offset = uib.getFieldOffset("f4a", 0);
     buffer.setUniformArray(f4_offset, &f4, 1);
 
     float2 f2(1.0f);
-    ssize_t f2_offset = uib.getUniformOffset("f2a", 0);
+    ssize_t f2_offset = uib.getFieldOffset("f2a", 0);
     buffer.setUniformArray(f2_offset, &f2, 1);
 
     buffer.invalidate();
@@ -626,9 +640,9 @@ TEST(FilamentTest, ColorConversion) {
 TEST(FilamentTest, FroxelData) {
     using namespace filament;
 
-    FEngine* engine = FEngine::create();
+    FEngine* engine = downcast(Engine::create());
 
-    LinearAllocatorArena arena("FRenderer: per-frame allocator", FEngine::CONFIG_PER_RENDER_PASS_ARENA_SIZE);
+    LinearAllocatorArena arena("FRenderer: per-frame allocator", 3 * 1024 * 1024);
     utils::ArenaScope<LinearAllocatorArena> scope(arena);
 
 
@@ -688,8 +702,8 @@ TEST(FilamentTest, FroxelData) {
     LightManager::Instance instance = engine->getLightManager().getInstance(e);
 
     FScene::LightSoa lights;
-    lights.push_back({}, {}, {}, {}, {}, {});   // first one is always skipped
-    lights.push_back(float4{ 0, 0, -5, 1 }, {}, instance, 1, {}, {});
+    lights.push_back({}, {}, {}, {}, {}, {}, {}, {});   // first one is always skipped
+    lights.push_back(float4{ 0, 0, -5, 1 }, {}, {}, {}, instance, 1, {}, {});
 
     {
         froxelData.froxelizeLights(*engine, {}, lights);
@@ -698,8 +712,8 @@ TEST(FilamentTest, FroxelData) {
         // light straddles the "light near" plane
         size_t pointCount = 0;
         for (const auto& entry : froxelBuffer) {
-            EXPECT_LE(entry.count, 1);
-            pointCount += entry.count;
+            EXPECT_LE(entry.count(), 1);
+            pointCount += entry.count();
         }
         EXPECT_GT(pointCount, 0);
     }
@@ -716,8 +730,8 @@ TEST(FilamentTest, FroxelData) {
         auto const& recordBuffer = froxelData.getRecordBufferUser();
         size_t pointCount = 0;
         for (const auto& entry : froxelBuffer) {
-            EXPECT_LE(entry.count, 1);
-            pointCount += entry.count;
+            EXPECT_LE(entry.count(), 1);
+            pointCount += entry.count();
         }
         EXPECT_GT(pointCount, 0);
     }
@@ -730,13 +744,13 @@ TEST(FilamentTest, FroxelData) {
 TEST(FilamentTest, GoogleLineDirective) {
     {
         char s[512] = "#line 10 \"foobar\"";
-        EXPECT_FALSE(filament::backend::requestsGoogleLineDirectivesExtension(&s[0], strlen(s)));
+        EXPECT_FALSE(filament::backend::requestsGoogleLineDirectivesExtension({ &s[0], strlen(s) }));
     }
     {
         char s[512] =
             "#extension GL_GOOGLE_cpp_style_line_directive : enable\n"
             "#line 10 \"foobar\"";
-        EXPECT_TRUE(filament::backend::requestsGoogleLineDirectivesExtension(&s[0], strlen(s)));
+        EXPECT_TRUE(filament::backend::requestsGoogleLineDirectivesExtension({ &s[0], strlen(s) }));
     }
     {
         char s[512] =

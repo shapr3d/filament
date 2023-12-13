@@ -92,9 +92,22 @@ vec3 Irradiance_RoughnessOne(const vec3 n) {
 //------------------------------------------------------------------------------
 
 vec3 diffuseIrradiance(const vec3 n) {
+    // On Metal devices with an A8X chipset, this light_iblSpecular texture sample must be pulled
+    // outside the frameUniforms.iblSH check. This is to avoid a Metal pipeline compilation error
+    // with the message: "Could not statically determine the target of a texture".
+    // The reason for this is unknown, and is possibly a bug that exhibits only on these devices.
+    vec3 irradianceRoughnessOne;
+    if (CONFIG_STATIC_TEXTURE_TARGET_WORKAROUND) {
+        irradianceRoughnessOne = Irradiance_RoughnessOne(n);
+    }
+
     if (frameUniforms.iblSH[0].x == 65504.0) {
 #if FILAMENT_QUALITY < FILAMENT_QUALITY_HIGH
-        return Irradiance_RoughnessOne(n);
+        if (CONFIG_STATIC_TEXTURE_TARGET_WORKAROUND) {
+            return irradianceRoughnessOne;
+        } else {
+            return Irradiance_RoughnessOne(n);
+        }
 #else
         ivec2 s = textureSize(light_iblSpecular, int(frameUniforms.iblRoughnessOneLevel));
         float du = 1.0 / float(s.x);
@@ -198,7 +211,7 @@ vec3 importanceSamplingNdfDggx(vec2 u, float roughness) {
 }
 
 vec3 hemisphereCosSample(vec2 u) {
-    float phi = 2.0f * PI * u.x;
+    float phi = 2.0 * PI * u.x;
     float cosTheta2 = 1.0 - u.y;
     float cosTheta = sqrt(cosTheta2);
     float sinTheta = sqrt(1.0 - cosTheta2);
@@ -244,7 +257,7 @@ float prefilteredImportanceSampling(float ipdf, float omegaP) {
 }
 
 vec3 isEvaluateSpecularIBL(const MaterialInputs material, const PixelParams pixel, const vec3 n, const vec3 v, const float NoV) {
-    const uint numSamples = uint(IBL_INTEGRATION_IMPORTANCE_SAMPLING_COUNT);
+    const int numSamples = IBL_INTEGRATION_IMPORTANCE_SAMPLING_COUNT;
     const float invNumSamples = 1.0 / float(numSamples);
     const vec3 up = vec3(0.0, 0.0, 1.0);
 
@@ -271,7 +284,7 @@ vec3 isEvaluateSpecularIBL(const MaterialInputs material, const PixelParams pixe
     float omegaP = (4.0 * PI) / (6.0 * dim * dim);
 
     vec3 indirectSpecular = vec3(0.0);
-    for (uint i = 0u; i < numSamples; i++) {
+    for (int i = 0; i < numSamples; i++) {
         vec2 u = hammersley(i);
         vec3 h = T * importanceSamplingNdfDggx(u, roughness);
 
@@ -303,7 +316,7 @@ vec3 isEvaluateSpecularIBL(const MaterialInputs material, const PixelParams pixe
 }
 
 vec3 isEvaluateDiffuseIBL(const MaterialInputs material, const PixelParams pixel, vec3 n, vec3 v) {
-    const uint numSamples = uint(IBL_INTEGRATION_IMPORTANCE_SAMPLING_COUNT);
+    const int numSamples = IBL_INTEGRATION_IMPORTANCE_SAMPLING_COUNT;
     const float invNumSamples = 1.0 / float(numSamples);
     const vec3 up = vec3(0.0, 0.0, 1.0);
 
@@ -329,7 +342,7 @@ vec3 isEvaluateDiffuseIBL(const MaterialInputs material, const PixelParams pixel
     float omegaP = (4.0 * PI) / (6.0 * dim * dim);
 
     vec3 indirectDiffuse = vec3(0.0);
-    for (uint i = 0u; i < numSamples; i++) {
+    for (int i = 0; i < numSamples; i++) {
         vec2 u = hammersley(i);
         vec3 h = T * hemisphereCosSample(u);
 
@@ -421,24 +434,25 @@ void evaluateClearCoatIBL(const MaterialInputs material, const PixelParams pixel
 #endif
 
 #if defined(MATERIAL_HAS_CLEAR_COAT)
+    if (pixel.clearCoat > 0.0) {
 #if defined(MATERIAL_HAS_NORMAL) || defined(MATERIAL_HAS_CLEAR_COAT_NORMAL)
-    // We want to use the geometric normal for the clear coat layer
-    float clearCoatNoV = clampNoV(dot(shading_clearCoatNormal, shading_view));
-    vec3 clearCoatR = GetAdjustedReflectedDirection(shading_view, shading_clearCoatNormal);
+        // We want to use the geometric normal for the clear coat layer
+        float clearCoatNoV = clampNoV(dot(shading_clearCoatNormal, shading_view));
+        vec3 clearCoatR = GetAdjustedReflectedDirection(shading_view, shading_clearCoatNormal);
 #else
-    float clearCoatNoV = shading_NoV;
-    vec3 clearCoatR = GetAdjustedReflectedDirection(shading_view, shading_normal);
+        float clearCoatNoV = shading_NoV;
+        vec3 clearCoatR = GetAdjustedReflectedDirection(shading_view, shading_normal);
 #endif
+        // The clear coat layer assumes an IOR of 1.5 (4% reflectance)
+        float Fc = F_Schlick(0.04, 1.0, clearCoatNoV) * pixel.clearCoat;
+        float attenuation = 1.0 - Fc;
+        Fd *= attenuation;
+        Fr *= attenuation;
 
-    // The clear coat layer assumes an IOR of 1.5 (4% reflectance)
-    float Fc = F_Schlick(0.04, 1.0, clearCoatNoV) * pixel.clearCoat;
-    float attenuation = 1.0 - Fc;
-    Fd *= attenuation;
-    Fr *= attenuation;
-
-    // TODO: Should we apply specularAO to the attenuation as well?
-    float specularAO = specularAO(clearCoatNoV, diffuseAO, pixel.clearCoatRoughness, cache);
-    Fr += prefilteredRadiance(clearCoatR, pixel.clearCoatPerceptualRoughness) * (specularAO * Fc);
+        // TODO: Should we apply specularAO to the attenuation as well?
+        float specularAO = specularAO(clearCoatNoV, diffuseAO, pixel.clearCoatRoughness, cache);
+        Fr += prefilteredRadiance(clearCoatR, pixel.clearCoatPerceptualRoughness) * (specularAO * Fc);
+    }
 #endif
 }
 
@@ -557,7 +571,7 @@ vec4 evaluateRefraction(
 
     // distance to camera plane
     const float invLog2sqrt5 = 0.8614;
-    float lod = max(0.0, (2.0f * log2(perceptualRoughness) + frameUniforms.refractionLodOffset) * invLog2sqrt5);
+    float lod = max(0.0, (2.0 * log2(perceptualRoughness) + frameUniforms.refractionLodOffset) * invLog2sqrt5);
     Fat = textureLod(light_ssr, vec3(p.xy, 0.0), lod);
 
     // if it's a transparent background, shift color components towards white
@@ -584,19 +598,19 @@ vec4 evaluateRefraction(
 
 void evaluateIBL(const MaterialInputs material, const PixelParams pixel, inout vec3 color, inout float alpha) {
     // specular layer
-    vec3 Fr = vec3(0.0f);
+    vec3 Fr = vec3(0.0);
 
     SSAOInterpolationCache interpolationCache;
 #if defined(BLEND_MODE_OPAQUE) || defined(BLEND_MODE_MASKED) || defined(MATERIAL_HAS_REFLECTIONS)
-    interpolationCache.uv = uvToRenderTargetUV(getNormalizedViewportCoord().xy);
+    interpolationCache.uv = uvToRenderTargetUV(getNormalizedPhysicalViewportCoord().xy);
 #endif
 
     // screen-space reflections
 #if defined(MATERIAL_HAS_REFLECTIONS)
-    vec4 ssrFr = vec4(0.0f);
+    vec4 ssrFr = vec4(0.0);
 #if defined(BLEND_MODE_OPAQUE) || defined(BLEND_MODE_MASKED)
     // do the uniform based test first
-    if (frameUniforms.ssrDistance > 0.0f) {
+    if (frameUniforms.ssrDistance > 0.0) {
         // There is no point doing SSR for very high roughness because we're limited by the fov
         // of the screen, in addition it doesn't really add much to the final image.
         // TODO: maybe make this a parameter
@@ -613,22 +627,22 @@ void evaluateIBL(const MaterialInputs material, const PixelParams pixel, inout v
     // TODO: for blended transparency, we have to ray-march here (limited to mirror reflections)
 #endif
 #else // MATERIAL_HAS_REFLECTIONS
-    const vec4 ssrFr = vec4(0.0f);
+    const vec4 ssrFr = vec4(0.0);
 #endif
 
-    // If screen-space reflections are turned on and have full contribution (ssr.a == 1.0f), then we
+    // If screen-space reflections are turned on and have full contribution (ssr.a == 1.0), then we
     // skip sampling the IBL down below.
 
 #if IBL_INTEGRATION == IBL_INTEGRATION_PREFILTERED_CUBEMAP
     vec3 E = specularDFG(pixel);
-    if (ssrFr.a < 1.0f) { // prevent reading the IBL if possible
+    if (ssrFr.a < 1.0) { // prevent reading the IBL if possible
         // we have to modify the IBL specular evaluation direction for anisotropic materials
         vec3 r = getReflectedVector(pixel, shading_view, shading_normal);
         Fr = E * prefilteredRadiance(r, pixel.perceptualRoughness);
     }
 #elif IBL_INTEGRATION == IBL_INTEGRATION_IMPORTANCE_SAMPLING
     vec3 E = vec3(0.0); // TODO: fix for importance sampling
-    if (ssrFr.a < 1.0f) { // prevent evaluating the IBL if possible
+    if (ssrFr.a < 1.0) { // prevent evaluating the IBL if possible
         Fr = isEvaluateSpecularIBL(material, pixel, shading_normal, shading_view, shading_NoV);
     }
 #endif

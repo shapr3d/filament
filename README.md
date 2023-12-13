@@ -31,7 +31,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.google.android.filament:filament-android:1.22.1'
+    implementation 'com.google.android.filament:filament-android:1.49.0'
 }
 ```
 
@@ -40,8 +40,8 @@ Here are all the libraries available in the group `com.google.android.filament`:
 | Artifact      | Description   |
 | ------------- | ------------- |
 | [![filament-android](https://maven-badges.herokuapp.com/maven-central/com.google.android.filament/filament-android/badge.svg?subject=filament-android)](https://maven-badges.herokuapp.com/maven-central/com.google.android.filament/filament-android)  | The Filament rendering engine itself. |
+| [![filament-android-debug](https://maven-badges.herokuapp.com/maven-central/com.google.android.filament/filament-android-debug/badge.svg?subject=filament-android-debug)](https://maven-badges.herokuapp.com/maven-central/com.google.android.filament/filament-android-debug)  | Debug version of `filament-android`. |
 | [![gltfio-android](https://maven-badges.herokuapp.com/maven-central/com.google.android.filament/gltfio-android/badge.svg?subject=gltfio-android)](https://maven-badges.herokuapp.com/maven-central/com.google.android.filament/gltfio-android) | A glTF 2.0 loader for Filament, depends on `filament-android`. |
-| [![gltfio-android-lite](https://maven-badges.herokuapp.com/maven-central/com.google.android.filament/gltfio-android-lite/badge.svg?subject=gltfio-android-lite)](https://maven-badges.herokuapp.com/maven-central/com.google.android.filament/gltfio-android-lite) | Trimmed version of `gltfio` that does not support some glTF extensions. |
 | [![filament-utils-android](https://maven-badges.herokuapp.com/maven-central/com.google.android.filament/filament-utils-android/badge.svg?subject=filament-utils-android)](https://maven-badges.herokuapp.com/maven-central/com.google.android.filament/filament-utils-android) | KTX loading, Kotlin math, and camera utilities, depends on `gltfio-android`. |
 | [![filamat-android](https://maven-badges.herokuapp.com/maven-central/com.google.android.filament/filamat-android/badge.svg?subject=filamat-android)](https://maven-badges.herokuapp.com/maven-central/com.google.android.filament/filamat-android) | A runtime material builder/compiler. This library is large but contains a full shader compiler/validator/optimizer and supports both OpenGL and Vulkan. |
 | [![filamat-android-lite](https://maven-badges.herokuapp.com/maven-central/com.google.android.filament/filamat-android-lite/badge.svg?subject=filamat-android-lite)](https://maven-badges.herokuapp.com/maven-central/com.google.android.filament/filamat-android-lite) | A much smaller alternative to `filamat-android` that can only generate OpenGL shaders. It does not provide validation or optimizations. |
@@ -50,8 +50,8 @@ Here are all the libraries available in the group `com.google.android.filament`:
 
 iOS projects can use CocoaPods to install the latest release:
 
-```
-pod 'Filament', '~> 1.22.1'
+```shell
+pod 'Filament', '~> 1.49.0'
 ```
 
 ### Snapshots
@@ -117,9 +117,9 @@ steps:
 - Image-based lighting
 - Physically-based camera (shutter speed, sensitivity and aperture)
 - Physical light units
-- Point lights, spot lights and directional light
+- Point lights, spot lights, and directional light
 - Specular anti-aliasing
-- Spot and directional light shadows
+- Point, spot, and directional light shadows
 - Cascaded shadows
 - EVSM, PCSS, DPCF, or PCF shadows
 - Transparent shadows
@@ -179,6 +179,7 @@ steps:
   - [x] KHR_mesh_quantization
   - [x] KHR_texture_basisu
   - [x] KHR_texture_transform
+  - [x] EXT_meshopt_compression
 
 
 ## Rendering with Filament

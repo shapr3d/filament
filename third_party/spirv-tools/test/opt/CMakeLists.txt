@@ -18,6 +18,7 @@ add_subdirectory(loop_optimizations)
 add_spvtools_unittest(TARGET opt
   SRCS aggressive_dead_code_elim_test.cpp
        amd_ext_to_khr.cpp
+       analyze_live_input_test.cpp
        assembly_builder_test.cpp
        block_merge_test.cpp
        ccp_test.cpp
@@ -42,8 +43,11 @@ add_spvtools_unittest(TARGET opt
        desc_sroa_test.cpp
        eliminate_dead_const_test.cpp
        eliminate_dead_functions_test.cpp
+       eliminate_dead_io_components_test.cpp
        eliminate_dead_member_test.cpp
+       eliminate_dead_output_stores_test.cpp
        feature_manager_test.cpp
+       fix_func_call_arguments_test.cpp
        fix_storage_class_test.cpp
        flatten_decoration_test.cpp
        fold_spec_const_op_composite_test.cpp
@@ -60,6 +64,7 @@ add_spvtools_unittest(TARGET opt
        inst_debug_printf_test.cpp
        instruction_list_test.cpp
        instruction_test.cpp
+       interface_var_sroa_test.cpp
        interp_fixup_test.cpp
        ir_builder.cpp
        ir_context_test.cpp
@@ -82,7 +87,8 @@ add_spvtools_unittest(TARGET opt
        propagator_test.cpp
        reduce_load_size_test.cpp
        redundancy_elimination_test.cpp
-	   remove_unused_interface_variables_test.cpp
+       remove_dontinline_test.cpp
+       remove_unused_interface_variables_test.cpp
        register_liveness.cpp
        relax_float_ops_test.cpp
        replace_desc_array_access_using_var_index_test.cpp
@@ -91,9 +97,10 @@ add_spvtools_unittest(TARGET opt
        scalar_replacement_test.cpp
        set_spec_const_default_value_test.cpp
        simplification_test.cpp
+       spread_volatile_semantics_test.cpp
        strength_reduction_test.cpp
        strip_debug_info_test.cpp
-       strip_reflect_info_test.cpp
+       strip_nonsemantic_info_test.cpp
        struct_cfg_analysis_test.cpp
        type_manager_test.cpp
        types_test.cpp

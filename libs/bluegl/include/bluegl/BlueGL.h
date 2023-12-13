@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 The Android Open Source Project
+ * Copyright (C) 2023 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@
 #define TNT_FILAMENT_BLUEGL__H
 
 
-// MSVC includes .../Windows Kits\Include.0.17763.0\um\GL/gl.h, with gl APIs conflicting with
+// MSVC includes .../Windows Kits\10\Include\10.0.17763.0\um\GL/gl.h, with gl APIs conflicting with
 // bluegl\include\GL/glcorearb.h, causing errors for OpenGL APIs such as:
 // error C2375:  'glBindTexture': redefinition; different linkage
 #ifndef FILAMENT_PLATFORM_WGL

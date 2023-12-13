@@ -22,6 +22,11 @@
 namespace filament::matdbg {
 
 std::string formatVariantString(Variant variant, MaterialDomain domain) noexcept {
+    if (domain == MaterialDomain::COMPUTE) {
+        // Currently we have no variants for compute materials
+        return "---";
+    }
+
     if (domain == MaterialDomain::POST_PROCESS) {
         switch (PostProcessVariant{variant.key}) {
             case PostProcessVariant::OPAQUE: return "OPA";
@@ -41,8 +46,13 @@ std::string formatVariantString(Variant variant, MaterialDomain domain) noexcept
         if (variant.key & Variant::SRE) variantString += "SRE|";
         if (variant.key & Variant::SKN) variantString += "SKN|";
         if (variant.key & Variant::DEP) variantString += "DEP|";
-        if (variant.key & Variant::FOG) variantString += "FOG|";
+        if (variant.key & Variant::DEP) {
+            if (variant.key & Variant::PCK) variantString += "PCK|";
+        } else {
+            if (variant.key & Variant::FOG) variantString += "FOG|";
+        }
         if (variant.key & Variant::VSM) variantString += "VSM|";
+        if (variant.key & Variant::STE) variantString += "STE|";
         variantString = variantString.substr(0, variantString.length() - 1);
     }
 

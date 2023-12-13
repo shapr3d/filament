@@ -17,7 +17,7 @@
 #ifndef TNT_FILAMENT_DETAILS_RENDERER_H
 #define TNT_FILAMENT_DETAILS_RENDERER_H
 
-#include "upcast.h"
+#include "downcast.h"
 
 #include "Allocators.h"
 #include "FrameInfo.h"
@@ -27,7 +27,7 @@
 
 #include "details/SwapChain.h"
 
-#include "private/backend/DriverApiForward.h"
+#include "backend/DriverApiForward.h"
 
 #include <fg/FrameGraphId.h>
 #include <fg/FrameGraphTexture.h>
@@ -129,6 +129,10 @@ public:
         mClearOptions = options;
     }
 
+    ClearOptions const& getClearOptions() const noexcept {
+        return mClearOptions;
+    }
+
 private:
     friend class Renderer;
     using Command = RenderPass::Command;
@@ -136,17 +140,21 @@ private:
     using Epoch = clock::time_point;
     using duration = clock::duration;
 
-    void initializeClearFlags();
+    backend::TargetBufferFlags getClearFlags() const noexcept;
+    void initializeClearFlags() noexcept;
 
     backend::TextureFormat getHdrFormat(const FView& view, bool translucent) const noexcept;
     backend::TextureFormat getLdrFormat(bool translucent) const noexcept;
 
     Epoch getUserEpoch() const { return mUserEpoch; }
-    duration getUserTime() const noexcept { return clock::now() - getUserEpoch(); }
+    double getUserTime() const noexcept {
+        duration const d = clock::now() - getUserEpoch();
+        // convert the duration (whatever it is) to a duration in seconds encoded as double
+        return std::chrono::duration<double>(d).count();
+    }
 
-    void getRenderTarget(FView const& view,
-            backend::TargetBufferFlags& outAttachementMask,
-            backend::Handle<backend::HwRenderTarget>& outTarget) const noexcept;
+    std::pair<backend::Handle<backend::HwRenderTarget>, backend::TargetBufferFlags>
+            getRenderTarget(FView const& view) const noexcept;
 
     void recordHighWatermark(size_t watermark) noexcept {
         mCommandsHighWatermark = std::max(mCommandsHighWatermark, watermark);
@@ -166,6 +174,7 @@ private:
     FSwapChain* mSwapChain = nullptr;
     size_t mCommandsHighWatermark = 0;
     uint32_t mFrameId = 0;
+    uint32_t mViewRenderedCount = 0;
     FrameInfoManager mFrameInfoManager;
     backend::TextureFormat mHdrTranslucent;
     backend::TextureFormat mHdrQualityMedium;
@@ -185,7 +194,7 @@ private:
     LinearAllocatorArena& mPerRenderPassArena;
 };
 
-FILAMENT_UPCAST(Renderer)
+FILAMENT_DOWNCAST(Renderer)
 
 } // namespace filament
 

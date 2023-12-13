@@ -25,6 +25,8 @@ set(SRCS
         src/AutomationSpec.cpp
         src/RemoteServer.cpp
         src/Settings.cpp
+        src/Settings_generated.cpp
+        src/Settings_generated.h
         src/ViewerGui.cpp
         src/TweakableMaterial.cpp
         src/CustomFileDialogs.cpp
@@ -47,14 +49,13 @@ endif()
 add_library(${TARGET} STATIC ${PUBLIC_HDRS} ${SRCS})
 target_link_libraries(${TARGET} PUBLIC imgui filament gltfio_core filagui jsmn civetweb ${PLATFORM_ADDITIONAL_LIBS})
 target_include_directories(${TARGET} PUBLIC ${PUBLIC_HDR_DIR})
+set_target_properties(${TARGET} PROPERTIES FOLDER Libs)
 
 # ==================================================================================================
 # Compiler flags
 # ==================================================================================================
 if (MSVC)
-    target_compile_options(${TARGET} PRIVATE $<$<CONFIG:Release>:/fp:fast>)
 else()
-    target_compile_options(${TARGET} PRIVATE $<$<CONFIG:Release>:-ffast-math>)
     target_compile_options(${TARGET} PRIVATE -Wno-deprecated-register)
 endif()
 
@@ -70,4 +71,5 @@ install(DIRECTORY ${PUBLIC_HDR_DIR}/viewer DESTINATION include)
 if (NOT ANDROID AND NOT WEBGL AND NOT IOS)
     add_executable(test_settings tests/test_settings.cpp)
     target_link_libraries(test_settings PRIVATE ${TARGET} gtest)
+    set_target_properties(test_settings PROPERTIES FOLDER Tests)
 endif()
