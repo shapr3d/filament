@@ -114,7 +114,7 @@ public:
     // In practice, MetalRingBuffer is used for argument buffers, which are kept in the constant
     // address space. Constant buffers have specific alignment requirements when specifying an
     // offset.
-#if defined(IOS)
+#if defined(IOS) && !TARGET_OS_MACCATALYST
 #if TARGET_OS_SIMULATOR
     // The iOS simulator has differing alignment requirements.
     static constexpr auto METAL_CONSTANT_BUFFER_OFFSET_ALIGNMENT = 256;
