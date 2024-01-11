@@ -26,7 +26,7 @@
 #include <array>
 #include <string>
 
-namespace gltfio {
+namespace filament::gltfio {
 
 enum class AlphaMode : uint8_t {
     OPAQUE,
@@ -36,8 +36,8 @@ enum class AlphaMode : uint8_t {
 
 // The following struct gets hashed so all padding bits should be explicit.
 // Tell the compiler to emit a warning if it adds any padding.
-#pragma clang diagnostic push
-#pragma clang diagnostic warning "-Wpadded"
+UTILS_WARNING_PUSH
+UTILS_WARNING_ENABLE_PADDED
 
 /**
  * \struct MaterialKey MaterialProvider.h gltfio/MaterialProvider.h
@@ -98,7 +98,7 @@ struct alignas(4) MaterialKey {
 
 static_assert(sizeof(MaterialKey) == 16, "MaterialKey has unexpected size.");
 
-#pragma clang diagnostic pop
+UTILS_WARNING_POP
 
 bool operator==(const MaterialKey& k1, const MaterialKey& k2);
 
@@ -118,12 +118,12 @@ inline uint8_t getNumUvSets(const UvMap& uvmap) {
  * \class MaterialProvider MaterialProvider.h gltfio/MaterialProvider.h
  * \brief Interface to a provider of glTF materials (has two implementations).
  *
- * - The \c MaterialGenerator implementation generates materials at run time (which can be slow) and
- *   requires the filamat library, but produces streamlined shaders. See createMaterialGenerator().
+ * - The \c JitShaderProvider implementation generates materials at run time (which can be slow) and
+ *   requires the filamat library, but produces streamlined shaders. See createJitShaderProvider().
  *
- * - The \c UbershaderLoader implementation uses a small number of pre-built materials with complex
+ * - The \c UbershaderProvider implementation uses a small number of pre-built materials with complex
  *   fragment shaders, but does not require any run time work or usage of filamat. See
- *   createUbershaderLoader().
+ *   createUbershaderProvider().
  *
  * Both implementations of MaterialProvider maintain a small cache of materials which must be
  * explicitly freed using destroyMaterials(). These materials are not freed automatically when the
@@ -141,15 +141,22 @@ public:
      * @param uvmap Output argument that gets populated with a small table that maps from a glTF uv
      *              index to a Filament uv index.
      * @param label Optional tag that is not a part of the cache key.
-     * @param extras Optional extras as stringified JSON (not a part of the cache key). Don't store the pointer.
+     * @param extras Optional extras as stringified JSON (not a part of the cache key).
+     *               Does not store the pointer.
      */
-    virtual filament::MaterialInstance* createMaterialInstance(MaterialKey* config, UvMap* uvmap,
+    virtual MaterialInstance* createMaterialInstance(MaterialKey* config, UvMap* uvmap,
             const char* label = "material", const char* extras = nullptr) = 0;
+
+    /**
+     * Creates or fetches a compiled Filament material corresponding to the given config.
+     */
+    virtual Material* getMaterial(MaterialKey* config, UvMap* uvmap,
+            const char* label = "material") { return nullptr; }
 
     /**
      * Gets a weak reference to the array of cached materials.
      */
-    virtual const filament::Material* const* getMaterials() const noexcept = 0;
+    virtual const Material* const* getMaterials() const noexcept = 0;
 
     /**
      * Gets the number of cached materials.
@@ -170,7 +177,7 @@ public:
      * Some types of providers (e.g. ubershader) require dummy attribute values
      * if the glTF model does not provide them.
      */
-    virtual bool needsDummyData(filament::VertexAttribute attrib) const noexcept = 0;
+    virtual bool needsDummyData(VertexAttribute attrib) const noexcept = 0;
 };
 
 void constrainMaterial(MaterialKey* key, UvMap* uvmap);
@@ -186,23 +193,22 @@ void processShaderString(std::string* shader, const UvMap& uvmap,
  *
  * Requires \c libfilamat to be linked in. Not available in \c libgltfio_core.
  *
- * @see createUbershaderLoader
+ * @see createUbershaderProvider
  */
 UTILS_PUBLIC
-MaterialProvider* createMaterialGenerator(filament::Engine* engine, bool optimizeShaders = false);
+MaterialProvider* createJitShaderProvider(Engine* engine, bool optimizeShaders = false);
 
 /**
  * Creates a material provider that loads a small set of pre-built materials.
  *
  * @return New material provider that can quickly load a material from a cache.
  *
- * Requires \c libgltfio_resources to be linked in.
- *
- * @see createMaterialGenerator
+ * @see createJitShaderProvider
  */
 UTILS_PUBLIC
-MaterialProvider* createUbershaderLoader(filament::Engine* engine);
+MaterialProvider* createUbershaderProvider(Engine* engine, const void* archive,
+        size_t archiveByteCount);
 
-} // namespace gltfio
+} // namespace filament::gltfio
 
 #endif // GLTFIO_MATERIALPROVIDER_H

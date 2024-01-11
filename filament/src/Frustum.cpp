@@ -19,6 +19,7 @@
 #include "Culler.h"
 
 #include <utils/compiler.h>
+#include <utils/Log.h>
 
 using namespace filament::math;
 
@@ -33,15 +34,22 @@ Frustum::Frustum(const mat4f& pv) {
 
 UTILS_NOINLINE
 void Frustum::setProjection(const mat4f& pv) {
+    // see: "Fast Extraction of Viewing Frustum Planes from the WorldView-Projection Matrix"
+    // by Gil Gribb & Klaus Hartmann
+    //
+    // Another way to think about this is that we're transforming each plane in clip-space to
+    // view-space. Such transform is performed as:
+    //      transpose(inverse(viewFromClipMatrix)), i.e.: transpose(projection)
+
     const mat4f m(transpose(pv));
 
     // Note: these "normals" are not normalized -- it's not necessary for the culling tests.
-    float4 l = -m[3] - m[0];
-    float4 r = -m[3] + m[0];
-    float4 b = -m[3] - m[1];
-    float4 t = -m[3] + m[1];
-    float4 n = -m[3] - m[2];
-    float4 f = -m[3] + m[2];
+    float4 l = -m[3] - m[0];    // m * { -1,  0,  0, -1 }
+    float4 r = -m[3] + m[0];    // m * {  1,  0,  0, -1 }
+    float4 b = -m[3] - m[1];    // m * {  0, -1,  0, -1 }
+    float4 t = -m[3] + m[1];    // m * {  0,  1,  0, -1 }
+    float4 n = -m[3] - m[2];    // m * {  0,  0, -1, -1 }
+    float4 f = -m[3] + m[2];    // m * {  0,  0,  1, -1 }
 
     // NOTE: for our box/frustum intersection routine normalizing these vectors is not required
     // however, they must be normalized for the sphere/frustum tests.
@@ -82,12 +90,12 @@ bool Frustum::intersects(const float4& sphere) const noexcept {
 }
 
 float Frustum::contains(float3 p) const noexcept {
-    float l = dot(mPlanes[0].xyz, p) + mPlanes[0].w;
-    float b = dot(mPlanes[1].xyz, p) + mPlanes[1].w;
-    float r = dot(mPlanes[2].xyz, p) + mPlanes[2].w;
-    float t = dot(mPlanes[3].xyz, p) + mPlanes[3].w;
-    float f = dot(mPlanes[4].xyz, p) + mPlanes[4].w;
-    float n = dot(mPlanes[5].xyz, p) + mPlanes[5].w;
+    float const l = dot(mPlanes[0].xyz, p) + mPlanes[0].w;
+    float const b = dot(mPlanes[1].xyz, p) + mPlanes[1].w;
+    float const r = dot(mPlanes[2].xyz, p) + mPlanes[2].w;
+    float const t = dot(mPlanes[3].xyz, p) + mPlanes[3].w;
+    float const f = dot(mPlanes[4].xyz, p) + mPlanes[4].w;
+    float const n = dot(mPlanes[5].xyz, p) + mPlanes[5].w;
     float d = l;
     d = std::max(d, b);
     d = std::max(d, r);
@@ -98,3 +106,19 @@ float Frustum::contains(float3 p) const noexcept {
 }
 
 } // namespace filament
+
+#if !defined(NDEBUG)
+
+utils::io::ostream& operator<<(utils::io::ostream& out, filament::Frustum const& frustum) {
+    float4 planes[6];
+    frustum.getNormalizedPlanes(planes);
+    out     << planes[0] << '\n'
+            << planes[1] << '\n'
+            << planes[2] << '\n'
+            << planes[3] << '\n'
+            << planes[4] << '\n'
+            << planes[5] << utils::io::endl;
+    return out;
+}
+
+#endif

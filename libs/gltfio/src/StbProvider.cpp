@@ -20,6 +20,7 @@
 #include <vector>
 
 #include <utils/JobSystem.h>
+#include <utils/Log.h>
 
 #include <filament/Engine.h>
 #include <filament/Texture.h>
@@ -33,7 +34,7 @@ using std::atomic;
 using std::vector;
 using std::unique_ptr;
 
-namespace gltfio {
+namespace filament::gltfio {
 
 class StbProvider final : public TextureProvider {
 public:
@@ -41,7 +42,7 @@ public:
     ~StbProvider();
 
     Texture* pushTexture(const uint8_t* data, size_t byteCount,
-            const char* mimeType, uint64_t flags) final;
+            const char* mimeType, TextureFlags flags) final;
 
     Texture* popTexture() final;
     void updateQueue() final;
@@ -86,7 +87,7 @@ private:
 };
 
 Texture* StbProvider::pushTexture(const uint8_t* data, size_t byteCount,
-            const char* mimeType, FlagBits flags) {
+            const char* mimeType, TextureFlags flags) {
     int width, height, numComponents;
     if (!stbi_info_from_memory(data, byteCount, &width, &height, &numComponents)) {
         mRecentPushMessage = std::string("Unable to parse texture: ") + stbi_failure_reason();
@@ -94,13 +95,12 @@ Texture* StbProvider::pushTexture(const uint8_t* data, size_t byteCount,
     }
 
     using InternalFormat = Texture::InternalFormat;
-    const FlagBits sRGB = FlagBits(Flags::sRGB);
 
     Texture* texture = Texture::Builder()
             .width(width)
             .height(height)
             .levels(0xff)
-            .format((flags & sRGB) ? InternalFormat::SRGB8_A8 : InternalFormat::RGBA8)
+            .format(any(flags & TextureFlags::sRGB) ? InternalFormat::SRGB8_A8 : InternalFormat::RGBA8)
             .build(*mEngine);
 
     if (texture == nullptr) {
@@ -126,7 +126,7 @@ Texture* StbProvider::pushTexture(const uint8_t* data, size_t byteCount,
     }
 
     JobSystem* js = &mEngine->getJobSystem();
-    info->decoderJob = jobs::createJob(*js, mDecoderRootJob, [this, info] {
+    info->decoderJob = jobs::createJob(*js, mDecoderRootJob, [info] {
         auto& source = info->sourceBuffer;
         int width, height, comp;
 
@@ -219,6 +219,22 @@ void StbProvider::cancelDecoding() {
     // in-flight jobs. We should consider throttling the number of simultaneous decoder jobs, which
     // would allow for actual cancellation.
     waitForCompletion();
+
+    // For cancelled jobs, we need to set the TextureInfo to the popped state and free the decoded
+    // data.
+    for (auto& info : mTextures) {
+        if (info->state != TextureState::DECODING) {
+            continue;
+        }
+        // Deleting data here should be safe thread-wise as the only other place where
+        // decodedTexelsBaseMipmap is loaded is in the job threads, and we have waited them to
+        // completion above. We also expect the TextureProvider API calls to be made only from one
+        // thread.
+        if (intptr_t data = info->decodedTexelsBaseMipmap.load()) {
+            delete [] (uint8_t*) data;
+        }
+        info->state = TextureState::POPPED;
+    }
 }
 
 const char* StbProvider::getPushMessage() const {
@@ -247,6 +263,11 @@ void StbProvider::decodeSingleTexture() {
 
 StbProvider::StbProvider(Engine* engine) : mEngine(engine) {
     mDecoderRootJob = mEngine->getJobSystem().createJob();
+#ifndef NDEBUG
+    slog.i << "Texture Decoder has "
+            << mEngine->getJobSystem().getThreadCount()
+            << " background threads." << io::endl;
+#endif
 }
 
 StbProvider::~StbProvider() {
@@ -258,4 +279,4 @@ TextureProvider* createStbProvider(Engine* engine) {
     return new StbProvider(engine);
 }
 
-} // namespace gltfio
+} // namespace filament::gltfio

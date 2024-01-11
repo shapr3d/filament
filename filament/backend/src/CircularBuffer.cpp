@@ -27,14 +27,17 @@
 #include <stdio.h>
 #include <algorithm>
 
+#include <utils/architecture.h>
 #include <utils/ashmem.h>
+#include <utils/debug.h>
 #include <utils/Log.h>
 #include <utils/Panic.h>
-#include <utils/debug.h>
 
 using namespace utils;
 
 namespace filament::backend {
+
+size_t CircularBuffer::sPageSize = arch::getPageSize();
 
 CircularBuffer::CircularBuffer(size_t size) {
     mData = alloc(size);
@@ -63,7 +66,8 @@ void* CircularBuffer::alloc(size_t size) noexcept {
     void* vaddr = MAP_FAILED;
     void* vaddr_shadow = MAP_FAILED;
     void* vaddr_guard = MAP_FAILED;
-    int fd = ashmem_create_region("filament::CircularBuffer", size + BLOCK_SIZE);
+    size_t const BLOCK_SIZE = getBlockSize();
+    int const fd = ashmem_create_region("filament::CircularBuffer", size + BLOCK_SIZE);
     if (fd >= 0) {
         // reserve/find enough address space
         void* reserve_vaddr = mmap(nullptr, size * 2 + BLOCK_SIZE,
@@ -133,6 +137,7 @@ UTILS_NOINLINE
 void CircularBuffer::dealloc() noexcept {
 #if HAS_MMAP
     if (mData) {
+        size_t const BLOCK_SIZE = getBlockSize();
         munmap(mData, mSize * 2 + BLOCK_SIZE);
         if (mUsesAshmem >= 0) {
             close(mUsesAshmem);
@@ -148,7 +153,7 @@ void CircularBuffer::dealloc() noexcept {
 
 void CircularBuffer::circularize() noexcept {
     if (mUsesAshmem > 0) {
-        intptr_t overflow = intptr_t(mHead) - (intptr_t(mData) + ssize_t(mSize));
+        intptr_t const overflow = intptr_t(mHead) - (intptr_t(mData) + ssize_t(mSize));
         if (overflow >= 0) {
             assert_invariant(size_t(overflow) <= mSize);
             mHead = (void *) (intptr_t(mData) + overflow);

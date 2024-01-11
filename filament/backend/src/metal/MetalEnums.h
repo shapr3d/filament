@@ -52,6 +52,19 @@ constexpr inline MTLCompareFunction getMetalCompareFunction(RasterState::DepthFu
     }
 }
 
+constexpr inline MTLStencilOperation getMetalStencilOperation(StencilOperation op) {
+    switch (op) {
+        case StencilOperation::KEEP: return MTLStencilOperationKeep;
+        case StencilOperation::ZERO: return MTLStencilOperationZero;
+        case StencilOperation::REPLACE: return MTLStencilOperationReplace;
+        case StencilOperation::INCR: return MTLStencilOperationIncrementClamp;
+        case StencilOperation::INCR_WRAP: return MTLStencilOperationIncrementWrap;
+        case StencilOperation::DECR: return MTLStencilOperationDecrementClamp;
+        case StencilOperation::DECR_WRAP: return MTLStencilOperationDecrementWrap;
+        case StencilOperation::INVERT: return MTLStencilOperationInvert;
+    }
+}
+
 constexpr inline MTLIndexType getIndexType(size_t elementSize) noexcept {
     if (elementSize == 2) {
         return MTLIndexTypeUInt16;
@@ -178,27 +191,6 @@ inline MTLPixelFormat getMetalFormat(PixelDataFormat format, PixelDataType type)
     return MTLPixelFormatInvalid;
 }
 
-inline bool metalFormatOrderInvariantEqual(MTLPixelFormat lhs, MTLPixelFormat rhs) {
-    if (lhs == rhs) {
-        return true;
-    }
-
-    if (lhs == MTLPixelFormatBGRA8Unorm && rhs == MTLPixelFormatRGBA8Unorm) {
-        return true;
-    }
-    if (lhs == MTLPixelFormatBGRA8Unorm_sRGB && rhs == MTLPixelFormatRGBA8Unorm_sRGB) {
-        return true;
-    }
-    if (lhs == MTLPixelFormatRGBA8Unorm && rhs == MTLPixelFormatBGRA8Unorm) {
-        return true;
-    }
-    if (lhs == MTLPixelFormatRGBA8Unorm_sRGB && rhs == MTLPixelFormatBGRA8Unorm_sRGB) {
-        return true;
-    }
-
-    return false;
-}
-
 inline MTLPixelFormat getMetalFormatLinear(MTLPixelFormat format) {
     switch (format) {
         case MTLPixelFormatR8Unorm_sRGB: return MTLPixelFormatR8Unorm;
@@ -272,6 +264,22 @@ constexpr inline bool isMetalFormatInteger(MTLPixelFormat format) {
     }
 }
 
+constexpr inline bool isMetalFormatStencil(MTLPixelFormat format) {
+    switch (format) {
+        case MTLPixelFormatStencil8:
+        case MTLPixelFormatDepth32Float_Stencil8:
+        case MTLPixelFormatX32_Stencil8:
+#if !defined(IOS)
+        case MTLPixelFormatDepth24Unorm_Stencil8:
+        case MTLPixelFormatX24_Stencil8:
+#endif
+            return true;
+
+        default:
+            return false;
+    }
+}
+
 constexpr inline MTLTextureType getMetalType(SamplerType target) {
     switch (target) {
         case SamplerType::SAMPLER_2D:
@@ -283,6 +291,8 @@ constexpr inline MTLTextureType getMetalType(SamplerType target) {
             return MTLTextureTypeCube;
         case SamplerType::SAMPLER_3D:
             return MTLTextureType3D;
+        case SamplerType::SAMPLER_CUBEMAP_ARRAY:
+            return MTLTextureTypeCubeArray;
     }
 }
 
@@ -329,8 +339,6 @@ constexpr inline MTLPrimitiveType getMetalPrimitiveType(PrimitiveType type) noex
         case PrimitiveType::LINE_STRIP: return MTLPrimitiveTypeLineStrip;
         case PrimitiveType::TRIANGLES: return MTLPrimitiveTypeTriangle;
         case PrimitiveType::TRIANGLE_STRIP: return MTLPrimitiveTypeTriangleStrip;
-        case PrimitiveType::NONE:
-            ASSERT_POSTCONDITION(false, "NONE is not a valid primitive type.");
     }
 }
 

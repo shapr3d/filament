@@ -7,10 +7,6 @@
 #define FROXEL_BUFFER_WIDTH         (1u << FROXEL_BUFFER_WIDTH_SHIFT)
 #define FROXEL_BUFFER_WIDTH_MASK    (FROXEL_BUFFER_WIDTH - 1u)
 
-#define RECORD_BUFFER_WIDTH_SHIFT   4u
-#define RECORD_BUFFER_WIDTH         (1u << RECORD_BUFFER_WIDTH_SHIFT)
-#define RECORD_BUFFER_WIDTH_MASK    (RECORD_BUFFER_WIDTH - 1u)
-
 #define LIGHT_TYPE_POINT            0u
 #define LIGHT_TYPE_SPOT             1u
 
@@ -50,8 +46,7 @@ uvec3 getFroxelCoords(const highp vec3 fragCoords) {
 /**
  * Computes the froxel index of the fragment at the specified coordinates.
  * The froxel index is computed from the 3D coordinates of the froxel in the
- * froxel grid and later used to fetch from the froxel data texture
- * (light_froxels).
+ * froxel grid and later used to fetch from the froxel buffer.
  */
 uint getFroxelIndex(const highp vec3 fragCoords) {
     uvec3 froxelCoord = getFroxelCoords(fragCoords);
@@ -69,15 +64,16 @@ ivec2 getFroxelTexCoord(uint froxelIndex) {
 
 /**
  * Returns the froxel data for the given froxel index. The data is fetched
- * from the light_froxels texture.
+ * from FroxelsUniforms UBO.
  */
-FroxelParams getFroxelParams(uint froxelIndex) {
-    ivec2 texCoord = getFroxelTexCoord(froxelIndex);
-    uvec2 entry = texelFetch(light_froxels, texCoord, 0).rg;
-
+FroxelParams getFroxelParams(const uint froxelIndex) {
+    uint w = froxelIndex >> 2u;
+    uint c = froxelIndex & 0x3u;
+    highp uvec4 d = froxelsUniforms.records[w];
+    highp uint f = d[c];
     FroxelParams froxel;
-    froxel.recordOffset = entry.r;
-    froxel.count = entry.g & 0xFFu;
+    froxel.recordOffset = f >> 16u;
+    froxel.count = f & 0xFFu;
     return froxel;
 }
 
@@ -107,8 +103,7 @@ float getDistanceAttenuation(const highp vec3 posToLight, float falloff) {
     float attenuation = getSquareFalloffAttenuation(distanceSquare, falloff);
     // light far attenuation
     highp vec3 v = getWorldPosition() - getWorldCameraPosition();
-    float d = dot(v, v);
-    attenuation *= saturate(frameUniforms.lightFarAttenuationParams.x - d * frameUniforms.lightFarAttenuationParams.y);
+    attenuation *= saturate(frameUniforms.lightFarAttenuationParams.x - dot(v, v) * frameUniforms.lightFarAttenuationParams.y);
     // Assume a punctual light occupies a volume of 1cm to avoid a division by 0
     return attenuation / max(distanceSquare, 1e-4);
 }
@@ -154,23 +149,24 @@ Light getLight(const uint lightIndex) {
     light.colorIntensity.w = computePreExposedIntensity(intensity, frameUniforms.exposure);
     light.l = normalize(posToLight);
     light.attenuation = getDistanceAttenuation(posToLight, positionFalloff.w);
+    light.direction = direction;
     light.NoL = saturate(dot(shading_normal, light.l));
     light.worldPosition = positionFalloff.xyz;
-    light.castsShadows = false;
-    light.contactShadows = false;
-    light.shadowIndex = 0u;
-    light.shadowLayer = 0u;
-    light.channels = channels;
-
-    uint type = typeShadow & 0x1u;
-    if (type == LIGHT_TYPE_SPOT) {
-        light.attenuation *= getAngleAttenuation(-direction, light.l, scaleOffset);
-        light.contactShadows = bool(typeShadow & 0x10u);
-        light.shadowIndex = (typeShadow >>  8u) & 0xFFu;
-        light.shadowLayer = (typeShadow >> 16u) & 0xFFu;
-        light.castsShadows   = bool(channels & 0x10000u);
+    light.channels = int(channels);
+    light.contactShadows = bool(typeShadow & 0x10u);
+#if defined(VARIANT_HAS_DYNAMIC_LIGHTING)
+    light.type = (typeShadow & 0x1u);
+#if defined(VARIANT_HAS_SHADOWING)
+    light.shadowIndex = int((typeShadow >>  8u) & 0xFFu);
+    light.castsShadows   = bool(channels & 0x10000u);
+    if (light.type == LIGHT_TYPE_SPOT) {
+        light.zLight = dot(shadowUniforms.shadows[light.shadowIndex].lightFromWorldZ, vec4(worldPosition, 1.0));
     }
-
+#endif
+    if (light.type == LIGHT_TYPE_SPOT) {
+        light.attenuation *= getAngleAttenuation(-direction, light.l, scaleOffset);
+    }
+#endif
     return light;
 }
 
@@ -184,23 +180,23 @@ void evaluatePunctualLights(const MaterialInputs material,
 
     // Fetch the light information stored in the froxel that contains the
     // current fragment
-    FroxelParams froxel = getFroxelParams(getFroxelIndex(getNormalizedViewportCoord2()));
+    FroxelParams froxel = getFroxelParams(getFroxelIndex(getNormalizedPhysicalViewportCoord()));
 
     // Each froxel contains how many lights can influence
     // the current fragment. A froxel also contains a record offset that
     // tells us where the indices of those lights are in the records
-    // texture. The records texture contains the indices of the actual
-    // light data in the lightsUniforms uniform buffer
+    // buffer. The records buffer contains the indices of the actual
+    // light data in the lightsUniforms UBO.
 
     uint index = froxel.recordOffset;
     uint end = index + froxel.count;
-    uint channels = objectUniforms.channels & 0xFFu;
+    int channels = object_uniforms_flagsChannels & 0xFF;
 
     // Iterate point lights
     for ( ; index < end; index++) {
         uint lightIndex = getLightIndex(index);
         Light light = getLight(lightIndex);
-        if ((light.channels & channels) == 0u) {
+        if ((light.channels & channels) == 0) {
             continue;
         }
 
@@ -214,10 +210,21 @@ void evaluatePunctualLights(const MaterialInputs material,
 #if defined(VARIANT_HAS_SHADOWING)
         if (light.NoL > 0.0) {
             if (light.castsShadows) {
-                visibility = shadow(false, light_shadowMap, light.shadowLayer, light.shadowIndex, 0u);
+                int shadowIndex = light.shadowIndex;
+                if (light.type == LIGHT_TYPE_POINT) {
+                    // point-light shadows are sampled from a direction
+                    highp vec3 r = getWorldPosition() - light.worldPosition;
+                    int face = getPointLightFace(r);
+                    shadowIndex += face;
+                    light.zLight = dot(shadowUniforms.shadows[shadowIndex].lightFromWorldZ,
+                            vec4(getWorldPosition(), 1.0));
+                }
+                highp vec4 shadowPosition = getShadowPosition(shadowIndex, light.direction, light.zLight);
+                visibility = shadow(false, light_shadowMap, shadowIndex,
+                        shadowPosition, light.zLight);
             }
             if (light.contactShadows && visibility > 0.0) {
-                if ((objectUniforms.flags & FILAMENT_OBJECT_CONTACT_SHADOWS_BIT) != 0u) {
+                if ((object_uniforms_flagsChannels & FILAMENT_OBJECT_CONTACT_SHADOWS_BIT) != 0) {
                     visibility *= 1.0 - screenSpaceContactShadow(light.l);
                 }
             }
@@ -234,5 +241,30 @@ void evaluatePunctualLights(const MaterialInputs material,
 #else
         color.rgb += surfaceShading(material, pixel, light, visibility);
 #endif
+    }
+
+    if (CONFIG_DEBUG_FROXEL_VISUALIZATION) {
+        if (froxel.count > 0u) {
+            const vec3 debugColors[17] = vec3[](
+                vec3(0.0,     0.0,     0.0),         // black
+                vec3(0.0,     0.0,     0.1647),      // darkest blue
+                vec3(0.0,     0.0,     0.3647),      // darker blue
+                vec3(0.0,     0.0,     0.6647),      // dark blue
+                vec3(0.0,     0.0,     0.9647),      // blue
+                vec3(0.0,     0.9255,  0.9255),      // cyan
+                vec3(0.0,     0.5647,  0.0),         // dark green
+                vec3(0.0,     0.7843,  0.0),         // green
+                vec3(1.0,     1.0,     0.0),         // yellow
+                vec3(0.90588, 0.75294, 0.0),         // yellow-orange
+                vec3(1.0,     0.5647,  0.0),         // orange
+                vec3(1.0,     0.0,     0.0),         // bright red
+                vec3(0.8392,  0.0,     0.0),         // red
+                vec3(1.0,     0.0,     1.0),         // magenta
+                vec3(0.6,     0.3333,  0.7882),      // purple
+                vec3(1.0,     1.0,     1.0),         // white
+                vec3(1.0,     1.0,     1.0)          // white
+            );
+            color = mix(color, debugColors[clamp(froxel.count, 0u, 16u)], 0.8);
+        }
     }
 }

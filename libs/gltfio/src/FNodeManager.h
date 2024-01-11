@@ -17,7 +17,7 @@
 #ifndef GLTFIO_FNODEMANAGER_H
 #define GLTFIO_FNODEMANAGER_H
 
-#include "upcast.h"
+#include "downcast.h"
 
 #include <gltfio/NodeManager.h>
 
@@ -26,7 +26,7 @@
 #include <utils/Entity.h>
 #include <utils/Slice.h>
 
-namespace gltfio {
+namespace filament::gltfio {
 
 class UTILS_PRIVATE FNodeManager : public NodeManager {
 public:
@@ -52,18 +52,20 @@ public:
         if (UTILS_UNLIKELY(mManager.hasComponent(entity))) {
             destroy(entity);
         }
-        Instance ci = mManager.addComponent(entity);
+        UTILS_UNUSED_IN_RELEASE Instance ci = mManager.addComponent(entity);
         assert_invariant(ci);
     }
 
     void destroy(utils::Entity e) noexcept {
-        if (Instance ci = mManager.getInstance(e); ci) {
+        if (Instance const ci = mManager.getInstance(e); ci) {
             mManager.removeComponent(e);
         }
     }
 
     void gc(utils::EntityManager& em) noexcept {
-        mManager.gc(em);
+        mManager.gc(em, [this](Entity e) {
+            destroy(e);
+        });
     }
 
     void setMorphTargetNames(Instance ci, utils::FixedCapacityVector<CString> names) noexcept {
@@ -132,8 +134,8 @@ private:
     Sim mManager;
 };
 
-FILAMENT_UPCAST(NodeManager)
+FILAMENT_DOWNCAST(NodeManager)
 
-} // namespace gltfio
+} // namespace filament::gltfio
 
 #endif // GLTFIO_FNODEMANAGER_H

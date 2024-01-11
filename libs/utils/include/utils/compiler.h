@@ -54,6 +54,12 @@
 #    define UTILS_NORETURN
 #endif
 
+#if __has_attribute(fallthrough)
+#   define UTILS_FALLTHROUGH [[fallthrough]]
+#else
+#   define UTILS_FALLTHROUGH
+#endif
+
 #if __has_attribute(visibility)
 #    ifndef TNT_DEV
 #        define UTILS_PRIVATE __attribute__((visibility("hidden")))
@@ -124,10 +130,16 @@
 #define FILAMENT_THREADING_MODE_SYNCHRONOUS_DRIVER 1
 #define FILAMENT_THREADING_MODE_ASYNCHRONOUS_DRIVER 2
 
-#if defined(__EMSCRIPTEN__) || defined(FILAMENT_SINGLE_THREADED)
+#if defined(FILAMENT_SINGLE_THREADED)
 #   define FILAMENT_THREADING_MODE FILAMENT_THREADING_MODE_SINGLE_THREADED
 #elif defined(FILAMENT_NO_DRIVER_THREAD)
 #   define FILAMENT_THREADING_MODE FILAMENT_THREADING_MODE_SYNCHRONOUS_DRIVER
+#elif defined(__EMSCRIPTEN__)
+#   if defined(__EMSCRIPTEN_PTHREADS__) && defined(FILAMENT_WASM_THREADS)
+#      define FILAMENT_THREADING_MODE FILAMENT_THREADING_MODE_ASYNCHRONOUS_DRIVER
+#   else
+#      define FILAMENT_THREADING_MODE FILAMENT_THREADING_MODE_SINGLE_THREADED
+#   endif
 #else
 #   define FILAMENT_THREADING_MODE FILAMENT_THREADING_MODE_ASYNCHRONOUS_DRIVER
 #endif
@@ -150,7 +162,7 @@
 #define UTILS_PURE
 #endif
 
-#if __has_attribute(maybe_unused)
+#if __has_attribute(maybe_unused) || (defined(_MSC_VER) && _MSC_VER >= 1911)
 #define UTILS_UNUSED [[maybe_unused]]
 #define UTILS_UNUSED_IN_RELEASE [[maybe_unused]]
 #elif __has_attribute(unused)
@@ -179,9 +191,11 @@
 
 #if defined(_MSC_VER)
 // MSVC does not support loop unrolling hints
+#   define UTILS_UNROLL
 #   define UTILS_NOUNROLL
 #else
 // C++11 allows pragmas to be specified as part of defines using the _Pragma syntax.
+#   define UTILS_UNROLL _Pragma("unroll")
 #   define UTILS_NOUNROLL _Pragma("nounroll")
 #endif
 
@@ -255,5 +269,18 @@ typedef SSIZE_T ssize_t;
 #endif 
 
 
+#if defined(_MSC_VER)
+#   define UTILS_WARNING_PUSH _Pragma("warning( push )")
+#   define UTILS_WARNING_POP _Pragma("warning( pop )")
+#   define UTILS_WARNING_ENABLE_PADDED _Pragma("warning(1: 4324)")
+#elif defined(__clang__)
+#   define UTILS_WARNING_PUSH _Pragma("clang diagnostic push")
+#   define UTILS_WARNING_POP  _Pragma("clang diagnostic pop")
+#   define UTILS_WARNING_ENABLE_PADDED _Pragma("clang diagnostic warning \"-Wpadded\"")
+#else
+#   define UTILS_WARNING_PUSH
+#   define UTILS_WARNING_POP
+#   define UTILS_WARNING_ENABLE_PADDED
+#endif
 
 #endif // TNT_UTILS_COMPILER_H

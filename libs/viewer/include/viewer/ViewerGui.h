@@ -30,6 +30,7 @@
 #include <gltfio/NodeManager.h>
 
 #include <viewer/Settings.h>
+#include <viewer/TweakableMaterial.h>
 
 #include <utils/Entity.h>
 #include <utils/compiler.h>
@@ -37,8 +38,7 @@
 #include <math/mat4.h>
 #include <math/vec3.h>
 
-#include <viewer/TweakableMaterial.h>
-
+#include <functional>
 #include <vector>
 
 namespace filagui {
@@ -71,7 +71,7 @@ public:
      * Upon construction, the simple viewer may create some additional Filament objects (such as
      * light sources) that it owns.
      */
-    ViewerGui(filament::Engine* engine, filament::Scene* scene, filament::View* view,
+    ViewerGui(Engine* engine, Scene* scene, View* view,
             int sidebarWidth = DEFAULT_SIDEBAR_WIDTH);
 
     /**
@@ -80,17 +80,17 @@ public:
     ~ViewerGui();
 
     /**
-     * Sets the viewer's current asset.
+     * Sets the viewer's current asset and instance.
      *
      * The viewer does not claim ownership over the asset or its entities. Clients should use
      * AssetLoader and ResourceLoader to load an asset before passing it in.
      *
      * This method does not add renderables to the scene; see populateScene().
      *
-     * @param asset The asset to view.
-     * @param instanceToAnimate Optional instance from which to get the animator.
+     * @param instance The asset to view.
+     * @param instance The instance to view.
      */
-    void setAsset(FilamentAsset* asset,  FilamentInstance* instanceToAnimate = nullptr);
+    void setAsset(FilamentAsset* asset, FilamentInstance* instance);
 
     /**
      * Adds the asset's ready-to-render entities into the scene.
@@ -110,7 +110,7 @@ public:
     /**
      * Sets or changes the current scene's IBL to allow the UI manipulate it.
      */
-    void setIndirectLight(filament::IndirectLight* ibl, filament::math::float3 const* sh3);
+    void setIndirectLight(IndirectLight* ibl, math::float3 const* sh3);
 
     /**
      * Computes Sunlight direction, intensity, and color from the IBL
@@ -120,8 +120,10 @@ public:
     /**
      * Applies the currently-selected glTF animation to the transformation hierarchy and updates
      * the bone matrices on all renderables.
+     *
+     * If an instance is provided, animation is applied to it rather than the "set" instance.
      */
-    void applyAnimation(double currentTime);
+    void applyAnimation(double currentTime, FilamentInstance* instance = nullptr);
 
     /**
      * Constructs ImGui controls for the current frame and responds to everything that the user has
@@ -142,7 +144,7 @@ public:
      * its callback. Note that the first call might be slower since it requires the creation of the
      * internal ImGuiHelper instance.
      */
-    void renderUserInterface(float timeStepInSeconds, filament::View* guiView, float pixelRatio);
+    void renderUserInterface(float timeStepInSeconds, View* guiView, float pixelRatio);
 
     /**
      * Event-passing methods, useful only when ViewerGui manages its own instance of ImGuiHelper.
@@ -217,7 +219,7 @@ public:
 
     /**
      * Adjusts the intensity of the IBL.
-     * See also filament::IndirectLight::setIntensity().
+     * See also IndirectLight::setIntensity().
      * Defaults to 30000.0.
      */
     void setIBLIntensity(float brightness) { mSettings.lighting.iblIntensity = brightness; }
@@ -232,7 +234,7 @@ public:
      */
     Settings& getSettings() { return mSettings; }
 
-    void stopAnimation() { mCurrentAnimation = 0; }
+    void stopAnimation() { mCurrentAnimation = -1; }
 
     int getCurrentCamera() const { return mCurrentCamera; }
 
@@ -243,8 +245,6 @@ public:
     void updateCameraSpeedOnUI(float value);
 private:
     using SceneMask = gltfio::NodeManager::SceneMask;
-
-    void updateIndirectLight();
 
     bool isRemoteMode() const { return mAsset == nullptr; }
 
@@ -267,9 +267,9 @@ private:
     void loadTweaksFromFile(const std::string& entityName, const std::string& filePath);
 
     // Immutable properties set from the constructor.
-    filament::Engine* const mEngine;
-    filament::Scene* const mScene;
-    filament::View* const mView;
+    Engine* const mEngine;
+    Scene* const mScene;
+    View* const mView;
     const utils::Entity mSunlight;
 
     // Lazily instantiated fields.
@@ -277,14 +277,13 @@ private:
 
     // Properties that can be changed from the application.
     FilamentAsset* mAsset = nullptr;
-    Animator* mAnimator = nullptr;
-    filament::IndirectLight* mIndirectLight = nullptr;
+    FilamentInstance* mInstance = nullptr;
+    IndirectLight* mIndirectLight = nullptr;
     std::function<void()> mCustomUI;
 
     // Properties that can be changed from the UI.
-    int mCurrentAnimation = 1; // It is a 1-based index and 0 means not playing animation
+    int mCurrentAnimation = 0; // -1 means not playing animation and count means plays all of them (0-based index)
     int mCurrentVariant = 0;
-    bool mResetAnimation = true;
     bool mEnableWireframe = false;
     int mVsmMsaaSamplesLog2 = 1;
     Settings mSettings;
@@ -297,6 +296,13 @@ private:
 
     // 0 is the default "free camera". Additional cameras come from the gltf file (1-based index).
     int mCurrentCamera = 0;
+
+    // Cross fade animation parameters.
+    float mCrossFadeDuration = 0.5f;  // number of seconds to transition between animations
+    int mPreviousAnimation = -1;      // zero-based index of the previous animation
+    double mCurrentStartTime = 0.0f;  // start time of most recent cross-fade (seconds)
+    double mPreviousStartTime = 0.0f; // start time of previous cross-fade (seconds)
+    bool mResetAnimation = true;      // set when building ImGui widgets, honored in applyAnimation
 
     // Color grading UI state.
     float mToneMapPlot[1024];
@@ -388,7 +394,7 @@ public:
 };
 
 UTILS_PUBLIC
-filament::math::mat4f fitIntoUnitCube(const filament::Aabb& bounds, float zoffset);
+math::mat4f fitIntoUnitCube(const Aabb& bounds, float zoffset);
 
 } // namespace viewer
 } // namespace filament

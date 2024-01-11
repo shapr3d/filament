@@ -49,23 +49,28 @@ class FIndirectLight;
 class Froxelizer;
 class LightManager;
 
+/*
+ * PerViewUniforms manages the UBO and samplers needed to render the color passes. Internally it
+ * holds onto handles for the PER_VIEW UBO and SamplerGroup. This class maintains a shadow copy
+ * of the UBO/sampler data, so it is possible to partially update it between commits.
+ */
 class PerViewUniforms {
 
     using LightManagerInstance = utils::EntityInstance<LightManager>;
     using TextureHandle = backend::Handle<backend::HwTexture>;
 
-    static constexpr uint32_t const SHADOW_SAMPLING_RUNTIME_PCF  = 0u;
-    static constexpr uint32_t const SHADOW_SAMPLING_RUNTIME_VSM  = 1u;
-    static constexpr uint32_t const SHADOW_SAMPLING_RUNTIME_DPCF = 2u;
-    static constexpr uint32_t const SHADOW_SAMPLING_RUNTIME_PCSS = 3u;
+    static constexpr uint32_t const SHADOW_SAMPLING_RUNTIME_PCF   = 0u;
+    static constexpr uint32_t const SHADOW_SAMPLING_RUNTIME_EVSM  = 1u;
+    static constexpr uint32_t const SHADOW_SAMPLING_RUNTIME_DPCF  = 2u;
+    static constexpr uint32_t const SHADOW_SAMPLING_RUNTIME_PCSS  = 3u;
 
 public:
     explicit PerViewUniforms(FEngine& engine) noexcept;
 
     void terminate(backend::DriverApi& driver);
 
-    void prepareCamera(const CameraInfo& camera) noexcept;
-    void prepareUpscaler(math::float2 scale, DynamicResolutionOptions const& options) noexcept;
+    void prepareCamera(FEngine& engine, const CameraInfo& camera) noexcept;
+    void prepareLodBias(float bias) noexcept;
 
     /*
      * @param viewport  viewport (should be same as RenderPassParams::viewport)
@@ -74,18 +79,24 @@ public:
      * @param yoffset   vertical rendering offset *within* the viewport.
      *                  Non-zero when we have guard bands.
      */
-    void prepareViewport(const filament::Viewport& viewport, uint32_t xoffset, uint32_t yoffset) noexcept;
+    void prepareViewport(
+            const filament::Viewport& physicalViewport,
+            const filament::Viewport& logicalViewport) noexcept;
 
-    void prepareTime(math::float4 const& userTime) noexcept;
-    void prepareTemporalNoise(TemporalAntiAliasingOptions const& options) noexcept;
+    void prepareTime(FEngine& engine, math::float4 const& userTime) noexcept;
+    void prepareTemporalNoise(FEngine& engine, TemporalAntiAliasingOptions const& options) noexcept;
     void prepareExposure(float ev100) noexcept;
-    void prepareFog(math::float3 const& cameraPosition, FogOptions const& options) noexcept;
+    void prepareFog(FEngine& engine, const CameraInfo& cameraInfo,
+            math::mat4 const& fogTransform, FogOptions const& options,
+            FIndirectLight const* ibl) noexcept;
     void prepareStructure(TextureHandle structure) noexcept;
     void prepareSSAO(TextureHandle ssao, AmbientOcclusionOptions const& options) noexcept;
     void prepareBlending(bool needsAlphaChannel) noexcept;
+    void prepareMaterialGlobals(std::array<math::float4, 4> const& materialGlobals) noexcept;
 
     // screen-space reflection and/or refraction (SSR)
     void prepareSSR(TextureHandle ssr,
+            bool disableSSR,
             float refractionLodOffset,
             ScreenSpaceReflectionsOptions const& ssrOptions) noexcept;
 
@@ -94,14 +105,15 @@ public:
             math::mat4f const& uvFromViewMatrix,
             ScreenSpaceReflectionsOptions const& ssrOptions) noexcept;
 
-    void prepareShadowMapping() noexcept;
+    void prepareShadowMapping(bool highPrecision) noexcept;
 
-    void prepareDirectionalLight(float exposure,
+    void prepareDirectionalLight(FEngine& engine, float exposure,
             math::float3 const& sceneSpaceDirection, LightManagerInstance instance) noexcept;
 
     void prepareIblLight(const IblOptions& options) noexcept;
 
-    void prepareAmbientLight(FIndirectLight const& ibl, float intensity, float exposure) noexcept;
+    void prepareAmbientLight(FEngine& engine,
+            FIndirectLight const& ibl, float intensity, float exposure) noexcept;
 
     void prepareDynamicLights(Froxelizer& froxelizer) noexcept;
 
@@ -120,6 +132,9 @@ public:
             ShadowMappingUniforms const& shadowMappingUniforms,
             SoftShadowOptions const& options) noexcept;
 
+    void prepareShadowPCFDebug(TextureHandle texture,
+            ShadowMappingUniforms const& shadowMappingUniforms) noexcept;
+
     // update local data into GPU UBO
     void commit(backend::DriverApi& driver) noexcept;
 
@@ -129,13 +144,10 @@ public:
     void unbindSamplers() noexcept;
 
 private:
-    FEngine& mEngine;
-    math::float2 mClipControl{};
     TypedUniformBuffer<PerViewUib> mUniforms;
     backend::SamplerGroup mSamplers;
     backend::Handle<backend::HwBufferObject> mUniformBufferHandle;
     backend::Handle<backend::HwSamplerGroup> mSamplerGroupHandle;
-    std::uniform_real_distribution<float> mUniformDistribution{ 0.0f, 1.0f };
     static void prepareShadowSampling(PerViewUib& uniforms,
             ShadowMappingUniforms const& shadowMappingUniforms) noexcept;
 };

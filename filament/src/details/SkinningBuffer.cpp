@@ -18,12 +18,16 @@
 
 #include "components/RenderableManager.h"
 
+#include "private/filament/SibStructs.h"
+
 #include "details/Engine.h"
 
 #include "FilamentAPI-impl.h"
 
 #include <math/half.h>
 #include <math/mat4.h>
+
+#include <cstring>
 
 namespace filament {
 
@@ -55,7 +59,7 @@ SkinningBuffer::Builder& SkinningBuffer::Builder::initialize(bool initialize) no
 }
 
 SkinningBuffer* SkinningBuffer::Builder::build(Engine& engine) {
-    return upcast(engine).createSkinningBuffer(*this);
+    return downcast(engine).createSkinningBuffer(*this);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -72,16 +76,16 @@ FSkinningBuffer::FSkinningBuffer(FEngine& engine, const Builder& builder)
     //     UNIFORM_BLOCK_DATA_SIZE).
 
     mHandle = driver.createBufferObject(
-            getPhysicalBoneCount(mBoneCount) * sizeof(PerRenderableUibBone),
+            getPhysicalBoneCount(mBoneCount) * sizeof(PerRenderableBoneUib::BoneData),
             BufferObjectBinding::UNIFORM,
             BufferUsage::DYNAMIC);
 
     if (builder->mInitialize) {
         // initialize the bones to identity (before rounding up)
-        auto* out = driver.allocatePod<PerRenderableUibBone>(mBoneCount);
-        std::uninitialized_fill_n(out, mBoneCount, makeBone({}));
+        auto* out = driver.allocatePod<PerRenderableBoneUib::BoneData>(mBoneCount);
+        std::uninitialized_fill_n(out, mBoneCount, FSkinningBuffer::makeBone({}));
         driver.updateBufferObject(mHandle, {
-            out, mBoneCount * sizeof(PerRenderableUibBone) }, 0);
+            out, mBoneCount * sizeof(PerRenderableBoneUib::BoneData) }, 0);
     }
 }
 
@@ -119,7 +123,7 @@ static uint32_t packHalf2x16(half2 v) noexcept {
 void FSkinningBuffer::setBones(FEngine& engine, Handle<backend::HwBufferObject> handle,
         RenderableManager::Bone const* transforms, size_t boneCount, size_t offset) noexcept {
     auto& driverApi = engine.getDriverApi();
-    PerRenderableUibBone* UTILS_RESTRICT out = driverApi.allocatePod<PerRenderableUibBone>(boneCount);
+    auto* UTILS_RESTRICT out = driverApi.allocatePod<PerRenderableBoneUib::BoneData>(boneCount);
     for (size_t i = 0, c = boneCount; i < c; ++i) {
         // the transform is stored in row-major, last row is not stored.
         mat4f transform(transforms[i].unitQuaternion);
@@ -127,27 +131,25 @@ void FSkinningBuffer::setBones(FEngine& engine, Handle<backend::HwBufferObject> 
         out[i] = makeBone(transform);
     }
     driverApi.updateBufferObject(handle, {
-                    out, boneCount * sizeof(PerRenderableUibBone) },
-            offset * sizeof(PerRenderableUibBone));
+                    out, boneCount * sizeof(PerRenderableBoneUib::BoneData) },
+            offset * sizeof(PerRenderableBoneUib::BoneData));
 }
 
-PerRenderableUibBone FSkinningBuffer::makeBone(mat4f transform) noexcept {
+PerRenderableBoneUib::BoneData FSkinningBuffer::makeBone(mat4f transform) noexcept {
     const mat3f cofactors = cof(transform.upperLeft());
     transform = transpose(transform); // row-major conversion
     return {
-            .bone = {
-                    .transform = {
-                            transform[0],
-                            transform[1],
-                            transform[2]
-                    },
-                    .cof = {
-                            packHalf2x16({ cofactors[0].x, cofactors[0].y }),
-                            packHalf2x16({ cofactors[0].z, cofactors[1].x }),
-                            packHalf2x16({ cofactors[1].y, cofactors[1].z }),
-                            packHalf2x16({ cofactors[2].x, cofactors[2].y })
-                            // cofactor[2][2] is not stored because we don't have space for it
-                    }
+            .transform = {
+                    transform[0],
+                    transform[1],
+                    transform[2]
+            },
+            .cof = {
+                    packHalf2x16({ cofactors[0].x, cofactors[0].y }),
+                    packHalf2x16({ cofactors[0].z, cofactors[1].x }),
+                    packHalf2x16({ cofactors[1].y, cofactors[1].z }),
+                    packHalf2x16({ cofactors[2].x, cofactors[2].y })
+                    // cofactor[2][2] is not stored because we don't have space for it
             }
     };
 }
@@ -155,14 +157,112 @@ PerRenderableUibBone FSkinningBuffer::makeBone(mat4f transform) noexcept {
 void FSkinningBuffer::setBones(FEngine& engine, Handle<backend::HwBufferObject> handle,
         mat4f const* transforms, size_t boneCount, size_t offset) noexcept {
     auto& driverApi = engine.getDriverApi();
-    PerRenderableUibBone* UTILS_RESTRICT out = driverApi.allocatePod<PerRenderableUibBone>(boneCount);
+    auto* UTILS_RESTRICT out = driverApi.allocatePod<PerRenderableBoneUib::BoneData>(boneCount);
     for (size_t i = 0, c = boneCount; i < c; ++i) {
         // the transform is stored in row-major, last row is not stored.
         out[i] = makeBone(transforms[i]);
     }
-    driverApi.updateBufferObject(handle, {
-                    out, boneCount * sizeof(PerRenderableUibBone) },
-            offset * sizeof(PerRenderableUibBone));
+    driverApi.updateBufferObject(handle, { out, boneCount * sizeof(PerRenderableBoneUib::BoneData) },
+            offset * sizeof(PerRenderableBoneUib::BoneData));
+}
+
+// This value is limited by ES3.0, ES3.0 only guarantees 2048.
+// When you change this value, you must change MAX_SKINNING_BUFFER_WIDTH at getters.vs
+constexpr size_t MAX_SKINNING_BUFFER_WIDTH = 2048;
+
+static inline size_t getSkinningBufferWidth(size_t pairCount) noexcept {
+    return std::clamp(pairCount, size_t(1), MAX_SKINNING_BUFFER_WIDTH);
+}
+
+static inline size_t getSkinningBufferHeight(size_t pairCount) noexcept {
+    return std::max(size_t(1),
+            (pairCount + MAX_SKINNING_BUFFER_WIDTH - 1) / MAX_SKINNING_BUFFER_WIDTH);
+}
+
+inline size_t getSkinningBufferSize(size_t pairCount) noexcept {
+    const size_t stride = getSkinningBufferWidth(pairCount);
+    const size_t height = getSkinningBufferHeight(pairCount);
+    return Texture::PixelBufferDescriptor::computeDataSize(
+            Texture::PixelBufferDescriptor::PixelDataFormat::RG,
+            Texture::PixelBufferDescriptor::PixelDataType::FLOAT,
+            stride, height, 1);
+}
+
+UTILS_NOINLINE
+void updateDataAt(backend::DriverApi& driver,
+        Handle<HwTexture> handle, PixelDataFormat format, PixelDataType type,
+        const utils::FixedCapacityVector<math::float2>& pairs,
+        size_t count) {
+
+    size_t const elementSize = sizeof(float2);
+    size_t const size = getSkinningBufferSize(count);
+    auto* out = (float2*)malloc(size);
+    std::memcpy(out, pairs.begin(), size);
+
+    size_t const textureWidth = getSkinningBufferWidth(count);
+    size_t const lineCount = count / textureWidth;
+    size_t const lastLineCount = count % textureWidth;
+
+    // 'out' buffer is going to be used up to 2 times, so for simplicity we use a shared_buffer
+    // to manage its lifetime. One side effect of this is that the callbacks below will allocate
+    // a small object on the heap. (inspired by MorphTargetBuffered)
+    std::shared_ptr<void> const allocation((void*)out, ::free);
+
+    if (lineCount) {
+        // update the full-width lines if any
+        driver.update3DImage(handle, 0, 0, 0, 0,
+                textureWidth, lineCount, 1,
+                PixelBufferDescriptor::make(
+                        out, textureWidth * lineCount * elementSize,
+                        format, type, [allocation](void const*, size_t) {}
+                ));
+        out += lineCount * textureWidth;
+    }
+
+    if (lastLineCount) {
+        // update the last partial line if any
+        driver.update3DImage(handle, 0, 0, lineCount, 0,
+                lastLineCount, 1, 1,
+                PixelBufferDescriptor::make(
+                        out, lastLineCount * elementSize,
+                        format, type, [allocation](void const*, size_t) {}
+                ));
+    }
+}
+
+FSkinningBuffer::HandleIndicesAndWeights FSkinningBuffer::createIndicesAndWeightsHandle(
+        FEngine& engine, size_t count) {
+    backend::Handle<backend::HwSamplerGroup> samplerHandle;
+    backend::Handle<backend::HwTexture> textureHandle;
+
+    FEngine::DriverApi& driver = engine.getDriverApi();
+    // create a texture for skinning pairs data (bone index and weight)
+    textureHandle = driver.createTexture(SamplerType::SAMPLER_2D, 1,
+            TextureFormat::RG32F, 1,
+            getSkinningBufferWidth(count),
+            getSkinningBufferHeight(count), 1,
+            TextureUsage::DEFAULT);
+    samplerHandle = driver.createSamplerGroup(PerRenderPrimitiveSkinningSib::SAMPLER_COUNT,
+            utils::FixedSizeString<32>("Skinning buffer samplers"));
+    SamplerGroup samplerGroup(PerRenderPrimitiveSkinningSib::SAMPLER_COUNT);
+    samplerGroup.setSampler(PerRenderPrimitiveSkinningSib::BONE_INDICES_AND_WEIGHTS,
+            { textureHandle, {}});
+    driver.updateSamplerGroup(samplerHandle,
+            samplerGroup.toBufferDescriptor(driver));
+    return {
+            .sampler = samplerHandle,
+            .texture = textureHandle
+    };
+}
+
+void FSkinningBuffer::setIndicesAndWeightsData(FEngine& engine,
+        backend::Handle<backend::HwTexture> textureHandle,
+        const utils::FixedCapacityVector<math::float2>& pairs, size_t count) {
+
+    FEngine::DriverApi& driver = engine.getDriverApi();
+    updateDataAt(driver, textureHandle,
+            Texture::Format::RG, Texture::Type::FLOAT,
+            pairs, count);
 }
 
 } // namespace filament

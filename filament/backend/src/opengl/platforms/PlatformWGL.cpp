@@ -14,11 +14,9 @@
  * limitations under the License.
  */
 
-#include "PlatformWGL.h"
+#include <backend/platforms/PlatformWGL.h>
 
 #include <Wingdi.h>
-
-#include "../OpenGLDriverFactory.h"
 
 #ifdef _MSC_VER
     // this variable is checked in BlueGL.h (included from "gl_headers.h" right after this), 
@@ -76,9 +74,11 @@ struct WGLSwapChain {
     bool isHeadless = false;
 };
 
-Driver* PlatformWGL::createDriver(void* const sharedGLContext) noexcept {
+static PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribs = nullptr;
+
+Driver* PlatformWGL::createDriver(void* const sharedGLContext,
+        const Platform::DriverConfig& driverConfig) noexcept {
     int result = 0;
-    PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribs = nullptr;
     int pixelFormat = 0;
 
     mPfd = {
@@ -98,13 +98,6 @@ Driver* PlatformWGL::createDriver(void* const sharedGLContext) noexcept {
         PFD_MAIN_PLANE,
         0,
         0, 0, 0
-    };
-
-    int attribs[] = {
-        WGL_CONTEXT_MAJOR_VERSION_ARB, 4,
-        WGL_CONTEXT_MINOR_VERSION_ARB, 1,
-        WGL_CONTEXT_FLAGS_ARB, WGL_CONTEXT_PROFILE_MASK_ARB,
-        0
     };
 
     HGLRC tempContext = NULL;
@@ -129,7 +122,22 @@ Driver* PlatformWGL::createDriver(void* const sharedGLContext) noexcept {
 
     wglCreateContextAttribs =
             (PFNWGLCREATECONTEXTATTRIBSARBPROC) wglGetProcAddress("wglCreateContextAttribsARB");
-    mContext = wglCreateContextAttribs(whdc, (HGLRC) sharedGLContext, attribs);
+
+    // try all versions down, from GL 4.5 to 4.1
+
+
+    for (int minor = 5; minor >= 1; minor--) {
+        mAttribs = {
+                WGL_CONTEXT_MAJOR_VERSION_ARB, 4,
+                WGL_CONTEXT_MINOR_VERSION_ARB, minor,
+                0
+        };
+        mContext = wglCreateContextAttribs(whdc, (HGLRC)sharedGLContext, mAttribs.data());
+        if (mContext) {
+            break;
+        }
+    }
+
     if (!mContext) {
         utils::slog.e << "wglCreateContextAttribs() failed, whdc=" << whdc << utils::io::endl;
         goto error;
@@ -147,7 +155,8 @@ Driver* PlatformWGL::createDriver(void* const sharedGLContext) noexcept {
 
     result = bluegl::bind();
     ASSERT_POSTCONDITION(!result, "Unable to load OpenGL entry points.");
-    return OpenGLDriverFactory::create(this, sharedGLContext);
+
+    return OpenGLPlatform::createDefaultDriver(this, sharedGLContext, driverConfig);
 
 error:
     if (tempContext) {
@@ -158,11 +167,24 @@ error:
     return NULL;
 }
 
+bool PlatformWGL::isExtraContextSupported() const noexcept {
+    return false;
+}
+
+void PlatformWGL::createContext(bool shared) {
+    HGLRC context = wglCreateContextAttribs(mWhdc, shared ? mContext : nullptr, mAttribs.data());
+    wglMakeCurrent(mWhdc, context);
+    mAdditionalContexts.push_back(context);
+}
+
 void PlatformWGL::terminate() noexcept {
     wglMakeCurrent(NULL, NULL);
     if (mContext) {
         wglDeleteContext(mContext);
         mContext = NULL;
+    }
+    for (auto& context : mAdditionalContexts) {
+        wglDeleteContext(mContext);
     }
     if (mHWnd && mWhdc) {
         ReleaseDC(mHWnd, mWhdc);
@@ -176,7 +198,7 @@ void PlatformWGL::terminate() noexcept {
     bluegl::unbind();
 }
 
-Platform::SwapChain* PlatformWGL::createSwapChain(void* nativeWindow, uint64_t& flags) noexcept {
+Platform::SwapChain* PlatformWGL::createSwapChain(void* nativeWindow, uint64_t flags) noexcept {
     auto* swapChain = new WGLSwapChain();
     swapChain->isHeadless = false;
 
@@ -195,7 +217,7 @@ Platform::SwapChain* PlatformWGL::createSwapChain(void* nativeWindow, uint64_t& 
     return (Platform::SwapChain*) swapChain;
 }
 
-Platform::SwapChain* PlatformWGL::createSwapChain(uint32_t width, uint32_t height, uint64_t& flags) noexcept {
+Platform::SwapChain* PlatformWGL::createSwapChain(uint32_t width, uint32_t height, uint64_t flags) noexcept {
     auto* swapChain = new WGLSwapChain();
     swapChain->isHeadless = true;
 
@@ -255,18 +277,6 @@ void PlatformWGL::commit(Platform::SwapChain* swapChain) noexcept {
     if (hdc != NULL) {
         SwapBuffers(hdc);
     }
-}
-
-//TODO Implement WGL fences
-Platform::Fence* PlatformWGL::createFence() noexcept {
-    return nullptr;
-}
-
-void PlatformWGL::destroyFence(Fence* fence) noexcept {
-}
-
-FenceStatus PlatformWGL::waitFence(Fence* fence, uint64_t timeout) noexcept {
-    return FenceStatus::ERROR;
 }
 
 } // namespace filament::backend

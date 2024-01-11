@@ -27,8 +27,8 @@ import com.google.android.filament.gltfio.*
 import kotlinx.coroutines.*
 import java.nio.Buffer
 
-private const val kNearPlane = 0.05     // 5 cm
-private const val kFarPlane = 1000.0    // 1 km
+private const val kNearPlane = 0.05f     // 5 cm
+private const val kFarPlane = 1000.0f    // 1 km
 private const val kAperture = 16f
 private const val kShutterSpeed = 1f / 125f
 private const val kSensitivity = 100f
@@ -73,10 +73,20 @@ class ModelViewer(
         get() = resourceLoader.asyncGetLoadProgress()
 
     var normalizeSkinningWeights = true
-    var recomputeBoundingBoxes = false
-    var ignoreBindTransform = false
 
     var cameraFocalLength = 28f
+        set(value) {
+            field = value
+            updateCameraProjection()
+        }
+
+    var cameraNear = kNearPlane
+        set(value) {
+            field = value
+            updateCameraProjection()
+        }
+
+    var cameraFar = kFarPlane
         set(value) {
             field = value
             updateCameraProjection()
@@ -114,9 +124,9 @@ class ModelViewer(
         view.scene = scene
         view.camera = camera
 
-        materialProvider = UbershaderLoader(engine)
+        materialProvider = UbershaderProvider(engine)
         assetLoader = AssetLoader(engine, materialProvider, EntityManager.get())
-        resourceLoader = ResourceLoader(engine, normalizeSkinningWeights, recomputeBoundingBoxes, ignoreBindTransform)
+        resourceLoader = ResourceLoader(engine, normalizeSkinningWeights)
 
         // Always add a direct light source since it is required for shadowing.
         // We highly recommend adding an indirect light as well.
@@ -178,10 +188,10 @@ class ModelViewer(
      */
     fun loadModelGlb(buffer: Buffer) {
         destroyModel()
-        asset = assetLoader.createAssetFromBinary(buffer)
+        asset = assetLoader.createAsset(buffer)
         asset?.let { asset ->
             resourceLoader.asyncBeginLoad(asset)
-            animator = asset.animator
+            animator = asset.instance.animator
             asset.releaseSourceData()
         }
     }
@@ -193,7 +203,7 @@ class ModelViewer(
      */
     fun loadModelGltf(buffer: Buffer, callback: (String) -> Buffer?) {
         destroyModel()
-        asset = assetLoader.createAssetFromJson(buffer)
+        asset = assetLoader.createAsset(buffer)
         asset?.let { asset ->
             for (uri in asset.resourceUris) {
                 val resourceBuffer = callback(uri)
@@ -204,7 +214,7 @@ class ModelViewer(
                 resourceLoader.addResourceData(uri, resourceBuffer)
             }
             resourceLoader.asyncBeginLoad(asset)
-            animator = asset.animator
+            animator = asset.instance.animator
             asset.releaseSourceData()
         }
     }
@@ -216,7 +226,7 @@ class ModelViewer(
      */
     fun loadModelGltfAsync(buffer: Buffer, callback: (String) -> Buffer) {
         destroyModel()
-        asset = assetLoader.createAssetFromJson(buffer)
+        asset = assetLoader.createAsset(buffer)
         fetchResourcesJob = CoroutineScope(Dispatchers.IO).launch {
             fetchResources(asset!!, callback)
         }
@@ -301,7 +311,7 @@ class ModelViewer(
         var count = 0
         val popRenderables = { count = asset.popRenderables(readyRenderables); count != 0 }
         while (popRenderables()) {
-            for (i in 0..count - 1) {
+            for (i in 0 until count) {
                 val ri = rcm.getInstance(readyRenderables[i])
                 rcm.setScreenSpaceContactShadows(ri, true)
             }
@@ -312,8 +322,8 @@ class ModelViewer(
 
     private fun addDetachListener(view: android.view.View) {
         view.addOnAttachStateChangeListener(object : android.view.View.OnAttachStateChangeListener {
-            override fun onViewAttachedToWindow(v: android.view.View?) {}
-            override fun onViewDetachedFromWindow(v: android.view.View?) {
+            override fun onViewAttachedToWindow(v: android.view.View) {}
+            override fun onViewDetachedFromWindow(v: android.view.View) {
                 uiHelper.detach()
 
                 destroyModel()
@@ -361,7 +371,7 @@ class ModelViewer(
                 resourceLoader.addResourceData(uri, buffer)
             }
             resourceLoader.asyncBeginLoad(asset)
-            animator = asset.animator
+            animator = asset.instance.animator
             asset.releaseSourceData()
         }
     }
@@ -370,7 +380,8 @@ class ModelViewer(
         val width = view.viewport.width
         val height = view.viewport.height
         val aspect = width.toDouble() / height.toDouble()
-        camera.setLensProjection(cameraFocalLength.toDouble(), aspect, kNearPlane, kFarPlane)
+        camera.setLensProjection(cameraFocalLength.toDouble(), aspect,
+            cameraNear.toDouble(), cameraFar.toDouble())
     }
 
     inner class SurfaceCallback : UiHelper.RendererCallback {
@@ -394,7 +405,17 @@ class ModelViewer(
             view.viewport = Viewport(0, 0, width, height)
             cameraManipulator.setViewport(width, height)
             updateCameraProjection()
+            synchronizePendingFrames(engine)
         }
+    }
+
+    private fun synchronizePendingFrames(engine: Engine) {
+        // Wait for all pending frames to be processed before returning. This is to
+        // avoid a race between the surface being resized before pending frames are
+        // rendered into it.
+        val fence = engine.createFence()
+        fence.wait(Fence.Mode.FLUSH, Fence.WAIT_FOR_EVER)
+        engine.destroyFence(fence)
     }
 
     companion object {

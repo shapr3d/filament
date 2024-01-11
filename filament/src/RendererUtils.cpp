@@ -43,11 +43,10 @@ FrameGraphId<FrameGraphTexture> RendererUtils::colorPass(
         FrameGraphId<FrameGraphTexture> color;
         FrameGraphId<FrameGraphTexture> output;
         FrameGraphId<FrameGraphTexture> depth;
+        FrameGraphId<FrameGraphTexture> stencil;
         FrameGraphId<FrameGraphTexture> ssao;
         FrameGraphId<FrameGraphTexture> ssr;    // either screen-space reflections or refractions
         FrameGraphId<FrameGraphTexture> structure;
-        float4 clearColor{};
-        TargetBufferFlags clearFlags{};
     };
 
     Blackboard& blackboard = fg.getBlackboard();
@@ -55,8 +54,9 @@ FrameGraphId<FrameGraphTexture> RendererUtils::colorPass(
     auto& colorPass = fg.addPass<ColorPassData>(name,
             [&](FrameGraph::Builder& builder, ColorPassData& data) {
 
+                TargetBufferFlags const clearColorFlags = config.clearFlags & TargetBufferFlags::COLOR;
                 TargetBufferFlags clearDepthFlags = config.clearFlags & TargetBufferFlags::DEPTH;
-                TargetBufferFlags clearColorFlags = config.clearFlags & TargetBufferFlags::COLOR;
+                TargetBufferFlags clearStencilFlags = config.clearFlags & TargetBufferFlags::STENCIL;
 
                 data.shadows = blackboard.get<FrameGraphTexture>("shadows");
                 data.ssao = blackboard.get<FrameGraphTexture>("ssao");
@@ -64,9 +64,11 @@ FrameGraphId<FrameGraphTexture> RendererUtils::colorPass(
                 data.depth = blackboard.get<FrameGraphTexture>("depth");
 
                 // Screen-space reflection or refractions
-                data.ssr = blackboard.get<FrameGraphTexture>("ssr");
-                if (data.ssr) {
-                    data.ssr = builder.sample(data.ssr);
+                if (config.hasScreenSpaceReflectionsOrRefractions) {
+                    data.ssr = blackboard.get<FrameGraphTexture>("ssr");
+                    if (data.ssr) {
+                        data.ssr = builder.sample(data.ssr);
+                    }
                 }
 
                 if (config.hasContactShadows) {
@@ -84,20 +86,32 @@ FrameGraphId<FrameGraphTexture> RendererUtils::colorPass(
                 }
 
                 if (!data.color) {
-                    // FIXME: this works only when the viewport is full
-                    //  if (view.isSkyboxVisible()) {
-                    //      // if the skybox is visible, then we don't need to clear at all
-                    //      clearColorFlags &= ~TargetBufferFlags::COLOR;
-                    //  }
                     data.color = builder.createTexture("Color Buffer", colorBufferDesc);
                 }
 
                 const bool canResolveDepth = engine.getDriverApi().isAutoDepthResolveSupported();
 
                 if (!data.depth) {
-                    // clear newly allocated depth buffers, regardless of given clear flags
+                    // clear newly allocated depth/stencil buffers, regardless of given clear flags
                     clearDepthFlags = TargetBufferFlags::DEPTH;
-                    data.depth = builder.createTexture("Depth Buffer", {
+                    clearStencilFlags = config.enabledStencilBuffer ?
+                            TargetBufferFlags::STENCIL : TargetBufferFlags::NONE;
+                    const char* const name = config.enabledStencilBuffer ?
+                             "Depth/Stencil Buffer" : "Depth Buffer";
+
+                    bool const isES2 =
+                            engine.getDriverApi().getFeatureLevel() == FeatureLevel::FEATURE_LEVEL_0;
+
+                    TextureFormat const stencilFormat = isES2 ?
+                            TextureFormat::DEPTH24_STENCIL8 : TextureFormat::DEPTH32F_STENCIL8;
+
+                    TextureFormat const depthOnlyFormat = isES2 ?
+                            TextureFormat::DEPTH24 : TextureFormat::DEPTH32F;
+
+                    TextureFormat const format = config.enabledStencilBuffer ?
+                            stencilFormat : depthOnlyFormat;
+
+                    data.depth = builder.createTexture(name, {
                             .width = colorBufferDesc.width,
                             .height = colorBufferDesc.height,
                             // If the color attachment requested MS, we assume this means the MS buffer
@@ -107,8 +121,11 @@ FrameGraphId<FrameGraphTexture> RendererUtils::colorPass(
                             // the tile depth buffer will be MS, but it'll be resolved to single
                             // sample automatically -- which is what we want.
                             .samples = canResolveDepth ? colorBufferDesc.samples : uint8_t(config.msaa),
-                            .format = TextureFormat::DEPTH32F,
+                            .format = format,
                     });
+                    if (config.enabledStencilBuffer) {
+                        data.stencil = data.depth;
+                    }
                 }
 
                 if (colorGradingConfig.asSubpass) {
@@ -146,13 +163,12 @@ FrameGraphId<FrameGraphTexture> RendererUtils::colorPass(
                  * is initialized in this file).
                  */
                 builder.declareRenderPass("Color Pass Target", {
-                        .attachments = { .color = { data.color, data.output }, .depth = data.depth },
+                        .attachments = { .color = { data.color, data.output },
+                        .depth = data.depth,
+                        .stencil = data.stencil },
+                        .clearColor = config.clearColor,
                         .samples = config.msaa,
-                        .clearFlags = clearColorFlags | clearDepthFlags });
-
-                data.clearColor = config.clearColor;
-                data.clearFlags = clearColorFlags | clearDepthFlags;
-
+                        .clearFlags = clearColorFlags | clearDepthFlags | clearStencilFlags });
                 blackboard["depth"] = data.depth;
             },
             [=, &view, &engine](FrameGraphResources const& resources,
@@ -161,24 +177,24 @@ FrameGraphId<FrameGraphTexture> RendererUtils::colorPass(
 
                 // set samplers and uniforms
                 view.prepareSSAO(data.ssao ?
-                                 resources.getTexture(data.ssao) : engine.getOneTextureArray());
+                        resources.getTexture(data.ssao) : engine.getOneTextureArray());
 
-                view.prepareShadowMap();
+                view.prepareShadowMapping(view.getVsmShadowOptions().highPrecision);
 
                 // set shadow sampler
                 view.prepareShadow(data.shadows ?
-                                   resources.getTexture(data.shadows) : engine.getOneDepthTextureArray());
+                        resources.getTexture(data.shadows) : engine.getOneDepthTextureArray());
 
                 // set structure sampler
                 view.prepareStructure(data.structure ?
-                                      resources.getTexture(data.structure) : engine.getOneDepthTexture());
+                        resources.getTexture(data.structure) : engine.getOneDepthTexture());
 
                 // set screen-space reflections and screen-space refractions
-                TextureHandle ssr = data.ssr ?
-                                    resources.getTexture(data.ssr) : engine.getOneTextureArray();
+                TextureHandle const ssr = data.ssr ?
+                        resources.getTexture(data.ssr) : engine.getOneTextureArray();
 
-                view.prepareSSR(ssr, config.ssrLodOffset,
-                        view.getScreenSpaceReflectionsOptions());
+                view.prepareSSR(ssr, config.screenSpaceReflectionHistoryNotReady,
+                        config.ssrLodOffset, view.getScreenSpaceReflectionsOptions());
 
                 // Note: here we can't use data.color's descriptor for the viewport because
                 // the actual viewport might be offset when the target is the swapchain.
@@ -189,11 +205,12 @@ FrameGraphId<FrameGraphTexture> RendererUtils::colorPass(
                         out.params.viewport.height == resources.getDescriptor(data.color).height);
 
                 view.prepareViewport(static_cast<filament::Viewport&>(out.params.viewport),
-                        config.xoffset, config.yoffset);
+                        config.logicalViewport);
+
                 view.commitUniforms(driver);
 
-                out.params.clearColor = data.clearColor;
-                out.params.flags.clear = data.clearFlags;
+                // TODO: this should be a parameter of FrameGraphRenderPass::Descriptor
+                out.params.clearStencil = config.clearStencil;
                 if (view.getBlendMode() == BlendMode::TRANSLUCENT) {
                     if (any(out.params.flags.discardStart & TargetBufferFlags::COLOR0)) {
                         // if the buffer is discarded (e.g. it's new) and we're blending,
@@ -206,7 +223,14 @@ FrameGraphId<FrameGraphTexture> RendererUtils::colorPass(
                 if (colorGradingConfig.asSubpass || colorGradingConfig.customResolve) {
                     out.params.subpassMask = 1;
                 }
-                passExecutor.execute(resources.getPassName(), out.target, out.params);
+
+                // this is a good time to flush the CommandStream, because we're about to potentially
+                // output a lot of commands. This guarantees here that we have at least
+                // FILAMENT_MIN_COMMAND_BUFFERS_SIZE_IN_MB bytes (1MiB by default).
+                engine.flush();
+                driver.beginRenderPass(out.target, out.params);
+                passExecutor.execute(engine, resources.getPassName());
+                driver.endRenderPass();
 
                 // color pass is typically heavy, and we don't have much CPU work left after
                 // this point, so flushing now allows us to start the GPU earlier and reduce
@@ -222,7 +246,7 @@ FrameGraphId<FrameGraphTexture> RendererUtils::colorPass(
     return output;
 }
 
-FrameGraphId<FrameGraphTexture> RendererUtils::refractionPass(
+std::pair<FrameGraphId<FrameGraphTexture>, bool> RendererUtils::refractionPass(
         FrameGraph& fg, FEngine& engine, FView const& view,
         ColorPassConfig config,
         PostProcessManager::ScreenSpaceRefConfig const& ssrConfig,
@@ -233,10 +257,13 @@ FrameGraphId<FrameGraphTexture> RendererUtils::refractionPass(
     auto input = blackboard.get<FrameGraphTexture>("color");
     FrameGraphId<FrameGraphTexture> output;
 
-    // find the first refractive object
+    // find the first refractive object in channel 2
     RenderPass::Command const* const refraction = std::partition_point(pass.begin(), pass.end(),
             [](auto const& command) {
-                return (command.key & RenderPass::PASS_MASK) < uint64_t(RenderPass::Pass::REFRACT);
+                constexpr uint64_t mask  = RenderPass::CHANNEL_MASK | RenderPass::PASS_MASK;
+                constexpr uint64_t channel = uint64_t(RenderableManager::Builder::DEFAULT_CHANNEL) << RenderPass::CHANNEL_SHIFT;
+                constexpr uint64_t value = channel | uint64_t(RenderPass::Pass::REFRACT);
+                return (command.key & mask) < value;
             });
 
     const bool hasScreenSpaceRefraction =
@@ -251,11 +278,13 @@ FrameGraphId<FrameGraphTexture> RendererUtils::refractionPass(
         blackboard.remove("color");
         blackboard.remove("depth");
 
+        config.hasScreenSpaceReflectionsOrRefractions = true;
+
         input = RendererUtils::colorPass(fg, "Color Pass (opaque)", engine, view, {
                         // When rendering the opaques, we need to conserve the sample buffer,
                         // so create config that specifies the sample count.
-                        .width = config.width,
-                        .height = config.height,
+                        .width = config.physicalViewport.width,
+                        .height = config.physicalViewport.height,
                         .samples = config.msaa,
                         .format = config.hdrFormat
                 }, config, { .asSubpass = false },
@@ -270,9 +299,16 @@ FrameGraphId<FrameGraphTexture> RendererUtils::refractionPass(
         // automatically because these are set in the Blackboard (they were set by the opaque
         // pass). For this reason, `desc` below is only used in colorPass() for the width and
         // height.
+
+        // Since we're reusing the existing target we don't want to clear any of its buffer.
+        // Important: if this target ended up being an imported target, then the clearFlags
+        // specified here wouldn't apply (the clearFlags of the imported target take precedence),
+        // and we'd end up clearing the opaque pass. This scenario never happens because it is
+        // prevented in Renderer.cpp's final blit.
         config.clearFlags = TargetBufferFlags::NONE;
-        output = RendererUtils::colorPass(fg, "Color Pass (transparent)", engine, view,
-                { .width = config.width, .height = config.height },
+        output = RendererUtils::colorPass(fg, "Color Pass (transparent)", engine, view, {
+                        .width = config.physicalViewport.width,
+                        .height = config.physicalViewport.height },
                 config, colorGradingConfig, pass.getExecutor(refraction, pass.end()));
 
         if (config.msaa > 1 && !colorGradingConfig.asSubpass) {
@@ -285,25 +321,21 @@ FrameGraphId<FrameGraphTexture> RendererUtils::refractionPass(
     } else {
         output = input;
     }
-    return output;
+    return { output, hasScreenSpaceRefraction };
 }
 
 UTILS_NOINLINE
 void RendererUtils::readPixels(backend::DriverApi& driver, Handle<HwRenderTarget> renderTargetHandle,
         uint32_t xoffset, uint32_t yoffset, uint32_t width, uint32_t height,
         backend::PixelBufferDescriptor&& buffer) {
-    if (!ASSERT_POSTCONDITION_NON_FATAL(
+    ASSERT_PRECONDITION(
             buffer.type != PixelDataType::COMPRESSED,
-            "buffer.format cannot be COMPRESSED")) {
-        return;
-    }
+            "buffer.format cannot be COMPRESSED");
 
-    if (!ASSERT_POSTCONDITION_NON_FATAL(
+    ASSERT_PRECONDITION(
             buffer.alignment > 0 && buffer.alignment <= 8 &&
             !(buffer.alignment & (buffer.alignment - 1u)),
-            "buffer.alignment must be 1, 2, 4 or 8")) {
-        return;
-    }
+            "buffer.alignment must be 1, 2, 4 or 8");
 
     // It's not really possible to know here which formats will be supported because
     // it can vary depending on the RenderTarget, in GL the following are ALWAYS supported though:
@@ -316,10 +348,8 @@ void RendererUtils::readPixels(backend::DriverApi& driver, Handle<HwRenderTarget
             buffer.top + height,
             buffer.alignment);
 
-    if (!ASSERT_POSTCONDITION_NON_FATAL(buffer.size >= sizeNeeded,
-            "Pixel buffer too small: has %u bytes, needs %u bytes", buffer.size, sizeNeeded)) {
-        return;
-    }
+    ASSERT_PRECONDITION(buffer.size >= sizeNeeded,
+            "Pixel buffer too small: has %u bytes, needs %u bytes", buffer.size, sizeNeeded);
 
     driver.readPixels(renderTargetHandle, xoffset, yoffset, width, height, std::move(buffer));
 }

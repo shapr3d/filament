@@ -29,7 +29,7 @@
 #include "fg/details/Resource.h"
 #include "fg/details/Utilities.h"
 
-#include "private/backend/DriverApiForward.h"
+#include "backend/DriverApiForward.h"
 
 #include <backend/DriverEnums.h>
 #include <backend/Handle.h>
@@ -460,7 +460,7 @@ private:
     FrameGraphHandle forwardResourceInternal(FrameGraphHandle resourceHandle,
             FrameGraphHandle replaceResourceHandle);
 
-    bool assertValid(FrameGraphHandle handle) const;
+    void assertValid(FrameGraphHandle handle) const;
 
     template<typename RESOURCE>
     FrameGraphId<RESOURCE> create(char const* name,
@@ -527,7 +527,7 @@ private:
 
 template<typename Data, typename Setup, typename Execute>
 FrameGraphPass<Data>& FrameGraph::addPass(char const* name, Setup setup, Execute&& execute) {
-    static_assert(sizeof(Execute) < 1024, "Execute() lambda is capturing too much data.");
+    static_assert(sizeof(Execute) < 2048, "Execute() lambda is capturing too much data.");
 
     // create the FrameGraph pass
     auto* const pass = mArena.make<FrameGraphPassConcrete<Data, Execute>>(std::forward<Execute>(execute));

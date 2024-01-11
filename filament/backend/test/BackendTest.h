@@ -43,7 +43,7 @@ protected:
 
     void initializeDriver();
     void executeCommands();
-    void flushAndWait(uint64_t timeout = 1000);
+    void flushAndWait();
 
     filament::backend::Handle<filament::backend::HwSwapChain> createSwapChain();
 
@@ -54,9 +54,14 @@ protected:
     void renderTriangle(filament::backend::Handle<filament::backend::HwRenderTarget> renderTarget,
             filament::backend::Handle<filament::backend::HwSwapChain> swapChain,
             filament::backend::Handle<filament::backend::HwProgram> program);
+    void renderTriangle(filament::backend::Handle<filament::backend::HwRenderTarget> renderTarget,
+            filament::backend::Handle<filament::backend::HwSwapChain> swapChain,
+            filament::backend::Handle<filament::backend::HwProgram> program,
+            const filament::backend::RenderPassParams& params);
 
     void readPixelsAndAssertHash(const char* testName, size_t width, size_t height,
-            filament::backend::Handle<filament::backend::HwRenderTarget> rt, uint32_t expectedHash);
+            filament::backend::Handle<filament::backend::HwRenderTarget> rt, uint32_t expectedHash,
+            bool exportScreenshot = false);
 
     filament::backend::DriverApi& getDriverApi() { return *commandStream; }
     filament::backend::Driver& getDriver() { return *driver; }
@@ -69,12 +74,6 @@ private:
 
     filament::backend::Handle<filament::backend::HwBufferObject> uniform;
 };
-
-
-// Utilities
-
-void getPixelInfo(filament::backend::PixelDataFormat format, filament::backend::PixelDataType type,
-        size_t& outComponents, int& outBpp);
 
 } // namespace test
 

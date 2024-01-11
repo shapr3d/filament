@@ -16,61 +16,62 @@
 
 #include "details/Material.h"
 
-#include "DFG.h"
+#include "Froxelizer.h"
 #include "MaterialParser.h"
 
 #include "details/Engine.h"
 
 #include "FilamentAPI-impl.h"
 
-#include <private/filament/SibGenerator.h>
-#include <private/filament/UibStructs.h>
 #include <private/filament/Variant.h>
 
+#include <private/filament/EngineEnums.h>
 #include <private/filament/SamplerInterfaceBlock.h>
-#include <private/filament/UniformInterfaceBlock.h>
-
-#include "private/backend/Program.h"
+#include <private/filament/BufferInterfaceBlock.h>
 
 #include <backend/DriverEnums.h>
+#include <backend/Program.h>
 
 #include <utils/CString.h>
+#include <utils/FixedCapacityVector.h>
 #include <utils/Panic.h>
+#include <utils/Hash.h>
 
-using namespace utils;
-using namespace filaflat;
+#include <unordered_map>
 
 namespace filament {
 
 using namespace backend;
+using namespace filaflat;
+using namespace utils;
 
-static MaterialParser* createParser(Backend backend, const void* data, size_t size) {
-    MaterialParser* materialParser = new MaterialParser(backend, data, size);
+static MaterialParser* createParser(Backend backend, ShaderLanguage language,
+                                    const void* data, size_t size) {
+    // unique_ptr so we don't leak MaterialParser on failures below
+    auto materialParser = std::make_unique<MaterialParser>(language, data, size);
 
-    MaterialParser::ParseResult materialResult = materialParser->parse();
+    MaterialParser::ParseResult const materialResult = materialParser->parse();
 
     if (backend == Backend::NOOP) {
-        return materialParser;
+        return materialParser.release();
     }
 
-    if (!ASSERT_POSTCONDITION_NON_FATAL(materialResult != MaterialParser::ParseResult::ERROR_MISSING_BACKEND,
-                "the material was not built for the %s backend\n", backendToString(backend))) {
-        return nullptr;
-    }
+    ASSERT_PRECONDITION(materialResult != MaterialParser::ParseResult::ERROR_MISSING_BACKEND,
+                "the material was not built for the %s backend and %s shader language\n",
+                backendToString(backend),
+                shaderLanguageToString(language));
 
-    if (!ASSERT_POSTCONDITION_NON_FATAL(materialResult == MaterialParser::ParseResult::SUCCESS,
-                "could not parse the material package")) {
-        return nullptr;
-    }
+    ASSERT_PRECONDITION(materialResult == MaterialParser::ParseResult::SUCCESS,
+                "could not parse the material package");
 
     uint32_t version = 0;
     materialParser->getMaterialVersion(&version);
-    ASSERT_PRECONDITION(version == MATERIAL_VERSION, "Material version mismatch. Expected %d but "
-            "received %d.", MATERIAL_VERSION, version);
+    ASSERT_PRECONDITION(version == MATERIAL_VERSION,
+            "Material version mismatch. Expected %d but received %d.", MATERIAL_VERSION, version);
 
     assert_invariant(backend != Backend::DEFAULT && "Default backend has not been resolved.");
 
-    return materialParser;
+    return materialParser.release();
 }
 
 struct Material::BuilderDetails {
@@ -78,6 +79,7 @@ struct Material::BuilderDetails {
     size_t mSize = 0;
     MaterialParser* mMaterialParser = nullptr;
     bool mDefaultMaterial = false;
+    std::unordered_map<std::string, std::variant<int32_t, float, bool>> mConstantSpecializations;
 };
 
 FMaterial::DefaultMaterialBuilder::DefaultMaterialBuilder() : Material::Builder() {
@@ -98,51 +100,52 @@ Material::Builder& Material::Builder::package(const void* payload, size_t size) 
     return *this;
 }
 
+template<typename T, typename>
+Material::Builder& Material::Builder::constant(const char* name, size_t nameLength, T value) {
+    ASSERT_PRECONDITION(name != nullptr, "name cannot be null");
+    mImpl->mConstantSpecializations[{name, nameLength}] = value;
+    return *this;
+}
+
+template Material::Builder& Material::Builder::constant<int32_t>(const char*, size_t, int32_t);
+template Material::Builder& Material::Builder::constant<float>(const char*, size_t, float);
+template Material::Builder& Material::Builder::constant<bool>(const char*, size_t, bool);
+
 Material* Material::Builder::build(Engine& engine) {
-    MaterialParser* materialParser = createParser(
-            upcast(engine).getBackend(), mImpl->mPayload, mImpl->mSize);
+    std::unique_ptr<MaterialParser> materialParser{ createParser(
+        downcast(engine).getBackend(), downcast(engine).getShaderLanguage(),
+        mImpl->mPayload, mImpl->mSize) };
+
+    if (materialParser == nullptr) {
+        return nullptr;
+    }
 
     uint32_t v = 0;
     materialParser->getShaderModels(&v);
     utils::bitset32 shaderModels;
     shaderModels.setValue(v);
 
-    ShaderModel shaderModel = upcast(engine).getDriver().getShaderModel();
+    ShaderModel const shaderModel = downcast(engine).getShaderModel();
     if (!shaderModels.test(static_cast<uint32_t>(shaderModel))) {
         CString name;
         materialParser->getName(&name);
         slog.e << "The material '" << name.c_str_safe() << "' was not built for ";
         switch (shaderModel) {
-            case ShaderModel::GL_ES_30: slog.e << "mobile.\n"; break;
-            case ShaderModel::GL_CORE_41: slog.e << "desktop.\n"; break;
-            case ShaderModel::UNKNOWN: /* should never happen */ break;
+            case ShaderModel::MOBILE:
+                slog.e << "mobile.\n";
+                break;
+            case ShaderModel::DESKTOP:
+                slog.e << "desktop.\n";
+                break;
         }
         slog.e << "Compiled material contains shader models 0x"
                 << io::hex << shaderModels.getValue() << io::dec << "." << io::endl;
         return nullptr;
     }
 
-    mImpl->mMaterialParser = materialParser;
+    mImpl->mMaterialParser = materialParser.release();
 
-    return upcast(engine).createMaterial(*this);
-}
-
-static void addSamplerGroup(Program& pb, uint8_t bindingPoint, SamplerInterfaceBlock const& sib,
-        SamplerBindingMap const& map) {
-    const size_t samplerCount = sib.getSize();
-    if (samplerCount) {
-        std::vector<Program::Sampler> samplers(samplerCount);
-        auto const& list = sib.getSamplerInfoList();
-        for (size_t i = 0, c = samplerCount; i < c; ++i) {
-            CString uniformName(
-                    SamplerInterfaceBlock::getUniformName(sib.getName().c_str(),
-                            list[i].name.c_str()));
-            uint8_t binding = map.getSamplerBinding(bindingPoint, (uint8_t)i);
-            const bool strict = (bindingPoint == filament::BindingPoints::PER_MATERIAL_INSTANCE);
-            samplers[i] = { std::move(uniformName), binding, strict };
-        }
-        pb.setSamplerGroup(bindingPoint, sib.getStageFlags(), samplers.data(), samplers.size());
-    }
+    return downcast(engine).createMaterial(*this);
 }
 
 FMaterial::FMaterial(FEngine& engine, const Material::Builder& builder)
@@ -152,18 +155,56 @@ FMaterial::FMaterial(FEngine& engine, const Material::Builder& builder)
     MaterialParser* parser = builder->mMaterialParser;
     mMaterialParser = parser;
 
-    UTILS_UNUSED_IN_RELEASE bool nameOk = parser->getName(&mName);
+    UTILS_UNUSED_IN_RELEASE bool const nameOk = parser->getName(&mName);
     assert_invariant(nameOk);
 
-    UTILS_UNUSED_IN_RELEASE bool sibOK = parser->getSIB(&mSamplerInterfaceBlock);
-    assert_invariant(sibOK);
+    mFeatureLevel = [parser]() -> FeatureLevel {
+        // code written this way so the IDE will complain when/if we add a FeatureLevel
+        uint8_t level = 1;
+        parser->getFeatureLevel(&level);
+        assert_invariant(level <= 3);
+        FeatureLevel featureLevel = FeatureLevel::FEATURE_LEVEL_1;
+        switch (FeatureLevel(level)) {
+            case FeatureLevel::FEATURE_LEVEL_0:
+            case FeatureLevel::FEATURE_LEVEL_1:
+            case FeatureLevel::FEATURE_LEVEL_2:
+            case FeatureLevel::FEATURE_LEVEL_3:
+                featureLevel = FeatureLevel(level);
+                break;
+        }
+        return featureLevel;
+    }();
 
-    UTILS_UNUSED_IN_RELEASE bool uibOK = parser->getUIB(&mUniformInterfaceBlock);
-    assert_invariant(uibOK);
+    UTILS_UNUSED_IN_RELEASE bool success;
+
+    success = parser->getCacheId(&mCacheId);
+    assert_invariant(success);
+
+    success = parser->getSIB(&mSamplerInterfaceBlock);
+    assert_invariant(success);
+
+    success = parser->getUIB(&mUniformInterfaceBlock);
+    assert_invariant(success);
+
+    if (UTILS_UNLIKELY(engine.getShaderLanguage() == ShaderLanguage::ESSL1)) {
+        success = parser->getBindingUniformInfo(&mBindingUniformInfo);
+        assert_invariant(success);
+
+        success = parser->getAttributeInfo(&mAttributeInfo);
+        assert_invariant(success);
+    } else if (mFeatureLevel <= FeatureLevel::FEATURE_LEVEL_1) {
+        // this chunk is not needed for materials at feature level 2 and above
+        success = parser->getUniformBlockBindings(&mUniformBlockBindings);
+        assert_invariant(success);
+    }
+
+    success = parser->getSamplerBlockBindings(
+            &mSamplerGroupBindingInfoList, &mSamplerBindingToNameMap);
+    assert_invariant(success);
 
 #if FILAMENT_ENABLE_MATDBG
     // Register the material with matdbg.
-    matdbg::DebugServer* server = upcast(engine).debug.server;
+    matdbg::DebugServer* server = downcast(engine).debug.server;
     if (UTILS_UNLIKELY(server)) {
         auto details = builder.mImpl;
         mDebuggerId = server->addMaterial(mName, details->mPayload, details->mSize, this);
@@ -175,8 +216,90 @@ FMaterial::FMaterial(FEngine& engine, const Material::Builder& builder)
         mSubpassInfo.isValid = false;
     }
 
-    // Populate sampler bindings for the backend that will consume this Material.
-    mSamplerBindings.populate(&mSamplerInterfaceBlock);
+    utils::FixedCapacityVector<MaterialConstant> constants;
+    // Older materials won't have a constants chunk, but that's okay.
+    parser->getConstants(&constants);
+
+    // Verify that all the constant specializations exist in the material and that their types match.
+    // The first specialization constants are defined internally by Filament.
+    // The subsequent constants are user-defined in the material.
+
+    // Feature level 0 doesn't support instancing
+    int const maxInstanceCount = (engine.getActiveFeatureLevel() == FeatureLevel::FEATURE_LEVEL_0)
+            ? 1 : CONFIG_MAX_INSTANCES;
+
+    int const maxFroxelBufferHeight = std::min(
+            FROXEL_BUFFER_MAX_ENTRY_COUNT / 4,
+            engine.getDriverApi().getMaxUniformBufferSize() / 16u);
+
+    bool const staticTextureWorkaround =
+            engine.getDriverApi().isWorkaroundNeeded(Workaround::A8X_STATIC_TEXTURE_TARGET_ERROR);
+
+    bool const powerVrShaderWorkarounds =
+            engine.getDriverApi().isWorkaroundNeeded(Workaround::POWER_VR_SHADER_WORKAROUNDS);
+
+    mSpecializationConstants.reserve(constants.size() + CONFIG_MAX_RESERVED_SPEC_CONSTANTS);
+    mSpecializationConstants.push_back({
+                    +ReservedSpecializationConstants::BACKEND_FEATURE_LEVEL,
+                    (int)engine.getSupportedFeatureLevel() });
+    mSpecializationConstants.push_back({
+                    +ReservedSpecializationConstants::CONFIG_MAX_INSTANCES,
+                    (int)maxInstanceCount });
+    mSpecializationConstants.push_back({
+                    +ReservedSpecializationConstants::CONFIG_FROXEL_BUFFER_HEIGHT,
+                    (int)maxFroxelBufferHeight });
+    mSpecializationConstants.push_back({
+                    +ReservedSpecializationConstants::CONFIG_DEBUG_DIRECTIONAL_SHADOWMAP,
+                    (bool)engine.debug.shadowmap.debug_directional_shadowmap });
+    mSpecializationConstants.push_back({
+                    +ReservedSpecializationConstants::CONFIG_DEBUG_FROXEL_VISUALIZATION,
+                    (bool)engine.debug.lighting.debug_froxel_visualization });
+    mSpecializationConstants.push_back({
+                    +ReservedSpecializationConstants::CONFIG_STATIC_TEXTURE_TARGET_WORKAROUND,
+                    (bool)staticTextureWorkaround });
+    mSpecializationConstants.push_back({
+                    +ReservedSpecializationConstants::CONFIG_POWER_VR_SHADER_WORKAROUNDS,
+                    (bool)powerVrShaderWorkarounds });
+    mSpecializationConstants.push_back({
+                    +ReservedSpecializationConstants::CONFIG_STEREO_EYE_COUNT,
+                    (int)engine.getConfig().stereoscopicEyeCount });
+    if (UTILS_UNLIKELY(engine.getShaderLanguage() == ShaderLanguage::ESSL1)) {
+        // The actual value of this spec-constant is set in the OpenGLDriver backend.
+        mSpecializationConstants.push_back({
+            +ReservedSpecializationConstants::CONFIG_SRGB_SWAPCHAIN_EMULATION,
+            false});
+    }
+
+    for (const auto& [name, value] : builder->mConstantSpecializations) {
+        auto found = std::find_if(
+                constants.begin(), constants.end(), [name = name](const auto& constant) {
+                    return strncmp(constant.name.data(), name.data(), name.length()) == 0;
+                });
+        ASSERT_PRECONDITION(found != constants.end(),
+                "The material %s does not have a constant parameter named %s.",
+                mName.c_str_safe(), name.c_str());
+        const char* const types[3] = {"an int", "a float", "a bool"};
+        const char* const errorMessage =
+                "The constant parameter %s on material %s is of type %s, but %s was "
+                "provided.";
+        switch (found->type) {
+            case ConstantType::INT:
+                ASSERT_PRECONDITION(std::holds_alternative<int32_t>(value), errorMessage,
+                        name.c_str(), mName.c_str_safe(), "int", types[value.index()]);
+                break;
+            case ConstantType::FLOAT:
+                ASSERT_PRECONDITION(std::holds_alternative<float>(value), errorMessage,
+                        name.c_str(), mName.c_str_safe(), "float", types[value.index()]);
+                break;
+            case ConstantType::BOOL:
+                ASSERT_PRECONDITION(std::holds_alternative<bool>(value), errorMessage,
+                        name.c_str(), mName.c_str_safe(), "bool", types[value.index()]);
+                break;
+        }
+        uint32_t const index =
+                std::distance(constants.begin(), found) + CONFIG_MAX_RESERVED_SPEC_CONSTANTS;
+        mSpecializationConstants.push_back({ index, value });
+    }
 
     parser->getShading(&mShading);
     parser->getMaterialProperties(&mMaterialProperties);
@@ -184,6 +307,7 @@ FMaterial::FMaterial(FEngine& engine, const Material::Builder& builder)
     parser->getInterpolation(&mInterpolation);
     parser->getVertexDomain(&mVertexDomain);
     parser->getMaterialDomain(&mMaterialDomain);
+    parser->getMaterialVariantFilterMask(&mVariantFilterMask);
     parser->getRequiredAttributes(&mRequiredAttributes);
     parser->getRefractionMode(&mRefractionMode);
     parser->getRefractionType(&mRefractionType);
@@ -280,16 +404,28 @@ FMaterial::FMaterial(FEngine& engine, const Material::Builder& builder)
     parser->hasCustomDepthShader(&mHasCustomDepthShader);
     mIsDefaultMaterial = builder->mDefaultMaterial;
 
-    // pre-cache the shared variants -- these variants are shared with the default material.
-    if (UTILS_UNLIKELY(!mIsDefaultMaterial && !mHasCustomDepthShader)) {
-        auto& cachedPrograms = mCachedPrograms;
-        for (Variant::type_t k = 0, n = VARIANT_COUNT; k < n; ++k) {
-            const Variant variant(k);
+    if (UTILS_UNLIKELY(mIsDefaultMaterial)) {
+        filaflat::MaterialChunk const& materialChunk{ mMaterialParser->getMaterialChunk() };
+        auto variants = FixedCapacityVector<Variant>::with_capacity(materialChunk.getShaderCount());
+        materialChunk.visitShaders([&variants](
+                ShaderModel, Variant variant, ShaderStage) {
             if (Variant::isValidDepthVariant(variant)) {
-                FMaterial const* const pMaterial = engine.getDefaultMaterial();
-                pMaterial->prepareProgram(variant);
-                cachedPrograms[k] = pMaterial->getProgram(variant);
+                variants.push_back(variant);
             }
+        });
+        std::sort(variants.begin(), variants.end(),
+                [](Variant lhs, Variant rhs) { return lhs.key < rhs.key; });
+        auto pos = std::unique(variants.begin(), variants.end());
+        variants.resize(std::distance(variants.begin(), pos));
+        std::swap(mDepthVariants, variants);
+    }
+
+    if (UTILS_UNLIKELY(!mIsDefaultMaterial && !mHasCustomDepthShader)) {
+        FMaterial const* const pDefaultMaterial = engine.getDefaultMaterial();
+        auto& cachedPrograms = mCachedPrograms;
+        for (Variant const variant : pDefaultMaterial->mDepthVariants) {
+            pDefaultMaterial->prepareProgram(variant);
+            cachedPrograms[variant.key] = pDefaultMaterial->getProgram(variant);
         }
     }
 
@@ -297,7 +433,16 @@ FMaterial::FMaterial(FEngine& engine, const Material::Builder& builder)
     parser->getColorWrite(&colorWrite);
     mRasterState.colorWrite = colorWrite;
     mRasterState.depthFunc = depthTest ? DepthFunc::GE : DepthFunc::A;
-    mRasterState.alphaToCoverage = mBlendingMode == BlendingMode::MASKED;
+
+    bool alphaToCoverageSet = false;
+    parser->getAlphaToCoverageSet(&alphaToCoverageSet);
+    if (alphaToCoverageSet) {
+        bool alphaToCoverage = false;
+        parser->getAlphaToCoverage(&alphaToCoverage);
+        mRasterState.alphaToCoverage = alphaToCoverage;
+    } else {
+        mRasterState.alphaToCoverage = mBlendingMode == BlendingMode::MASKED;
+    }
 
     parser->hasSpecularAntiAliasing(&mSpecularAntiAliasing);
     if (mSpecularAntiAliasing) {
@@ -313,11 +458,53 @@ FMaterial::~FMaterial() noexcept {
     delete mMaterialParser;
 }
 
+void FMaterial::invalidate(Variant::type_t variantMask, Variant::type_t variantValue) noexcept {
+    // update the spec constants that can change
+    // TODO: should we just always update all of them?
+    for (auto& item : mSpecializationConstants) {
+        if (item.id == ReservedSpecializationConstants::CONFIG_DEBUG_DIRECTIONAL_SHADOWMAP) {
+            item.value = mEngine.debug.shadowmap.debug_directional_shadowmap;
+        } else if (item.id == ReservedSpecializationConstants::CONFIG_DEBUG_FROXEL_VISUALIZATION) {
+            item.value = mEngine.debug.lighting.debug_froxel_visualization;
+        }
+    }
+
+    DriverApi& driverApi = mEngine.getDriverApi();
+    auto& cachedPrograms = mCachedPrograms;
+    for (size_t k = 0, n = VARIANT_COUNT; k < n; ++k) {
+        Variant const variant(k);
+        if ((k & variantMask) == variantValue) {
+            if (UTILS_LIKELY(!mIsDefaultMaterial)) {
+                // The depth variants may be shared with the default material, in which case
+                // we should not free it now.
+                bool const isSharedVariant =
+                        Variant::isValidDepthVariant(variant) && !mHasCustomDepthShader;
+                if (isSharedVariant) {
+                    // we don't own this variant, skip.
+                    continue;
+                }
+            }
+            driverApi.destroyProgram(cachedPrograms[k]);
+            cachedPrograms[k].clear();
+        }
+    }
+
+    if (UTILS_UNLIKELY(!mIsDefaultMaterial && !mHasCustomDepthShader)) {
+        FMaterial const* const pDefaultMaterial = mEngine.getDefaultMaterial();
+        for (Variant const variant: pDefaultMaterial->mDepthVariants) {
+            pDefaultMaterial->prepareProgram(variant);
+            if (!cachedPrograms[variant.key]) {
+                cachedPrograms[variant.key] = pDefaultMaterial->getProgram(variant);
+            }
+        }
+    }
+}
+
 void FMaterial::terminate(FEngine& engine) {
 
 #if FILAMENT_ENABLE_MATDBG
     // Unregister the material with matdbg.
-    matdbg::DebugServer* server = upcast(mEngine).debug.server;
+    matdbg::DebugServer* server = engine.debug.server;
     if (UTILS_UNLIKELY(server)) {
         server->removeMaterial(mDebuggerId);
     }
@@ -327,13 +514,55 @@ void FMaterial::terminate(FEngine& engine) {
     mDefaultInstance.terminate(engine);
 }
 
+void FMaterial::compile(CompilerPriorityQueue priority,
+        UserVariantFilterMask variantSpec,
+        backend::CallbackHandler* handler,
+        utils::Invocable<void(Material*)>&& callback) noexcept {
+
+    // Turn off the STE variant if stereo is not supported.
+    if (!mEngine.getDriverApi().isStereoSupported()) {
+        variantSpec &= ~UserVariantFilterMask(UserVariantFilterBit::STE);
+    }
+
+    UserVariantFilterMask const variantFilter =
+            ~variantSpec & UserVariantFilterMask(UserVariantFilterBit::ALL);
+
+    if (UTILS_LIKELY(mEngine.getDriverApi().isParallelShaderCompileSupported())) {
+        auto const& variants = isVariantLit() ?
+                VariantUtils::getLitVariants() : VariantUtils::getUnlitVariants();
+        for (auto const variant: variants) {
+            if (!variantFilter || variant == Variant::filterUserVariant(variant, variantFilter)) {
+                if (hasVariant(variant)) {
+                    prepareProgram(variant, priority);
+                }
+            }
+        }
+    }
+
+    if (callback) {
+        struct Callback {
+            Invocable<void(Material*)> f;
+            Material* m;
+            static void func(void* user) {
+                auto* const c = reinterpret_cast<Callback*>(user);
+                c->f(c->m);
+                delete c;
+            }
+        };
+        auto* const user = new(std::nothrow) Callback{ std::move(callback), this };
+        mEngine.getDriverApi().compilePrograms(priority, handler, &Callback::func, static_cast<void*>(user));
+    } else {
+        mEngine.getDriverApi().compilePrograms(priority, nullptr, nullptr, nullptr);
+    }
+}
+
 FMaterialInstance* FMaterial::createInstance(const char* name) const noexcept {
     return FMaterialInstance::duplicate(&mDefaultInstance, name);
 }
 
 bool FMaterial::hasParameter(const char* name) const noexcept {
-    return mUniformInterfaceBlock.hasUniform(name) ||
-            mSamplerInterfaceBlock.hasSampler(name) ||
+    return mUniformInterfaceBlock.hasField(name) ||
+           mSamplerInterfaceBlock.hasSampler(name) ||
             mSubpassInfo.name == utils::CString(name);
 }
 
@@ -341,88 +570,91 @@ bool FMaterial::isSampler(const char* name) const noexcept {
     return mSamplerInterfaceBlock.hasSampler(name);
 }
 
-UniformInterfaceBlock::UniformInfo const* FMaterial::reflect(
-        utils::StaticString const& name) const noexcept {
-    return mUniformInterfaceBlock.getUniformInfo(name.c_str());
+BufferInterfaceBlock::FieldInfo const* FMaterial::reflect(
+        std::string_view name) const noexcept {
+    return mUniformInterfaceBlock.getFieldInfo(name);
 }
 
-void FMaterial::prepareProgramSlow(Variant variant) const noexcept {
+bool FMaterial::hasVariant(Variant variant) const noexcept {
+    Variant vertexVariant, fragmentVariant;
     switch (getMaterialDomain()) {
         case MaterialDomain::SURFACE:
-            getSurfaceProgramSlow(variant);
+            vertexVariant = Variant::filterVariantVertex(variant);
+            fragmentVariant = Variant::filterVariantFragment(variant);
             break;
-
         case MaterialDomain::POST_PROCESS:
-            getPostProcessProgramSlow(variant);
+            vertexVariant = fragmentVariant = variant;
+            break;
+        case MaterialDomain::COMPUTE:
+            // TODO: implement MaterialDomain::COMPUTE
+            return false;
+    }
+    const ShaderModel sm = mEngine.getShaderModel();
+    if (!mMaterialParser->hasShader(sm, vertexVariant, ShaderStage::VERTEX)) {
+        return false;
+    }
+    if (!mMaterialParser->hasShader(sm, fragmentVariant, ShaderStage::FRAGMENT)) {
+        return false;
+    }
+    return true;
+}
+
+void FMaterial::prepareProgramSlow(Variant variant,
+        backend::CompilerPriorityQueue priorityQueue) const noexcept {
+    assert_invariant(mEngine.hasFeatureLevel(mFeatureLevel));
+    switch (getMaterialDomain()) {
+        case MaterialDomain::SURFACE:
+            getSurfaceProgramSlow(variant, priorityQueue);
+            break;
+        case MaterialDomain::POST_PROCESS:
+            getPostProcessProgramSlow(variant, priorityQueue);
+            break;
+        case MaterialDomain::COMPUTE:
+            // TODO: implement MaterialDomain::COMPUTE
             break;
     }
 }
 
-void FMaterial::getSurfaceProgramSlow(Variant variant) const noexcept {
+void FMaterial::getSurfaceProgramSlow(Variant variant,
+        CompilerPriorityQueue priorityQueue) const noexcept {
     // filterVariant() has already been applied in generateCommands(), shouldn't be needed here
     // if we're unlit, we don't have any bits that correspond to lit materials
     assert_invariant(variant == Variant::filterVariant(variant, isVariantLit()) );
 
     assert_invariant(!Variant::isReserved(variant));
 
-    Variant vertexVariant   = Variant::filterVariantVertex(variant);
-    Variant fragmentVariant = Variant::filterVariantFragment(variant);
+    Variant const vertexVariant   = Variant::filterVariantVertex(variant);
+    Variant const fragmentVariant = Variant::filterVariantFragment(variant);
 
-    Program pb = getProgramBuilderWithVariants(variant, vertexVariant, fragmentVariant);
-    pb
-        .setUniformBlock(BindingPoints::PER_VIEW, PerViewUib::_name)
-        .setUniformBlock(BindingPoints::PER_RENDERABLE, PerRenderableUib::_name)
-        .setUniformBlock(BindingPoints::LIGHTS, LightsUib::_name)
-        .setUniformBlock(BindingPoints::SHADOW, ShadowUib::_name)
-        .setUniformBlock(BindingPoints::FROXEL_RECORDS, FroxelRecordUib::_name)
-        .setUniformBlock(BindingPoints::PER_MATERIAL_INSTANCE, mUniformInterfaceBlock.getName());
-
-    if (Variant(variant).hasSkinningOrMorphing()) {
-        pb.setUniformBlock(BindingPoints::PER_RENDERABLE_BONES, PerRenderableUibBone::_name);
-        pb.setUniformBlock(BindingPoints::PER_RENDERABLE_MORPHING, PerRenderableMorphingUib::_name);
-    }
-
-    // Always add the morphing sampler group because there is no way
-    // that SamplerBindingMap knows the current variant.
-    addSamplerGroup(pb, BindingPoints::PER_RENDERABLE_MORPHING,
-            SibGenerator::getPerRenderPrimitiveMorphingSib(variant), mSamplerBindings);
-
-    addSamplerGroup(pb, BindingPoints::PER_VIEW, SibGenerator::getPerViewSib(variant), mSamplerBindings);
-    addSamplerGroup(pb, BindingPoints::PER_MATERIAL_INSTANCE, mSamplerInterfaceBlock, mSamplerBindings);
-
-    // getSurfaceBindingIndexMap in GLSLPostProcessor.cpp also needs to update if sampler groups are added.
+    Program pb{ getProgramWithVariants(variant, vertexVariant, fragmentVariant) };
+    pb.priorityQueue(priorityQueue);
     createAndCacheProgram(std::move(pb), variant);
 }
 
-void FMaterial::getPostProcessProgramSlow(Variant variant) const noexcept {
-
-    Program pb = getProgramBuilderWithVariants(variant, variant, variant);
-    pb.setUniformBlock(BindingPoints::PER_VIEW, PerViewUib::_name)
-      .setUniformBlock(BindingPoints::PER_MATERIAL_INSTANCE, mUniformInterfaceBlock.getName());
-
-    addSamplerGroup(pb, BindingPoints::PER_MATERIAL_INSTANCE, mSamplerInterfaceBlock, mSamplerBindings);
-
-    // getPostProcessBindingIndexMap in GLSLPostProcessor.cpp also needs to update if sampler groups are added.
+void FMaterial::getPostProcessProgramSlow(Variant variant,
+        CompilerPriorityQueue priorityQueue) const noexcept {
+    Program pb{ getProgramWithVariants(variant, variant, variant) };
+    pb.priorityQueue(priorityQueue);
     createAndCacheProgram(std::move(pb), variant);
 }
 
-Program FMaterial::getProgramBuilderWithVariants(
+Program FMaterial::getProgramWithVariants(
         Variant variant,
         Variant vertexVariant,
         Variant fragmentVariant) const noexcept {
-    const ShaderModel sm = mEngine.getDriver().getShaderModel();
-    const bool isNoop = mEngine.getBackend() == Backend::NOOP;
-
+    FEngine const& engine = mEngine;
+    const ShaderModel sm = engine.getShaderModel();
+    const bool isNoop = engine.getBackend() == Backend::NOOP;
     /*
      * Vertex shader
      */
 
-    filaflat::ShaderBuilder& vsBuilder = mEngine.getVertexShaderBuilder();
+    ShaderContent& vsBuilder = engine.getVertexShaderContent();
 
-    UTILS_UNUSED_IN_RELEASE bool vsOK = mMaterialParser->getShader(vsBuilder, sm,
-            vertexVariant, ShaderType::VERTEX);
+    UTILS_UNUSED_IN_RELEASE bool const vsOK = mMaterialParser->getShader(vsBuilder, sm,
+            vertexVariant, ShaderStage::VERTEX);
 
-    ASSERT_POSTCONDITION(isNoop || (vsOK && vsBuilder.size() > 0),
+    ASSERT_POSTCONDITION(isNoop || (vsOK && !vsBuilder.empty()),
             "The material '%s' has not been compiled to include the required "
             "GLSL or SPIR-V chunks for the vertex shader (variant=0x%x, filtered=0x%x).",
             mName.c_str(), variant.key, vertexVariant.key);
@@ -431,25 +663,54 @@ Program FMaterial::getProgramBuilderWithVariants(
      * Fragment shader
      */
 
-    filaflat::ShaderBuilder& fsBuilder = mEngine.getFragmentShaderBuilder();
+    ShaderContent& fsBuilder = engine.getFragmentShaderContent();
 
-    UTILS_UNUSED_IN_RELEASE bool fsOK = mMaterialParser->getShader(fsBuilder, sm,
-            fragmentVariant, ShaderType::FRAGMENT);
+    UTILS_UNUSED_IN_RELEASE bool const fsOK = mMaterialParser->getShader(fsBuilder, sm,
+            fragmentVariant, ShaderStage::FRAGMENT);
 
-    ASSERT_POSTCONDITION(isNoop || (fsOK && fsBuilder.size() > 0),
+    ASSERT_POSTCONDITION(isNoop || (fsOK && !fsBuilder.empty()),
             "The material '%s' has not been compiled to include the required "
             "GLSL or SPIR-V chunks for the fragment shader (variant=0x%x, filtered=0x%x).",
             mName.c_str(), variant.key, fragmentVariant.key);
 
-    Program pb;
-    pb.diagnostics(mName,
-              [this, variant](io::ostream& out) -> io::ostream& {
-                  return out << mName.c_str_safe()
-                             << ", variant=(" << io::hex << variant.key << io::dec << ")";
-              })
-            .withVertexShader(vsBuilder.data(), vsBuilder.size())
-            .withFragmentShader(fsBuilder.data(), fsBuilder.size());
-    return pb;
+    Program program;
+    program.shader(ShaderStage::VERTEX, vsBuilder.data(), vsBuilder.size())
+           .shader(ShaderStage::FRAGMENT, fsBuilder.data(), fsBuilder.size())
+           .uniformBlockBindings(mUniformBlockBindings)
+           .diagnostics(mName,
+                    [this, variant](io::ostream& out) -> io::ostream& {
+                        return out << mName.c_str_safe()
+                                   << ", variant=(" << io::hex << variant.key << io::dec << ")";
+                    });
+
+    UTILS_NOUNROLL
+    for (size_t i = 0; i < Enum::count<SamplerBindingPoints>(); i++) {
+        SamplerBindingPoints const bindingPoint = (SamplerBindingPoints)i;
+        auto const& info = mSamplerGroupBindingInfoList[i];
+        if (info.count) {
+            std::array<Program::Sampler, backend::MAX_SAMPLER_COUNT> samplers{};
+            for (size_t j = 0, c = info.count; j < c; ++j) {
+                uint8_t const binding = info.bindingOffset + j;
+                samplers[j] = { mSamplerBindingToNameMap[binding], binding };
+            }
+            program.setSamplerGroup(+bindingPoint, info.shaderStageFlags,
+                    samplers.data(), info.count);
+        }
+    }
+
+    if (UTILS_UNLIKELY(mEngine.getShaderLanguage() == ShaderLanguage::ESSL1)) {
+        assert_invariant(!mBindingUniformInfo.empty());
+        for (auto const& [index, uniforms] : mBindingUniformInfo) {
+            program.uniforms(uint32_t(index), uniforms);
+        }
+        program.attributes(mAttributeInfo);
+    }
+
+    program.specializationConstants(mSpecializationConstants);
+
+    program.cacheId(utils::hash::combine(size_t(mCacheId), variant.key));
+
+    return program;
 }
 
 void FMaterial::createAndCacheProgram(Program&& p, Variant variant) const noexcept {
@@ -461,9 +722,9 @@ void FMaterial::createAndCacheProgram(Program&& p, Variant variant) const noexce
 size_t FMaterial::getParameters(ParameterInfo* parameters, size_t count) const noexcept {
     count = std::min(count, getParameterCount());
 
-    const auto& uniforms = mUniformInterfaceBlock.getUniformInfoList();
+    const auto& uniforms = mUniformInterfaceBlock.getFieldInfoList();
     size_t i = 0;
-    size_t uniformCount = std::min(count, size_t(uniforms.size()));
+    size_t const uniformCount = std::min(count, size_t(uniforms.size()));
     for ( ; i < uniformCount; i++) {
         ParameterInfo& info = parameters[i];
         const auto& uniformInfo = uniforms[i];
@@ -471,12 +732,12 @@ size_t FMaterial::getParameters(ParameterInfo* parameters, size_t count) const n
         info.isSampler = false;
         info.isSubpass = false;
         info.type = uniformInfo.type;
-        info.count = uniformInfo.size;
+        info.count = std::max(1u, uniformInfo.size);
         info.precision = uniformInfo.precision;
     }
 
     const auto& samplers = mSamplerInterfaceBlock.getSamplerInfoList();
-    size_t samplerCount = samplers.size();
+    size_t const samplerCount = samplers.size();
     for (size_t j = 0; i < count && j < samplerCount; i++, j++) {
         ParameterInfo& info = parameters[i];
         const auto& samplerInfo = samplers[j];
@@ -496,11 +757,12 @@ size_t FMaterial::getParameters(ParameterInfo* parameters, size_t count) const n
         info.subpassType = mSubpassInfo.type;
         info.count = 1;
         info.precision = mSubpassInfo.precision;
-        i++;
     }
 
     return count;
 }
+
+#if FILAMENT_ENABLE_MATDBG
 
 // Swaps in an edited version of the original package that was used to create the material. The
 // edited package was stashed in response to a debugger event. This is invoked only when the
@@ -509,10 +771,7 @@ size_t FMaterial::getParameters(ParameterInfo* parameters, size_t count) const n
 void FMaterial::applyPendingEdits() noexcept {
     const char* name = mName.c_str();
     slog.d << "Applying edits to " << (name ? name : "(untitled)") << io::endl;
-    destroyPrograms(mEngine);
-    for (auto& program : mCachedPrograms) {
-        program.clear();
-    }
+    destroyPrograms(mEngine); // FIXME: this will not destroy the shared variants
     delete mMaterialParser;
     mMaterialParser = mPendingEdits;
     mPendingEdits = nullptr;
@@ -525,20 +784,20 @@ void FMaterial::applyPendingEdits() noexcept {
  * @{
  */
 
-#if FILAMENT_ENABLE_MATDBG
-
-void FMaterial::onEditCallback(void* userdata, const utils::CString& name, const void* packageData,
+void FMaterial::onEditCallback(void* userdata, const utils::CString&, const void* packageData,
         size_t packageSize) {
-    FMaterial* material = upcast((Material*) userdata);
-    FEngine& engine = material->mEngine;
+    FMaterial* material = downcast((Material*) userdata);
+    FEngine const& engine = material->mEngine;
 
-    // This is called on a web server thread so we defer clearing the program cache
+    // This is called on a web server thread, so we defer clearing the program cache
     // and swapping out the MaterialParser until the next getProgram call.
-    material->mPendingEdits = createParser(engine.getBackend(), packageData, packageSize);
+    material->mPendingEdits = createParser(engine.getBackend(), engine.getShaderLanguage(),
+            packageData, packageSize);
 }
 
 void FMaterial::onQueryCallback(void* userdata, VariantList* pVariants) {
-    FMaterial* material = upcast((Material*) userdata);
+    FMaterial* material = downcast((Material*) userdata);
+    std::lock_guard<utils::Mutex> const lock(material->mActiveProgramsLock);
     *pVariants = material->mActivePrograms;
     material->mActivePrograms.reset();
 }
@@ -550,18 +809,19 @@ void FMaterial::onQueryCallback(void* userdata, VariantList* pVariants) {
 void FMaterial::destroyPrograms(FEngine& engine) {
     DriverApi& driverApi = engine.getDriverApi();
     auto& cachedPrograms = mCachedPrograms;
-    for (Variant::type_t k = 0, n = VARIANT_COUNT; k < n; ++k) {
+    for (size_t k = 0, n = VARIANT_COUNT; k < n; ++k) {
         const Variant variant(k);
         if (!mIsDefaultMaterial) {
             // The depth variants may be shared with the default material, in which case
             // we should not free it now.
-            bool isSharedVariant = Variant::isValidDepthVariant(variant) && !mHasCustomDepthShader;
+            bool const isSharedVariant = Variant::isValidDepthVariant(variant) && !mHasCustomDepthShader;
             if (isSharedVariant) {
                 // we don't own this variant, skip.
                 continue;
             }
         }
         driverApi.destroyProgram(cachedPrograms[k]);
+        cachedPrograms[k].clear();
     }
 }
 

@@ -33,7 +33,7 @@ using std::atomic;
 using std::vector;
 using std::unique_ptr;
 
-namespace gltfio {
+namespace filament::gltfio {
 
 class Ktx2Provider final : public TextureProvider {
 public:
@@ -41,7 +41,7 @@ public:
     ~Ktx2Provider();
 
     Texture* pushTexture(const uint8_t* data, size_t byteCount,
-            const char* mimeType, uint64_t flags) final;
+            const char* mimeType, TextureFlags flags) final;
 
     Texture* popTexture() final;
     void updateQueue() final;
@@ -87,13 +87,12 @@ private:
 };
 
 Texture* Ktx2Provider::pushTexture(const uint8_t* data, size_t byteCount,
-            const char* mimeType, FlagBits flags) {
-    using InternalFormat = Texture::InternalFormat;
+            const char* mimeType, TextureProvider::TextureFlags flags) {
     using TransferFunction = ktxreader::Ktx2Reader::TransferFunction;
-    const FlagBits sRGB = FlagBits(Flags::sRGB);
 
     auto async = mKtxReader->asyncCreate(data, byteCount,
-            (flags & sRGB) ? TransferFunction::sRGB : TransferFunction::LINEAR);
+            any(flags & TextureProvider::TextureFlags::sRGB) ?
+            TransferFunction::sRGB : TransferFunction::LINEAR);
 
     if (async == nullptr) {
         mRecentPushMessage = "Unable to build Texture object.";
@@ -117,7 +116,7 @@ Texture* Ktx2Provider::pushTexture(const uint8_t* data, size_t byteCount,
     }
 
     JobSystem* js = &mEngine->getJobSystem();
-    item->job = jobs::createJob(*js, mDecoderRootJob, [this, item] {
+    item->job = jobs::createJob(*js, mDecoderRootJob, [item] {
         using Result = ktxreader::Ktx2Reader::Result;
         const bool success = Result::SUCCESS == item->async->doTranscoding();
         item->transcoderState.store(success ? TranscoderState::SUCCESS : TranscoderState::ERROR);
@@ -159,7 +158,7 @@ void Ktx2Provider::updateQueue() {
         if (item->state != QueueItemState::TRANSCODING) {
             continue;
         }
-        Texture* texture = item->async->getTexture();
+        item->async->getTexture();
         const TranscoderState state = item->transcoderState.load();
         if (state != TranscoderState::NOT_STARTED) {
             if (item->job) {
@@ -198,6 +197,17 @@ void Ktx2Provider::cancelDecoding() {
     // in-flight jobs. We should consider throttling the number of simultaneous decoder jobs, which
     // would allow for actual cancellation.
     waitForCompletion();
+
+    // For cancelled jobs, we need to set the QueueItemState to POPPED and free the decoded data
+    // stored in item->async.
+    for (auto& item : mQueueItems) {
+        if (item->state != QueueItemState::TRANSCODING) {
+            continue;
+        }
+        mKtxReader->asyncDestroy(&item->async);
+        item->async = nullptr;
+        item->state = QueueItemState::POPPED;
+    }
 }
 
 const char* Ktx2Provider::getPushMessage() const {
@@ -250,4 +260,4 @@ TextureProvider* createKtx2Provider(Engine* engine) {
     return new Ktx2Provider(engine);
 }
 
-} // namespace gltfio
+} // namespace filament::gltfio

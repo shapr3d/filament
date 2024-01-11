@@ -333,10 +333,16 @@ static void setup(Engine* engine, View*, Scene* scene) {
     if (ibl) {
         auto& params = g_params;
         IndirectLight* const pIndirectLight = ibl->getIndirectLight();
-        params.lightDirection = IndirectLight::getDirectionEstimate(ibl->getSphericalHarmonics());
-        float4 c = pIndirectLight->getColorEstimate(ibl->getSphericalHarmonics(), params.lightDirection);
-        params.lightIntensity = c.w * pIndirectLight->getIntensity();
-        params.lightColor = c.rgb;
+        // If we loaded an equirectangular IBL, we don't have spherical harmonics. In that case,
+        // simply skip the estimates.
+        if (ibl->hasSphericalHarmonics()) {
+            params.lightDirection =
+                    IndirectLight::getDirectionEstimate(ibl->getSphericalHarmonics());
+            float4 c = pIndirectLight->getColorEstimate(
+                    ibl->getSphericalHarmonics(), params.lightDirection);
+            params.lightIntensity = c.w * pIndirectLight->getIntensity();
+            params.lightColor = c.rgb;
+        }
     }
 
     g_params.bloomOptions.dirt = FilamentApp::get().getDirtTexture();
@@ -596,11 +602,16 @@ static void gui(filament::Engine* engine, filament::View*) {
 
         if (ImGui::CollapsingHeader("Camera")) {
             ImGui::Indent();
-            ImGui::SliderFloat("Focal length", &FilamentApp::get().getCameraFocalLength(), 16.0f, 90.0f);
+            ImGui::SliderFloat("Focal length", &params.cameraFocalLength, 16.0f, 90.0f);
             ImGui::SliderFloat("Aperture", &params.cameraAperture, 1.0f, 32.0f);
             ImGui::SliderFloat("Speed", &params.cameraSpeed, 800.0f, 1.0f);
             ImGui::SliderFloat("ISO", &params.cameraISO, 25.0f, 6400.0f);
+            ImGui::SliderFloat("Near", &params.cameraNear, 0.01f, 1.0f);
+            ImGui::SliderFloat("Far", &params.cameraFar, 1.0f, 10000.0f);
             ImGui::Unindent();
+
+            FilamentApp::get().setCameraFocalLength(params.cameraFocalLength);
+            FilamentApp::get().setCameraNearFar(params.cameraNear, params.cameraFar);
         }
 
         if (ImGui::CollapsingHeader("Indirect Light")) {
@@ -885,15 +896,12 @@ static void gui(filament::Engine* engine, filament::View*) {
             ImGui::SliderFloat("Polygon Offset Scale", &params.polygonOffsetSlope, 0.0f, 10.0f);
             ImGui::SliderFloat("Polygon Offset Constant", &params.polygonOffsetConstant, 0.0f, 10.0f);
 
-            bool* lispsm;
-            if (debug.getPropertyAddress<bool>("d.shadowmap.lispsm", &lispsm)) {
-                ImGui::Checkbox("Enable LiSPSM", lispsm);
-                if (*lispsm) {
-                    ImGui::SliderFloat("dzn",
-                            debug.getPropertyAddress<float>("d.shadowmap.dzn"), 0.0f, 1.0f);
-                    ImGui::SliderFloat("dzf",
-                            debug.getPropertyAddress<float>("d.shadowmap.dzf"),-1.0f, 0.0f);
-                }
+            ImGui::Checkbox("Enable LiSPSM", &params.lispsm);
+            if (params.lispsm) {
+                ImGui::SliderFloat("dzn",
+                        debug.getPropertyAddress<float>("d.shadowmap.dzn"), 0.0f, 1.0f);
+                ImGui::SliderFloat("dzf",
+                        debug.getPropertyAddress<float>("d.shadowmap.dzf"),-1.0f, 0.0f);
             }
             ImGui::Unindent();
         }
@@ -942,6 +950,7 @@ static void gui(filament::Engine* engine, filament::View*) {
 
     LightManager::ShadowOptions options = lcm.getShadowOptions(lightInstance);
     options.stable = params.stableShadowMap;
+    options.lispsm = params.lispsm;
     options.normalBias = params.normalBias;
     options.constantBias = params.constantBias;
     options.polygonOffsetConstant = params.polygonOffsetConstant;

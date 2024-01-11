@@ -149,12 +149,13 @@ Java_com_google_android_filament_View_nSetShadowType(JNIEnv*, jclass, jlong nati
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_google_android_filament_View_nSetVsmShadowOptions(JNIEnv*, jclass, jlong nativeView,
-        jint anisotropy, jboolean mipmapping, jfloat minVarianceScale,
+        jint anisotropy, jboolean mipmapping, jboolean highPrecision, jfloat minVarianceScale,
         jfloat lightBleedReduction) {
     View* view = (View*) nativeView;
     View::VsmShadowOptions options;
     options.anisotropy = (uint8_t)anisotropy;
     options.mipmapping = (bool)mipmapping;
+    options.highPrecision = (bool)highPrecision;
     options.minVarianceScale = minVarianceScale;
     options.lightBleedReduction = lightBleedReduction;
     view->setVsmShadowOptions(options);
@@ -259,14 +260,14 @@ Java_com_google_android_filament_View_nSetAmbientOcclusionOptions(JNIEnv*, jclas
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_google_android_filament_View_nSetSSCTOptions(JNIEnv *, jclass, jlong nativeView,
-        jfloat ssctLightConeRad, jfloat ssctStartTraceDistance, jfloat ssctContactDistanceMax,
+        jfloat ssctLightConeRad, jfloat ssctShadowDistance, jfloat ssctContactDistanceMax,
         jfloat ssctIntensity, jfloat ssctLightDirX, jfloat ssctLightDirY, jfloat ssctLightDirZ,
         jfloat ssctDepthBias, jfloat ssctDepthSlopeBias, jint ssctSampleCount,
         jint ssctRayCount, jboolean ssctEnabled) {
     View* view = (View*) nativeView;
     View::AmbientOcclusionOptions options = view->getAmbientOcclusionOptions();
     options.ssct.lightConeRad = ssctLightConeRad;
-    options.ssct.shadowDistance = ssctStartTraceDistance;
+    options.ssct.shadowDistance = ssctShadowDistance;
     options.ssct.contactDistanceMax = ssctContactDistanceMax;
     options.ssct.intensity = ssctIntensity;
     options.ssct.lightDirection = math::float3{ ssctLightDirX, ssctLightDirY, ssctLightDirZ };
@@ -281,7 +282,7 @@ Java_com_google_android_filament_View_nSetSSCTOptions(JNIEnv *, jclass, jlong na
 extern "C" JNIEXPORT void JNICALL
 Java_com_google_android_filament_View_nSetBloomOptions(JNIEnv*, jclass,
         jlong nativeView, jlong nativeTexture,
-        jfloat dirtStrength, jfloat strength, jint resolution, jfloat anamorphism, jint levels,
+        jfloat dirtStrength, jfloat strength, jint resolution, jint levels,
         jint blendMode, jboolean threshold, jboolean enabled, jfloat highlight,
         jboolean lensFlare, jboolean starburst, jfloat chromaticAberration, jint ghostCount,
         jfloat ghostSpacing, jfloat ghostThreshold, jfloat haloThickness, jfloat haloRadius,
@@ -293,7 +294,6 @@ Java_com_google_android_filament_View_nSetBloomOptions(JNIEnv*, jclass,
             .dirtStrength = dirtStrength,
             .strength = strength,
             .resolution = (uint32_t)resolution,
-            .anamorphism = anamorphism,
             .levels = (uint8_t)levels,
             .blendMode = (View::BloomOptions::BlendMode)blendMode,
             .threshold = (bool)threshold,
@@ -314,12 +314,14 @@ Java_com_google_android_filament_View_nSetBloomOptions(JNIEnv*, jclass,
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_google_android_filament_View_nSetFogOptions(JNIEnv *, jclass , jlong nativeView,
-        jfloat distance, jfloat maximumOpacity, jfloat height, jfloat heightFalloff, jfloat r,
-        jfloat g, jfloat b, jfloat density, jfloat inScatteringStart,
-        jfloat inScatteringSize, jboolean fogColorFromIbl, jboolean enabled) {
+        jfloat distance, jfloat maximumOpacity, jfloat height, jfloat heightFalloff, jfloat cutOffDistance,
+        jfloat r, jfloat g, jfloat b, jfloat density, jfloat inScatteringStart,
+        jfloat inScatteringSize, jboolean fogColorFromIbl, jlong skyColorNativeObject, jboolean enabled) {
     View* view = (View*) nativeView;
+    Texture* skyColor = (Texture*) skyColorNativeObject;
     View::FogOptions options = {
              .distance = distance,
+             .cutOffDistance = cutOffDistance,
              .maximumOpacity = maximumOpacity,
              .height = height,
              .heightFalloff = heightFalloff,
@@ -328,6 +330,7 @@ Java_com_google_android_filament_View_nSetFogOptions(JNIEnv *, jclass , jlong na
              .inScatteringStart = inScatteringStart,
              .inScatteringSize = inScatteringSize,
              .fogColorFromIbl = (bool)fogColorFromIbl,
+             .skyColor = skyColor,
              .enabled = (bool)enabled
     };
     view->setFogOptions(options);
@@ -464,8 +467,61 @@ Java_com_google_android_filament_View_nPick(JNIEnv* env, jclass,
 
 extern "C"
 JNIEXPORT void JNICALL
+Java_com_google_android_filament_View_nSetStencilBufferEnabled(JNIEnv *, jclass, jlong nativeView,
+        jboolean enabled) {
+    View* view = (View*) nativeView;
+    view->setStencilBufferEnabled(enabled);
+}
+
+extern "C"
+JNIEXPORT jboolean JNICALL
+Java_com_google_android_filament_View_nIsStencilBufferEnabled(JNIEnv *, jclass, jlong nativeView) {
+    View* view = (View*) nativeView;
+    return view->isStencilBufferEnabled();
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_google_android_filament_View_nSetStereoscopicOptions(JNIEnv *, jclass, jlong nativeView,
+        jboolean enabled) {
+    View* view = (View*) nativeView;
+    View::StereoscopicOptions options {
+        .enabled = (bool) enabled
+    };
+    view->setStereoscopicOptions(options);
+}
+
+extern "C"
+JNIEXPORT void JNICALL
 Java_com_google_android_filament_View_nSetGuardBandOptions(JNIEnv *, jclass,
         jlong nativeView, jboolean enabled) {
     View* view = (View*) nativeView;
     view->setGuardBandOptions({ .enabled = (bool)enabled });
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_google_android_filament_View_nSetMaterialGlobal(JNIEnv * , jclass, jlong nativeView,
+        jint index, jfloat x, jfloat y, jfloat z, jfloat w) {
+    View *view = (View *) nativeView;
+    view->setMaterialGlobal((uint32_t)index, { x, y, z, w });
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_google_android_filament_View_nGetMaterialGlobal(JNIEnv *env, jclass clazz,
+        jlong nativeView, jint index, jfloatArray out_) {
+    jfloat* out = env->GetFloatArrayElements(out_, nullptr);
+    View *view = (View *) nativeView;
+    auto result = view->getMaterialGlobal(index);
+    std::copy_n(result.v, 4, out);
+    env->ReleaseFloatArrayElements(out_, out, 0);
+}
+
+extern "C"
+JNIEXPORT int JNICALL
+Java_com_google_android_filament_View_nGetFogEntity(JNIEnv *env, jclass clazz,
+        jlong nativeView) {
+    View *view = (View *) nativeView;
+    return (jint)view->getFogEntity().getId();
 }

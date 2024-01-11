@@ -45,7 +45,7 @@ BuilderType::Builder& BuilderType::Builder::operator=(BuilderType::Builder const
 BuilderType::Builder& BuilderType::Builder::operator=(BuilderType::Builder&& rhs) noexcept = default;
 
 RenderTarget::Builder& RenderTarget::Builder::texture(AttachmentPoint pt, Texture* texture) noexcept {
-    mImpl->mAttachments[(size_t)pt].texture = upcast(texture);
+    mImpl->mAttachments[(size_t)pt].texture = downcast(texture);
     return *this;
 }
 
@@ -68,27 +68,22 @@ RenderTarget* RenderTarget::Builder::build(Engine& engine) {
     using backend::TextureUsage;
     const FRenderTarget::Attachment& color = mImpl->mAttachments[(size_t)AttachmentPoint::COLOR0];
     const FRenderTarget::Attachment& depth = mImpl->mAttachments[(size_t)AttachmentPoint::DEPTH];
-    if (!ASSERT_PRECONDITION_NON_FATAL(color.texture, "COLOR0 attachment not set")) {
-        return nullptr;
-    }
-    if (!ASSERT_PRECONDITION_NON_FATAL(color.texture->getUsage() & TextureUsage::COLOR_ATTACHMENT,
-            "Texture usage must contain COLOR_ATTACHMENT")) {
-        return nullptr;
-    }
-    if (depth.texture) {
-        if (!ASSERT_PRECONDITION_NON_FATAL(depth.texture->getUsage() & TextureUsage::DEPTH_ATTACHMENT,
-                "Texture usage must contain DEPTH_ATTACHMENT")) {
-            return nullptr;
-        }
+
+    if (color.texture) {
+        ASSERT_PRECONDITION(color.texture->getUsage() & TextureUsage::COLOR_ATTACHMENT,
+                "Texture usage must contain COLOR_ATTACHMENT");
     }
 
-    const size_t maxDrawBuffers = upcast(engine).getDriverApi().getMaxDrawBuffers();
+    if (depth.texture) {
+        ASSERT_PRECONDITION(depth.texture->getUsage() & TextureUsage::DEPTH_ATTACHMENT,
+                "Texture usage must contain DEPTH_ATTACHMENT");
+    }
+
+    const size_t maxDrawBuffers = downcast(engine).getDriverApi().getMaxDrawBuffers();
     for (size_t i = maxDrawBuffers; i < MAX_SUPPORTED_COLOR_ATTACHMENTS_COUNT; i++) {
-        if (!ASSERT_PRECONDITION_NON_FATAL(!mImpl->mAttachments[i].texture,
+        ASSERT_PRECONDITION(!mImpl->mAttachments[i].texture,
                 "Only %u color attachments are supported, but COLOR%u attachment is set",
-                maxDrawBuffers, i)) {
-            return nullptr;
-        }
+                maxDrawBuffers, i);
     }
     
     uint32_t minWidth = std::numeric_limits<uint32_t>::max();
@@ -106,14 +101,12 @@ RenderTarget* RenderTarget::Builder::build(Engine& engine) {
         }
     }
 
-    if (!ASSERT_PRECONDITION_NON_FATAL(minWidth == maxWidth && minHeight == maxHeight,
-            "All attachments dimensions must match")) {
-        return nullptr;
-    }
+    ASSERT_PRECONDITION(minWidth == maxWidth && minHeight == maxHeight,
+            "All attachments dimensions must match");
 
     mImpl->mWidth  = minWidth;
     mImpl->mHeight = minHeight;
-    return upcast(engine).createRenderTarget(*this);
+    return downcast(engine).createRenderTarget(*this);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -129,7 +122,7 @@ FRenderTarget::FRenderTarget(FEngine& engine, const RenderTarget::Builder& build
 
     auto setAttachment = [this](TargetBufferInfo& info, AttachmentPoint attachmentPoint) {
         Attachment const& attachment = mAttachments[(size_t)attachmentPoint];
-        auto t = upcast(attachment.texture);
+        auto t = downcast(attachment.texture);
         info.handle = t->getHwHandle();
         info.level  = attachment.mipLevel;
         if (t->getTarget() == Texture::Sampler::SAMPLER_CUBEMAP) {
@@ -143,7 +136,7 @@ FRenderTarget::FRenderTarget(FEngine& engine, const RenderTarget::Builder& build
     for (size_t i = 0; i < MRT::MAX_SUPPORTED_RENDER_TARGET_COUNT; i++) {
         Attachment const& attachment = mAttachments[i];
         if (attachment.texture) {
-            TargetBufferFlags targetBufferBit = getTargetBufferFlagsAt(i);
+            TargetBufferFlags const targetBufferBit = getTargetBufferFlagsAt(i);
             mAttachmentMask |= targetBufferBit;
             setAttachment(mrt[i], (AttachmentPoint)i);
             if (any(attachment.texture->getUsage() &

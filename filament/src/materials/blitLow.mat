@@ -22,18 +22,23 @@ material {
     ],
     depthWrite : false,
     depthCulling : false,
-    domain: postprocess
+    domain: postprocess,
+    featureLevel : 0
 }
 
 vertex {
     void postProcessVertex(inout PostProcessVertexInputs postProcess) {
         postProcess.vertex.xy = materialParams.viewport.xy + postProcess.normalizedUV * materialParams.viewport.zw;
+        postProcess.vertex.xy = uvToRenderTargetUV(postProcess.vertex.xy);
     }
 }
 
 fragment {
     void postProcess(inout PostProcessInputs postProcess) {
+#if FILAMENT_EFFECTIVE_VERSION == 100
+        postProcess.color = texture2D(materialParams_color, variable_vertex.xy);
+#else
         postProcess.color = textureLod(materialParams_color, variable_vertex.xy, 0.0);
+#endif
     }
 }
-

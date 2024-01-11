@@ -49,6 +49,13 @@ class ImGuiHelper;
 class IBL;
 class MeshAssimp;
 
+#if defined(FILAMENT_DRIVER_SUPPORTS_VULKAN)
+// For customizing the vulkan backend
+namespace filament::backend {
+class VulkanPlatform;
+}
+#endif
+
 class FilamentApp {
 public:
     using KeyDownEventHook = std::function<bool(int, int16_t)>;
@@ -68,7 +75,7 @@ public:
     using ImGuiCallback = std::function<void(filament::Engine*, filament::View*)>;
     using AnimCallback = std::function<void(filament::Engine*, filament::View*, double now)>;
     using ResizeCallback = std::function<void(filament::Engine*, filament::View*)>;
-    using DropCallback = std::function<void(std::string)>;
+    using DropCallback = std::function<void(std::string_view)>;
 
     static FilamentApp& get();
 
@@ -85,6 +92,8 @@ public:
             PostRenderCallback postRender = PostRenderCallback(),
             size_t width = 1600, size_t height = 900);
 
+    void reconfigureCameras() { mReconfigureCameras = true; }
+
     filament::Material const* getDefaultMaterial() const noexcept { return mDefaultMaterial; }
     filament::Material const* getTransparentMaterial() const noexcept { return mTransparentMaterial; }
     IBL* getIBL() const noexcept { return mIBL.get(); }
@@ -95,7 +104,8 @@ public:
 
     void setSidebarWidth(int width) { mSidebarWidth = width; }
     void setWindowTitle(const char* title) { mWindowTitle = title; }
-    float& getCameraFocalLength() { return mCameraFocalLength; }
+    void setCameraFocalLength(float focalLength) { mCameraFocalLength = focalLength; }
+    void setCameraNearFar(float near, float far) { mCameraNear = near; mCameraFar = far; }
 
     void addOffscreenView(filament::View* view) { mOffscreenViews.push_back(view); }
 
@@ -188,6 +198,7 @@ private:
         void fixupMouseCoordinatesForHdpi(ssize_t& x, ssize_t& y) const;
 
         FilamentApp* const mFilamentApp = nullptr;
+        Config mConfig;
         const bool mIsHeadless;
 
         SDL_Window* mWindow = nullptr;
@@ -250,6 +261,13 @@ private:
     std::string mWindowTitle;
     std::vector<filament::View*> mOffscreenViews;
     float mCameraFocalLength = 28.0f;
+    float mCameraNear = 0.0078125f;
+    float mCameraFar = 100.0f;
+    bool mReconfigureCameras = false;
+
+#if defined(FILAMENT_DRIVER_SUPPORTS_VULKAN)
+    filament::backend::VulkanPlatform* mVulkanPlatform = nullptr;
+#endif
 
     CameraMovementSpeedUpdateCallback mCameraMovementSpeedUpdateCallback = nullptr;
     filament::camutils::Manipulator<float>::FlightSpeedModifiedCallback mFlightSpeedModifiedCallback = nullptr;

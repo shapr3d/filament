@@ -20,7 +20,10 @@
 #include <draco/compression/decode.h>
 #endif
 
+#include <utils/compiler.h>
 #include <utils/Log.h>
+
+#if GLTFIO_DRACO_SUPPORTED
 
 #include <memory>
 #include <vector>
@@ -28,9 +31,11 @@
 using std::unique_ptr;
 using std::vector;
 
+#endif
+
 using namespace utils;
 
-namespace gltfio {
+namespace filament::gltfio {
 
 DracoMesh* DracoCache::findOrCreateMesh(const cgltf_buffer_view* key) {
     auto iter = mCache.find(key);
@@ -61,7 +66,7 @@ DracoMesh::~DracoMesh() {
 }
 
 // Gets the number of components in the given cgltf vector type, or -1 for matrices.
-static int getNumComponents(cgltf_type ctype) {
+UTILS_UNUSED_IN_RELEASE static int getNumComponents(cgltf_type ctype) {
     return ((int) ctype) <= 4 ? ((int) ctype) : -1;
 }
 
@@ -222,4 +227,4 @@ bool DracoMesh::getVertexAttributes(uint32_t attributeId, cgltf_accessor* target
 
 #endif
 
-} // namespace gltfio
+} // namespace filament::gltfio

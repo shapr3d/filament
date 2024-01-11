@@ -22,6 +22,8 @@
 
 #include "private/backend/HandleAllocator.h"
 
+#include <backend/SamplerDescriptor.h>
+
 #include <utils/compiler.h>
 #include <utils/Log.h>
 #include <utils/debug.h>
@@ -32,23 +34,24 @@ namespace backend {
 class MetalPlatform;
 
 class MetalBuffer;
+class MetalProgram;
+class MetalSamplerGroup;
+class MetalTexture;
 struct MetalUniformBuffer;
 struct MetalContext;
-struct MetalProgram;
-struct MetalTexture;
-struct UniformBufferState;
+struct BufferState;
 
 #ifndef FILAMENT_METAL_HANDLE_ARENA_SIZE_IN_MB
 #define FILAMENT_METAL_HANDLE_ARENA_SIZE_IN_MB 8
 #endif
 
 class MetalDriver final : public DriverBase {
-    explicit MetalDriver(MetalPlatform* platform) noexcept;
+    explicit MetalDriver(MetalPlatform* platform, const Platform::DriverConfig& driverConfig) noexcept;
     ~MetalDriver() noexcept override;
     Dispatcher getDispatcher() const noexcept final;
 
 public:
-    static Driver* create(MetalPlatform* platform);
+    static Driver* create(MetalPlatform* platform, const Platform::DriverConfig& driverConfig);
 
 private:
 
@@ -119,10 +122,15 @@ private:
         mHandleAllocator.deallocate(handle, p);
     }
 
-    void enumerateSamplerGroups(const MetalProgram* program, ShaderType shaderType,
-            const std::function<void(const SamplerGroup::Sampler*, size_t)>& f);
-    void enumerateBoundUniformBuffers(const std::function<void(const UniformBufferState&,
-            MetalBuffer*, uint32_t)>& f);
+    inline void setRenderPrimitiveBuffer(Handle<HwRenderPrimitive> rph,
+            Handle<HwVertexBuffer> vbh, Handle<HwIndexBuffer> ibh);
+
+    inline void setRenderPrimitiveRange(Handle<HwRenderPrimitive> rph, PrimitiveType pt,
+            uint32_t offset, uint32_t minIndex, uint32_t maxIndex, uint32_t count);
+
+    void finalizeSamplerGroup(MetalSamplerGroup* sg);
+    void enumerateBoundBuffers(BufferObjectBinding bindingType,
+            const std::function<void(const BufferState&, MetalBuffer*, uint32_t)>& f);
 
 };
 

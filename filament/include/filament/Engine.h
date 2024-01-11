@@ -17,6 +17,8 @@
 #ifndef TNT_FILAMENT_ENGINE_H
 #define TNT_FILAMENT_ENGINE_H
 
+#include <filament/FilamentAPI.h>
+
 #include <backend/Platform.h>
 
 #include <utils/compiler.h>
@@ -49,10 +51,27 @@ class SwapChain;
 class Texture;
 class VertexBuffer;
 class View;
+class InstanceBuffer;
 
 class LightManager;
 class RenderableManager;
 class TransformManager;
+
+#ifndef FILAMENT_PER_RENDER_PASS_ARENA_SIZE_IN_MB
+#    define FILAMENT_PER_RENDER_PASS_ARENA_SIZE_IN_MB 3
+#endif
+
+#ifndef FILAMENT_PER_FRAME_COMMANDS_SIZE_IN_MB
+#    define FILAMENT_PER_FRAME_COMMANDS_SIZE_IN_MB 2
+#endif
+
+#ifndef FILAMENT_MIN_COMMAND_BUFFERS_SIZE_IN_MB
+#    define FILAMENT_MIN_COMMAND_BUFFERS_SIZE_IN_MB 1
+#endif
+
+#ifndef FILAMENT_COMMAND_BUFFER_SIZE_IN_MB
+#    define FILAMENT_COMMAND_BUFFER_SIZE_IN_MB (FILAMENT_MIN_COMMAND_BUFFERS_SIZE_IN_MB * 3)
+#endif
 
 /**
  * Engine is filament's main entry-point.
@@ -148,93 +167,265 @@ class TransformManager;
  * @see Renderer
  */
 class UTILS_PUBLIC Engine {
+    struct BuilderDetails;
 public:
     using Platform = backend::Platform;
     using Backend = backend::Backend;
+    using DriverConfig = backend::Platform::DriverConfig;
+    using FeatureLevel = backend::FeatureLevel;
 
     /**
-     * Creates an instance of Engine
+     * Config is used to define the memory footprint used by the engine, such as the
+     * command buffer size. Config can be used to customize engine requirements based
+     * on the applications needs.
      *
-     * @param backend           Which driver backend to use.
-     *
-     * @param platform          A pointer to an object that implements Platform. If this is
-     *                          provided, then this object is used to create the hardware context
-     *                          and expose platform features to it.
-     *
-     *                          If not provided (or nullptr is used), an appropriate Platform
-     *                          is created automatically.
-     *
-     *                          All methods of this interface are called from filament's
-     *                          render thread, which is different from the main thread.
-     *
-     *                          The lifetime of \p platform must exceed the lifetime of
-     *                          the Engine object.
-     *
-     *  @param sharedGLContext  A platform-dependant OpenGL context used as a shared context
-     *                          when creating filament's internal context.
-     *                          Setting this parameter will force filament to use the OpenGL
-     *                          implementation (instead of Vulkan for instance).
+     *    .perRenderPassArenaSizeMB (default: 3 MiB)
+     *   +--------------------------+
+     *   |                          |
+     *   | .perFrameCommandsSizeMB  |
+     *   |    (default 2 MiB)       |
+     *   |                          |
+     *   +--------------------------+
+     *   |  (froxel, etc...)        |
+     *   +--------------------------+
      *
      *
-     * @return A pointer to the newly created Engine, or nullptr if the Engine couldn't be created.
+     *      .commandBufferSizeMB (default 3MiB)
+     *   +--------------------------+
+     *   | .minCommandBufferSizeMB  |
+     *   +--------------------------+
+     *   | .minCommandBufferSizeMB  |
+     *   +--------------------------+
+     *   | .minCommandBufferSizeMB  |
+     *   +--------------------------+
+     *   :                          :
+     *   :                          :
      *
-     * nullptr if the GPU driver couldn't be initialized, for instance if it doesn't
-     * support the right version of OpenGL or OpenGL ES.
-     *
-     * @exception utils::PostConditionPanic can be thrown if there isn't enough memory to
-     * allocate the command buffer. If exceptions are disabled, this condition if fatal and
-     * this function will abort.
-     *
-     * \remark
-     * This method is thread-safe.
      */
-    static Engine* create(Backend backend = Backend::DEFAULT,
-            Platform* platform = nullptr, void* sharedGLContext = nullptr);
+    struct Config {
+        /**
+         * Size in MiB of the low-level command buffer arena.
+         *
+         * Each new command buffer is allocated from here. If this buffer is too small the program
+         * might terminate or rendering errors might occur.
+         *
+         * This is typically set to minCommandBufferSizeMB * 3, so that up to 3 frames can be
+         * batched-up at once.
+         *
+         * This value affects the application's memory usage.
+         */
+        uint32_t commandBufferSizeMB = FILAMENT_COMMAND_BUFFER_SIZE_IN_MB;
+
+
+        /**
+         * Size in MiB of the per-frame data arena.
+         *
+         * This is the main arena used for allocations when preparing a frame.
+         * e.g.: Froxel data and high-level commands are allocated from this arena.
+         *
+         * If this size is too small, the program will abort on debug builds and have undefined
+         * behavior otherwise.
+         *
+         * This value affects the application's memory usage.
+         */
+        uint32_t perRenderPassArenaSizeMB = FILAMENT_PER_RENDER_PASS_ARENA_SIZE_IN_MB;
+
+
+        /**
+         * Size in MiB of the backend's handle arena.
+         *
+         * Backends will fallback to slower heap-based allocations when running out of space and
+         * log this condition.
+         *
+         * If 0, then the default value for the given platform is used
+         *
+         * This value affects the application's memory usage.
+         */
+        uint32_t driverHandleArenaSizeMB = 0;
+
+
+        /**
+         * Minimum size in MiB of a low-level command buffer.
+         *
+         * This is how much space is guaranteed to be available for low-level commands when a new
+         * buffer is allocated. If this is too small, the engine might have to stall to wait for
+         * more space to become available, this situation is logged.
+         *
+         * This value does not affect the application's memory usage.
+         */
+        uint32_t minCommandBufferSizeMB = FILAMENT_MIN_COMMAND_BUFFERS_SIZE_IN_MB;
+
+
+        /**
+         * Size in MiB of the per-frame high level command buffer.
+         *
+         * This buffer is related to the number of draw calls achievable within a frame, if it is
+         * too small, the program will abort on debug builds and have undefined behavior otherwise.
+         *
+         * It is allocated from the 'per-render-pass arena' above. Make sure that at least 1 MiB is
+         * left in the per-render-pass arena when deciding the size of this buffer.
+         *
+         * This value does not affect the application's memory usage.
+         */
+        uint32_t perFrameCommandsSizeMB = FILAMENT_PER_FRAME_COMMANDS_SIZE_IN_MB;
+
+        /**
+         * Number of threads to use in Engine's JobSystem.
+         *
+         * Engine uses a utils::JobSystem to carry out paralleization of Engine workloads. This
+         * value sets the number of threads allocated for JobSystem. Configuring this value can be
+         * helpful in CPU-constrained environments where too many threads can cause contention of
+         * CPU and reduce performance.
+         *
+         * The default value is 0, which implies that the Engine will use a heuristic to determine
+         * the number of threads to use.
+         */
+        uint32_t jobSystemThreadCount = 0;
+
+        /*
+         * Number of most-recently destroyed textures to track for use-after-free.
+         *
+         * This will cause the backend to throw an exception when a texture is freed but still bound
+         * to a SamplerGroup and used in a draw call. 0 disables completely.
+         *
+         * Currently only respected by the Metal backend.
+         */
+        size_t textureUseAfterFreePoolSize = 0;
+
+        /*
+         * The number of eyes to render when stereoscopic rendering is enabled. Supported values are
+         * between 1 and Engine::getMaxStereoscopicEyes() (inclusive).
+         *
+         * @see View::setStereoscopicOptions
+         * @see Engine::getMaxStereoscopicEyes
+         */
+        uint8_t stereoscopicEyeCount = 2;
+    };
+
+
+#if FILAMENT_THREADING_MODE == FILAMENT_THREADING_MODE_ASYNCHRONOUS_DRIVER
+    using CreateCallback = void(void* user, void* token);
+#endif
+
+    /**
+     * Engine::Builder is used to create a new filament Engine.
+     */
+    class Builder : public BuilderBase<BuilderDetails> {
+        friend struct BuilderDetails;
+        friend class FEngine;
+    public:
+        Builder() noexcept;
+        Builder(Builder const& rhs) noexcept;
+        Builder(Builder&& rhs) noexcept;
+        ~Builder() noexcept;
+        Builder& operator=(Builder const& rhs) noexcept;
+        Builder& operator=(Builder&& rhs) noexcept;
+
+        /**
+         * @param backend Which driver backend to use
+         * @return A reference to this Builder for chaining calls.
+         */
+        Builder& backend(Backend backend) noexcept;
+
+        /**
+         * @param platform A pointer to an object that implements Platform. If this is
+         *                 provided, then this object is used to create the hardware context
+         *                 and expose platform features to it.
+         *
+         *                 If not provided (or nullptr is used), an appropriate Platform
+         *                 is created automatically.
+         *
+         *                 All methods of this interface are called from filament's
+         *                 render thread, which is different from the main thread.
+         *
+         *                 The lifetime of \p platform must exceed the lifetime of
+         *                 the Engine object.
+         *
+         * @return A reference to this Builder for chaining calls.
+         */
+        Builder& platform(Platform* platform) noexcept;
+
+        /**
+         * @param config    A pointer to optional parameters to specify memory size
+         *                  configuration options.  If nullptr, then defaults used.
+         *
+         * @return A reference to this Builder for chaining calls.
+         */
+        Builder& config(const Config* config) noexcept;
+
+        /**
+         * @param sharedContext A platform-dependant context used as a shared context
+         *                      when creating filament's internal context.
+         *
+         * @return A reference to this Builder for chaining calls.
+         */
+        Builder& sharedContext(void* sharedContext) noexcept;
+
+        /**
+         * @param featureLevel The feature level at which initialize Filament.
+         * @return A reference to this Builder for chaining calls.
+         */
+        Builder& featureLevel(FeatureLevel featureLevel) noexcept;
+
+#if FILAMENT_THREADING_MODE == FILAMENT_THREADING_MODE_ASYNCHRONOUS_DRIVER
+        /**
+         * Creates the filament Engine asynchronously.
+         *
+         * @param callback  Callback called once the engine is initialized and it is safe to
+         *                  call Engine::getEngine().
+         */
+        void build(utils::Invocable<void(void* token)>&& callback) const;
+#endif
+
+        /**
+         * Creates an instance of Engine.
+         *
+         * @return  A pointer to the newly created Engine, or nullptr if the Engine couldn't be
+         *          created.
+         *          nullptr if the GPU driver couldn't be initialized, for instance if it doesn't
+         *          support the right version of OpenGL or OpenGL ES.
+         *
+         * @exception   utils::PostConditionPanic can be thrown if there isn't enough memory to
+         *              allocate the command buffer. If exceptions are disabled, this condition if
+         *              fatal and this function will abort.
+         */
+        Engine* build() const;
+    };
+
+    /**
+     * Backward compatibility helper to create an Engine.
+     * @see Builder
+     */
+    static inline Engine* create(Backend backend = Backend::DEFAULT,
+            Platform* platform = nullptr, void* sharedContext = nullptr,
+            const Config* config = nullptr) {
+        return Engine::Builder()
+                .backend(backend)
+                .platform(platform)
+                .sharedContext(sharedContext)
+                .config(config)
+                .build();
+    }
+
 
 #if FILAMENT_THREADING_MODE == FILAMENT_THREADING_MODE_ASYNCHRONOUS_DRIVER
     /**
-     * A callback used with Engine::createAsync() called once the engine is initialized and it is
-     * safe to call Engine::getEngine(token). This callback is invoked from an arbitrary worker
-     * thread. Engine::getEngine() CANNOT be called from that thread, instead it must be called
-     * from the same thread than Engine::createAsync() was called from.
-     *
-     * @param user   User provided parameter given in createAsync().
-     *
-     * @param token  An opaque token used to call Engine::getEngine().
+     * Backward compatibility helper to create an Engine asynchronously.
+     * @see Builder
      */
-    using CreateCallback = void(void* user, void* token);
-
-    /**
-     * Creates an instance of Engine asynchronously
-     *
-     * @param callback          Callback called once the engine is initialized and it is safe to
-     *                          call Engine::getEngine.
-     *
-     * @param user              A user provided pointer that is given back to callback unmodified.
-     *
-     * @param backend           Which driver backend to use.
-     *
-     * @param platform          A pointer to an object that implements Platform. If this is
-     *                          provided, then this object is used to create the hardware context
-     *                          and expose platform features to it.
-     *
-     *                          If not provided (or nullptr is used), an appropriate Platform
-     *                          is created automatically.
-     *
-     *                          All methods of this interface are called from filament's
-     *                          render thread, which is different from the main thread.
-     *
-     *                          The lifetime of \p platform must exceed the lifetime of
-     *                          the Engine object.
-     *
-     *  @param sharedGLContext  A platform-dependant OpenGL context used as a shared context
-     *                          when creating filament's internal context.
-     *                          Setting this parameter will force filament to use the OpenGL
-     *                          implementation (instead of Vulkan for instance).
-     */
-    static void createAsync(CreateCallback callback, void* user,
+    static inline void createAsync(CreateCallback callback, void* user,
             Backend backend = Backend::DEFAULT,
-            Platform* platform = nullptr, void* sharedGLContext = nullptr);
+            Platform* platform = nullptr, void* sharedContext = nullptr,
+            const Config* config = nullptr) {
+        Engine::Builder()
+                .backend(backend)
+                .platform(platform)
+                .sharedContext(sharedContext)
+                .config(config)
+                .build([callback, user](void* token) {
+                    callback(user, token);
+                });
+    }
 
     /**
      * Retrieve an Engine* from createAsync(). This must be called from the same thread than
@@ -250,6 +441,7 @@ public:
      */
     static Engine* getEngine(void* token);
 #endif
+
 
     /**
      * Destroy the Engine instance and all associated resources.
@@ -307,6 +499,94 @@ public:
     static void destroy(Engine* engine);
 
     /**
+     * Query the feature level supported by the selected backend.
+     *
+     * A specific feature level needs to be set before the corresponding features can be used.
+     *
+     * @return FeatureLevel supported the selected backend.
+     * @see setActiveFeatureLevel
+     */
+    FeatureLevel getSupportedFeatureLevel() const noexcept;
+
+    /**
+     * Activate all features of a given feature level. If an explicit feature level is not specified
+     * at Engine initialization time via Builder::featureLevel, the default feature level is
+     * FeatureLevel::FEATURE_LEVEL_0 on devices not compatible with GLES 3.0; otherwise, the default
+     * is FeatureLevel::FEATURE_LEVEL_1. The selected feature level must not be higher than the
+     * value returned by getActiveFeatureLevel() and it's not possible lower the active feature
+     * level. Additionally, it is not possible to modify the feature level at all if the Engine was
+     * initialized at FeatureLevel::FEATURE_LEVEL_0.
+     *
+     * @param featureLevel the feature level to activate. If featureLevel is lower than
+     *                     getActiveFeatureLevel(), the current (higher) feature level is kept. If
+     *                     featureLevel is higher than getSupportedFeatureLevel(), or if the engine
+     *                     was initialized at feature level 0, an exception is thrown, or the
+     *                     program is terminated if exceptions are disabled.
+     *
+     * @return the active feature level.
+     *
+     * @see Builder::featureLevel
+     * @see getSupportedFeatureLevel
+     * @see getActiveFeatureLevel
+     */
+    FeatureLevel setActiveFeatureLevel(FeatureLevel featureLevel);
+
+    /**
+     * Returns the currently active feature level.
+     * @return currently active feature level
+     * @see getSupportedFeatureLevel
+     * @see setActiveFeatureLevel
+     */
+    FeatureLevel getActiveFeatureLevel() const noexcept;
+
+    /**
+     * Queries the maximum number of GPU instances that Filament creates when automatic instancing
+     * is enabled. This value is also the limit for the number of transforms that can be stored in
+     * an InstanceBuffer. This value may depend on the device and platform, but will remain constant
+     * during the lifetime of this Engine.
+     *
+     * This value does not apply when using the instances(size_t) method on
+     * RenderableManager::Builder.
+     *
+     * @return the number of max automatic instances
+     * @see setAutomaticInstancingEnabled
+     * @see RenderableManager::Builder::instances(size_t)
+     * @see RenderableManager::Builder::instances(size_t, InstanceBuffer*)
+     */
+    size_t getMaxAutomaticInstances() const noexcept;
+
+    /**
+     * Queries the device and platform for instanced stereo rendering support.
+     *
+     * @return true if stereo rendering is supported, false otherwise
+     * @see View::setStereoscopicOptions
+     */
+    bool isStereoSupported() const noexcept;
+
+    /**
+     * Retrieves the configuration settings of this Engine.
+     *
+     * This method returns the configuration object that was supplied to the Engine's
+     * Builder::config method during the creation of this Engine. If the Builder::config method was
+     * not explicitly called (or called with nullptr), this method returns the default configuration
+     * settings.
+     *
+     * @return a Config object with this Engine's configuration
+     * @see Builder::config
+     */
+    const Config& getConfig() const noexcept;
+
+    /**
+     * Returns the maximum number of stereoscopic eyes supported by Filament. The actual number of
+     * eyes rendered is set at Engine creation time with the Engine::Config::stereoscopicEyeCount
+     * setting.
+     *
+     * @return the max number of stereoscopic eyes supported
+     * @see Engine::Config::stereoscopicEyeCount
+     */
+    static size_t getMaxStereoscopicEyes() noexcept;
+
+    /**
      * @return EntityManager used by filament
      */
     utils::EntityManager& getEntityManager() noexcept;
@@ -334,6 +614,28 @@ public:
      * This is typically called once just after creating the Engine.
      */
     void enableAccurateTranslations() noexcept;
+
+    /**
+     * Enables or disables automatic instancing of render primitives. Instancing of render
+     * primitives can greatly reduce CPU overhead but requires the instanced primitives to be
+     * identical (i.e. use the same geometry) and use the same MaterialInstance. If it is known
+     * that the scene doesn't contain any identical primitives, automatic instancing can have some
+     * overhead and it is then best to disable it.
+     *
+     * Disabled by default.
+     *
+     * @param enable true to enable, false to disable automatic instancing.
+     *
+     * @see RenderableManager
+     * @see MaterialInstance
+     */
+    void setAutomaticInstancingEnabled(bool enable) noexcept;
+
+    /**
+     * @return true if automatic instancing is enabled, false otherwise.
+     * @see setAutomaticInstancingEnabled
+     */
+    bool isAutomaticInstancingEnabled() const noexcept;
 
     /**
      * Creates a SwapChain from the given Operating System's native window handle.
@@ -444,7 +746,27 @@ public:
     bool destroy(const Texture* p);             //!< Destroys a Texture object.
     bool destroy(const RenderTarget* p);        //!< Destroys a RenderTarget object.
     bool destroy(const View* p);                //!< Destroys a View object.
+    bool destroy(const InstanceBuffer* p);      //!< Destroys an InstanceBuffer object.
     void destroy(utils::Entity e);              //!< Destroys all filament-known components from this entity
+
+    bool isValid(const BufferObject* p);        //!< Tells whether a BufferObject object is valid
+    bool isValid(const VertexBuffer* p);        //!< Tells whether an VertexBuffer object is valid
+    bool isValid(const Fence* p);               //!< Tells whether a Fence object is valid
+    bool isValid(const IndexBuffer* p);         //!< Tells whether an IndexBuffer object is valid
+    bool isValid(const SkinningBuffer* p);      //!< Tells whether a SkinningBuffer object is valid
+    bool isValid(const MorphTargetBuffer* p);   //!< Tells whether a MorphTargetBuffer object is valid
+    bool isValid(const IndirectLight* p);       //!< Tells whether an IndirectLight object is valid
+    bool isValid(const Material* p);            //!< Tells whether an IndirectLight object is valid
+    bool isValid(const Renderer* p);            //!< Tells whether a Renderer object is valid
+    bool isValid(const Scene* p);               //!< Tells whether a Scene object is valid
+    bool isValid(const Skybox* p);              //!< Tells whether a SkyBox object is valid
+    bool isValid(const ColorGrading* p);        //!< Tells whether a ColorGrading object is valid
+    bool isValid(const SwapChain* p);           //!< Tells whether a SwapChain object is valid
+    bool isValid(const Stream* p);              //!< Tells whether a Stream object is valid
+    bool isValid(const Texture* p);             //!< Tells whether a Texture object is valid
+    bool isValid(const RenderTarget* p);        //!< Tells whether a RenderTarget object is valid
+    bool isValid(const View* p);                //!< Tells whether a View object is valid
+    bool isValid(const InstanceBuffer* p);      //!< Tells whether an InstanceBuffer object is valid
 
     /**
      * Kicks the hardware thread (e.g. the OpenGL, Vulkan or Metal thread) and blocks until
@@ -545,6 +867,22 @@ public:
       * @return JobSystem used by filament
       */
     utils::JobSystem& getJobSystem() noexcept;
+
+#if defined(__EMSCRIPTEN__)
+    /**
+      * WebGL only: Tells the driver to reset any internal state tracking if necessary.
+      *
+      * This is only useful when integrating an external renderer into Filament on platforms
+      * like WebGL, where share contexts do not exist. Filament keeps track of the GL
+      * state it has set (like which texture is bound), and does not re-set that state if
+      * it does not think it needs to. However, if an external renderer has set different
+      * state in the mean time, Filament will use that new state unknowingly.
+      *
+      * If you are in this situation, call this function - ideally only once per frame,
+      * immediately after calling Engine::execute().
+      */
+    void resetBackendState() noexcept;
+#endif
 
     DebugRegistry& getDebugRegistry() noexcept;
 

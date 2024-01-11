@@ -42,7 +42,8 @@ set(DIST_HDRS
         ${PUBLIC_HDR_DIR}/${TARGET}/unwindows.h
 )
 
-set(DIST_LINUX_HDRS
+# Use our custom mutex/condition only on ANDROID
+set(DIST_ANDROID_HDRS
         ${PUBLIC_HDR_DIR}/${TARGET_LINUX}/Mutex.h
 )
 
@@ -52,6 +53,7 @@ set(DIST_GENERIC_HDRS
 
 set(SRCS
         src/api_level.cpp
+        src/architecture.cpp
         src/ashmem.cpp
         src/debug.cpp
         src/Allocator.cpp
@@ -70,7 +72,6 @@ set(SRCS
         src/Profiler.cpp
         src/sstream.cpp
         src/string.cpp
-        src/Systrace.cpp
         src/ThreadUtils.cpp
 )
 
@@ -79,6 +80,7 @@ if (WIN32)
 endif()
 if (ANDROID)
     list(APPEND SRCS src/android/ThermalManager.cpp)
+    list(APPEND SRCS src/android/Systrace.cpp)
 endif()
 if (LINUX OR ANDROID)
     list(APPEND SRCS src/linux/Condition.cpp)
@@ -87,6 +89,10 @@ if (LINUX OR ANDROID)
 endif()
 if (APPLE)
     list(APPEND SRCS src/darwin/Path.mm)
+    list(APPEND SRCS src/darwin/Systrace.cpp)
+endif()
+if (WEBGL)
+    list(APPEND SRCS src/web/Path.cpp)
 endif()
 
 # ==================================================================================================
@@ -96,6 +102,7 @@ include_directories(${PUBLIC_HDR_DIR})
 
 add_library(${TARGET} STATIC ${PUBLIC_HDRS} ${SRCS})
 target_include_directories(${TARGET} PUBLIC ${PUBLIC_HDR_DIR})
+set_target_properties(${TARGET} PROPERTIES FOLDER Libs)
 target_link_libraries(${TARGET} PUBLIC tsl)
 
 if (ANDROID)
@@ -122,8 +129,8 @@ endif()
 set(INSTALL_TYPE ARCHIVE)
 install(TARGETS ${TARGET} ${INSTALL_TYPE} DESTINATION lib/${DIST_DIR})
 install(FILES ${DIST_HDRS} DESTINATION include/${TARGET})
-if (LINUX OR ANDROID)
-    install(FILES ${DIST_LINUX_HDRS} DESTINATION include/${TARGET_LINUX})
+if (ANDROID)
+    install(FILES ${DIST_ANDROID_HDRS} DESTINATION include/${TARGET_LINUX})
 else()
     install(FILES ${DIST_GENERIC_HDRS} DESTINATION include/${TARGET_GENERIC})
 endif()
@@ -141,7 +148,10 @@ set(TEST_SRCS
         test/test_CyclicBarrier.cpp
         test/test_Entity.cpp
         test/test_FixedCapacityVector.cpp
+        test/test_FixedCircularBuffer.cpp
+        test/test_Hash.cpp
         test/test_JobSystem.cpp
+        test/test_QuadTreeArray.cpp
         test/test_RangeMap.cpp
         test/test_StructureOfArrays.cpp
         test/test_sstream.cpp
@@ -150,6 +160,10 @@ set(TEST_SRCS
         test/test_Zip2Iterator.cpp
         test/test_BinaryTreeArray.cpp
 )
+
+if (WEBGL_PTHREADS)
+    target_compile_definitions(${TARGET} PUBLIC -DFILAMENT_WASM_THREADS)
+endif()
 
 # The Path tests are platform-specific
 if (NOT WEBGL)
@@ -163,6 +177,7 @@ endif()
 add_executable(test_${TARGET} ${TEST_SRCS})
 
 target_link_libraries(test_${TARGET} PRIVATE gtest utils tsl math)
+set_target_properties(test_${TARGET} PROPERTIES FOLDER Tests)
 
 # ==================================================================================================
 # Benchmarks
@@ -171,6 +186,7 @@ target_link_libraries(test_${TARGET} PRIVATE gtest utils tsl math)
 if (NOT WEBGL)
 
     add_library(benchmark_${TARGET}_callee SHARED benchmark/benchmark_callee.cpp)
+    set_target_properties(benchmark_${TARGET}_callee PROPERTIES FOLDER Benchmarks)
 
     set(BENCHMARK_SRCS
             benchmark/benchmark_allocators.cpp
@@ -184,5 +200,7 @@ if (NOT WEBGL)
     add_executable(benchmark_${TARGET} ${BENCHMARK_SRCS})
 
     target_link_libraries(benchmark_${TARGET} PRIVATE benchmark_main utils benchmark_${TARGET}_callee)
+
+    set_target_properties(benchmark_${TARGET} PROPERTIES FOLDER Benchmarks)
 
 endif()

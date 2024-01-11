@@ -18,11 +18,7 @@
 
 #include <filamentapp/FilamentApp.h>
 
-#if !defined(WIN32)
-#if defined(FILAMENT_SUPPORTS_WAYLAND)
-#    include <SDL_syswm.h>
-#endif
-#else
+#if defined(WIN32)
 #    include <SDL_syswm.h>
 #    include <utils/unwindows.h>
 #endif
@@ -42,10 +38,15 @@
 #include <filament/RenderableManager.h>
 #include <filament/Scene.h>
 #include <filament/Skybox.h>
+#include <filament/SwapChain.h>
 #include <filament/View.h>
 
 #ifndef NDEBUG
 #include <filament/DebugRegistry.h>
+#endif
+
+#if defined(FILAMENT_DRIVER_SUPPORTS_VULKAN)
+#include <backend/platforms/VulkanPlatform.h>
 #endif
 
 #include <filagui/ImGuiHelper.h>
@@ -61,6 +62,42 @@ using namespace filament;
 using namespace filagui;
 using namespace filament::math;
 using namespace utils;
+
+namespace {
+
+using namespace filament::backend;
+
+#if defined(FILAMENT_DRIVER_SUPPORTS_VULKAN)
+class FilamentAppVulkanPlatform : public VulkanPlatform {
+public:
+    FilamentAppVulkanPlatform(char const* gpuHintCstr) {
+        utils::CString gpuHint{ gpuHintCstr };
+        if (gpuHint.empty()) {
+            return;
+        }
+        VulkanPlatform::Customization::GPUPreference pref;
+        // Check to see if it is an integer, if so turn it into an index.
+        if (std::all_of(gpuHint.begin(), gpuHint.end(), ::isdigit)) {
+            char* p_end {};
+            pref.index = static_cast<int8_t>(std::strtol(gpuHint.c_str(), &p_end, 10));
+        } else {
+            pref.deviceName = gpuHint;
+        }
+        mCustomization = {
+            .gpu = pref
+        };
+    }
+
+    virtual VulkanPlatform::Customization getCustomization() const noexcept override {
+        return mCustomization;
+    }
+
+private:
+    VulkanPlatform::Customization mCustomization;
+};
+#endif
+
+} // anonymous namespace
 
 FilamentApp& FilamentApp::get() {
     static FilamentApp filamentApp;
@@ -207,6 +244,8 @@ void FilamentApp::run(const Config& config, SetupCallback setupCallback,
 
     int sidebarWidth = mSidebarWidth;
     float cameraFocalLength = mCameraFocalLength;
+    float cameraNear = mCameraNear;
+    float cameraFar = mCameraFar;
 
     SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
     SDL_Window* sdlWindow = window->getSDLWindow();
@@ -216,10 +255,15 @@ void FilamentApp::run(const Config& config, SetupCallback setupCallback,
             SDL_SetWindowTitle(sdlWindow, mWindowTitle.c_str());
         }
 
-        if (mSidebarWidth != sidebarWidth || mCameraFocalLength != cameraFocalLength) {
+        if (mSidebarWidth != sidebarWidth ||
+            mCameraFocalLength != cameraFocalLength ||
+            mCameraNear != cameraNear ||
+            mCameraFar != cameraFar) {
             window->configureCamerasForWindow();
             sidebarWidth = mSidebarWidth;
             cameraFocalLength = mCameraFocalLength;
+            cameraNear = mCameraNear;
+            cameraFar = mCameraFar;
         }
 
         if (FILAMENT_THREADING_MODE != FILAMENT_THREADING_MODE_ASYNCHRONOUS_DRIVER) {
@@ -409,17 +453,23 @@ void FilamentApp::run(const Config& config, SetupCallback setupCallback,
         lightmapCube->mapFrustum(*mEngine, lightmapCamera);
         cameraCube->mapFrustum(*mEngine, window->mMainCamera);
 
-        // TODO: we need better timing or use SDL_GL_SetSwapInterval
-        SDL_Delay(16);
+        // Delay rendering for roughly one monitor refresh interval
+        // TODO: Use SDL_GL_SetSwapInterval for proper vsync
+        SDL_DisplayMode Mode;
+        int refreshIntervalMS = (SDL_GetDesktopDisplayMode(
+            SDL_GetWindowDisplayIndex(window->mWindow), &Mode) == 0 &&
+            Mode.refresh_rate != 0) ? round(1000.0 / Mode.refresh_rate) : 16;
+        SDL_Delay(refreshIntervalMS);
 
         Renderer* renderer = window->getRenderer();
 
         if (preRender) {
-            for (auto const& view : window->mViews) {
-                if (view.get() != window->mUiView) {
-                    preRender(mEngine, view->getView(), mScene, renderer);
-                }
-            }
+            preRender(mEngine, window->mViews[0]->getView(), mScene, renderer);
+        }
+
+        if (mReconfigureCameras) {
+            window->configureCamerasForWindow();
+            mReconfigureCameras = false;
         }
 
         if (renderer->beginFrame(window->getSwapChain())) {
@@ -430,11 +480,7 @@ void FilamentApp::run(const Config& config, SetupCallback setupCallback,
                 renderer->render(view->getView());
             }
             if (postRender) {
-                for (auto const& view : window->mViews) {
-                    if (view.get() != window->mUiView) {
-                        postRender(mEngine, view->getView(), mScene, renderer);
-                    }
-                }
+                postRender(mEngine, window->mViews[0]->getView(), mScene, renderer);
             }
             renderer->endFrame();
 
@@ -462,6 +508,12 @@ void FilamentApp::run(const Config& config, SetupCallback setupCallback,
     mEngine->destroy(mScene);
     Engine::destroy(&mEngine);
     mEngine = nullptr;
+
+#if defined(FILAMENT_DRIVER_SUPPORTS_VULKAN)
+    if (mVulkanPlatform) {
+        delete mVulkanPlatform;
+    }
+#endif
 }
 
 FilamentApp::CameraMovementSpeedUpdateCallback FilamentApp::getCameraMovementSpeedUpdateCallback() {
@@ -577,7 +629,7 @@ void FilamentApp::initSDL() {
 
 FilamentApp::Window::Window(FilamentApp* filamentApp,
         const Config& config, std::string title, size_t w, size_t h)
-        : mFilamentApp(filamentApp), mIsHeadless(config.headless) {
+        : mFilamentApp(filamentApp), mConfig(config), mIsHeadless(config.headless) {
     const int x = SDL_WINDOWPOS_CENTERED;
     const int y = SDL_WINDOWPOS_CENTERED;
     uint32_t windowFlags = SDL_WINDOW_SHOWN | SDL_WINDOW_ALLOW_HIGHDPI;
@@ -593,40 +645,54 @@ FilamentApp::Window::Window(FilamentApp* filamentApp,
     // events.
     mWindow = SDL_CreateWindow(title.c_str(), x, y, (int) w, (int) h, windowFlags);
 
+    auto const createEngine = [&config, this]() {
+        auto backend = config.backend;
+
+        // This mirrors the logic for choosing a backend given compile-time flags and client having
+        // provided DEFAULT as the backend (see PlatformFactory.cpp)
+        #if !defined(__EMSCRIPTEN__) && !defined(__ANDROID__) && !defined(IOS) && \
+            !defined(__APPLE__) && defined(FILAMENT_DRIVER_SUPPORTS_VULKAN)
+            if (backend == Engine::Backend::DEFAULT) {
+                backend = Engine::Backend::VULKAN;
+            }
+        #endif
+
+        Engine::Config engineConfig = {};
+        engineConfig.stereoscopicEyeCount = config.stereoscopicEyeCount;
+
+        if (backend == Engine::Backend::VULKAN) {
+            #if defined(FILAMENT_DRIVER_SUPPORTS_VULKAN)
+                mFilamentApp->mVulkanPlatform =
+                        new FilamentAppVulkanPlatform(config.vulkanGPUHint.c_str());
+                return Engine::Builder()
+                        .backend(backend)
+                        .platform(mFilamentApp->mVulkanPlatform)
+                        .featureLevel(config.featureLevel)
+                        .config(&engineConfig)
+                        .build();
+            #endif
+        }
+        return Engine::Builder()
+                .backend(backend)
+                .featureLevel(config.featureLevel)
+                .config(&engineConfig)
+                .build();
+    };
+
     if (config.headless) {
-        mFilamentApp->mEngine = Engine::create(config.backend);
+        mFilamentApp->mEngine = createEngine();
         mSwapChain = mFilamentApp->mEngine->createSwapChain((uint32_t) w, (uint32_t) h);
         mWidth = w;
         mHeight = h;
     } else {
 
-#if defined(FILAMENT_SUPPORTS_WAYLAND)
-        struct {
-            struct wl_display *display;
-            struct wl_surface *surface;
-        } wayland{};
-
-        SDL_SysWMinfo wmi;
-        SDL_VERSION(&wmi.version);
-        ASSERT_POSTCONDITION(SDL_GetWindowWMInfo(mWindow, &wmi), "SDL version unsupported!");
-        if (wmi.subsystem == SDL_SYSWM_WAYLAND) {
-            wayland.display = wmi.info.wl.display;
-            wayland.surface = wmi.info.wl.surface;
-        }
-        void* nativeWindow = &wayland;
-
-        // Create the Engine after the window in case this happens to be a single-threaded platform.
-        // For single-threaded platforms, we need to ensure that Filament's OpenGL context is
-        // current, rather than the one created by SDL.
-        mFilamentApp->mEngine = Engine::create(config.backend, nullptr, nativeWindow);
-#else
         void* nativeWindow = ::getNativeWindow(mWindow);
 
         // Create the Engine after the window in case this happens to be a single-threaded platform.
         // For single-threaded platforms, we need to ensure that Filament's OpenGL context is
         // current, rather than the one created by SDL.
-        mFilamentApp->mEngine = Engine::create(config.backend);
-#endif
+        mFilamentApp->mEngine = createEngine();
+
         // get the resolved backend
         mBackend = config.backend = mFilamentApp->mEngine->getBackend();
 
@@ -651,7 +717,11 @@ FilamentApp::Window::Window(FilamentApp* filamentApp,
 
 #endif
 
-        mSwapChain = mFilamentApp->mEngine->createSwapChain(nativeSwapChain);
+        // Write back the active feature level.
+        config.featureLevel = mFilamentApp->mEngine->getActiveFeatureLevel();
+
+        mSwapChain = mFilamentApp->mEngine->createSwapChain(
+                nativeSwapChain, filament::SwapChain::CONFIG_HAS_STENCIL_BUFFER);
     }
     mRenderer = mFilamentApp->mEngine->createRenderer();
 
@@ -672,7 +742,7 @@ FilamentApp::Window::Window(FilamentApp* filamentApp,
     if (config.splitView) {
         mViews.emplace_back(mDepthView = new CView(*mRenderer, "Depth View"));
         mViews.emplace_back(mGodView = new GodView(*mRenderer, "God View"));
-        mViews.emplace_back(mOrthoView = new CView(*mRenderer, "Ortho View"));
+        mViews.emplace_back(mOrthoView = new CView(*mRenderer, "Shadow View"));
     }
     mViews.emplace_back(mUiView = new CView(*mRenderer, "UI View"));
 
@@ -683,23 +753,23 @@ FilamentApp::Window::Window(FilamentApp* filamentApp,
             .build(config.cameraMode);
     mDebugCameraMan = CameraManipulator::Builder()
             .targetPosition(0, 0, -4)
-            .build(camutils::Mode::ORBIT);
+            .flightMoveDamping(15.0)
+            .build(config.cameraMode);
 
     mMainView->setCamera(mMainCamera);
     mMainView->setCameraManipulator(mMainCameraMan);
     if (config.splitView) {
         // Depth view always uses the main camera
         mDepthView->setCamera(mMainCamera);
+        mDepthView->setCameraManipulator(mMainCameraMan);
 
         // The god view uses the main camera for culling, but the debug camera for viewing
         mGodView->setCamera(mMainCamera);
         mGodView->setGodCamera(mDebugCamera);
+        mGodView->setCameraManipulator(mDebugCameraMan);
 
         // Ortho view obviously uses an ortho camera
         mOrthoView->setCamera( (Camera *)mMainView->getView()->getDirectionalLightCamera() );
-
-        mDepthView->setCameraManipulator(mMainCameraMan);
-        mGodView->setCameraManipulator(mDebugCameraMan);
     }
 
     // configure the cameras
@@ -869,12 +939,27 @@ void FilamentApp::Window::configureCamerasForWindow() {
     // the sidebar. To prevent this we simply clamp the width of the main viewport.
     const uint32_t mainWidth = splitview ? width : std::max(1, (int) width - sidebar);
 
-    double near = 0.0078125;
-    double far = 100;
-    mMainCamera->setLensProjection(mFilamentApp->mCameraFocalLength, double(mainWidth) / height, near, far);
+    double near = mFilamentApp->mCameraNear;
+    double far = mFilamentApp->mCameraFar;
+    if (mMainView->getView()->getStereoscopicOptions().enabled) {
+        mat4 projections[4];
+        projections[0] = Camera::projection(mFilamentApp->mCameraFocalLength, 1.0, near, far);
+        projections[1] = projections[0];
+        // simulate foveated rendering
+        projections[2] = Camera::projection(mFilamentApp->mCameraFocalLength * 2.0, 1.0, near, far);
+        projections[3] = projections[2];
+        mMainCamera->setCustomEyeProjection(projections, 4, projections[0], near, far);
+    } else {
+        mMainCamera->setLensProjection(mFilamentApp->mCameraFocalLength, 1.0, near, far);
+    }
     mDebugCamera->setProjection(45.0, double(width) / height, 0.0078125, 4096, Camera::Fov::VERTICAL);
-    mOrthoCamera->setProjection(Camera::Projection::ORTHO, -3, 3, -3 * ratio, 3 * ratio, near, far);
-    mOrthoCamera->lookAt({ 0, 0, 0 }, {0, 0, -4});
+
+    auto aspectRatio = double(mainWidth) / height;
+    if (mMainView->getView()->getStereoscopicOptions().enabled) {
+        const int ec = mConfig.stereoscopicEyeCount;
+        aspectRatio = double(mainWidth) / ec / height;
+    }
+    mMainCamera->setScaling({1.0 / aspectRatio, 1.0});
 
     // We're in split view when there are more views than just the Main and UI views.
     if (splitview) {
@@ -902,7 +987,7 @@ FilamentApp::CView::~CView() {
     engine.destroy(view);
 }
 
-void FilamentApp::CView::setViewport(Viewport const& viewport) {
+void FilamentApp::CView::setViewport(filament::Viewport const& viewport) {
     mViewport = viewport;
     view->setViewport(viewport);
     if (mCameraManipulator) {

@@ -96,10 +96,10 @@ and in-progress work.
 
 *Note*: The validator checks some Universal Limits, from section 2.17 of the SPIR-V spec.
 The validator will fail on a module that exceeds those minimum upper bound limits.
-It is [future work](https://github.com/KhronosGroup/SPIRV-Tools/projects/1#card-1052403)
-to parameterize the validator to allow larger
-limits accepted by a more than minimally capable SPIR-V consumer.
+The validator has been parameterized to allow larger values, for use when targeting 
+a more-than-minimally-capable SPIR-V consumer.
 
+See [`tools/val/val.cpp`](tools/val/val.cpp) or run `spirv-val --help` for the command-line help.
 
 ### Optimizer
 
@@ -210,6 +210,24 @@ project](https://github.com/google/graphicsfuzz) for fuzzing of GLSL shaders.
 To suggest an additional capability for the fuzzer, [file an
 issue](https://github.com/KhronosGroup/SPIRV-Tools/issues]) with
 "Fuzzer:" as the start of its title.
+
+
+### Diff
+
+*Note:* The diff tool is still under development.
+
+The diff tool takes two SPIR-V files, either in binary or text format and
+produces a diff-style comparison between the two.  The instructions between the
+src and dst modules are matched as best as the tool can, and output is produced
+(in src id-space) that shows which instructions are removed in src, added in dst
+or modified between them.  The order of instructions are not retained.
+
+Matching instructions between two SPIR-V modules is not trivial, and thus a
+number of heuristics are applied in this tool.  In particular, without debug
+information, match functions is nontrivial as they can be reordered.  As such,
+this tool is primarily useful to produce the diff of two SPIR-V modules derived
+from the same source, for example before and after a modification to the shader,
+before and after a transformation, or SPIR-V produced from different tools.
 
 
 ### Extras
@@ -399,7 +417,7 @@ targets, you need to install CMake Version 2.8.12 or later.
 - [Python 3](http://www.python.org/): for utility scripts and running the test
 suite.
 - [Bazel](https://bazel.build/) (optional): if building the source with Bazel,
-you need to install Bazel Version 0.29.1 on your machine. Other versions may
+you need to install Bazel Version 5.0.0 on your machine. Other versions may
 also work, but are not verified.
 - [Emscripten SDK](https://emscripten.org) (optional): if building the
   WebAssembly module.
@@ -623,6 +641,15 @@ This is experimental.
 
 * `spirv-cfg` - the control flow graph dumper
   * `<spirv-dir>/tools/cfg`
+
+### Diff tool
+
+*Warning:* This functionality is under development, and is incomplete.
+
+The diff tool produces a diff-style comparison between two SPIR-V modules.
+
+* `spirv-diff` - the standalone diff tool
+  * `<spirv-dir>`/tools/diff`
 
 ### Utility filters
 

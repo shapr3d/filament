@@ -235,6 +235,10 @@ public:
      * Changes the coarse-level draw ordering.
      */
     void setPriority(uint8_t priority) noexcept;
+
+protected:
+    // prevent heap allocation
+    ~Skybox() = default;
 };
 
 } // namespace filament

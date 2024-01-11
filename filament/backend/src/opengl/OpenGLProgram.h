@@ -18,34 +18,35 @@
 #define TNT_FILAMENT_BACKEND_OPENGL_OPENGLPROGRAM_H
 
 #include "DriverBase.h"
-#include "OpenGLDriver.h"
 
-#include "private/backend/Driver.h"
-#include "private/backend/Program.h"
+#include "OpenGLContext.h"
+#include "ShaderCompilerService.h"
+
+#include <private/backend/Driver.h>
+#include <backend/Program.h>
 
 #include <utils/compiler.h>
-#include <utils/Log.h>
-
-#include <vector>
+#include <utils/FixedCapacityVector.h>
 
 #include <stddef.h>
 #include <stdint.h>
 
-
 namespace filament::backend {
+
+class OpenGLDriver;
 
 class OpenGLProgram : public HwProgram {
 public:
 
     OpenGLProgram() noexcept;
-    OpenGLProgram(OpenGLDriver& gld, Program&& builder) noexcept;
+    OpenGLProgram(OpenGLDriver& gld, Program&& program) noexcept;
     ~OpenGLProgram() noexcept;
 
-    bool isValid() const noexcept { return mValid; }
+    bool isValid() const noexcept { return mToken || gl.program != 0; }
 
     void use(OpenGLDriver* const gld, OpenGLContext& context) noexcept {
-        if (UTILS_UNLIKELY(!mInitialized)) {
-            initialize(context);
+        if (UTILS_UNLIKELY(!gl.program)) {
+            initialize(*gld);
         }
 
         context.useProgram(gl.program);
@@ -58,7 +59,7 @@ public:
             // - the content of any bound sampler buffer has changed
             // ... since last time we used this program
 
-            // turns out the former might be relatively cheap to check, the later requires
+            // Turns out the former might be relatively cheap to check, the latter requires
             // a bit less. Compared to what updateSamplers() actually does, which is
             // pretty little, I'm not sure if we'll get ahead.
 
@@ -67,57 +68,41 @@ public:
     }
 
     struct {
-        GLuint shaders[Program::SHADER_TYPE_COUNT] = {};
         GLuint program = 0;
     } gl; // 12 bytes
 
+    // For ES2 only
+    void updateUniforms(uint32_t index, GLuint id, void const* buffer, uint16_t age) noexcept;
+    void setRec709ColorSpace(bool rec709) const noexcept;
+
 private:
-    static constexpr uint8_t TEXTURE_UNIT_COUNT = OpenGLContext::MAX_TEXTURE_UNIT_COUNT;
-    static constexpr uint8_t VERTEX_SHADER_BIT   = uint8_t(1) << size_t(Program::Shader::VERTEX);
-    static constexpr uint8_t FRAGMENT_SHADER_BIT = uint8_t(1) << size_t(Program::Shader::FRAGMENT);
+    // keep these away from of other class attributes
+    struct LazyInitializationData;
 
-    static void compileShaders(OpenGLContext& context,
-            Program::ShaderSource shadersSource,
-            GLuint shaderIds[Program::SHADER_TYPE_COUNT],
-            std::array<utils::CString, Program::SHADER_TYPE_COUNT>& outShaderSourceCode) noexcept;
-
-    static GLuint linkProgram(const GLuint shaderIds[Program::SHADER_TYPE_COUNT]) noexcept;
-
-    static bool checkProgramStatus(const char* name,
-            GLuint& program, GLuint shaderIds[Program::SHADER_TYPE_COUNT],
-            std::array<utils::CString, 2> const& shaderSourceCode) noexcept;
-
-    void initialize(OpenGLContext& context);
+    void initialize(OpenGLDriver& gld);
 
     void initializeProgramState(OpenGLContext& context, GLuint program,
-            Program::UniformBlockInfo const& uniformBlockInfo,
-            Program::SamplerGroupInfo const& samplerGroupInfo) noexcept;
+            LazyInitializationData& lazyInitializationData) noexcept;
 
-    void updateSamplers(OpenGLDriver* gld) noexcept;
+    void updateSamplers(OpenGLDriver* gld) const noexcept;
 
-    // keep these away from of other class attributes
-    struct LazyInitializationData {
-        Program::UniformBlockInfo uniformBlockInfo;
-        Program::SamplerGroupInfo samplerGroupInfo;
-        std::array<utils::CString, Program::SHADER_TYPE_COUNT> shaderSourceCode;
-    };
+    ShaderCompilerService::program_token_t mToken{};
 
     // number of bindings actually used by this program
     uint8_t mUsedBindingsCount = 0u;
-    // whether lazy initialization has been performed
-    bool mInitialized : 1;
-    // whether lazy initialization was successful
-    bool mValid : 1;
-    UTILS_UNUSED uint8_t padding[2] = {};
+    UTILS_UNUSED uint8_t padding[3] = {};
+    std::array<uint8_t, Program::SAMPLER_BINDING_COUNT> mUsedSamplerBindingPoints;   // 4 bytes
 
-    union {
-        // when mInitialized == true:
-        // information about each USED sampler buffer per binding (no gaps)
-        std::array<uint8_t, Program::BINDING_COUNT> mUsedBindingPoints;   // 12 bytes
-        // when mInitialized == false:
-        // lazy initialization data pointer
-        LazyInitializationData* mLazyInitializationData;
+    // only needed for ES2
+    using LocationInfo = utils::FixedCapacityVector<GLint>;
+    struct UniformsRecord {
+        Program::UniformInfo uniforms;
+        LocationInfo locations;
+        mutable GLuint id = 0;
+        mutable uint16_t age = std::numeric_limits<uint16_t>::max();
     };
+    UniformsRecord const* mUniformsRecords = nullptr;
+    GLint mRec709Location = -1;
 };
 
 // if OpenGLProgram is larger tha 64 bytes, it'll fall in a larger Handle bucket.

@@ -21,7 +21,9 @@
 
 #include "FilamentAPI-impl.h"
 
-#include "ColorSpace.h"
+#include "ColorSpaceUtils.h"
+
+#include <filament/ColorSpace.h>
 
 #include <math/vec2.h>
 #include <math/vec3.h>
@@ -31,13 +33,15 @@
 #include <utils/SpinLock.h>
 #include <utils/Systrace.h>
 
-#include <math.h>
-#include <stdlib.h>
+#include <cmath>
+#include <cstdlib>
+#include <tuple>
 
 namespace filament {
 
 using namespace utils;
 using namespace math;
+using namespace color;
 using namespace backend;
 
 //------------------------------------------------------------------------------
@@ -89,6 +93,9 @@ struct ColorGrading::BuilderDetails {
     float3 midPoint         = {1.0f};
     float3 highlightScale   = {1.0f};
 
+    // Output color space
+    ColorSpace outputColorSpace = Rec709-sRGB-D65;
+
     bool operator!=(const BuilderDetails &rhs) const {
         return !(rhs == *this);
     }
@@ -117,7 +124,8 @@ struct ColorGrading::BuilderDetails {
                saturation == rhs.saturation &&
                shadowGamma == rhs.shadowGamma &&
                midPoint == rhs.midPoint &&
-               highlightScale == rhs.highlightScale;
+               highlightScale == rhs.highlightScale &&
+               outputColorSpace == rhs.outputColorSpace;
     }
 };
 
@@ -253,6 +261,12 @@ ColorGrading::Builder& ColorGrading::Builder::curves(
     return *this;
 }
 
+ColorGrading::Builder& ColorGrading::Builder::outputColorSpace(
+        const ColorSpace& colorSpace) noexcept {
+    mImpl->outputColorSpace = colorSpace;
+    return *this;
+}
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 ColorGrading* ColorGrading::Builder::build(Engine& engine) {
@@ -284,7 +298,7 @@ ColorGrading* ColorGrading::Builder::build(Engine& engine) {
         }
     }
 
-    FColorGrading* colorGrading = upcast(engine).createColorGrading(*this);
+    FColorGrading* colorGrading = downcast(engine).createColorGrading(*this);
 
     if (needToneMapper) {
         delete mImpl->toneMapper;
@@ -558,21 +572,15 @@ static float3 luminanceScaling(float3 x,
 // Quality
 //------------------------------------------------------------------------------
 
-static void selectLutTextureParams(ColorGrading::LutFormat lutFormat,
-        TextureFormat& internalFormat, PixelDataFormat& format, PixelDataType& type) noexcept {
+static std::tuple<TextureFormat, PixelDataFormat, PixelDataType>
+        selectLutTextureParams(ColorGrading::LutFormat lutFormat) noexcept {
     // We use RGBA16F for high quality modes instead of RGB16F because RGB16F
     // is not supported everywhere
     switch (lutFormat) {
         case ColorGrading::LutFormat::INTEGER:
-            internalFormat = TextureFormat::RGB10_A2;
-            format = PixelDataFormat::RGBA;
-            type = PixelDataType::UINT_2_10_10_10_REV;
-            break;
+            return { TextureFormat::RGB10_A2, PixelDataFormat::RGBA, PixelDataType::UINT_2_10_10_10_REV };
         case ColorGrading::LutFormat::FLOAT:
-            internalFormat = TextureFormat::RGBA16F;
-            format = PixelDataFormat::RGBA;
-            type = PixelDataType::HALF;
-            break;
+            return { TextureFormat::RGBA16F, PixelDataFormat::RGBA, PixelDataType::HALF };
     }
 }
 
@@ -605,16 +613,27 @@ static float3 selectColorGradingLuminance(ColorGrading::ToneMapping toneMapping)
 }
 #pragma clang diagnostic pop
 
+using ColorTransform = float3(*)(float3);
+
+static ColorTransform selectOETF(const ColorSpace& colorSpace) noexcept {
+    if (colorSpace.getTransferFunction() == Linear) {
+        return OETF_Linear;
+    }
+    return OETF_sRGB;
+}
+
 //------------------------------------------------------------------------------
 // Color grading implementation
 //------------------------------------------------------------------------------
 
 struct Config {
-    size_t lutDimension;
+    size_t lutDimension{};
     mat3f  adaptationTransform;
     mat3f  colorGradingIn;
     mat3f  colorGradingOut;
-    float3 colorGradingLuminance;
+    float3 colorGradingLuminance{};
+
+    ColorTransform oetf;
 };
 
 // Inside the FColorGrading constructor, TSAN sporadically detects a data race on the config struct;
@@ -637,6 +656,7 @@ FColorGrading::FColorGrading(FEngine& engine, const Builder& builder) {
         c.colorGradingIn        = selectColorGradingTransformIn(builder->toneMapping);
         c.colorGradingOut       = selectColorGradingTransformOut(builder->toneMapping);
         c.colorGradingLuminance = selectColorGradingLuminance(builder->toneMapping);
+        c.oetf                  = selectOETF(builder->outputColorSpace);
     }
 
     mDimension = c.lutDimension;
@@ -645,10 +665,8 @@ FColorGrading::FColorGrading(FEngine& engine, const Builder& builder) {
     size_t elementSize = sizeof(half4);
     void* data = malloc(lutElementCount * elementSize);
 
-    TextureFormat textureFormat;
-    PixelDataFormat format;
-    PixelDataType type;
-    selectLutTextureParams(builder->format, textureFormat, format, type);
+    auto [textureFormat, format, type] = selectLutTextureParams(builder->format);
+    assert_invariant(FTexture::isTextureFormatSupported(engine, textureFormat));
     assert_invariant(FTexture::validatePixelFormatAndType(textureFormat, format, type));
 
     void* converted = nullptr;
@@ -759,7 +777,7 @@ FColorGrading::FColorGrading(FEngine& engine, const Builder& builder) {
                     v = saturate(v);
 
                     // Apply OETF
-                    v = OETF_sRGB(v);
+                    v = c.oetf(v);
 
                     *p++ = half4{v, 0.0f};
                 }

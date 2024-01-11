@@ -53,7 +53,7 @@ BufferObject::Builder& BufferObject::Builder::import(intptr_t id) noexcept {
 }
 
 BufferObject* BufferObject::Builder::build(Engine& engine) {
-    return upcast(engine).createBufferObject(*this);
+    return downcast(engine).createBufferObject(*this);
 }
 
 // ------------------------------------------------------------------------------------------------

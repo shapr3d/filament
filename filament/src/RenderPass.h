@@ -22,7 +22,7 @@
 #include "details/Camera.h"
 #include "details/Scene.h"
 
-#include "private/backend/DriverApiForward.h"
+#include "backend/DriverApiForward.h"
 
 #include <private/filament/Variant.h>
 
@@ -49,50 +49,56 @@ public:
      *   Command key encoding
      *   --------------------
      *
+     *   CC    = Channel
+     *   PP    = Pass
      *   a     = alpha masking
      *   ppp   = priority
      *   t     = two-pass transparency ordering
      *   0     = reserved, must be zero
      *
-     *   DEPTH command
-     *   |   6  | 2| 2|1| 3 | 2|       16       |               32               |
-     *   +------+--+--+-+---+--+----------------+--------------------------------+
-     *   |000000|01|00|0|ppp|00|0000000000000000|          distanceBits          |
-     *   +------+--+--+-+---+-------------------+--------------------------------+
-     *   | correctness      |     optimizations (truncation allowed)             |
+     *
+     * TODO: we need to add a "primitive id" in the low-bits of material-id, so that
+     *       auto-instancing can work better
+     *
+     *   DEPTH command (b00)
+     *   |  |  | 2| 2| 2|1| 3 | 2|  6   |   10     |               32               |
+     *   +--+--+--+--+--+-+---+--+------+----------+--------------------------------+
+     *   |CC|00|00|01|00|0|ppp|00|000000| Z-bucket |          material-id           |
+     *   +--+--+--+--+--+-+---+--+------+----------+--------------------------------+
+     *   | correctness        |      optimizations (truncation allowed)             |
      *
      *
-     *   COLOR command
-     *   |   6  | 2| 2|1| 3 | 2|  6   |   10     |               32               |
-     *   +------+--+--+-+---+--+------+----------+--------------------------------+
-     *   |000001|01|00|a|ppp|00|000000| Z-bucket |          material-id           |
-     *   |000010|01|00|a|ppp|00|000000| Z-bucket |          material-id           | refraction
-     *   +------+--+--+-+---+--+------+----------+--------------------------------+
-     *   | correctness      |      optimizations (truncation allowed)             |
+     *   COLOR (b01) and REFRACT (b10) commands
+     *   |  | 2| 2| 2| 2|1| 3 | 2|  6   |   10     |               32               |
+     *   +--+--+--+--+--+-+---+--+------+----------+--------------------------------+
+     *   |CC|00|01|01|00|a|ppp|00|000000| Z-bucket |          material-id           |
+     *   |CC|00|10|01|00|a|ppp|00|000000| Z-bucket |          material-id           | refraction
+     *   +--+--+--+--+--+-+---+--+------+----------+--------------------------------+
+     *   | correctness        |      optimizations (truncation allowed)             |
      *
      *
-     *   BLENDED command
-     *   |   6  | 2| 2|1| 3 | 2|              32                |         15    |1|
-     *   +------+--+--+-+---+--+--------------------------------+---------------+-+
-     *   |000011|01|00|0|ppp|00|         ~distanceBits          |   blendOrder  |t|
-     *   +------+--+--+-+---+--+--------------------------------+---------------+-+
-     *   | correctness                                                            |
+     *   BLENDED command (b11)
+     *   | 2| 2| 2| 2| 2|1| 3 | 2|              32                |         15    |1|
+     *   +--+--+--+--+--+-+---+--+--------------------------------+---------------+-+
+     *   |CC|00|11|01|00|0|ppp|00|         ~distanceBits          |   blendOrder  |t|
+     *   +--+--+--+--+--+-+---+--+--------------------------------+---------------+-+
+     *   | correctness                                                              |
      *
      *
      *   pre-CUSTOM command
-     *   |   6  | 2| 2|         22           |               32               |
-     *   +------+--+--+----------------------+--------------------------------+
-     *   | pass |00|00|        order         |      custom command index      |
-     *   +------+--+--+----------------------+--------------------------------+
-     *   | correctness                                                        |
+     *   | 2| 2| 2| 2| 2|         22           |               32               |
+     *   +--+--+--+--+--+----------------------+--------------------------------+
+     *   |CC|00|PP|00|00|        order         |      custom command index      |
+     *   +--+--+--+--+--+----------------------+--------------------------------+
+     *   | correctness                                                          |
      *
      *
      *   post-CUSTOM command
-     *   |   6  | 2| 2|         22           |               32               |
-     *   +------+--+--+----------------------+--------------------------------+
-     *   | pass |11|00|        order         |      custom command index      |
-     *   +------+--+--+----------------------+--------------------------------+
-     *   | correctness                                                        |
+     *   | 2| 2| 2| 2| 2|         22           |               32               |
+     *   +--+--+--+--+--+----------------------+--------------------------------+
+     *   |CC|00|PP|11|00|        order         |      custom command index      |
+     *   +--+--+--+--+--+----------------------+--------------------------------+
+     *   | correctness                                                          |
      *
      *
      *   SENTINEL command
@@ -102,9 +108,6 @@ public:
      *   +-----------------------------------------------------------------------+
      */
     using CommandKey = uint64_t;
-
-    static constexpr uint64_t DISTANCE_BITS_MASK            = 0xFFFFFFFFllu;
-    static constexpr unsigned DISTANCE_BITS_SHIFT           = 0;
 
     static constexpr uint64_t BLEND_ORDER_MASK              = 0xFFFEllu;
     static constexpr unsigned BLEND_ORDER_SHIFT             = 1;
@@ -136,11 +139,14 @@ public:
     static constexpr uint64_t BLENDING_MASK                 = 0x0020000000000000llu;
     static constexpr unsigned BLENDING_SHIFT                = 53;
 
-    static constexpr uint64_t PASS_MASK                     = 0xFC00000000000000llu;
-    static constexpr unsigned PASS_SHIFT                    = 58;
-
     static constexpr uint64_t CUSTOM_MASK                   = 0x0300000000000000llu;
     static constexpr unsigned CUSTOM_SHIFT                  = 56;
+
+    static constexpr uint64_t PASS_MASK                     = 0x0C00000000000000llu;
+    static constexpr unsigned PASS_SHIFT                    = 58;
+
+    static constexpr uint64_t CHANNEL_MASK                  = 0xC000000000000000llu;
+    static constexpr unsigned CHANNEL_SHIFT                 = 62;
 
     static constexpr uint64_t CUSTOM_ORDER_MASK             = 0x003FFFFF00000000llu;
     static constexpr unsigned CUSTOM_ORDER_SHIFT            = 32;
@@ -197,7 +203,7 @@ public:
      * The variant is inserted while building the commands, because we don't know it before that
      */
     static CommandKey makeMaterialSortingKey(uint32_t materialId, uint32_t instanceId) noexcept {
-        CommandKey key = ((materialId << MATERIAL_ID_SHIFT) & MATERIAL_ID_MASK) |
+        CommandKey const key = ((materialId << MATERIAL_ID_SHIFT) & MATERIAL_ID_MASK) |
                          ((instanceId << MATERIAL_INSTANCE_ID_SHIFT) & MATERIAL_INSTANCE_ID_MASK);
         return (key << MATERIAL_SHIFT) & MATERIAL_MASK;
     }
@@ -213,22 +219,38 @@ public:
         return boolish ? std::numeric_limits<uint64_t>::max() : uint64_t(0);
     }
 
-    struct PrimitiveInfo { // 32 bytes
-        FMaterialInstance const* mi = nullptr;                          // 8 bytes (4)
+    template<typename T>
+    static CommandKey select(T boolish, uint64_t value) noexcept {
+        return boolish ? value : uint64_t(0);
+    }
+
+    struct PrimitiveInfo { // 48 bytes
+        union {
+            FMaterialInstance const* mi;
+            uint64_t padding = {}; // ensures mi is 8 bytes on all archs
+        };                                                              // 8 bytes
+        backend::RasterState rasterState;                               // 4 bytes
         backend::Handle<backend::HwRenderPrimitive> primitiveHandle;    // 4 bytes
+        backend::Handle<backend::HwBufferObject> skinningHandle;        // 4 bytes
+        backend::Handle<backend::HwSamplerGroup> skinningTexture;       // 4 bytes
         backend::Handle<backend::HwBufferObject> morphWeightBuffer;     // 4 bytes
         backend::Handle<backend::HwSamplerGroup> morphTargetBuffer;     // 4 bytes
-        backend::RasterState rasterState;                               // 4 bytes
-        uint16_t index = 0;                                             // 2 bytes
-        uint16_t instanceCount;                                         // 2 bytes
+        backend::Handle<backend::HwBufferObject> instanceBufferHandle;  // 4 bytes
+        uint32_t index = 0;                                             // 4 bytes
+        uint32_t skinningOffset = 0;                                    // 4 bytes
+        uint16_t instanceCount;                                         // 2 bytes [MSb: user]
         Variant materialVariant;                                        // 1 byte
-        uint8_t reserved[11 - sizeof(void*)] = {};                      // 3 bytes (7)
-    };
-    static_assert(sizeof(PrimitiveInfo) == 32);
+//        uint8_t reserved[0] = {};                                       // 0 bytes
 
-    struct alignas(8) Command {     // 40 bytes
+        static const uint16_t USER_INSTANCE_MASK = 0x8000u;
+        static const uint16_t INSTANCE_COUNT_MASK = 0x7fffu;
+    };
+    static_assert(sizeof(PrimitiveInfo) == 48);
+
+    struct alignas(8) Command {     // 64 bytes
         CommandKey key = 0;         //  8 bytes
-        PrimitiveInfo primitive;    // 32 bytes
+        PrimitiveInfo primitive;    // 48 bytes
+        uint64_t reserved[1] = {};  //  8 bytes
         bool operator < (Command const& rhs) const noexcept { return key < rhs.key; }
         // placement new declared as "throw" to avoid the compiler's null-check
         inline void* operator new (std::size_t, void* ptr) {
@@ -236,17 +258,18 @@ public:
             return ptr;
         }
     };
-    static_assert(sizeof(Command) == 40);
+    static_assert(sizeof(Command) == 64);
     static_assert(std::is_trivially_destructible_v<Command>,
             "Command isn't trivially destructible");
 
     using RenderFlags = uint8_t;
     static constexpr RenderFlags HAS_SHADOWING           = 0x01;
     static constexpr RenderFlags HAS_INVERSE_FRONT_FACES = 0x02;
+    static constexpr RenderFlags IS_STEREOSCOPIC         = 0x04;
 
     // Arena used for commands
     using Arena = utils::Arena<
-            utils::LinearAllocator,
+            utils::LinearAllocator,                 // note: can't change this allocator
             utils::LockingPolicy::NoLock,
             utils::TrackingPolicy::HighWatermark,
             utils::AreaPolicy::StaticArea>;
@@ -264,8 +287,8 @@ public:
     // allocated commands ARE NOT freed, they're owned by the Arena
     ~RenderPass() noexcept;
 
-    // if non-null, overrides the material's polygon offset
-    void overridePolygonOffset(backend::PolygonOffset* polygonOffset) noexcept;
+    // a box that both offsets the viewport and clips it
+    void setScissorViewport(backend::Viewport viewport) noexcept;
 
     // specifies the geometry to generate commands for
     void setGeometry(FScene::RenderableSoa const& soa, utils::Range<uint32_t> vr,
@@ -292,62 +315,76 @@ public:
 
     // This is the main function of this class, this appends commands to the pass using
     // the current camera, geometry and flags set. This can be called multiple times if needed.
-    void appendCommands(CommandTypeFlags commandTypeFlags) noexcept;
+    void appendCommands(FEngine& engine, CommandTypeFlags commandTypeFlags) noexcept;
 
-    // sorts commands, then trims sentinels
-    void sortCommands() noexcept;
+    // sorts and instanceify commands then trims sentinels
+    void sortCommands(FEngine& engine) noexcept;
 
     // Helper to execute all the commands generated by this RenderPass
-    void execute(const char* name,
+    void execute(FEngine& engine, const char* name,
             backend::Handle<backend::HwRenderTarget> renderTarget,
-            backend::RenderPassParams params) const noexcept {
-        getExecutor().execute(name, renderTarget, params);
-    }
+            backend::RenderPassParams params) const noexcept;
 
     /*
      * Executor holds the range of commands to execute for a given pass
      */
     class Executor {
         using CustomCommandFn = std::function<void()>;
-        using CustomCommandVector = std::vector<CustomCommandFn,
-                utils::STLAllocator<CustomCommandFn, LinearAllocatorArena>>;
-
         friend class RenderPass;
-        FEngine& mEngine;
-        Command const* mBegin;
-        Command const* mEnd;
-        FScene::RenderableSoa const& mRenderableSoa;
-        const CustomCommandVector mCustomCommands;
-        const backend::Handle<backend::HwBufferObject> mUboHandle;
-        const backend::PolygonOffset mPolygonOffset;
-        const bool mPolygonOffsetOverride;
+
+        // these fields are constant after creation
+        utils::Slice<Command> mCommands;
+        utils::Slice<CustomCommandFn> mCustomCommands;
+        backend::Handle<backend::HwBufferObject> mUboHandle;
+        backend::Handle<backend::HwBufferObject> mInstancedUboHandle;
+        backend::Viewport mScissorViewport;
+
+        backend::Viewport mScissor{};            // value of scissor override
+        backend::PolygonOffset mPolygonOffset{}; // value of the override
+        bool mPolygonOffsetOverride : 1;         // whether to override the polygon offset setting
+        bool mScissorOverride : 1;               // whether to override the polygon offset setting
 
         Executor(RenderPass const* pass, Command const* b, Command const* e) noexcept;
 
-        void recordDriverCommands(FEngine& engine, backend::DriverApi& driver,
-                const Command* first, const Command* last,
-                FScene::RenderableSoa const& soa, uint16_t readOnlyDepthStencil) const noexcept;
+        void execute(backend::DriverApi& driver,
+                const Command* first, const Command* last) const noexcept;
 
     public:
+        Executor() = default;
         Executor(Executor const& rhs);
+        Executor& operator=(Executor const& rhs) = default;
         ~Executor() noexcept;
-        void execute(const char* name,
-                backend::Handle<backend::HwRenderTarget> renderTarget,
-                backend::RenderPassParams const& params) const noexcept;
+
+        // if non-null, overrides the material's polygon offset
+        void overridePolygonOffset(backend::PolygonOffset const* polygonOffset) noexcept;
+
+        // if non-null, overrides the material's scissor
+        void overrideScissor(backend::Viewport const* scissor) noexcept;
+        void overrideScissor(backend::Viewport const& scissor) noexcept;
+
+        void execute(FEngine& engine, const char* name) const noexcept;
     };
 
     // returns a new executor for this pass
+    Executor getExecutor() {
+        return { this, mCommandBegin, mCommandEnd };
+    }
+
     Executor getExecutor() const {
         return { this, mCommandBegin, mCommandEnd };
     }
 
     // returns a new executor for this pass with a custom range
+    Executor getExecutor(Command const* b, Command const* e) {
+        return { this, b, e };
+    }
+
     Executor getExecutor(Command const* b, Command const* e) const {
         return { this, b, e };
     }
 
     // Appends a custom command.
-    void appendCustomCommand(Pass pass, CustomCommand custom, uint32_t order,
+    void appendCustomCommand(uint8_t channel, Pass pass, CustomCommand custom, uint32_t order,
             Executor::CustomCommandFn command);
 
 
@@ -356,10 +393,11 @@ private:
 
     Command* append(size_t count) noexcept;
     void resize(size_t count) noexcept;
+    void instanceify(FEngine& engine) noexcept;
 
-    // on 64-bits systems, we process batches of 256 (64 bytes) cache-lines, or 512 (32 bytes) commands
-    // on 32-bits systems, we process batches of 512 (32 bytes) cache-lines, or 512 (32 bytes) commands
-    static constexpr size_t JOBS_PARALLEL_FOR_COMMANDS_COUNT = 512;
+    // we choose the command count per job to minimize JobSystem overhead.
+    // on a Pixel 4, 2048 commands is about half a millisecond of processing.
+    static constexpr size_t JOBS_PARALLEL_FOR_COMMANDS_COUNT = 2048;
     static constexpr size_t JOBS_PARALLEL_FOR_COMMANDS_SIZE  =
             sizeof(Command) * JOBS_PARALLEL_FOR_COMMANDS_COUNT;
 
@@ -370,13 +408,15 @@ private:
             FScene::RenderableSoa const& soa, utils::Range<uint32_t> range,
             Variant variant, RenderFlags renderFlags,
             FScene::VisibleMaskType visibilityMask,
-            math::float3 cameraPosition, math::float3 cameraForward) noexcept;
+            math::float3 cameraPosition, math::float3 cameraForward,
+            uint8_t instancedStereoEyeCount) noexcept;
 
     template<uint32_t commandTypeFlags>
-    static inline void generateCommandsImpl(uint32_t, Command* commands,
+    static inline Command* generateCommandsImpl(uint32_t extraFlags, Command* curr,
             FScene::RenderableSoa const& soa, utils::Range<uint32_t> range,
             Variant variant, RenderFlags renderFlags, FScene::VisibleMaskType visibilityMask,
-            math::float3 cameraPosition, math::float3 cameraForward) noexcept;
+            math::float3 cameraPosition, math::float3 cameraForward,
+            uint8_t instancedStereoEyeCount) noexcept;
 
     static void setupColorCommand(Command& cmdDraw, Variant variant,
             FMaterialInstance const* mi, bool inverseFrontFaces) noexcept;
@@ -385,7 +425,6 @@ private:
             FScene::RenderableSoa& renderableData, utils::Range<uint32_t> vr) noexcept;
 
     // a reference to the Engine, mostly to get to things like JobSystem
-    FEngine& mEngine;
 
     // Arena where all Commands are allocated. The Arena owns the commands.
     Arena& mCommandArena;
@@ -404,6 +443,7 @@ private:
 
     // the UBO containing the data for the renderables
     backend::Handle<backend::HwBufferObject> mUboHandle;
+    backend::Handle<backend::HwBufferObject> mInstancedUboHandle;
 
     // info about the camera
     math::float3 mCameraPosition{};
@@ -418,14 +458,14 @@ private:
     // Additional visibility mask
     FScene::VisibleMaskType mVisibilityMask = std::numeric_limits<FScene::VisibleMaskType>::max();
 
-    // whether to override the polygon offset setting
-    bool mPolygonOffsetOverride = false;
-
-    // value of the override
-    backend::PolygonOffset mPolygonOffset{};
+    backend::Viewport mScissorViewport{ 0, 0,
+            std::numeric_limits<int32_t>::max(),
+            std::numeric_limits<int32_t>::max() };
 
     // a vector for our custom commands
-    mutable Executor::CustomCommandVector mCustomCommands;
+    using CustomCommandVector = std::vector<Executor::CustomCommandFn,
+            utils::STLAllocator<Executor::CustomCommandFn, LinearAllocatorArena>>;
+    mutable CustomCommandVector mCustomCommands;
 };
 
 } // namespace filament

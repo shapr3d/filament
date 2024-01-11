@@ -46,6 +46,13 @@ public:
     /**
      * Creates a new path with the specified pathname.
      *
+     * @param pathname a pathname string view
+     */
+    Path(std::string_view pathname);
+
+    /**
+     * Creates a new path with the specified pathname.
+     *
      * @param pathname a pathname string
      */
     Path(const std::string& pathname);
@@ -253,6 +260,12 @@ public:
      * @return a path representing a directory where temporary files can be stored
      */
     static Path getTemporaryDirectory();
+
+    /**
+     * @return a path representing a directory where settings files can be stored,
+     *         it is recommended to append an app specific folder name to that path
+     */
+    static Path getUserSettingsDirectory();
 
     /**
      * Creates a directory denoted by the given path.

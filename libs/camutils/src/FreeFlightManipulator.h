@@ -181,7 +181,7 @@ public:
 
     Bookmark getHomeBookmark() const override {
         Bookmark bookmark;
-        bookmark.flight.position = Base::mProps.flightStartPosition;;
+        bookmark.flight.position = Base::mProps.flightStartPosition;
         bookmark.flight.pitch = Base::mProps.flightStartPitch;
         bookmark.flight.yaw = Base::mProps.flightStartYaw;
         return bookmark;

@@ -21,7 +21,7 @@
 
 #include <filament/Renderer.h>
 
-#include "upcast.h"
+#include "downcast.h"
 
 #include "Allocators.h"
 #include "FrameHistory.h"
@@ -73,8 +73,6 @@ class FMaterialInstance;
 class FRenderer;
 class FScene;
 
-static constexpr Culler::result_type VISIBLE_RENDERABLE = 1u << VISIBLE_RENDERABLE_BIT;
-
 // ------------------------------------------------------------------------------------------------
 
 class FView : public View {
@@ -88,9 +86,13 @@ public:
 
     CameraInfo computeCameraInfo(FEngine& engine) const noexcept;
 
+    // note: viewport/cameraInfo are passed by value to make it clear that prepare cannot
+    // keep references on them that would outlive the scope of prepare() (e.g. with JobSystem).
     void prepare(FEngine& engine, backend::DriverApi& driver, ArenaScope& arena,
-            filament::Viewport const& viewport, CameraInfo const& cameraInfo,
+            filament::Viewport viewport, CameraInfo cameraInfo,
             math::float4 const& userTime, bool needsAlphaChannel) noexcept;
+
+    void bindPerViewUniformsAndSamplers(FEngine::DriverApi& driver) const noexcept;
 
     void setScene(FScene* scene) { mScene = scene; }
     FScene const* getScene() const noexcept { return mScene; }
@@ -132,28 +134,30 @@ public:
     }
 
     void prepareUpscaler(math::float2 scale) const noexcept;
-    void prepareCamera(const CameraInfo& cameraInfo) const noexcept;
-    void prepareViewport(const Viewport& viewport, uint32_t xoffset, uint32_t yoffset) const noexcept;
-    void prepareShadowing(FEngine& engine, backend::DriverApi& driver,
-            FScene::RenderableSoa& renderableData, FScene::LightSoa& lightData,
-            CameraInfo const& cameraInfo) noexcept;
-    void prepareLighting(FEngine& engine, FEngine::DriverApi& driver, ArenaScope& arena,
-            filament::Viewport const& viewport, CameraInfo const &cameraInfo) noexcept;
+    void prepareCamera(FEngine& engine, const CameraInfo& cameraInfo) const noexcept;
+
+    void prepareViewport(
+            const Viewport& physicalViewport,
+            const filament::Viewport& logicalViewport) const noexcept;
+
+    void prepareShadowing(FEngine& engine, FScene::RenderableSoa& renderableData,
+            FScene::LightSoa const& lightData, CameraInfo const& cameraInfo) noexcept;
+    void prepareLighting(FEngine& engine, ArenaScope& arena, CameraInfo const& cameraInfo) noexcept;
 
     void prepareSSAO(backend::Handle<backend::HwTexture> ssao) const noexcept;
-    void prepareSSR(backend::Handle<backend::HwTexture> ssr, float refractionLodOffset,
-            ScreenSpaceReflectionsOptions const& ssrOptions) const noexcept;
-    void prepareHistorySSR(backend::Handle<backend::HwTexture> ssr,
-            math::mat4f const& historyProjection, math::mat4f const& uvFromViewMatrix,
+    void prepareSSR(backend::Handle<backend::HwTexture> ssr, bool disableSSR,
+            float refractionLodOffset,
             ScreenSpaceReflectionsOptions const& ssrOptions) const noexcept;
     void prepareStructure(backend::Handle<backend::HwTexture> structure) const noexcept;
     void prepareShadow(backend::Handle<backend::HwTexture> structure) const noexcept;
-    void prepareShadowMap() const noexcept;
+    void prepareShadowMapping(bool highPrecision) const noexcept;
 
     void cleanupRenderPasses() const noexcept;
-    void froxelize(FEngine& engine, math::mat4f const& viewMatrix) const noexcept;
     void commitUniforms(backend::DriverApi& driver) const noexcept;
     void commitFroxels(backend::DriverApi& driverApi) const noexcept;
+
+    utils::JobSystem::Job* getFroxelizerSync() const noexcept { return mFroxelizerSync; }
+    void setFroxelizerSync(utils::JobSystem::Job* sync) noexcept { mFroxelizerSync = sync; }
 
     bool hasDirectionalLight() const noexcept { return mHasDirectionalLight; }
     bool hasDynamicLighting() const noexcept { return mHasDynamicLighting; }
@@ -164,9 +168,13 @@ public:
     bool hasDPCF() const noexcept { return mShadowType == ShadowType::DPCF; }
     bool hasPCSS() const noexcept { return mShadowType == ShadowType::PCSS; }
     bool hasPicking() const noexcept { return mActivePickingQueriesList != nullptr; }
+    bool hasInstancedStereo() const noexcept {
+        return mIsStereoSupported && mStereoscopicOptions.enabled;
+    }
 
-    FrameGraphId<FrameGraphTexture> renderShadowMaps(FrameGraph& fg, FEngine& engine,
-            FEngine::DriverApi& driver, RenderPass const& pass) noexcept;
+    FrameGraphId<FrameGraphTexture> renderShadowMaps(FEngine& engine, FrameGraph& fg,
+            CameraInfo const& cameraInfo, math::float4 const& userTime,
+            RenderPass const& pass) noexcept;
 
     void updatePrimitivesLod(
             FEngine& engine, const CameraInfo& camera,
@@ -182,8 +190,14 @@ public:
 
     bool isScreenSpaceReflectionEnabled() const noexcept { return mScreenSpaceReflectionsOptions.enabled; }
 
+    void setStencilBufferEnabled(bool enabled) noexcept { mStencilBufferEnabled = enabled; }
+
+    bool isStencilBufferEnabled() const noexcept { return mStencilBufferEnabled; }
+
+    void setStereoscopicOptions(StereoscopicOptions const& options) noexcept;
+
     FCamera const* getDirectionalLightCamera() const noexcept {
-        return &mShadowMapManager.getCascadeShadowMap(0)->getDebugCamera();
+        return mShadowMapManager.getDirectionalLightCamera();
     }
 
     void setRenderTarget(FRenderTarget* renderTarget) noexcept {
@@ -254,6 +268,10 @@ public:
         return mDithering;
     }
 
+    const StereoscopicOptions& getStereoscopicOptions() const noexcept {
+        return mStereoscopicOptions;
+    }
+
     bool hasPostProcessPass() const noexcept {
         return mHasPostProcessPass;
     }
@@ -301,9 +319,7 @@ public:
         mShadowType = shadow;
     }
 
-    void setVsmShadowOptions(VsmShadowOptions const& options) noexcept {
-        mVsmShadowOptions = options;
-    }
+    void setVsmShadowOptions(VsmShadowOptions options) noexcept;
 
     VsmShadowOptions getVsmShadowOptions() const noexcept {
         return mVsmShadowOptions;
@@ -403,6 +419,14 @@ public:
     void executePickingQueries(backend::DriverApi& driver,
             backend::RenderTargetHandle handle, float scale) noexcept;
 
+    void setMaterialGlobal(uint32_t index, math::float4 const& value);
+
+    math::float4 getMaterialGlobal(uint32_t index) const;
+
+    utils::Entity getFogEntity() const noexcept {
+        return mFogEntity;
+    }
+
 private:
 
     struct FPickingQuery : public PickingQuery {
@@ -447,13 +471,6 @@ private:
             Culler::result_type* visibleMask,
             size_t count);
 
-    void bindPerViewUniformsAndSamplers(FEngine::DriverApi& driver) const noexcept {
-        mPerViewUniforms.bind(driver);
-        driver.bindUniformBuffer(BindingPoints::LIGHTS, mLightUbh);
-        driver.bindUniformBuffer(BindingPoints::SHADOW, mShadowMapManager.getShadowUniformsHandle());
-        driver.bindUniformBuffer(BindingPoints::FROXEL_RECORDS, mFroxelizer.getRecordBuffer());
-    }
-
     // Clean-up the whole history, free all resources. This is typically called when the View is
     // being terminated.
     void drainFrameHistory(FEngine& engine) noexcept;
@@ -463,7 +480,7 @@ private:
     static FScene::RenderableSoa::iterator partition(
             FScene::RenderableSoa::iterator begin,
             FScene::RenderableSoa::iterator end,
-            uint8_t mask) noexcept;
+            Culler::result_type mask, Culler::result_type value) noexcept;
 
     // these are accessed in the render loop, keep together
     backend::Handle<backend::HwBufferObject> mLightUbh;
@@ -476,6 +493,7 @@ private:
     FCamera* mViewingCamera = nullptr;
 
     mutable Froxelizer mFroxelizer;
+    utils::JobSystem::Job* mFroxelizerSync = nullptr;
 
     Viewport mViewport;
     bool mCulling = true;
@@ -489,6 +507,7 @@ private:
     bool mShadowingEnabled = true;
     bool mScreenSpaceRefractionEnabled = true;
     bool mHasPostProcessPass = true;
+    bool mStencilBufferEnabled = false;
     AmbientOcclusionOptions mAmbientOcclusionOptions{};
     ShadowType mShadowType = ShadowType::PCF;
     VsmShadowOptions mVsmShadowOptions; // FIXME: this should probably be per-light
@@ -501,9 +520,12 @@ private:
     MultiSampleAntiAliasingOptions mMultiSampleAntiAliasingOptions;
     ScreenSpaceReflectionsOptions mScreenSpaceReflectionsOptions;
     GuardBandOptions mGuardBandOptions;
+    StereoscopicOptions mStereoscopicOptions;
     BlendMode mBlendMode = BlendMode::OPAQUE;
     const FColorGrading* mColorGrading = nullptr;
     const FColorGrading* mDefaultColorGrading = nullptr;
+    utils::Entity mFogEntity{};
+    bool mIsStereoSupported : 1;
 
     PIDController mPidController;
     DynamicResolutionOptions mDynamicResolution;
@@ -532,12 +554,19 @@ private:
 
     ShadowMapManager mShadowMapManager;
 
+    std::array<math::float4, 4> mMaterialGlobals = {{
+                                                            { 0, 0, 0, 1 },
+                                                            { 0, 0, 0, 1 },
+                                                            { 0, 0, 0, 1 },
+                                                            { 0, 0, 0, 1 },
+                                                    }};
+
 #ifndef NDEBUG
     std::array<DebugRegistry::FrameHistory, 5*60> mDebugFrameHistory;
 #endif
 };
 
-FILAMENT_UPCAST(View)
+FILAMENT_DOWNCAST(View)
 
 } // namespace filament
 

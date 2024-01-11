@@ -278,6 +278,7 @@ if(NOT MSVC)
         PRIVATE -Wno-unused-const-variable
         PRIVATE -Wno-unused-private-field
         PRIVATE -Wno-unused-variable
+        PRIVATE -Wno-deprecated-non-prototype # See https://github.com/madler/zlib/issues/633
     )
 else()
     target_compile_options(${TARGET} PRIVATE /bigobj)
@@ -297,3 +298,5 @@ target_include_directories (${TARGET} PUBLIC ${PUBLIC_HDR_DIR})
 
 # and we're linking against the libraries below, importing their public headers
 target_link_libraries(${TARGET} LINK_PUBLIC z)
+
+set_target_properties(${TARGET} PROPERTIES FOLDER ThirdParty)

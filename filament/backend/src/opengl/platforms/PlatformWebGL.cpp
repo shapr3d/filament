@@ -14,27 +14,31 @@
  * limitations under the License.
  */
 
-#include "PlatformWebGL.h"
-#include "../OpenGLDriverFactory.h"
+#include <backend/platforms/PlatformWebGL.h>
 
 namespace filament::backend {
 
 using namespace backend;
 
-Driver* PlatformWebGL::createDriver(void* const sharedGLContext) noexcept {
-    return OpenGLDriverFactory::create(this, sharedGLContext);
+Driver* PlatformWebGL::createDriver(void* const sharedGLContext,
+        const Platform::DriverConfig& driverConfig) noexcept {
+    return OpenGLPlatform::createDefaultDriver(this, sharedGLContext, driverConfig);
+}
+
+int PlatformWebGL::getOSVersion() const noexcept {
+    return 0;
 }
 
 void PlatformWebGL::terminate() noexcept {
 }
 
 Platform::SwapChain* PlatformWebGL::createSwapChain(
-        void* nativeWindow, uint64_t& flags) noexcept {
+        void* nativeWindow, uint64_t flags) noexcept {
     return (SwapChain*)nativeWindow;
 }
 
 Platform::SwapChain* PlatformWebGL::createSwapChain(
-        uint32_t width, uint32_t height, uint64_t& flags) noexcept {
+        uint32_t width, uint32_t height, uint64_t flags) noexcept {
     // TODO: implement headless SwapChain
     return nullptr;
 }
@@ -47,19 +51,6 @@ void PlatformWebGL::makeCurrent(Platform::SwapChain* drawSwapChain,
 }
 
 void PlatformWebGL::commit(Platform::SwapChain* swapChain) noexcept {
-}
-
-Platform::Fence* PlatformWebGL::createFence() noexcept {
-    Fence* f = new Fence();
-    return f;
-}
-
-void PlatformWebGL::destroyFence(Fence* fence) noexcept {
-    delete fence;
-}
-
-FenceStatus PlatformWebGL::waitFence(Fence* fence, uint64_t timeout) noexcept {
-    return FenceStatus::CONDITION_SATISFIED;
 }
 
 } // namespace filament::backend

@@ -2,16 +2,24 @@ void addEmissive(const MaterialInputs material, inout vec4 color) {
 #if defined(MATERIAL_HAS_EMISSIVE)
     highp vec4 emissive = material.emissive;
     highp float attenuation = mix(1.0, getExposure(), emissive.w);
-    color.rgb += emissive.rgb * (attenuation * color.a);
+#if defined(BLEND_MODE_TRANSPARENT) || defined(BLEND_MODE_FADE)
+    attenuation *= color.a;
+#endif
+    color.rgb += emissive.rgb * attenuation;
 #endif
 }
 
+vec4 fixupAlpha(vec4 color) {
 #if defined(BLEND_MODE_MASKED)
-float computeMaskedAlpha(float a) {
-    // Use derivatives to smooth alpha tested edges
-    return (a - getMaskThreshold()) / max(fwidth(a), 1e-3) + 0.5;
-}
+    // If we reach this point in the code, we already know that the fragment is not discarded due
+    // to the threshold factor. Therefore we can just output 1.0, which prevents a "punch through"
+    // effect from occuring. We do this only for TRANSLUCENT views in order to prevent breakage
+    // of ALPHA_TO_COVERAGE.
+    return vec4(color.rgb, (frameUniforms.needsAlphaChannel == 1.0) ? 1.0 : color.a);
+#else
+    return color;
 #endif
+}
 
 /**
  * Evaluates unlit materials. In this lighting model, only the base color and
@@ -30,31 +38,24 @@ float computeMaskedAlpha(float a) {
 vec4 evaluateMaterial(const MaterialInputs material) {
     vec4 color = material.baseColor;
 
-#if defined(BLEND_MODE_MASKED)
-    color.a = computeMaskedAlpha(color.a);
-    if (color.a <= 0.0) {
-        discard;
-    }
-
-    // Output 1.0 for translucent view to prevent "punch through" artifacts. We do not do this
-    // for opaque views to enable proper usage of ALPHA_TO_COVERAGE.
-    if (frameUniforms.needsAlphaChannel == 1.0) {
-        color.a = 1.0;
-    }
-#endif
-
 #if defined(VARIANT_HAS_DIRECTIONAL_LIGHTING)
 #if defined(VARIANT_HAS_SHADOWING)
     float visibility = 1.0;
-    uint cascade = getShadowCascade();
-    bool cascadeHasVisibleShadows = bool(frameUniforms.cascades & ((1u << cascade) << 8u));
-    bool hasDirectionalShadows = bool(frameUniforms.directionalShadows & 1u);
+    int cascade = getShadowCascade();
+    bool cascadeHasVisibleShadows = bool(frameUniforms.cascades & ((1 << cascade) << 8));
+    bool hasDirectionalShadows = bool(frameUniforms.directionalShadows & 1);
     if (hasDirectionalShadows && cascadeHasVisibleShadows) {
-        uint layer = cascade;
-        visibility = shadow(true, light_shadowMap, layer, 0u, cascade);
+        highp vec4 shadowPosition = getShadowPosition(cascade);
+        visibility = shadow(true, light_shadowMap, cascade, shadowPosition, 0.0);
+        // shadow far attenuation
+        highp vec3 v = getWorldPosition() - getWorldCameraPosition();
+        // (viewFromWorld * v).z == dot(transpose(viewFromWorld), v)
+        highp float z = dot(transpose(getViewFromWorldMatrix())[2].xyz, v);
+        highp vec2 p = frameUniforms.shadowFarAttenuationParams;
+        visibility = 1.0 - ((1.0 - visibility) * saturate(p.x - z * z * p.y));
     }
-    if ((frameUniforms.directionalShadows & 0x2u) != 0u && visibility > 0.0) {
-        if ((objectUniforms.flags & FILAMENT_OBJECT_CONTACT_SHADOWS_BIT) != 0u) {
+    if ((frameUniforms.directionalShadows & 0x2) != 0 && visibility > 0.0) {
+        if ((object_uniforms_flagsChannels & FILAMENT_OBJECT_CONTACT_SHADOWS_BIT) != 0) {
             visibility *= (1.0 - screenSpaceContactShadow(frameUniforms.lightDirection));
         }
     }
@@ -68,5 +69,5 @@ vec4 evaluateMaterial(const MaterialInputs material) {
 
     addEmissive(material, color);
 
-    return color;
+    return fixupAlpha(color);
 }

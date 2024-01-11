@@ -23,75 +23,75 @@ namespace filament {
 using namespace math;
 
 void IndirectLight::setIntensity(float intensity) noexcept {
-    upcast(this)->setIntensity(intensity);
+    downcast(this)->setIntensity(intensity);
 }
 
 float IndirectLight::getIntensity() const noexcept {
-    return upcast(this)->getIntensity();
+    return downcast(this)->getIntensity();
 }
 
 void IndirectLight::setRotation(mat3f const& rotation) noexcept {
-    upcast(this)->setRotation(rotation);
+    downcast(this)->setRotation(rotation);
 }
 
 const mat3f& IndirectLight::getRotation() const noexcept {
-    return upcast(this)->getRotation();
+    return downcast(this)->getRotation();
 }
 
 Texture const* IndirectLight::getReflectionsTexture() const noexcept {
-    return upcast(this)->getReflectionsTexture();
+    return downcast(this)->getReflectionsTexture();
 }
 
 Texture const* IndirectLight::getIrradianceTexture() const noexcept {
-    return upcast(this)->getIrradianceTexture();
+    return downcast(this)->getIrradianceTexture();
 }
 
 float3 IndirectLight::getDirectionEstimate() const noexcept {
-    return upcast(this)->getDirectionEstimate();
+    return downcast(this)->getDirectionEstimate();
 }
 
 float4 IndirectLight::getColorEstimate(float3 direction) const noexcept {
-    return upcast(this)->getColorEstimate(direction);
+    return downcast(this)->getColorEstimate(direction);
 }
 
 void IndirectLight::setIblOptions(IblOptions const& options) noexcept {
-    upcast(this)->setIblOptions(options);
+    downcast(this)->setIblOptions(options);
 }
 
 IblOptions const& IndirectLight::getIblOptions() const noexcept {
-    return upcast(this)->getIblOptions();
+    return downcast(this)->getIblOptions();
 }
 
 void IndirectLight::setIblTechnique(const IblOptions::IblTechnique iblTechnique) noexcept {
-    upcast(this)->setIblTechnique(iblTechnique);
+    downcast(this)->setIblTechnique(iblTechnique);
 }
 
 IblOptions::IblTechnique IndirectLight::getIblTechnique() const noexcept {
-    return upcast(this)->getIblTechnique();
+    return downcast(this)->getIblTechnique();
 }
 
 void IndirectLight::setIblCenter(const float3& iblCenter) noexcept {
-    upcast(this)->setIblCenter(iblCenter);
+    downcast(this)->setIblCenter(iblCenter);
 }
 
 const float3& IndirectLight::getIblCenter() const noexcept {
-    return upcast(this)->getIblCenter();
+    return downcast(this)->getIblCenter();
 }
 
 void IndirectLight::setIblHalfExtents(const float3& iblHalfExtents) noexcept {
-    upcast(this)->setIblHalfExtents(iblHalfExtents);
+    downcast(this)->setIblHalfExtents(iblHalfExtents);
 }
 
 const float3& IndirectLight::getIblHalfExtents() const noexcept {
-    return upcast(this)->getIblHalfExtents();
+    return downcast(this)->getIblHalfExtents();
 }
 
 void IndirectLight::setIblTintAndIntensity(const float4& iblTintAndIntensity) noexcept {
-    upcast(this)->setIblTintAndIntensity(iblTintAndIntensity);
+    downcast(this)->setIblTintAndIntensity(iblTintAndIntensity);
 }
 
 const float4& IndirectLight::getIblTintAndIntensity() const noexcept {
-    return upcast(this)->getIblTintAndIntensity();
+    return downcast(this)->getIblTintAndIntensity();
 }
 
 float3 IndirectLight::getDirectionEstimate(const float3* sh) noexcept {

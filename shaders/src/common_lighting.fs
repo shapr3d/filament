@@ -2,13 +2,15 @@ struct Light {
     vec4 colorIntensity;  // rgb, pre-exposed intensity
     vec3 l;
     float attenuation;
+    highp vec3 worldPosition;
     float NoL;
-    vec3 worldPosition;
+    highp vec3 direction;
+    float zLight;
     bool castsShadows;
     bool contactShadows;
-    uint shadowIndex;
-    uint shadowLayer;
-    uint channels;
+    uint type;
+    int shadowIndex;
+    int channels;
 };
 
 struct PixelParams {
@@ -65,7 +67,7 @@ struct PixelParams {
 
 float computeMicroShadowing(float NoL, float visibility) {
     // Chan 2018, "Material Advances in Call of Duty: WWII"
-    float aperture = inversesqrt(1.0 - visibility);
+    float aperture = inversesqrt(1.0 - min(visibility, 0.9999));
     float microShadow = saturate(NoL * aperture);
     return microShadow * microShadow;
 }

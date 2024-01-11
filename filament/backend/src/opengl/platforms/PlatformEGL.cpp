@@ -14,21 +14,28 @@
  * limitations under the License.
  */
 
-#include "PlatformEGL.h"
+#include <backend/platforms/PlatformEGL.h>
 
-#include "opengl/OpenGLDriver.h"
-#include "opengl/OpenGLContext.h"
-#include "opengl/OpenGLDriverFactory.h"
+#include "opengl/GLUtils.h"
+
+#if defined(__ANDROID__)
+#include <sys/system_properties.h>
+#endif
 
 #include <utils/compiler.h>
 #include <utils/Log.h>
+#include <utils/Panic.h>
+
+#ifndef EGL_CONTEXT_OPENGL_BACKWARDS_COMPATIBLE_ANGLE
+#   define EGL_CONTEXT_OPENGL_BACKWARDS_COMPATIBLE_ANGLE 0x3483
+#endif
 
 using namespace utils;
 
 namespace filament::backend {
 using namespace backend;
 
-// The Android NDK doesn't exposes extensions, fake it with eglGetProcAddress
+// The Android NDK doesn't expose extensions, fake it with eglGetProcAddress
 namespace glext {
 UTILS_PRIVATE PFNEGLCREATESYNCKHRPROC eglCreateSyncKHR = {};
 UTILS_PRIVATE PFNEGLDESTROYSYNCKHRPROC eglDestroySyncKHR = {};
@@ -44,30 +51,36 @@ using namespace glext;
 // ---------------------------------------------------------------------------------------------
 
 void PlatformEGL::logEglError(const char* name) noexcept {
-    const char* err;
-    switch (eglGetError()) {
-        case EGL_NOT_INITIALIZED:       err = "EGL_NOT_INITIALIZED";    break;
-        case EGL_BAD_ACCESS:            err = "EGL_BAD_ACCESS";         break;
-        case EGL_BAD_ALLOC:             err = "EGL_BAD_ALLOC";          break;
-        case EGL_BAD_ATTRIBUTE:         err = "EGL_BAD_ATTRIBUTE";      break;
-        case EGL_BAD_CONTEXT:           err = "EGL_BAD_CONTEXT";        break;
-        case EGL_BAD_CONFIG:            err = "EGL_BAD_CONFIG";         break;
-        case EGL_BAD_CURRENT_SURFACE:   err = "EGL_BAD_CURRENT_SURFACE";break;
-        case EGL_BAD_DISPLAY:           err = "EGL_BAD_DISPLAY";        break;
-        case EGL_BAD_SURFACE:           err = "EGL_BAD_SURFACE";        break;
-        case EGL_BAD_MATCH:             err = "EGL_BAD_MATCH";          break;
-        case EGL_BAD_PARAMETER:         err = "EGL_BAD_PARAMETER";      break;
-        case EGL_BAD_NATIVE_PIXMAP:     err = "EGL_BAD_NATIVE_PIXMAP";  break;
-        case EGL_BAD_NATIVE_WINDOW:     err = "EGL_BAD_NATIVE_WINDOW";  break;
-        case EGL_CONTEXT_LOST:          err = "EGL_CONTEXT_LOST";       break;
-        default:                        err = "unknown";                break;
-    }
-    slog.e << name << " failed with " << err << io::endl;
+    logEglError(name, eglGetError());
 }
 
-static void clearGlError() noexcept {
+void PlatformEGL::logEglError(const char* name, EGLint error) noexcept {
+    slog.e << name << " failed with " << getEglErrorName(error) << io::endl;
+}
+
+const char* PlatformEGL::getEglErrorName(EGLint error) noexcept {
+    switch (error) {
+        case EGL_NOT_INITIALIZED:       return "EGL_NOT_INITIALIZED";
+        case EGL_BAD_ACCESS:            return "EGL_BAD_ACCESS";
+        case EGL_BAD_ALLOC:             return "EGL_BAD_ALLOC";
+        case EGL_BAD_ATTRIBUTE:         return "EGL_BAD_ATTRIBUTE";
+        case EGL_BAD_CONTEXT:           return "EGL_BAD_CONTEXT";
+        case EGL_BAD_CONFIG:            return "EGL_BAD_CONFIG";
+        case EGL_BAD_CURRENT_SURFACE:   return "EGL_BAD_CURRENT_SURFACE";
+        case EGL_BAD_DISPLAY:           return "EGL_BAD_DISPLAY";
+        case EGL_BAD_SURFACE:           return "EGL_BAD_SURFACE";
+        case EGL_BAD_MATCH:             return "EGL_BAD_MATCH";
+        case EGL_BAD_PARAMETER:         return "EGL_BAD_PARAMETER";
+        case EGL_BAD_NATIVE_PIXMAP:     return "EGL_BAD_NATIVE_PIXMAP";
+        case EGL_BAD_NATIVE_WINDOW:     return "EGL_BAD_NATIVE_WINDOW";
+        case EGL_CONTEXT_LOST:          return "EGL_CONTEXT_LOST";
+        default:                        return "unknown";
+    }
+}
+
+void PlatformEGL::clearGlError() noexcept {
     // clear GL error that may have been set by previous calls
-    GLenum error = glGetError();
+    GLenum const error = glGetError();
     if (error != GL_NO_ERROR) {
         slog.w << "Ignoring pending GL error " << io::hex << error << io::endl;
     }
@@ -79,23 +92,57 @@ PlatformEGL::PlatformEGL(EGLDisplay display) noexcept :
         mEGLDisplay(display), mIsEGLDisplayExternal(display != EGL_NO_DISPLAY) {
 }
 
-Driver* PlatformEGL::createDriver(void* sharedContext) noexcept {
+int PlatformEGL::getOSVersion() const noexcept {
+    return 0;
+}
+
+bool PlatformEGL::isOpenGL() const noexcept {
+    return false;
+}
+
+Driver* PlatformEGL::createDriver(void* sharedContext, const Platform::DriverConfig& driverConfig) noexcept {
     if (!mIsEGLDisplayExternal) {
         mEGLDisplay = eglGetDisplay(EGL_DEFAULT_DISPLAY);
         assert_invariant(mEGLDisplay != EGL_NO_DISPLAY);
 
         EGLint major, minor;
         EGLBoolean initialized = eglInitialize(mEGLDisplay, &major, &minor);
+
+        if (!initialized) {
+            EGLDeviceEXT eglDevice;
+            EGLint numDevices;
+            PFNEGLQUERYDEVICESEXTPROC eglQueryDevicesEXT =
+                    (PFNEGLQUERYDEVICESEXTPROC)eglGetProcAddress("eglQueryDevicesEXT");
+            if (eglQueryDevicesEXT != nullptr) {
+                eglQueryDevicesEXT(1, &eglDevice, &numDevices);
+                if(auto* getPlatformDisplay = reinterpret_cast<PFNEGLGETPLATFORMDISPLAYEXTPROC>(
+                        eglGetProcAddress("eglGetPlatformDisplay"))) {
+                    mEGLDisplay = getPlatformDisplay(EGL_PLATFORM_DEVICE_EXT, eglDevice, 0);
+                    initialized = eglInitialize(mEGLDisplay, &major, &minor);
+                }
+            }
+        }
+
         if (UTILS_UNLIKELY(!initialized)) {
             slog.e << "eglInitialize failed" << io::endl;
             return nullptr;
         }
-
     }
 
+#if defined(FILAMENT_IMPORT_ENTRY_POINTS)
     importGLESExtensionsEntryPoints();
+#endif
 
     auto extensions = GLUtils::split(eglQueryString(mEGLDisplay, EGL_EXTENSIONS));
+    ext.egl.ANDROID_recordable = extensions.has("EGL_ANDROID_recordable");
+    ext.egl.KHR_gl_colorspace = extensions.has("EGL_KHR_gl_colorspace");
+    ext.egl.KHR_create_context = extensions.has("EGL_KHR_create_context");
+    ext.egl.KHR_no_config_context = extensions.has("EGL_KHR_no_config_context");
+    ext.egl.KHR_surfaceless_context = extensions.has("KHR_surfaceless_context");
+    if (ext.egl.KHR_create_context) {
+        // KHR_create_context implies KHR_surfaceless_context for ES3.x contexts
+        ext.egl.KHR_surfaceless_context = true;
+    }
 
     eglCreateSyncKHR = (PFNEGLCREATESYNCKHRPROC) eglGetProcAddress("eglCreateSyncKHR");
     eglDestroySyncKHR = (PFNEGLDESTROYSYNCKHRPROC) eglGetProcAddress("eglDestroySyncKHR");
@@ -104,123 +151,129 @@ Driver* PlatformEGL::createDriver(void* sharedContext) noexcept {
     eglCreateImageKHR = (PFNEGLCREATEIMAGEKHRPROC) eglGetProcAddress("eglCreateImageKHR");
     eglDestroyImageKHR = (PFNEGLDESTROYIMAGEKHRPROC) eglGetProcAddress("eglDestroyImageKHR");
 
-#ifdef FILAMENT_USE_ANGLE
-    constexpr EGLint recordable = EGL_DONT_CARE;
-#else
-    constexpr EGLint recordable = 1;
-#endif
-
-    EGLint configsCount;
-    EGLint configAttribs[] = {
-            EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT_KHR,        //  0
-            EGL_RED_SIZE,    8,                                 //  2
-            EGL_GREEN_SIZE,  8,                                 //  4
-            EGL_BLUE_SIZE,   8,                                 //  6
-            EGL_ALPHA_SIZE,  0,                                 //  8 : reserved to set ALPHA_SIZE below
-            EGL_DEPTH_SIZE, 24,                                 // 10
-            EGL_RECORDABLE_ANDROID, recordable,                 // 12
-            EGL_NONE                                            // 14
-    };
-
-    EGLint contextAttribs[] = {
-            EGL_CONTEXT_CLIENT_VERSION, 3,
-            EGL_NONE, EGL_NONE, // reserved for EGL_CONTEXT_OPENGL_NO_ERROR_KHR below
-            EGL_NONE
-    };
-
-    EGLint pbufferAttribs[] = {
+    EGLint const pbufferAttribs[] = {
             EGL_WIDTH,  1,
             EGL_HEIGHT, 1,
             EGL_NONE
     };
 
+#ifdef __ANDROID__
+    bool requestES2Context = false;
+    char property[PROP_VALUE_MAX];
+    int const length = __system_property_get("debug.filament.es2", property);
+    if (length > 0) {
+        requestES2Context = bool(atoi(property));
+    }
+#else
+    constexpr bool requestES2Context = false;
+#endif
+
+    Config contextAttribs;
+
+    if (isOpenGL()) {
+        // Request a OpenGL 4.1 context
+        contextAttribs[EGL_CONTEXT_MAJOR_VERSION] = 4;
+        contextAttribs[EGL_CONTEXT_MINOR_VERSION] = 1;
+    } else {
+        // Request a ES2 context, devices that support ES3 will return an ES3 context
+        contextAttribs[EGL_CONTEXT_CLIENT_VERSION] = 2;
+    }
+
+    // FOR TESTING ONLY, enforce the ES version we're asking for.
+    // FIXME: we should check EGL_ANGLE_create_context_backwards_compatible, however, at least
+    //        some versions of ANGLE don't advertise this extension but do support it.
+    if (requestES2Context) {
+        // TODO: is there a way to request the ANGLE driver if available?
+        contextAttribs[EGL_CONTEXT_OPENGL_BACKWARDS_COMPATIBLE_ANGLE] = EGL_FALSE;
+    }
+
 #ifdef NDEBUG
-    // When we don't have a shared context and we're in release mode, we always activate the
+    // When we don't have a shared context, and we're in release mode, we always activate the
     // EGL_KHR_create_context_no_error extension.
     if (!sharedContext && extensions.has("EGL_KHR_create_context_no_error")) {
-        contextAttribs[2] = EGL_CONTEXT_OPENGL_NO_ERROR_KHR;
-        contextAttribs[3] = EGL_TRUE;
+        contextAttribs[EGL_CONTEXT_OPENGL_NO_ERROR_KHR] = EGL_TRUE;
     }
 #endif
 
-    EGLConfig eglConfig = nullptr;
+    // config use for creating the context
+    EGLConfig eglConfig = EGL_NO_CONFIG_KHR;
 
-    // find an opaque config
-    if (!eglChooseConfig(mEGLDisplay, configAttribs, &mEGLConfig, 1, &configsCount) ||
-            (configAttribs[13] == EGL_DONT_CARE && configsCount == 0)) {
-        logEglError("eglChooseConfig");
-        goto error;
-    }
 
-    if (recordable == 1 && configsCount == 0) {
-        // warn and retry without EGL_RECORDABLE_ANDROID
-        logEglError("eglChooseConfig(..., EGL_RECORDABLE_ANDROID) failed. Continuing without it.");
-        configAttribs[12] = EGL_RECORDABLE_ANDROID;
-        configAttribs[13] = EGL_DONT_CARE;
-        if (!eglChooseConfig(mEGLDisplay, configAttribs, &mEGLConfig, 1, &configsCount) ||
-                configsCount == 0) {
-            logEglError("eglChooseConfig");
-            goto error;
+    if (UTILS_UNLIKELY(!ext.egl.KHR_no_config_context)) {
+        // find a config we can use if we don't have "EGL_KHR_no_config_context" and that we can use
+        // for the dummy pbuffer surface.
+        mEGLConfig = findSwapChainConfig(
+                SWAP_CHAIN_CONFIG_TRANSPARENT |
+                SWAP_CHAIN_HAS_STENCIL_BUFFER,
+                true, true);
+        if (UTILS_UNLIKELY(mEGLConfig == EGL_NO_CONFIG_KHR)) {
+            goto error; // error already logged
         }
+        // if we don't have the EGL_KHR_no_config_context the context must be created with
+        // the same config as the swapchain, so we have no choice but to create a
+        // transparent config.
+        eglConfig = mEGLConfig;
     }
 
-    // find a transparent config
-    configAttribs[8] = EGL_ALPHA_SIZE;
-    configAttribs[9] = 8;
-    if (!eglChooseConfig(mEGLDisplay, configAttribs, &mEGLTransparentConfig, 1, &configsCount) ||
-            (configAttribs[13] == EGL_DONT_CARE && configsCount == 0)) {
-        logEglError("eglChooseConfig");
-        goto error;
-    }
-
-    if (recordable == 1 && configsCount == 0) {
-        // warn and retry without EGL_RECORDABLE_ANDROID
-        logEglError("eglChooseConfig(..., EGL_RECORDABLE_ANDROID) failed. Continuing without it.");
-        // this is not fatal
-        configAttribs[12] = EGL_RECORDABLE_ANDROID;
-        configAttribs[13] = EGL_DONT_CARE;
-        if (!eglChooseConfig(mEGLDisplay, configAttribs, &mEGLTransparentConfig, 1, &configsCount) ||
-                configsCount == 0) {
-            logEglError("eglChooseConfig");
-            goto error;
+    for (size_t tries = 0; tries < 3; tries++) {
+        mEGLContext = eglCreateContext(mEGLDisplay, eglConfig,
+                (EGLContext)sharedContext, contextAttribs.data());
+        if (UTILS_LIKELY(mEGLContext != EGL_NO_CONTEXT)) {
+            break;
         }
+
+        GLint const error = eglGetError();
+        if (error == EGL_BAD_ATTRIBUTE) {
+            // ANGLE doesn't always advertise this extension, so we have to try
+            contextAttribs.erase(EGL_CONTEXT_OPENGL_BACKWARDS_COMPATIBLE_ANGLE);
+            continue;
+        }
+#ifdef NDEBUG
+        else if (error == EGL_BAD_MATCH &&
+                   sharedContext && extensions.has("EGL_KHR_create_context_no_error")) {
+            // context creation could fail because of EGL_CONTEXT_OPENGL_NO_ERROR_KHR
+            // not matching the sharedContext. Try with it.
+            contextAttribs[EGL_CONTEXT_OPENGL_NO_ERROR_KHR] = EGL_TRUE;
+            continue;
+        }
+#endif
+        (void)error;
+        break;
     }
 
-    if (!extensions.has("EGL_KHR_no_config_context")) {
-        // if we have the EGL_KHR_no_config_context, we don't need to worry about the config
-        // when creating the context, otherwise, we must always pick a transparent config.
-        eglConfig = mEGLConfig = mEGLTransparentConfig;
-    }
-
-    // the pbuffer dummy surface is always created with a transparent surface because
-    // either we have EGL_KHR_no_config_context and it doesn't matter, or we don't and
-    // we must use a transparent surface
-    mEGLDummySurface = eglCreatePbufferSurface(mEGLDisplay, mEGLTransparentConfig, pbufferAttribs);
-    if (mEGLDummySurface == EGL_NO_SURFACE) {
-        logEglError("eglCreatePbufferSurface");
-        goto error;
-    }
-
-    mEGLContext = eglCreateContext(mEGLDisplay, eglConfig, (EGLContext)sharedContext, contextAttribs);
-    if (mEGLContext == EGL_NO_CONTEXT && sharedContext &&
-        extensions.has("EGL_KHR_create_context_no_error")) {
-        // context creation could fail because of EGL_CONTEXT_OPENGL_NO_ERROR_KHR
-        // not matching the sharedContext. Try with it.
-        contextAttribs[2] = EGL_CONTEXT_OPENGL_NO_ERROR_KHR;
-        contextAttribs[3] = EGL_TRUE;
-        mEGLContext = eglCreateContext(mEGLDisplay, eglConfig, (EGLContext)sharedContext, contextAttribs);
-    }
     if (UTILS_UNLIKELY(mEGLContext == EGL_NO_CONTEXT)) {
         // eglCreateContext failed
         logEglError("eglCreateContext");
         goto error;
     }
 
-    if (!makeCurrent(mEGLDummySurface, mEGLDummySurface)) {
+    if (ext.egl.KHR_surfaceless_context) {
+        // Adreno 306 driver advertises KHR_create_context but doesn't support passing
+        // EGL_NO_SURFACE to eglMakeCurrent with a 3.0 context.
+        if (UTILS_UNLIKELY(!eglMakeCurrent(mEGLDisplay,
+                EGL_NO_SURFACE, EGL_NO_SURFACE, mEGLContext))) {
+            if (eglGetError() == EGL_BAD_MATCH) {
+                ext.egl.KHR_surfaceless_context = false;
+            }
+        }
+    }
+
+    if (UTILS_UNLIKELY(!ext.egl.KHR_surfaceless_context)) {
+        // create the dummy surface, just for being able to make the context current.
+        mEGLDummySurface = eglCreatePbufferSurface(mEGLDisplay, mEGLConfig, pbufferAttribs);
+        if (UTILS_UNLIKELY(mEGLDummySurface == EGL_NO_SURFACE)) {
+            logEglError("eglCreatePbufferSurface");
+            goto error;
+        }
+    }
+
+    if (UTILS_UNLIKELY(!makeCurrent(mEGLDummySurface, mEGLDummySurface))) {
         // eglMakeCurrent failed
         logEglError("eglMakeCurrent");
         goto error;
     }
+
+    mContextAttribs = std::move(contextAttribs);
 
     initializeGlExtensions();
 
@@ -228,7 +281,7 @@ Driver* PlatformEGL::createDriver(void* sharedContext) noexcept {
     clearGlError();
 
     // success!!
-    return OpenGLDriverFactory::create(this, sharedContext);
+    return OpenGLPlatform::createDefaultDriver(this, sharedContext, driverConfig);
 
 error:
     // if we're here, we've failed
@@ -250,6 +303,44 @@ error:
     return nullptr;
 }
 
+bool PlatformEGL::isExtraContextSupported() const noexcept {
+    return ext.egl.KHR_surfaceless_context;
+}
+
+void PlatformEGL::createContext(bool shared) {
+    EGLConfig config = ext.egl.KHR_no_config_context ? EGL_NO_CONFIG_KHR : mEGLConfig;
+
+    EGLContext context = eglCreateContext(mEGLDisplay, config,
+            shared ? mEGLContext : EGL_NO_CONTEXT, mContextAttribs.data());
+
+    if (UTILS_UNLIKELY(context == EGL_NO_CONTEXT)) {
+        // eglCreateContext failed
+        logEglError("eglCreateContext");
+    }
+
+    assert_invariant(context != EGL_NO_CONTEXT);
+
+    eglMakeCurrent(mEGLDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, context);
+
+    mAdditionalContexts.push_back(context);
+}
+
+void PlatformEGL::releaseContext() noexcept {
+    EGLContext context = eglGetCurrentContext();
+    eglMakeCurrent(mEGLDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+    if (context != EGL_NO_CONTEXT) {
+        eglDestroyContext(mEGLDisplay, context);
+    }
+
+    mAdditionalContexts.erase(
+            std::remove_if(mAdditionalContexts.begin(), mAdditionalContexts.end(),
+                    [context](EGLContext c) {
+                        return c == context;
+                    }), mAdditionalContexts.end());
+
+    eglReleaseThread();
+}
+
 EGLBoolean PlatformEGL::makeCurrent(EGLSurface drawSurface, EGLSurface readSurface) noexcept {
     if (UTILS_UNLIKELY((drawSurface != mCurrentDrawSurface || readSurface != mCurrentReadSurface))) {
         mCurrentDrawSurface = drawSurface;
@@ -260,45 +351,153 @@ EGLBoolean PlatformEGL::makeCurrent(EGLSurface drawSurface, EGLSurface readSurfa
 }
 
 void PlatformEGL::terminate() noexcept {
+    // it's always allowed to use EGL_NO_SURFACE, EGL_NO_CONTEXT
     eglMakeCurrent(mEGLDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
-    eglDestroySurface(mEGLDisplay, mEGLDummySurface);
+    if (mEGLDummySurface) {
+        eglDestroySurface(mEGLDisplay, mEGLDummySurface);
+    }
     eglDestroyContext(mEGLDisplay, mEGLContext);
+    for (auto context : mAdditionalContexts) {
+        eglDestroyContext(mEGLDisplay, context);
+    }
     if (!mIsEGLDisplayExternal) {
         eglTerminate(mEGLDisplay);
     }
     eglReleaseThread();
 }
 
+EGLConfig PlatformEGL::findSwapChainConfig(uint64_t flags, bool window, bool pbuffer) const {
+    // Find config that support ES3.
+    EGLConfig config = EGL_NO_CONFIG_KHR;
+    EGLint configsCount;
+    Config configAttribs = {
+            { EGL_RED_SIZE,         8 },
+            { EGL_GREEN_SIZE,       8 },
+            { EGL_BLUE_SIZE,        8 },
+            { EGL_ALPHA_SIZE,      (flags & SWAP_CHAIN_CONFIG_TRANSPARENT) ? 8 : 0 },
+            { EGL_DEPTH_SIZE,      24 },
+            { EGL_STENCIL_SIZE,    (flags & SWAP_CHAIN_HAS_STENCIL_BUFFER) ? 8 : 0 }
+    };
+
+    if (!ext.egl.KHR_no_config_context) {
+        if (isOpenGL()) {
+            configAttribs[EGL_RENDERABLE_TYPE] = EGL_OPENGL_BIT;
+        } else {
+            configAttribs[EGL_RENDERABLE_TYPE] = EGL_OPENGL_ES2_BIT;
+            if (ext.egl.KHR_create_context) {
+                configAttribs[EGL_RENDERABLE_TYPE] |= EGL_OPENGL_ES3_BIT_KHR;
+            }
+        }
+    }
+
+    if (window) {
+        configAttribs[EGL_SURFACE_TYPE] |= EGL_WINDOW_BIT;
+    }
+
+    if (pbuffer) {
+        configAttribs[EGL_SURFACE_TYPE] |= EGL_PBUFFER_BIT;
+    }
+
+#ifndef FILAMENT_USE_ANGLE
+    // Silence runtime warnings in Shapr3D about retrying without EGL_RECORDABLE_ANDROID
+    if (ext.egl.ANDROID_recordable) {
+        configAttribs[EGL_RECORDABLE_ANDROID] = EGL_TRUE;
+    }
+#endif
+
+    if (UTILS_UNLIKELY(
+            !eglChooseConfig(mEGLDisplay, configAttribs.data(), &config, 1, &configsCount))) {
+        logEglError("eglChooseConfig");
+            return EGL_NO_CONFIG_KHR;
+    }
+
+    if (UTILS_UNLIKELY(configsCount == 0)) {
+        if (ext.egl.ANDROID_recordable) {
+            // warn and retry without EGL_RECORDABLE_ANDROID
+            logEglError(
+                    "eglChooseConfig(..., EGL_RECORDABLE_ANDROID) failed. Continuing without it.");
+            configAttribs[EGL_RECORDABLE_ANDROID] = EGL_DONT_CARE;
+            if (UTILS_UNLIKELY(
+                    !eglChooseConfig(mEGLDisplay, configAttribs.data(), &config, 1, &configsCount)
+                            || configsCount == 0)) {
+                logEglError("eglChooseConfig");
+                return EGL_NO_CONFIG_KHR;
+            }
+        } else {
+            // we found zero config matching our request!
+            logEglError("eglChooseConfig() didn't find any matching config!");
+            return EGL_NO_CONFIG_KHR;
+        }
+    }
+    return config;
+}
+
+bool PlatformEGL::isSRGBSwapChainSupported() const noexcept {
+    return ext.egl.KHR_gl_colorspace;
+}
+
 Platform::SwapChain* PlatformEGL::createSwapChain(
-        void* nativeWindow, uint64_t& flags) noexcept {
-    EGLSurface sur = eglCreateWindowSurface(mEGLDisplay,
-            (flags & SWAP_CHAIN_CONFIG_TRANSPARENT) ?
-            mEGLTransparentConfig : mEGLConfig,
-            (EGLNativeWindowType)nativeWindow, nullptr);
+        void* nativeWindow, uint64_t flags) noexcept {
+
+    EGLConfig config = EGL_NO_CONFIG_KHR;
+    if (UTILS_LIKELY(ext.egl.KHR_no_config_context)) {
+        config = findSwapChainConfig(flags, true, false);
+    } else {
+        config = mEGLConfig;
+    }
+
+    if (UTILS_UNLIKELY(config == EGL_NO_CONFIG_KHR)) {
+        return nullptr;
+    }
+
+    Config attribs;
+
+    if (ext.egl.KHR_gl_colorspace) {
+        if (flags & SWAP_CHAIN_CONFIG_SRGB_COLORSPACE) {
+            attribs[EGL_GL_COLORSPACE_KHR] = EGL_GL_COLORSPACE_SRGB_KHR;
+        }
+    }
+
+    EGLSurface sur = eglCreateWindowSurface(mEGLDisplay, config,
+            (EGLNativeWindowType)nativeWindow, attribs.data());
 
     if (UTILS_UNLIKELY(sur == EGL_NO_SURFACE)) {
         logEglError("eglCreateWindowSurface");
         return nullptr;
     }
-    if (!eglSurfaceAttrib(mEGLDisplay, sur, EGL_SWAP_BEHAVIOR, EGL_BUFFER_DESTROYED)) {
-        logEglError("eglSurfaceAttrib(..., EGL_SWAP_BEHAVIOR, EGL_BUFFER_DESTROYED)");
-        // this is not fatal
-    }
+
+    // this is not fatal
+    eglSurfaceAttrib(mEGLDisplay, sur, EGL_SWAP_BEHAVIOR, EGL_BUFFER_DESTROYED);
+
     return (SwapChain*)sur;
 }
 
 Platform::SwapChain* PlatformEGL::createSwapChain(
-        uint32_t width, uint32_t height, uint64_t& flags) noexcept {
+        uint32_t width, uint32_t height, uint64_t flags) noexcept {
 
-    EGLint attribs[] = {
-            EGL_WIDTH, EGLint(width),
-            EGL_HEIGHT, EGLint(height),
-            EGL_NONE
+    EGLConfig config = EGL_NO_CONFIG_KHR;
+    if (UTILS_LIKELY(ext.egl.KHR_no_config_context)) {
+        config = findSwapChainConfig(flags, false, true);
+    } else {
+        config = mEGLConfig;
+    }
+
+    if (UTILS_UNLIKELY(config == EGL_NO_CONFIG_KHR)) {
+        return nullptr;
+    }
+
+    Config attribs = {
+            { EGL_WIDTH,  EGLint(width) },
+            { EGL_HEIGHT, EGLint(height) },
     };
 
-    EGLSurface sur = eglCreatePbufferSurface(mEGLDisplay,
-                (flags & SWAP_CHAIN_CONFIG_TRANSPARENT) ?
-                mEGLTransparentConfig : mEGLConfig, attribs);
+    if (ext.egl.KHR_gl_colorspace) {
+        if (flags & SWAP_CHAIN_CONFIG_SRGB_COLORSPACE) {
+            attribs[EGL_GL_COLORSPACE_KHR] = EGL_GL_COLORSPACE_SRGB_KHR;
+        }
+    }
+
+    EGLSurface sur = eglCreatePbufferSurface(mEGLDisplay, config, attribs.data());
 
     if (UTILS_UNLIKELY(sur == EGL_NO_SURFACE)) {
         logEglError("eglCreatePbufferSurface");
@@ -331,6 +530,10 @@ void PlatformEGL::commit(Platform::SwapChain* swapChain) noexcept {
     }
 }
 
+bool PlatformEGL::canCreateFence() noexcept {
+    return true;
+}
+
 Platform::Fence* PlatformEGL::createFence() noexcept {
     Fence* f = nullptr;
 #ifdef EGL_KHR_reusable_sync
@@ -353,7 +556,7 @@ FenceStatus PlatformEGL::waitFence(
 #ifdef EGL_KHR_reusable_sync
     EGLSyncKHR sync = (EGLSyncKHR) fence;
     if (sync != EGL_NO_SYNC_KHR) {
-        EGLint status = eglClientWaitSyncKHR(mEGLDisplay, sync, 0, (EGLTimeKHR)timeout);
+        EGLint const status = eglClientWaitSyncKHR(mEGLDisplay, sync, 0, (EGLTimeKHR)timeout);
         if (status == EGL_CONDITION_SATISFIED_KHR) {
             return FenceStatus::CONDITION_SATISFIED;
         }
@@ -365,35 +568,78 @@ FenceStatus PlatformEGL::waitFence(
     return FenceStatus::ERROR;
 }
 
-void PlatformEGL::createExternalImageTexture(void* texture) noexcept {
-    auto* t = (OpenGLDriver::GLTexture*) texture;
-    glGenTextures(1, &t->gl.id);
-    if (UTILS_LIKELY(ext.OES_EGL_image_external_essl3)) {
-        t->gl.target = GL_TEXTURE_EXTERNAL_OES;
-        t->gl.targetIndex = (uint8_t)
-                OpenGLContext::getIndexForTextureTarget(GL_TEXTURE_EXTERNAL_OES);
+OpenGLPlatform::ExternalTexture* PlatformEGL::createExternalImageTexture() noexcept {
+    ExternalTexture* outTexture = new ExternalTexture{};
+    glGenTextures(1, &outTexture->id);
+    if (UTILS_LIKELY(ext.gl.OES_EGL_image_external_essl3)) {
+        outTexture->target = GL_TEXTURE_EXTERNAL_OES;
     } else {
         // if texture external is not supported, revert to texture 2d
-        t->gl.target = GL_TEXTURE_2D;
-        t->gl.targetIndex = (uint8_t)
-                OpenGLContext::getIndexForTextureTarget(GL_TEXTURE_2D);
+        outTexture->target = GL_TEXTURE_2D;
     }
+    return outTexture;
 }
 
-void PlatformEGL::destroyExternalImage(void* texture) noexcept {
-    auto* t = (OpenGLDriver::GLTexture*) texture;
-    glDeleteTextures(1, &t->gl.id);
+void PlatformEGL::destroyExternalImage(ExternalTexture* texture) noexcept {
+    glDeleteTextures(1, &texture->id);
+    delete texture;
+}
+
+bool PlatformEGL::setExternalImage(void* externalImage,
+        UTILS_UNUSED_IN_RELEASE ExternalTexture* texture) noexcept {
+    if (UTILS_LIKELY(ext.gl.OES_EGL_image_external_essl3)) {
+        assert_invariant(texture->target == GL_TEXTURE_EXTERNAL_OES);
+        // the texture is guaranteed to be bound here.
+#ifdef GL_OES_EGL_image
+        glEGLImageTargetTexture2DOES(GL_TEXTURE_EXTERNAL_OES,
+                static_cast<GLeglImageOES>(externalImage));
+#endif
+    }
+    return true;
 }
 
 void PlatformEGL::initializeGlExtensions() noexcept {
+    // We're guaranteed to be on an ES platform, since we're using EGL
     GLUtils::unordered_string_set glExtensions;
-    GLint n;
-    glGetIntegerv(GL_NUM_EXTENSIONS, &n);
-    for (GLint i = 0; i < n; ++i) {
-        const char * const extension = (const char*) glGetStringi(GL_EXTENSIONS, (GLuint)i);
-        glExtensions.insert(extension);
+    const char* const extensions = (const char*)glGetString(GL_EXTENSIONS);
+    glExtensions = GLUtils::split(extensions);
+    ext.gl.OES_EGL_image_external_essl3 = glExtensions.has("GL_OES_EGL_image_external_essl3");
+}
+
+// ---------------------------------------------------------------------------------------------
+
+PlatformEGL::Config::Config() = default;
+
+PlatformEGL::Config::Config(std::initializer_list<std::pair<EGLint, EGLint>> list)
+        : mConfig(list) {
+    mConfig.emplace_back(EGL_NONE, EGL_NONE);
+}
+
+EGLint& PlatformEGL::Config::operator[](EGLint name) {
+    auto pos = std::find_if(mConfig.begin(), mConfig.end(),
+            [name](auto&& v) { return v.first == name; });
+    if (pos == mConfig.end()) {
+        mConfig.insert(pos - 1, { name, 0 });
+        pos = mConfig.end() - 2;
     }
-    ext.OES_EGL_image_external_essl3 = glExtensions.has("GL_OES_EGL_image_external_essl3");
+    return pos->second;
+}
+
+EGLint PlatformEGL::Config::operator[](EGLint name) const {
+    auto pos = std::find_if(mConfig.begin(), mConfig.end(),
+            [name](auto&& v) { return v.first == name; });
+    assert_invariant(pos != mConfig.end());
+    return pos->second;
+}
+
+void PlatformEGL::Config::erase(EGLint name) noexcept {
+    if (name != EGL_NONE) {
+        auto pos = std::find_if(mConfig.begin(), mConfig.end(),
+                [name](auto&& v) { return v.first == name; });
+        if (pos != mConfig.end()) {
+            mConfig.erase(pos);
+        }
+    }
 }
 
 } // namespace filament::backend

@@ -27,12 +27,12 @@ namespace filament::backend {
 // Simple manager for VkSampler objects.
 class VulkanSamplerCache {
 public:
-    explicit VulkanSamplerCache(VulkanContext&);
+    void initialize(VkDevice device);
     VkSampler getSampler(SamplerParams params) noexcept;
-    void reset() noexcept;
+    void terminate() noexcept;
 private:
-    VulkanContext& mContext;
-    tsl::robin_map<uint32_t, VkSampler> mCache;
+    VkDevice mDevice;
+    tsl::robin_map<SamplerParams, VkSampler, SamplerParams::Hasher, SamplerParams::EqualTo> mCache;
 };
 
 } // namespace filament::backend

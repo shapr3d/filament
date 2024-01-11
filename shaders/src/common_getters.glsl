@@ -24,12 +24,22 @@ highp mat4 getViewFromClipMatrix() {
 
 /** @public-api */
 highp mat4 getClipFromWorldMatrix() {
-    return frameUniforms.clipFromWorldMatrix;
+#if defined(VARIANT_HAS_INSTANCED_STEREO)
+    int eye = instance_index % CONFIG_STEREO_EYE_COUNT;
+    return frameUniforms.clipFromWorldMatrix[eye];
+#else
+    return frameUniforms.clipFromWorldMatrix[0];
+#endif
 }
 
 /** @public-api */
 highp mat4 getWorldFromClipMatrix() {
     return frameUniforms.worldFromClipMatrix;
+}
+
+/** @public-api */
+highp mat4 getUserWorldFromWorldMatrix() {
+    return frameUniforms.userWorldFromWorldMatrix;
 }
 
 /** @public-api */
@@ -47,11 +57,28 @@ highp float getUserTimeMod(float m) {
     return mod(mod(frameUniforms.userTime.x, m) + mod(frameUniforms.userTime.y, m), m);
 }
 
-// TODO: below shouldn't be accessible from post-process materials
+/**
+ * Transforms a texture UV to make it suitable for a render target attachment.
+ *
+ * In Vulkan and Metal, texture coords are Y-down but in OpenGL they are Y-up. This wrapper function
+ * accounts for these differences. When sampling from non-render targets (i.e. uploaded textures)
+ * these differences do not matter because OpenGL has a second piece of backwardness, which is that
+ * the first row of texels in glTexImage2D is interpreted as the bottom row.
+ *
+ * To protect users from these differences, we recommend that materials in the SURFACE domain
+ * leverage this wrapper function when sampling from offscreen render targets.
+ *
+ * @public-api
+ */
+highp vec2 uvToRenderTargetUV(const highp vec2 uv) {
+#if defined(TARGET_METAL_ENVIRONMENT) || defined(TARGET_VULKAN_ENVIRONMENT)
+    return vec2(uv.x, 1.0 - uv.y);
+#else
+    return uv;
+#endif
+}
 
-#define FILAMENT_OBJECT_SKINNING_ENABLED_BIT   0x1u
-#define FILAMENT_OBJECT_MORPHING_ENABLED_BIT   0x2u
-#define FILAMENT_OBJECT_CONTACT_SHADOWS_BIT    0x4u
+// TODO: below shouldn't be accessible from post-process materials
 
 /** @public-api */
 highp vec4 getResolution() {
@@ -60,12 +87,12 @@ highp vec4 getResolution() {
 
 /** @public-api */
 highp vec3 getWorldCameraPosition() {
-    return frameUniforms.cameraPosition;
+    return frameUniforms.worldFromViewMatrix[3].xyz;
 }
 
-/** @public-api */
+/** @public-api, @deprecated use getUserWorldPosition() or getUserWorldFromWorldMatrix() instead  */
 highp vec3 getWorldOffset() {
-    return frameUniforms.worldOffset;
+    return getUserWorldFromWorldMatrix()[3].xyz;
 }
 
 /** @public-api */
@@ -78,4 +105,24 @@ float getExposure() {
 /** @public-api */
 float getEV100() {
     return frameUniforms.ev100;
+}
+
+//------------------------------------------------------------------------------
+// user defined globals
+//------------------------------------------------------------------------------
+
+highp vec4 getMaterialGlobal0() {
+    return frameUniforms.custom[0];
+}
+
+highp vec4 getMaterialGlobal1() {
+    return frameUniforms.custom[1];
+}
+
+highp vec4 getMaterialGlobal2() {
+    return frameUniforms.custom[2];
+}
+
+highp vec4 getMaterialGlobal3() {
+    return frameUniforms.custom[3];
 }

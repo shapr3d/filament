@@ -17,9 +17,9 @@
 #ifndef TNT_FILAMENT_COMPONENTS_LIGHTMANAGER_H
 #define TNT_FILAMENT_COMPONENTS_LIGHTMANAGER_H
 
-#include "upcast.h"
+#include "downcast.h"
 
-#include "private/backend/DriverApiForward.h"
+#include "backend/DriverApiForward.h"
 
 #include <filament/LightManager.h>
 
@@ -46,20 +46,32 @@ public:
 
     void gc(utils::EntityManager& em) noexcept;
 
-    size_t getComponentCount() const noexcept {
-        return mManager.getComponentCount();
-    }
-
-    utils::Entity const* getEntities() const noexcept {
-        return mManager.getEntities();
-    }
+    /*
+     * Component Manager APIs
+     */
 
     bool hasComponent(utils::Entity e) const noexcept {
         return mManager.hasComponent(e);
     }
 
     Instance getInstance(utils::Entity e) const noexcept {
-        return mManager.getInstance(e);
+        return { mManager.getInstance(e) };
+    }
+
+    size_t getComponentCount() const noexcept {
+        return mManager.getComponentCount();
+    }
+
+    bool empty() const noexcept {
+        return mManager.empty();
+    }
+
+    utils::Entity getEntity(Instance i) const noexcept {
+        return mManager.getEntity(i);
+    }
+
+    utils::Entity const* getEntities() const noexcept {
+        return mManager.getEntities();
     }
 
     void create(const FLightManager::Builder& builder, utils::Entity entity);
@@ -127,12 +139,12 @@ public:
     }
 
     bool isSpotLight(Instance i) const noexcept {
-        Type type = getType(i);
+        Type const type = getType(i);
         return type == Type::FOCUSED_SPOT || type == Type::SPOT;
     }
 
     bool isDirectionalLight(Instance i) const noexcept {
-        Type type = getType(i);
+        Type const type = getType(i);
         return type == Type::DIRECTIONAL || type == Type::SUN;
     }
 
@@ -300,7 +312,7 @@ private:
     FEngine& mEngine;
 };
 
-FILAMENT_UPCAST(LightManager)
+FILAMENT_DOWNCAST(LightManager)
 
 
 } // namespace filament

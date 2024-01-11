@@ -47,11 +47,11 @@ FCamera::FCamera(FEngine& engine, Entity e)
           mEntity(e) {
 }
 
-void UTILS_NOINLINE FCamera::setProjection(double fovInDegrees, double aspect, double near, double far,
-        Camera::Fov direction) noexcept {
+math::mat4 FCamera::projection(Fov direction, double fovInDegrees,
+        double aspect, double near, double far) {
     double w;
     double h;
-    double s = std::tan(fovInDegrees * math::d::DEG_TO_RAD / 2.0) * near;
+    double const s = std::tan(fovInDegrees * math::d::DEG_TO_RAD / 2.0) * near;
     if (direction == Fov::VERTICAL) {
         w = s * aspect;
         h = s;
@@ -59,54 +59,70 @@ void UTILS_NOINLINE FCamera::setProjection(double fovInDegrees, double aspect, d
         w = s;
         h = s / aspect;
     }
-    FCamera::setProjection(Projection::PERSPECTIVE, -w, w, -h, h, near, far);
+    mat4 p = math::mat4::frustum(-w, w, -h, h, near, far);
+    if (far == std::numeric_limits<double>::infinity()) {
+        p[2][2] = -1.0f;           // lim(far->inf) = -1
+        p[3][2] = -2.0f * near;    // lim(far->inf) = -2*near
+    }
+    return p;
 }
 
-void FCamera::setLensProjection(double focalLengthInMillimeters,
-        double aspect, double near, double far) noexcept {
+math::mat4 FCamera::projection(double focalLengthInMillimeters,
+        double aspect, double near, double far) {
     // a 35mm camera has a 36x24mm wide frame size
-    double h = (0.5 * near) * ((SENSOR_SIZE * 1000.0) / focalLengthInMillimeters);
-    double w = h * aspect;
-    FCamera::setProjection(Projection::PERSPECTIVE, -w, w, -h, h, near, far);
+    double const h = (0.5 * near) * ((SENSOR_SIZE * 1000.0) / focalLengthInMillimeters);
+    double const w = h * aspect;
+    mat4 p = math::mat4::frustum(-w, w, -h, h, near, far);
+    if (far == std::numeric_limits<double>::infinity()) {
+        p[2][2] = -1.0f;           // lim(far->inf) = -1
+        p[3][2] = -2.0f * near;    // lim(far->inf) = -2*near
+    }
+    return p;
 }
 
 /*
  * All methods for setting the projection funnel through here
  */
 
-void UTILS_NOINLINE FCamera::setCustomProjection(mat4 const& p, double near, double far) noexcept {
-    setCustomProjection(p, p, near, far);
-}
-
 void UTILS_NOINLINE FCamera::setCustomProjection(mat4 const& p,
         mat4 const& c, double near, double far) noexcept {
-    mProjection = p;
+    for (auto& eyeProjection: mEyeProjection) {
+        eyeProjection = p;
+    }
     mProjectionForCulling = c;
-    mNear = (float)near;
-    mFar = (float)far;
+    mNear = near;
+    mFar = far;
+}
+
+void UTILS_NOINLINE FCamera::setCustomEyeProjection(math::mat4 const* projection, size_t count,
+        math::mat4 const& projectionForCulling, double near, double far) {
+    const Engine::Config& config = mEngine.getConfig();
+    ASSERT_PRECONDITION(count >= config.stereoscopicEyeCount,
+            "All eye projections must be supplied together, count must be >= "
+            "config.stereoscopicEyeCount (%d)", config.stereoscopicEyeCount);
+    for (int i = 0; i < config.stereoscopicEyeCount; i++) {
+        mEyeProjection[i] = projection[i];
+    }
+    mProjectionForCulling = projectionForCulling;
+    mNear = near;
+    mFar = far;
 }
 
 void UTILS_NOINLINE FCamera::setProjection(Camera::Projection projection,
         double left, double right,
         double bottom, double top,
-        double near, double far) noexcept {
+        double near, double far) {
 
-    // we make sure our preconditions are verified, using default values,
-    // to avoid inconsistent states in the renderer later.
-    if (UTILS_UNLIKELY(left == right ||
-                       bottom == top ||
-                       (projection == Projection::PERSPECTIVE && (near <= 0 || far <= near)) ||
-                       (projection == Projection::ORTHO && (near == far)))) {
-        PANIC_LOG("Camera preconditions not met. Using default projection.");
-        left = -0.1;
-        right = 0.1;
-        bottom = -0.1;
-        top = 0.1;
-        near = 0.1;
-        far = 100.0;
-    }
+    ASSERT_PRECONDITION(!(
+            left == right ||
+            bottom == top ||
+            (projection == Projection::PERSPECTIVE && (near <= 0 || far <= near)) ||
+            (projection == Projection::ORTHO && (near == far))),
+            "Camera preconditions not met in setProjection(%s, %f, %f, %f, %f, %f, %f)",
+            projection == Camera::Projection::PERSPECTIVE ? "PERSPECTIVE" : "ORTHO",
+            left, right, bottom, top, near, far);
 
-    mat4 p;
+    mat4 c, p;
     switch (projection) {
         case Projection::PERSPECTIVE:
             /*
@@ -117,8 +133,8 @@ void UTILS_NOINLINE FCamera::setProjection(Camera::Projection projection,
              *       0        0      F+N/N-F   2*F*N/N-F
              *       0        0        -1           0
              */
-            p = mat4::frustum(left, right, bottom, top, near, far);
-            mProjectionForCulling = p;
+            c = mat4::frustum(left, right, bottom, top, near, far);
+            p = c;
 
             /*
              * but we're using a far plane at infinity
@@ -141,16 +157,16 @@ void UTILS_NOINLINE FCamera::setProjection(Camera::Projection projection,
              *       0       0       -2/F-N    - F+N/F-N
              *       0       0         0            1
              */
-            p = mat4::ortho(left, right, bottom, top, near, far);
-            mProjectionForCulling = p;
+            c = mat4::ortho(left, right, bottom, top, near, far);
+            p = c;
             break;
     }
-    mProjection = p;
-    mNear = float(near);
-    mFar = float(far);
+    FCamera::setCustomProjection(p, c, near, far);
 }
 
-math::mat4 FCamera::getProjectionMatrix() const noexcept {
+math::mat4 FCamera::getProjectionMatrix(uint8_t eye) const noexcept {
+    UTILS_UNUSED_IN_RELEASE const Engine::Config& config = mEngine.getConfig();
+    assert_invariant(eye < config.stereoscopicEyeCount);
     // This is where we transform the user clip-space (GL convention) to our virtual clip-space
     // (inverted DX convention)
     // Note that this math ends up setting the projection matrix' p33 to 0, which is where we're
@@ -161,7 +177,7 @@ math::mat4 FCamera::getProjectionMatrix() const noexcept {
             0.0, 0.0, -0.5, 0.5,    // GL to inverted DX convention
             0.0, 0.0, 0.0, 1.0
     }};
-    return m * mProjection;
+    return m * mEyeProjection[eye];
 }
 
 math::mat4 FCamera::getCullingProjectionMatrix() const noexcept {
@@ -175,6 +191,13 @@ math::mat4 FCamera::getCullingProjectionMatrix() const noexcept {
     return m * mProjectionForCulling;
 }
 
+const math::mat4& FCamera::getUserProjectionMatrix(uint8_t eyeId) const {
+    const Engine::Config& config = mEngine.getConfig();
+    ASSERT_PRECONDITION(eyeId < config.stereoscopicEyeCount,
+            "eyeId must be < config.stereoscopicEyeCount (%d)", config.stereoscopicEyeCount);
+    return mEyeProjection[eyeId];
+}
+
 void UTILS_NOINLINE FCamera::setModelMatrix(const mat4f& modelMatrix) noexcept {
     FTransformManager& transformManager = mEngine.getTransformManager();
     transformManager.setTransform(transformManager.getInstance(mEntity), modelMatrix);
@@ -185,7 +208,14 @@ void UTILS_NOINLINE FCamera::setModelMatrix(const mat4& modelMatrix) noexcept {
     transformManager.setTransform(transformManager.getInstance(mEntity), modelMatrix);
 }
 
-void FCamera::lookAt(const float3& eye, const float3& center, const float3& up) noexcept {
+void UTILS_NOINLINE FCamera::setEyeModelMatrix(uint8_t eyeId, math::mat4 const& model) {
+    const Engine::Config& config = mEngine.getConfig();
+    ASSERT_PRECONDITION(eyeId < config.stereoscopicEyeCount,
+            "eyeId must be < config.stereoscopicEyeCount (%d)", config.stereoscopicEyeCount);
+    mEyeFromView[eyeId] = inverse(model);
+}
+
+void FCamera::lookAt(double3 const& eye, double3 const& center, double3 const& up) noexcept {
     FTransformManager& transformManager = mEngine.getTransformManager();
     transformManager.setTransform(transformManager.getInstance(mEntity),
             mat4::lookAt(eye, center, up));
@@ -212,7 +242,8 @@ void FCamera::setExposure(float aperture, float shutterSpeed, float sensitivity)
 }
 
 double FCamera::getFocalLength() const noexcept {
-    return (FCamera::SENSOR_SIZE * mProjection[1][1]) * 0.5;
+    auto const& monoscopicEyeProjection = mEyeProjection[0];
+    return (FCamera::SENSOR_SIZE * monoscopicEyeProjection[1][1]) * 0.5;
 }
 
 double FCamera::computeEffectiveFocalLength(double focalLength, double focusDistance) noexcept {
@@ -221,74 +252,46 @@ double FCamera::computeEffectiveFocalLength(double focalLength, double focusDist
 }
 
 double FCamera::computeEffectiveFov(double fovInDegrees, double focusDistance) noexcept {
-    double f = 0.5 * FCamera::SENSOR_SIZE / std::tan(fovInDegrees * math::d::DEG_TO_RAD * 0.5);
+    double const f = 0.5 * FCamera::SENSOR_SIZE / std::tan(fovInDegrees * math::d::DEG_TO_RAD * 0.5);
     focusDistance = std::max(f, focusDistance);
-    double fov = 2.0 * std::atan(FCamera::SENSOR_SIZE * (focusDistance - f) / (2.0 * focusDistance * f));
+    double const fov = 2.0 * std::atan(FCamera::SENSOR_SIZE * (focusDistance - f) / (2.0 * focusDistance * f));
     return fov * math::d::RAD_TO_DEG;
 }
 
-template<typename T>
-math::details::TMat44<T> inverseProjection(const math::details::TMat44<T>& p) noexcept {
-    math::details::TMat44<T> r;
-    const T A = 1 / p[0][0];
-    const T B = 1 / p[1][1];
-    if (p[2][3] != T(0)) {
-        // perspective projection
-        // a 0 tx 0
-        // 0 b ty 0
-        // 0 0 tz c
-        // 0 0 -1 0
-        const T C = 1 / p[3][2];
-        r[0][0] = A;
-        r[1][1] = B;
-        r[2][2] = 0;
-        r[2][3] = C;
-        r[3][0] = p[2][0] * A;    // not needed if symmetric
-        r[3][1] = p[2][1] * B;    // not needed if symmetric
-        r[3][2] = -1;
-        r[3][3] = p[2][2] * C;
-    } else {
-        // orthographic projection
-        // a 0 0 tx
-        // 0 b 0 ty
-        // 0 0 c tz
-        // 0 0 0 1
-        const T C = 1 / p[2][2];
-        r[0][0] = A;
-        r[1][1] = B;
-        r[2][2] = C;
-        r[3][3] = 1;
-        r[3][0] = -p[3][0] * A;
-        r[3][1] = -p[3][1] * B;
-        r[3][2] = -p[3][2] * C;
-    }
-    return r;
+uint8_t FCamera::getStereoscopicEyeCount() const noexcept {
+    const Engine::Config& config = mEngine.getConfig();
+    return config.stereoscopicEyeCount;
 }
 
 // ------------------------------------------------------------------------------------------------
 
 CameraInfo::CameraInfo(FCamera const& camera) noexcept {
-    projection         = mat4f{ camera.getProjectionMatrix() };
+    for (int i = 0; i < camera.getStereoscopicEyeCount(); i++) {
+        eyeProjection[i]   = mat4f{ camera.getProjectionMatrix(i) };
+    }
     cullingProjection  = mat4f{ camera.getCullingProjectionMatrix() };
     model              = mat4f{ camera.getModelMatrix() };
     view               = mat4f{ camera.getViewMatrix() };
-    zn                 = camera.getNear();
-    zf                 = camera.getCullingFar();
+    zn                 = (float)camera.getNear();
+    zf                 = (float)camera.getCullingFar();
     ev100              = Exposure::ev100(camera);
     f                  = (float)camera.getFocalLength();
     A                  = f / camera.getAperture();
     d                  = std::max(zn, camera.getFocusDistance());
 }
 
-CameraInfo::CameraInfo(FCamera const& camera, const math::mat4& worldOriginCamera) noexcept {
-    const mat4 modelMatrix{ worldOriginCamera * camera.getModelMatrix() };
-    projection         = mat4f{ camera.getProjectionMatrix() };
+CameraInfo::CameraInfo(FCamera const& camera, math::mat4 const& inWorldTransform) noexcept {
+    const mat4 modelMatrix{ inWorldTransform * camera.getModelMatrix() };
+    for (int i = 0; i < camera.getStereoscopicEyeCount(); i++) {
+        eyeProjection[i]   = mat4f{ camera.getProjectionMatrix(i) };
+        eyeFromView[i]     = mat4f{ camera.getEyeFromViewMatrix(i) };
+    }
     cullingProjection  = mat4f{ camera.getCullingProjectionMatrix() };
     model              = mat4f{ modelMatrix };
     view               = mat4f{ inverse(modelMatrix) };
-    worldOrigin        = worldOriginCamera;
-    zn                 = camera.getNear();
-    zf                 = camera.getCullingFar();
+    worldTransform     = inWorldTransform;
+    zn                 = (float)camera.getNear();
+    zf                 = (float)camera.getCullingFar();
     ev100              = Exposure::ev100(camera);
     f                  = (float)camera.getFocalLength();
     A                  = f / camera.getAperture();

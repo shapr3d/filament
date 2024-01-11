@@ -606,8 +606,9 @@ TEST_F(ValidateArithmetics, DotNotVectorTypeOperand1) {
 
   CompileSuccessfully(GenerateCode(body).c_str());
   ASSERT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions());
-  EXPECT_THAT(getDiagnosticString(), HasSubstr("Operand 6[%float] cannot be a "
-                                               "type"));
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("Operand '6[%float]' cannot be a "
+                        "type"));
 }
 
 TEST_F(ValidateArithmetics, DotNotVectorTypeOperand2) {
@@ -656,7 +657,7 @@ TEST_F(ValidateArithmetics, DotDifferentVectorSize) {
   EXPECT_THAT(
       getDiagnosticString(),
       HasSubstr(
-          "Expected operands to have the same number of componenets: Dot"));
+          "Expected operands to have the same number of components: Dot"));
 }
 
 TEST_F(ValidateArithmetics, VectorTimesScalarSuccess) {

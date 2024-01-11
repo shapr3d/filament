@@ -22,7 +22,7 @@
 
 #include <private/filament/EngineEnums.h>
 
-#include <utils/CString.h>
+#include <string_view>
 
 /*
  * Here we define all the UBOs known by filament as C structs. It is used by filament to
@@ -32,28 +32,59 @@
 
 namespace filament {
 
+namespace std140 {
+
+struct alignas(16) vec3 : public std::array<float, 3> {};
+struct alignas(16) vec4 : public std::array<float, 4> {};
+
+struct mat33 : public std::array<vec3, 3> {
+    mat33& operator=(math::mat3f const& rhs) noexcept {
+        for (int i = 0; i < 3; i++) {
+            (*this)[i][0] = rhs[i][0];
+            (*this)[i][1] = rhs[i][1];
+            (*this)[i][2] = rhs[i][2];
+        }
+        return *this;
+    }
+};
+
+struct mat44 : public std::array<vec4, 4> {
+    mat44& operator=(math::mat4f const& rhs) noexcept {
+        for (int i = 0; i < 4; i++) {
+            (*this)[i][0] = rhs[i][0];
+            (*this)[i][1] = rhs[i][1];
+            (*this)[i][2] = rhs[i][2];
+            (*this)[i][3] = rhs[i][3];
+        }
+        return *this;
+    }
+};
+
+} // std140
 /*
- * These structures are only used to call offsetof() and make it easy to visualize the UBO.
- *
- * IMPORTANT NOTE: Respect std140 layout, don't update without updating getUib()
+ * IMPORTANT NOTE: Respect std140 layout, don't update without updating UibGenerator::get{*}Uib()
  */
 
 struct PerViewUib { // NOLINT(cppcoreguidelines-pro-type-member-init)
-    static constexpr utils::StaticString _name{ "FrameUniforms" };
+    static constexpr std::string_view _name{ "FrameUniforms" };
 
     // --------------------------------------------------------------------------------------------
     // Values that can be accessed in both surface and post-process materials
     // --------------------------------------------------------------------------------------------
 
-    math::mat4f viewFromWorldMatrix;
-    math::mat4f worldFromViewMatrix;
-    math::mat4f clipFromViewMatrix;
-    math::mat4f viewFromClipMatrix;
-    math::mat4f clipFromWorldMatrix;
-    math::mat4f worldFromClipMatrix;
+    math::mat4f viewFromWorldMatrix;    // clip    view <- world    : view matrix
+    math::mat4f worldFromViewMatrix;    // clip    view -> world    : model matrix
+    math::mat4f clipFromViewMatrix;     // clip <- view    world    : projection matrix
+    math::mat4f viewFromClipMatrix;     // clip -> view    world    : inverse projection matrix
+    math::mat4f clipFromWorldMatrix[CONFIG_MAX_STEREOSCOPIC_EYES]; // clip <- view <- world
+    math::mat4f worldFromClipMatrix;    // clip -> view -> world
+    math::mat4f userWorldFromWorldMatrix;   // userWorld <- world
+    math::float4 clipTransform;             // [sx, sy, tx, ty] only used by VERTEX_DOMAIN_DEVICE
+
+    // --------------------------------------------------------------------------------------------
 
     math::float2 clipControl;       // clip control
-    float time;                     // time in seconds, with a 1 second period
+    float time;                     // time in seconds, with a 1-second period
     float temporalNoise;            // noise [0,1] when TAA is used, 0 otherwise
     math::float4 userTime;          // time(s), (double)time - (float)time, 0, 0
 
@@ -62,20 +93,15 @@ struct PerViewUib { // NOLINT(cppcoreguidelines-pro-type-member-init)
     // (i.e.: not in the post-processing materials)
     // --------------------------------------------------------------------------------------------
 
-    math::float2 origin;            // viewport left, bottom (in pixels)
-    math::float2 offset;            // rendering offset left, bottom (in pixels)
-    math::float4 resolution;        // viewport width, height, 1/width, 1/height
+    math::float4 resolution;        // physical viewport width, height, 1/width, 1/height
+    math::float2 logicalViewportScale;  // scale-factor to go from physical to logical viewport
+    math::float2 logicalViewportOffset; // offset to go from physical to logical viewport
 
     float lodBias;                  // load bias to apply to user materials
     float refractionLodOffset;
-    float padding1;
-    float padding2;
 
     // camera position in view space (when camera_at_origin is enabled), i.e. it's (0,0,0).
-    // Always add worldOffset in the shader to get the true world-space position of the camera.
-    math::float3 cameraPosition;
     float oneOverFarMinusNear;      // 1 / (f-n), always positive
-    math::float3 worldOffset;       // this is (0,0,0) when camera_at_origin is disabled
     float nearOverFarMinusNear;     // n / (f-n), always positive
     float cameraFar;                // camera *culling* far-plane distance, always positive (projection far is at +inf)
     float exposure;
@@ -83,7 +109,7 @@ struct PerViewUib { // NOLINT(cppcoreguidelines-pro-type-member-init)
     float needsAlphaChannel;
 
     // AO
-    float aoSamplingQualityAndEdgeDistance;     // 0: bilinear, !0: bilateral edge distance
+    float aoSamplingQualityAndEdgeDistance;     // <0: no AO, 0: bilinear, !0: bilateral edge distance
     float aoBentNormals;                        // 0: no AO bent normal, >0.0 AO bent normals
     float aoReserved0;
     float aoReserved1;
@@ -93,7 +119,7 @@ struct PerViewUib { // NOLINT(cppcoreguidelines-pro-type-member-init)
     // --------------------------------------------------------------------------------------------
     math::float4 zParams;                       // froxel Z parameters
     math::uint3 fParams;                        // stride-x, stride-y, stride-z
-    uint32_t lightChannels;                     // light channel bits
+    int32_t lightChannels;                      // light channel bits
     math::float2 froxelCountXY;
 
     // IBL
@@ -108,7 +134,7 @@ struct PerViewUib { // NOLINT(cppcoreguidelines-pro-type-member-init)
     float padding0;
     math::float4 lightColorIntensity;           // directional light
     math::float4 sun;                           // cos(sunAngle), sin(sunAngle), 1/(sunAngle*HALO_SIZE-sunAngle), HALO_EXP
-    math::float2 lightFarAttenuationParams;     // a, a/far (a=1/pct-of-far)
+    math::float2 shadowFarAttenuationParams;    // a, a/far (a=1/pct-of-far)
 
     // --------------------------------------------------------------------------------------------
     // Directional light shadowing [variant: SRE | DIR]
@@ -116,20 +142,17 @@ struct PerViewUib { // NOLINT(cppcoreguidelines-pro-type-member-init)
     // bit 0: directional (sun) shadow enabled
     // bit 1: directional (sun) screen-space contact shadow enabled
     // bit 8-15: screen-space contact shadows ray casting steps
-    uint32_t directionalShadows;
+    int32_t directionalShadows;
     float ssContactShadowDistance;
 
     // position of cascade splits, in world space (not including the near plane)
     // -Inf stored in unused components
     math::float4 cascadeSplits;
     // bit 0-3: cascade count
-    // bit 4: visualize cascades
     // bit 8-11: cascade has visible shadows
-    uint32_t cascades;
-    float shadowBulbRadiusLs;           // light radius in light-space
-    float shadowBias;                   // normal bias
+    int32_t cascades;
     float shadowPenumbraRatioScale;     // For DPCF or PCSS, scale penumbra ratio for artistic use
-    std::array<math::mat4f, CONFIG_MAX_SHADOW_CASCADES> lightFromWorldMatrix;
+    math::float2 lightFarAttenuationParams;     // a, a/far (a=1/pct-of-far)
 
     // --------------------------------------------------------------------------------------------
     // VSM shadows [variant: VSM]
@@ -142,16 +165,19 @@ struct PerViewUib { // NOLINT(cppcoreguidelines-pro-type-member-init)
     // --------------------------------------------------------------------------------------------
     // Fog [variant: FOG]
     // --------------------------------------------------------------------------------------------
+    math::float3 fogDensity;        // { density, -falloff * yc, density * exp(-fallof * yc) }
     float fogStart;
     float fogMaxOpacity;
-    float fogHeight;
-    float fogHeightFalloff;         // falloff * 1.44269
+    uint32_t fogMinMaxMip;
+    float fogHeightFalloff;
+    float fogCutOffDistance;
     math::float3 fogColor;
-    float fogDensity;               // (density/falloff)*exp(-falloff*(camera.y - fogHeight))
+    float fogColorFromIbl;
     float fogInscatteringStart;
     float fogInscatteringSize;
-    float fogColorFromIbl;
-    float fogReserved0;
+    float fogOneOverFarMinusNear;
+    float fogNearOverFarMinusNear;
+    std140::mat33 fogFromWorldMatrix;
 
     // --------------------------------------------------------------------------------------------
     // Screen-space reflections [variant: SSR (i.e.: VSM | SRE)]
@@ -164,6 +190,19 @@ struct PerViewUib { // NOLINT(cppcoreguidelines-pro-type-member-init)
     float ssrStride;                    // ssr texel stride, >= 1.0
 
     // --------------------------------------------------------------------------------------------
+    // user defined global variables
+    // --------------------------------------------------------------------------------------------
+    math::float4 custom[4];
+
+    // --------------------------------------------------------------------------------------------
+    // for feature level 0 / es2 usage
+    // --------------------------------------------------------------------------------------------
+    int32_t rec709;                     // Only for ES2, 0 or 1, whether we need to do sRGB conversion
+    float es2Reserved0;
+    float es2Reserved1;
+    float es2Reserved2;
+
+    // --------------------------------------------------------------------------------------------
     // Shapr3D
     // --------------------------------------------------------------------------------------------
     math::float3 iblCenter;             // center of the sphere or IBL AABB
@@ -174,37 +213,62 @@ struct PerViewUib { // NOLINT(cppcoreguidelines-pro-type-member-init)
     math::mat4f iblRotation;            // contains the IBL's rotation
 
     // bring PerViewUib to 2 KiB
-    math::float4 reserved[41];
+    math::float4 reserved[33];
 };
 
 // 2 KiB == 128 float4s
 static_assert(sizeof(PerViewUib) == sizeof(math::float4) * 128,
         "PerViewUib should be exactly 2KiB");
 
-// PerRenderableUib must have an alignment of 256 to be compatible with all versions of GLES.
-struct alignas(256) PerRenderableUib { // NOLINT(cppcoreguidelines-pro-type-member-init)
-    static constexpr utils::StaticString _name{ "ObjectUniforms" };
-    math::mat4f worldFromModelMatrix;
-    math::mat3f worldFromModelNormalMatrix;   // this gets expanded to 48 bytes during the copy to the UBO
-    alignas(16) math::mat3f materialOrientationMatrix;   // this gets expanded to 48 bytes during the copy to the UBO
-    alignas(16) uint32_t morphTargetCount;
-    uint32_t flags;                           // see packFlags() below
-    uint32_t channels;                        // 0x000000ll
-    uint32_t objectId;                        // used for picking
+// ------------------------------------------------------------------------------------------------
+// MARK: -
+
+struct PerRenderableData {
+    std140::mat44 worldFromModelMatrix;
+    std140::mat33 worldFromModelNormalMatrix;
+    std140::mat33 materialOrientationMatrix;
+    int32_t morphTargetCount;
+    int32_t flagsChannels;                   // see packFlags() below (0x00000fll)
+    int32_t objectId;                        // used for picking
     // TODO: We need a better solution, this currently holds the average local scale for the renderable
     float userData;
-    alignas(16) math::float3 materialOrientationCenter; // center of renderable's material mapping in world space
+    alignas(16) math::float3 materialOrientationCenter;   // center of renderable's material mapping in world space
 
-    static uint32_t packFlags(bool skinning, bool morphing, bool contactShadows) noexcept {
-        return (skinning ? 1 : 0) |
-               (morphing ? 2 : 0) |
-               (contactShadows ? 4 : 0);
+    math::float4 reserved[4];
+
+    static uint32_t packFlagsChannels(
+            bool skinning, bool morphing, bool contactShadows, bool hasInstanceBuffer,
+            uint8_t channels) noexcept {
+        return (skinning              ? 0x100 : 0) |
+               (morphing              ? 0x200 : 0) |
+               (contactShadows        ? 0x400 : 0) |
+               (hasInstanceBuffer     ? 0x800 : 0) |
+               channels;
     }
 };
-static_assert(sizeof(PerRenderableUib) % 256 == 0, "sizeof(Transform) should be a multiple of 256");
+
+#ifndef _MSC_VER
+// not sure why this static_assert fails on MSVC
+static_assert(std::is_trivially_default_constructible_v<PerRenderableData>,
+        "make sure PerRenderableData stays trivially_default_constructible");
+#endif
+
+static_assert(sizeof(PerRenderableData) == 256,
+        "sizeof(PerRenderableData) must be 256 bytes");
+
+struct alignas(256) PerRenderableUib { // NOLINT(cppcoreguidelines-pro-type-member-init)
+    static constexpr std::string_view _name{ "ObjectUniforms" };
+    PerRenderableData data[CONFIG_MAX_INSTANCES];
+};
+// PerRenderableUib must have an alignment of 256 to be compatible with all versions of GLES.
+static_assert(sizeof(PerRenderableUib) <= CONFIG_MINSPEC_UBO_SIZE,
+        "PerRenderableUib exceeds max UBO size");
+
+// ------------------------------------------------------------------------------------------------
+// MARK: -
 
 struct LightsUib { // NOLINT(cppcoreguidelines-pro-type-member-init)
-    static constexpr utils::StaticString _name{ "LightsUniforms" };
+    static constexpr std::string_view _name{ "LightsUniforms" };
     math::float4 positionFalloff;     // { float3(pos), 1/falloff^2 }
     math::float3 direction;           // dir
     float reserved1;                  // 0
@@ -212,63 +276,90 @@ struct LightsUib { // NOLINT(cppcoreguidelines-pro-type-member-init)
     math::float2 spotScaleOffset;     // { scale, offset }
     float reserved3;                  // 0
     float intensity;                  // float
-    uint32_t typeShadow;              // 0x00.ll.ii.ct (t: 0=point, 1=spot, c:contact, ii: index, ll: layer)
+    uint32_t typeShadow;              // 0x00.00.ii.ct (t: 0=point, 1=spot, c:contact, ii: index)
     uint32_t channels;                // 0x000c00ll (ll: light channels, c: caster)
 
-    static uint32_t packTypeShadow(uint8_t type, bool contactShadow, uint8_t index, uint8_t layer) noexcept {
-        return (type & 0xF) | (contactShadow ? 0x10 : 0x00) | (index << 8) | (layer << 16);
+    static uint32_t packTypeShadow(uint8_t type, bool contactShadow, uint8_t index) noexcept {
+        return (type & 0xF) | (contactShadow ? 0x10 : 0x00) | (index << 8);
     }
     static uint32_t packChannels(uint8_t lightChannels, bool castShadows) noexcept {
         return lightChannels | (castShadows ? 0x10000 : 0);
     }
 };
-static_assert(sizeof(LightsUib) == 64, "the actual UBO is an array of 256 mat4");
+static_assert(sizeof(LightsUib) == 64,
+        "the actual UBO is an array of 256 mat4");
 
-// UBO for punctual (spot light) shadows.
+// ------------------------------------------------------------------------------------------------
+// MARK: -
+
+// UBO for punctual (pointlight and spotlight) shadows.
 struct ShadowUib { // NOLINT(cppcoreguidelines-pro-type-member-init)
-    static constexpr utils::StaticString _name{ "ShadowUniforms" };
+    static constexpr std::string_view _name{ "ShadowUniforms" };
     struct alignas(16) ShadowData {
-        math::mat4f lightFromWorldMatrix;
-        math::float3 direction;
-        float normalBias;
-        math::float4 lightFromWorldZ;
-
-        float texelSizeAtOneMeter;
-        float bulbRadiusLs;
-        float nearOverFarMinusNear;
+        math::mat4f lightFromWorldMatrix;       // 64
+        math::float4 lightFromWorldZ;           // 16
+        math::float4 scissorNormalized;         // 16
+        float texelSizeAtOneMeter;              //  4
+        float bulbRadiusLs;                     //  4
+        float nearOverFarMinusNear;             //  4
+        float normalBias;                       //  4
+        bool elvsm;                             //  4
+        uint32_t layer;                         //  4
+        uint32_t reserved1;                     //  4
+        uint32_t reserved2;                     //  4
     };
-    ShadowData shadows[CONFIG_MAX_SHADOW_CASTING_SPOTS];
+    ShadowData shadows[CONFIG_MAX_SHADOWMAPS];
 };
-static_assert(sizeof(ShadowUib) <= 16384, "ShadowUib exceed max UBO size");
+static_assert(sizeof(ShadowUib) <= CONFIG_MINSPEC_UBO_SIZE,
+        "ShadowUib exceeds max UBO size");
+
+// ------------------------------------------------------------------------------------------------
+// MARK: -
 
 // UBO froxel record buffer.
 struct FroxelRecordUib { // NOLINT(cppcoreguidelines-pro-type-member-init)
-    static constexpr utils::StaticString _name{ "FroxelRecordUniforms" };
+    static constexpr std::string_view _name{ "FroxelRecordUniforms" };
     math::uint4 records[1024];
 };
-static_assert(sizeof(FroxelRecordUib) == 16384, "FroxelRecordUib should be exactly 16KiB");
+static_assert(sizeof(FroxelRecordUib) == 16384,
+        "FroxelRecordUib should be exactly 16KiB");
+
+struct FroxelsUib { // NOLINT(cppcoreguidelines-pro-type-member-init)
+    static constexpr std::string_view _name{ "FroxelsUniforms" };
+    math::uint4 records[1024];
+};
+static_assert(sizeof(FroxelsUib) == 16384,
+        "FroxelsUib should be exactly 16KiB");
+
+// ------------------------------------------------------------------------------------------------
+// MARK: -
 
 // This is not the UBO proper, but just an element of a bone array.
-struct PerRenderableUibBone { // NOLINT(cppcoreguidelines-pro-type-member-init)
-    static constexpr utils::StaticString _name{ "BonesUniforms" };
+struct PerRenderableBoneUib { // NOLINT(cppcoreguidelines-pro-type-member-init)
+    static constexpr std::string_view _name{ "BonesUniforms" };
     struct alignas(16) BoneData {
         // bone transform, last row assumed [0,0,0,1]
         math::float4 transform[3];
         // 8 first cofactor matrix of transform's upper left
         math::uint4 cof;
     };
-    BoneData bone;
+    BoneData bones[CONFIG_MAX_BONE_COUNT];
 };
-static_assert(CONFIG_MAX_BONE_COUNT * sizeof(PerRenderableUibBone) <= 16384,
-        "PerRenderableUibBone exceed max UBO size");
+
+static_assert(sizeof(PerRenderableBoneUib) <= CONFIG_MINSPEC_UBO_SIZE,
+        "PerRenderableUibBone exceeds max UBO size");
+
+// ------------------------------------------------------------------------------------------------
+// MARK: -
 
 struct alignas(16) PerRenderableMorphingUib {
-    static constexpr utils::StaticString _name{ "MorphingUniforms" };
+    static constexpr std::string_view _name{ "MorphingUniforms" };
     // The array stride(the bytes between array elements) is always rounded up to the size of a vec4 in std140.
     math::float4 weights[CONFIG_MAX_MORPH_TARGET_COUNT];
 };
-static_assert(sizeof(PerRenderableMorphingUib) <= 16384,
-        "PerRenderableMorphingUib exceed max UBO size");
+
+static_assert(sizeof(PerRenderableMorphingUib) <= CONFIG_MINSPEC_UBO_SIZE,
+        "PerRenderableMorphingUib exceeds max UBO size");
 
 } // namespace filament
 

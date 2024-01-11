@@ -17,6 +17,7 @@
 #include <utils/Path.h>
 
 #include <direct.h>
+#include <shlobj.h>
 #include <sys/stat.h>
 #include <stdlib.h>
 #include <windows.h>
@@ -45,6 +46,12 @@ Path Path::getTemporaryDirectory() {
     CHAR lpTempPathBuffer[MAX_PATH];
     DWORD dwRetVal = GetTempPathA(MAX_PATH, lpTempPathBuffer);
     return Path(lpTempPathBuffer);
+}
+
+Path Path::getUserSettingsDirectory() {
+    CHAR home[MAX_PATH];
+    SHGetFolderPathA(NULL, CSIDL_APPDATA, NULL, 0, home);
+    return Path(home);
 }
 
 std::vector<Path> Path::listContents() const {

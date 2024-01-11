@@ -35,16 +35,30 @@ namespace filament {
 
 using namespace backend;
 
-FMaterialInstance::FMaterialInstance() noexcept = default;
+FMaterialInstance::FMaterialInstance() noexcept
+        : mCulling(CullingMode::BACK),
+          mDepthFunc(RasterState::DepthFunc::LE),
+          mColorWrite(false),
+          mDepthWrite(false),
+          mHasScissor(false),
+          mIsDoubleSided(false),
+          mTransparencyMode(TransparencyMode::DEFAULT) {
+}
 
 FMaterialInstance::FMaterialInstance(FEngine& engine,
         FMaterialInstance const* other, const char* name)
         : mMaterial(other->mMaterial),
           mPolygonOffset(other->mPolygonOffset),
+          mStencilState(other->mStencilState),
+          mMaskThreshold(other->mMaskThreshold),
+          mSpecularAntiAliasingVariance(other->mSpecularAntiAliasingVariance),
+          mSpecularAntiAliasingThreshold(other->mSpecularAntiAliasingThreshold),
           mCulling(other->mCulling),
+          mDepthFunc(other->mDepthFunc),
           mColorWrite(other->mColorWrite),
           mDepthWrite(other->mDepthWrite),
-          mDepthFunc(other->mDepthFunc),
+          mHasScissor(false),
+          mIsDoubleSided(other->mIsDoubleSided),
           mScissorRect(other->mScissorRect),
           mName(name ? CString(name) : other->mName) {
 
@@ -58,14 +72,28 @@ FMaterialInstance::FMaterialInstance(FEngine& engine,
     }
 
     if (!material->getSamplerInterfaceBlock().isEmpty()) {
-        mSamplers.setSamplers(other->getSamplerGroup());
-        mSbHandle = driver.createSamplerGroup(mSamplers.getSize());
+        mSamplers = other->getSamplerGroup();
+        mSbHandle = driver.createSamplerGroup(
+                mSamplers.getSize(), utils::FixedSizeString<32>(mMaterial->getName().c_str_safe()));
     }
+
+    if (material->hasDoubleSidedCapability()) {
+        setDoubleSided(mIsDoubleSided);
+    }
+
+    if (material->getBlendingMode() == BlendingMode::MASKED) {
+        setMaskThreshold(mMaskThreshold);
+    }
+
+    if (material->hasSpecularAntiAliasing()) {
+        setSpecularAntiAliasingThreshold(mSpecularAntiAliasingThreshold);
+        setSpecularAntiAliasingVariance(mSpecularAntiAliasingVariance);
+    }
+
+    setTransparencyMode(material->getTransparencyMode());
 
     mMaterialSortingKey = RenderPass::makeMaterialSortingKey(
             material->getId(), material->generateMaterialInstanceId());
-
-    setTransparencyMode(material->getTransparencyMode());
 }
 
 FMaterialInstance* FMaterialInstance::duplicate(
@@ -88,10 +116,16 @@ void FMaterialInstance::initDefaultInstance(FEngine& engine, FMaterial const* ma
 
     if (!material->getSamplerInterfaceBlock().isEmpty()) {
         mSamplers = SamplerGroup(material->getSamplerInterfaceBlock().getSize());
-        mSbHandle = driver.createSamplerGroup(mSamplers.getSize());
+        mSbHandle = driver.createSamplerGroup(
+                mSamplers.getSize(), utils::FixedSizeString<32>("Default material"));
     }
 
     const RasterState& rasterState = material->getRasterState();
+    // At the moment, only MaterialInstances have a stencil state, but in the future it should be
+    // possible to set the stencil state directly on a material (through material definitions, or
+    // MaterialBuilder).
+    // TODO: Here is where we'd "inherit" the stencil state from the Material.
+    // mStencilState = material->getStencilState();
 
     // We inherit the resolved culling mode rather than the builder-set culling mode.
     // This preserves the property whereby double-sidedness automatically disables culling.
@@ -133,27 +167,27 @@ void FMaterialInstance::commitSlow(DriverApi& driver) const {
         driver.updateBufferObject(mUbHandle, mUniforms.toBufferDescriptor(driver), 0);
     }
     if (mSamplers.isDirty()) {
-        driver.updateSamplerGroup(mSbHandle, std::move(mSamplers.toCommandStream()));
+        driver.updateSamplerGroup(mSbHandle, mSamplers.toBufferDescriptor(driver));
     }
 }
 
 // ------------------------------------------------------------------------------------------------
 
-void FMaterialInstance::setParameter(const char* name,
+void FMaterialInstance::setParameter(std::string_view name,
         backend::Handle<backend::HwTexture> texture, backend::SamplerParams params) noexcept {
-    size_t index = mMaterial->getSamplerInterfaceBlock().getSamplerInfo(name)->offset;
+    size_t const index = mMaterial->getSamplerInterfaceBlock().getSamplerInfo(name)->offset;
     mSamplers.setSampler(index, { texture, params });
 }
 
-void FMaterialInstance::setParameterImpl(const char* name,
-        Texture const* texture, TextureSampler const& sampler) noexcept {
+void FMaterialInstance::setParameterImpl(std::string_view name,
+        FTexture const* texture, TextureSampler const& sampler) {
 
 #ifndef NDEBUG
     // Per GLES3.x specification, depth texture can't be filtered unless in compare mode.
-    if (isDepthFormat(texture->getFormat())) {
+    if (texture && isDepthFormat(texture->getFormat())) {
         if (sampler.getCompareMode() == SamplerCompareMode::NONE) {
-            SamplerMinFilter minFilter = sampler.getMinFilter();
-            SamplerMagFilter magFilter = sampler.getMagFilter();
+            SamplerMinFilter const minFilter = sampler.getMinFilter();
+            SamplerMagFilter const magFilter = sampler.getMagFilter();
             if (magFilter == SamplerMagFilter::LINEAR ||
                 minFilter == SamplerMinFilter::LINEAR ||
                 minFilter == SamplerMinFilter::LINEAR_MIPMAP_LINEAR ||
@@ -161,26 +195,45 @@ void FMaterialInstance::setParameterImpl(const char* name,
                 minFilter == SamplerMinFilter::NEAREST_MIPMAP_LINEAR) {
                 PANIC_LOG("Depth textures can't be sampled with a linear filter "
                           "unless the comparison mode is set to COMPARE_TO_TEXTURE. "
-                          "(material: \"%s\", parameter: \"%s\")",
-                          getMaterial()->getName().c_str(), name);
+                          "(material: \"%s\", parameter: \"%.*s\")",
+                          getMaterial()->getName().c_str(), name.size(), name.data());
             }
         }
     }
 #endif
 
-    setParameter(name, upcast(texture)->getHwHandle(), sampler.getSamplerParams());
+    Handle<HwTexture> handle{};
+    if (UTILS_LIKELY(texture)) {
+        handle = texture->getHwHandle();
+    }
+    setParameter(name, handle, sampler.getSamplerParams());
 }
 
 void FMaterialInstance::setMaskThreshold(float threshold) noexcept {
     setParameter("_maskThreshold", math::saturate(threshold));
+    mMaskThreshold = math::saturate(threshold);
+}
+
+float FMaterialInstance::getMaskThreshold() const noexcept {
+    return mMaskThreshold;
 }
 
 void FMaterialInstance::setSpecularAntiAliasingVariance(float variance) noexcept {
     setParameter("_specularAntiAliasingVariance", math::saturate(variance));
+    mSpecularAntiAliasingVariance = math::saturate(variance);
+}
+
+float FMaterialInstance::getSpecularAntiAliasingVariance() const noexcept {
+    return mSpecularAntiAliasingVariance;
 }
 
 void FMaterialInstance::setSpecularAntiAliasingThreshold(float threshold) noexcept {
     setParameter("_specularAntiAliasingThreshold", math::saturate(threshold * threshold));
+    mSpecularAntiAliasingThreshold = std::sqrt(math::saturate(threshold * threshold));
+}
+
+float FMaterialInstance::getSpecularAntiAliasingThreshold() const noexcept {
+    return mSpecularAntiAliasingThreshold;
 }
 
 void FMaterialInstance::setDoubleSided(bool doubleSided) noexcept {
@@ -192,6 +245,11 @@ void FMaterialInstance::setDoubleSided(bool doubleSided) noexcept {
     if (doubleSided) {
         setCullingMode(CullingMode::NONE);
     }
+    mIsDoubleSided = doubleSided;
+}
+
+bool FMaterialInstance::isDoubleSided() const noexcept {
+    return mIsDoubleSided;
 }
 
 void FMaterialInstance::setTransparencyMode(TransparencyMode mode) noexcept {
@@ -200,6 +258,10 @@ void FMaterialInstance::setTransparencyMode(TransparencyMode mode) noexcept {
 
 void FMaterialInstance::setDepthCulling(bool enable) noexcept {
     mDepthFunc = enable ? RasterState::DepthFunc::GE : RasterState::DepthFunc::A;
+}
+
+bool FMaterialInstance::isDepthCullingEnabled() const noexcept {
+    return mDepthFunc != RasterState::DepthFunc::A;
 }
 
 const char* FMaterialInstance::getName() const noexcept {

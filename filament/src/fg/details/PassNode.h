@@ -22,7 +22,7 @@
 #include "fg/FrameGraph.h"
 #include "fg/FrameGraphRenderPass.h"
 
-#include "private/backend/DriverApiForward.h"
+#include "backend/DriverApiForward.h"
 
 #include <backend/TargetBufferInfo.h>
 
@@ -45,7 +45,7 @@ protected:
     FrameGraph& mFrameGraph;
     std::unordered_set<FrameGraphHandle::Index> mDeclaredHandles;
 public:
-    PassNode(FrameGraph& fg) noexcept;
+    explicit PassNode(FrameGraph& fg) noexcept;
     PassNode(PassNode&& rhs) noexcept;
     PassNode(PassNode const&) = delete;
     PassNode& operator=(PassNode const&) = delete;
@@ -80,7 +80,7 @@ public:
         } backend;
 
         void devirtualize(FrameGraph& fg, ResourceAllocatorInterface& resourceAllocator) noexcept;
-        void destroy(ResourceAllocatorInterface& resourceAllocator) noexcept;
+        void destroy(ResourceAllocatorInterface& resourceAllocator) const noexcept;
     };
 
     RenderPassNode(FrameGraph& fg, const char* name, FrameGraphPassBase* base) noexcept;
@@ -109,7 +109,7 @@ private:
 
 class PresentPassNode : public PassNode {
 public:
-    PresentPassNode(FrameGraph& fg) noexcept;
+    explicit PresentPassNode(FrameGraph& fg) noexcept;
     PresentPassNode(PresentPassNode&& rhs) noexcept;
     ~PresentPassNode() noexcept override;
     PresentPassNode(PresentPassNode const&) = delete;

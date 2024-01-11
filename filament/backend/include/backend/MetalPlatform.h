@@ -22,14 +22,13 @@
 
 #import <Metal/Metal.h>
 
-namespace filament {
-namespace backend {
+namespace filament::backend {
 
-class UTILS_PUBLIC MetalPlatform : public DefaultPlatform {
+class UTILS_PUBLIC MetalPlatform : public Platform {
 public:
     ~MetalPlatform() override;
 
-    Driver* createDriver(void* sharedContext) noexcept override;
+    Driver* createDriver(void* sharedContext, const Platform::DriverConfig& driverConfig) noexcept override;
     int getOSVersion() const noexcept override { return 0; }
 
     /**
@@ -69,7 +68,6 @@ private:
 
 };
 
-} // namespace backend
-} // namespace filament
+} // namespace filament::backend
 
 #endif // TNT_FILAMENT_BACKEND_PRIVATE_METALPLATFORM_H

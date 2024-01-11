@@ -6,6 +6,10 @@ plugins {
 
 project.ext.isSample = true
 
+kotlin {
+    jvmToolchain(versions.jdk)
+}
+
 filamentTools {
     materialInputDir = project.layout.projectDirectory.dir("src/main/materials")
     materialOutputDir = project.layout.projectDirectory.dir("src/main/assets/materials")
@@ -29,7 +33,6 @@ android {
         applicationId "com.google.android.filament.textured"
         minSdkVersion versions.minSdk
         targetSdkVersion versions.targetSdk
-        missingDimensionStrategy 'functionality', 'full'
     }
 
     // NOTE: This is a workaround required because the AGP task collectReleaseDependencies
@@ -42,6 +45,11 @@ android {
     // Telling aapt to not compress them allows to load them efficiently
     aaptOptions {
         noCompress 'filamat', 'ktx'
+    }
+
+    compileOptions {
+        sourceCompatibility versions.jdk
+        targetCompatibility versions.jdk
     }
 }
 
