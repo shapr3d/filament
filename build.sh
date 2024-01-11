@@ -32,10 +32,10 @@ function print_help {
     echo "    -m"
     echo "        Compile with make instead of ninja."
     echo "    -p platform1,platform2,..."
-    echo "        Where platformN is [desktop|android|ios|catalyst|webgl|all]."
+    echo "        Where platformN is [desktop|android|ios|catalyst|visionos|webgl|all]."
     echo "        Platform(s) to build, defaults to desktop."
     echo "        Building for iOS/Catalyst/WebGL will automatically perform a partial desktop build."
-    echo "        Building for Catalyst will exclude OpenGL support (same as -g)."
+    echo "        Building for Catalyst/visionOS will exclude OpenGL support (same as -g)."
     echo "    -q abi1,abi2,..."
     echo "        Where platformN is [armeabi-v7a|arm64-v8a|x86|x86_64|all]."
     echo "        ABIs to build when the platform is Android. Defaults to all."
@@ -53,7 +53,7 @@ function print_help {
     echo "        Enable EGL on Linux support for desktop builds."
     echo "    -l"
     echo "        Build arm64/x86_64 universal libraries."
-    echo "        For iOS, this builds universal binaries for devices and the simulator (implies -s)."
+    echo "        For iOS/visionOS, this builds universal binaries for devices and the simulator (implies -s)."
     echo "        For macOS/Catalyst, this builds universal binaries for both Apple silicon and Intel-based Macs."
     echo "    -w"
     echo "        Build Web documents (compiles .md.html files to .html)."
@@ -136,6 +136,7 @@ ISSUE_RELEASE_BUILD=false
 # Default: build desktop only
 ISSUE_ANDROID_BUILD=false
 ISSUE_IOS_BUILD=false
+ISSUE_VISIONOS_BUILD=false
 ISSUE_CATALYST_BUILD=false
 ISSUE_DESKTOP_BUILD=true
 ISSUE_WEBGL_BUILD=false
@@ -179,6 +180,7 @@ MATOPT_GRADLE_OPTION=""
 ASAN_UBSAN_OPTION=""
 
 IOS_BUILD_SIMULATOR=false
+VISIONOS_BUILD_SIMULATOR=false
 BUILD_UNIVERSAL_LIBRARIES=false
 
 BUILD_GENERATOR=Ninja
@@ -709,6 +711,43 @@ function build_ios {
     fi
 }
 
+function build_visionos {
+    local old_ogl_ios_option=${OPENGL_IOS_OPTION}
+    OPENGL_IOS_OPTION="-DFILAMENT_SUPPORTS_OPENGL=OFF"
+
+    build_desktop_tools_for_ios "${MOBILE_HOST_TOOLS}"
+
+    if [[ "${ISSUE_DEBUG_BUILD}" == "true" ]]; then
+        build_ios_target "Debug" "arm64" "xros"
+        
+        if [[ "${IOS_BUILD_SIMULATOR}" == "true" ]]; then
+            # visionOS Simulator is not supported on x86_64
+            #build_visionos_target "Debug" "x86_64" "xrsimulator"
+            build_ios_target "Debug" "arm64" "xrsimulator"
+                        
+            archive_ios "Debug" "xrsimulator"
+        fi
+        
+        archive_ios "Debug" "xros"
+    fi
+
+    if [[ "${ISSUE_RELEASE_BUILD}" == "true" ]]; then
+        build_ios_target "Release" "arm64" "xros"
+        
+        if [[ "${IOS_BUILD_SIMULATOR}" == "true" ]]; then
+            # visionOS Simulator is not supported on x86_64
+            #build_visionos_target "Release" "x86_64" "xrsimulator"
+            build_ios_target "Release" "arm64" "xrsimulator"
+
+            archive_ios "Release" "xrsimulator"            
+        fi
+
+        archive_ios "Release" "xros"
+    fi
+
+    OPENGL_IOS_OPTION=${old_ogl_ios_option}
+}
+
 function build_mac_catalyst {
     local old_ogl_ios_option=${OPENGL_IOS_OPTION}
     OPENGL_IOS_OPTION="-DFILAMENT_SUPPORTS_OPENGL=OFF"
@@ -904,6 +943,9 @@ while getopts ":hacCfgijmp:q:uvGslwtedk:b" opt; do
                     ios)
                         ISSUE_IOS_BUILD=true
                     ;;
+                    visionos)
+                        ISSUE_VISIONOS_BUILD=true
+                    ;;
                     catalyst)
                         ISSUE_CATALYST_BUILD=true
                     ;;
@@ -913,13 +955,14 @@ while getopts ":hacCfgijmp:q:uvGslwtedk:b" opt; do
                     all)
                         ISSUE_ANDROID_BUILD=true
                         ISSUE_IOS_BUILD=true
+                        ISSUE_VISIONOS_BUILD=true
                         ISSUE_CATALYST_BUILD=true
                         ISSUE_DESKTOP_BUILD=true
                         ISSUE_WEBGL_BUILD=false
                     ;;
                     *)
                         echo "Unknown platform ${platform}"
-                        echo "Platform must be one of [desktop|android|ios|webgl|all]"
+                        echo "Platform must be one of [desktop|android|ios|visionos|webgl|all]"
                         echo ""
                         exit 1
                     ;;    
@@ -1058,6 +1101,13 @@ if [[ "${ISSUE_IOS_BUILD}" == "true" ]]; then
         IOS_BUILD_SIMULATOR=true
     fi
     check_debug_release_build build_ios
+fi
+
+if [[ "${ISSUE_VISIONOS_BUILD}" == "true" ]]; then
+    if [[ "${BUILD_UNIVERSAL_LIBRARIES}" == "true" ]]; then
+        VISIONOS_BUILD_SIMULATOR=true
+    fi
+    check_debug_release_build build_visionos
 fi
 
 if [[ "${ISSUE_CATALYST_BUILD}" == "true" ]]; then

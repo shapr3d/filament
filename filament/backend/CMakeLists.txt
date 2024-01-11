@@ -368,7 +368,7 @@ if (MSVC)
 else()
     set(FILAMENT_WARNINGS
             -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers
-            -Wextra-semi -Wnewline-eof -Wdeprecated -Wundef
+            -Wextra-semi -Wnewline-eof -Wdeprecated -Wno-deprecated-declarations -Wundef
             -Wgnu-conditional-omitted-operand
             -Wweak-vtables -Wnon-virtual-dtor -Wclass-varargs -Wimplicit-fallthrough
             -Wover-aligned
