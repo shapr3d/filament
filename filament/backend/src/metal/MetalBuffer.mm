@@ -68,7 +68,7 @@ void MetalBuffer::copyIntoBuffer(void* src, size_t size, size_t byteOffset) {
     // If the GPU buffer is not private, just perform the copy
     if (mBuffer.storageMode != MTLStorageModePrivate) {
         memcpy(static_cast<uint8_t*>(mBuffer.contents), src, size);
-#if !TARGET_OS_IOS || TARGET_OS_MACCATALYST
+#if TARGET_OS_MACCATALYST || TARGET_OS_OSX
         if (mBuffer.storageMode == MTLStorageModeManaged) {
             [mBuffer didModifyRange:NSMakeRange(0, size)];
         }
