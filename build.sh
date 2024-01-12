@@ -721,22 +721,20 @@ function build_visionos {
         build_ios_target "Debug" "arm64" "xros"
 
         if [[ "${IOS_BUILD_SIMULATOR}" == "true" ]]; then
-            # visionOS Simulator is not supported on x86_64
-            #build_visionos_target "Debug" "x86_64" "xrsimulator"
+            # visionOS Simulator is not supported on x86_64 since Xcode 15.2
             build_ios_target "Debug" "arm64" "xrsimulator"
 
             archive_ios "Debug" "xrsimulator"
         fi
-        
+
         archive_ios "Debug" "xros"
     fi
 
     if [[ "${ISSUE_RELEASE_BUILD}" == "true" ]]; then
         build_ios_target "Release" "arm64" "xros"
-        
+
         if [[ "${IOS_BUILD_SIMULATOR}" == "true" ]]; then
-            # visionOS Simulator is not supported on x86_64
-            #build_visionos_target "Release" "x86_64" "xrsimulator"
+            # visionOS Simulator is not supported on x86_64 since Xcode 15.2
             build_ios_target "Release" "arm64" "xrsimulator"
 
             archive_ios "Release" "xrsimulator"
