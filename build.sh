@@ -720,7 +720,7 @@ function build_visionos {
     if [[ "${ISSUE_DEBUG_BUILD}" == "true" ]]; then
         build_ios_target "Debug" "arm64" "xros"
 
-        if [[ "${IOS_BUILD_SIMULATOR}" == "true" ]]; then
+        if [[ "${VISIONOS_BUILD_SIMULATOR}" == "true" ]]; then
             # visionOS Simulator is not supported on x86_64 since Xcode 15.2
             build_ios_target "Debug" "arm64" "xrsimulator"
 
@@ -733,7 +733,7 @@ function build_visionos {
     if [[ "${ISSUE_RELEASE_BUILD}" == "true" ]]; then
         build_ios_target "Release" "arm64" "xros"
 
-        if [[ "${IOS_BUILD_SIMULATOR}" == "true" ]]; then
+        if [[ "${VISIONOS_BUILD_SIMULATOR}" == "true" ]]; then
             # visionOS Simulator is not supported on x86_64 since Xcode 15.2
             build_ios_target "Release" "arm64" "xrsimulator"
 
@@ -1020,7 +1020,8 @@ while getopts ":hacCfgijmp:q:uvGslwtedk:b" opt; do
             ;;
         s)
             IOS_BUILD_SIMULATOR=true
-            echo "iOS simulator support enabled."
+            VISIONOS_BUILD_SIMULATOR=true
+            echo "visionOS/iOS simulator support enabled."
             ;;
         t)
             SWIFTSHADER_OPTION="-DFILAMENT_USE_SWIFTSHADER=ON"
