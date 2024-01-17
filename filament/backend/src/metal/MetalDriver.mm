@@ -1281,7 +1281,7 @@ void MetalDriver::readPixels(Handle<HwRenderTarget> src, uint32_t x, uint32_t y,
 
     mContext->blitter->blit(getPendingCommandBuffer(mContext), args, "readPixels blit");
 
-#if !defined(IOS) || TARGET_OS_MACCATALYST
+#if TARGET_OS_OSX || TARGET_OS_MACCATALYST
     // Managed textures on macOS require explicit synchronization between GPU / CPU.
     if (readPixelsTexture.storageMode == MTLStorageModeManaged) {
         id <MTLBlitCommandEncoder> blitEncoder = [getPendingCommandBuffer(mContext) blitCommandEncoder];
