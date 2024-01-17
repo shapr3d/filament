@@ -922,6 +922,8 @@ const char* ViewerGui::formatToName(filament::Texture::InternalFormat format) co
 }
 
 std::string ViewerGui::validateTweaks(const TweakableMaterial& tweaks) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wc++20-extensions"
     auto verifyTextured = [&]<typename T, bool MayContainFile, bool IsColor, bool IsDerivable>(
         std::string & result,
         const std::string & prompt,
@@ -979,6 +981,7 @@ std::string ViewerGui::validateTweaks(const TweakableMaterial& tweaks) {
             result += "ERROR: " + prompt + " has no channel numbers! Expected a " + std::to_string(expectedChannelCount) + " channel texture.\n";
         }
     };
+#pragma clang diagnostic pop
 
     std::string result = "";
     verifyTextured(result, "BaseColor", tweaks.mBaseColor);

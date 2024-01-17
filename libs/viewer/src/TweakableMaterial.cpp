@@ -93,8 +93,8 @@ void TweakableMaterial::fromJson(const json& source) {
 
     readTexturedFromJson(source, "baseColor", mBaseColor, true, isAlpha, isAlpha ? 4 : 3);
     readValueFromJson(source, "tintColor", mTintColor, { 1.0f, 1.0f, 1.0f });
-    readValueFromJson(source, "emissiveIntensity", mEmissiveIntensity, { 0.0f });
-    readValueFromJson(source, "emissiveExposureWeight", mEmissiveExposureWeight, { 0.0f });
+    readValueFromJson(source, "emissiveIntensity", mEmissiveIntensity, 0.0f);
+    readValueFromJson(source, "emissiveExposureWeight", mEmissiveExposureWeight, 0.0f);
 
     readValueFromJson(source, "normalIntensity", mNormalIntensity, 1.0f);
     readTexturedFromJson(source, "normalTexture", mNormal, false, false, 3);
@@ -234,7 +234,7 @@ void TweakableMaterial::drawUI(const std::string& header) {
             }
         }
         if (header.size() > 0) {
-            ImGui::TextColored({ 1,0,0,1 }, header.c_str());
+            ImGui::TextColored({ 1,0,0,1 }, "%s", header.c_str());
         }
         else {
             ImGui::TextColored({ 0,1,0,1 }, "OK");
