@@ -20,9 +20,9 @@ Don't duplicate what's in the Jira ticket. If it's outdated, let's update that.
 
 ## Material shader statistics implications
 <!---
-The statistics regarding the performance of material shaders are updated four-weekly and can be found in:
+The statistics regarding the performance of material shaders are updated after each filament version change and can be found in:
 https://shapr3d.atlassian.net/wiki/spaces/RT/pages/3323134029/Benchmark+material+attribute+performance .
-If you belive that your commit has a heavy impact on performance, please inform @benceboros2 .
+If you belive that your commit has a heavy impact on performance and needs an additional check, please inform @benceboros2 .
 -->
 
 ## Upstreaming scope
