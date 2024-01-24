@@ -39,17 +39,6 @@ using namespace utils;
 
 namespace filament::viewer {
 
-std::string_view to_string(color::ColorSpace const& colorspace) noexcept {
-    using namespace color;
-    if (colorspace == Rec709-Linear-D65) {
-        return "Rec709-Linear-D65";
-    }
-    if (colorspace == Rec709-sRGB-D65) {
-        return "Rec709-sRGB-D65";
-    }
-    return "unknown";
-}
-
 // Skips over an unused token.
 int parse(jsmntok_t const* tokens, int i) {
     int end = i + 1;
@@ -798,6 +787,17 @@ ColorGrading* createColorGrading(const ColorGradingSettings& settings, Engine* e
     return colorGrading;
 }
 
+static std::ostream& operator<<(std::ostream& out, ColorSpace in) {
+    using namespace color;
+    if (in == Rec709-Linear-D65) {
+        return out << "\"Rec709-Linear-D65\"";
+    }
+    if (in == Rec709-sRGB-D65) {
+        return out << "\"Rec709-sRGB-D65\"";
+    }
+    return out << "\"INVALID\"";
+}
+
 static std::ostream& operator<<(std::ostream& out, CGQL in) {
     switch (in) {
         case CGQL::LOW: return out << "\"LOW\"";
@@ -841,14 +841,14 @@ static std::ostream& operator<<(std::ostream& out, AgxToneMapper::AgxLook in) {
 
 static std::ostream& operator<<(std::ostream& out, const AgxToneMapperSettings& in) {
     return out << "{\n"
-               << "\"look\": " << (in.look) << ",\n"
+               << "\"look\": " << (in.look) << "\n"
                << "}";
 }
 
 static std::ostream& operator<<(std::ostream& out, const ColorGradingSettings& in) {
     return out << "{\n"
         << "\"enabled\": " << to_string(in.enabled) << ",\n"
-        << "\"colorspace\": " << to_string(in.colorspace) << ",\n"
+        << "\"colorspace\": " << (in.colorspace) << ",\n"
         << "\"quality\": " << (in.quality) << ",\n"
         << "\"toneMapping\": " << (in.toneMapping) << ",\n"
         << "\"genericToneMapper\": " << (in.genericToneMapper) << ",\n"
@@ -889,12 +889,12 @@ static std::ostream& operator<<(std::ostream& out, const LightManager::ShadowOpt
         << "},\n"
         << "\"mapSize\": " << in.mapSize << ",\n"
         << "\"shadowCascades\": " << int(in.shadowCascades) << ",\n"
-        << "\"cascadeSplitPositions\": " << (splitsVector) << "\n"
+        << "\"cascadeSplitPositions\": " << (splitsVector) << ",\n"
         << "\"stable\": " << to_string(in.stable) << ",\n"
         << "\"lispsm\": " << to_string(in.lispsm) << ",\n"
         << "\"screenSpaceContactShadows\": " << to_string(in.screenSpaceContactShadows) << ",\n"
         << "\"shadowBulbRadius\": " << in.shadowBulbRadius << ",\n"
-        << "\"transform\": " << in.transform.xyzw << ",\n"
+        << "\"transform\": " << in.transform.xyzw << "\n"
         << "}";
 }
 
