@@ -350,7 +350,7 @@ int parse(jsmntok_t const* tokens, int i, const char* jsonChunk, FogOptions* out
 std::ostream& operator<<(std::ostream& out, const FogOptions& in) {
     return out << "{\n"
         << "\"distance\": " << (in.distance) << ",\n"
-        << "\"cutOffDistance\": " << (std::isnan(in.cutOffDistance) ? "\"NAN\"" : std::isinf(in.cutOffDistance) ? "\"INFINITY\"" : std::to_string(in.cutOffDistance)) << ",\n"
+        << "\"cutOffDistance\": " << (std::isinf(in.cutOffDistance) ? 1e99 : in.cutOffDistance) << ",\n"
         << "\"maximumOpacity\": " << (in.maximumOpacity) << ",\n"
         << "\"height\": " << (in.height) << ",\n"
         << "\"heightFalloff\": " << (in.heightFalloff) << ",\n"
