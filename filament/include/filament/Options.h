@@ -177,7 +177,7 @@ struct FogOptions {
      * Note: The SkyBox is typically at a distance of 1e19 in world space (depending on the near
      * plane distance and projection used though).
      */
-    float cutOffDistance = INFINITY;
+    float cutOffDistance = 1e19;
 
     /**
      * fog's maximum opacity between 0 and 1
