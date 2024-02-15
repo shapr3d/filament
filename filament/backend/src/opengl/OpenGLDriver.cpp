@@ -3017,11 +3017,9 @@ void OpenGLDriver::insertEventMarker(char const* string, uint32_t len) {
 void OpenGLDriver::pushGroupMarker(char const* string, uint32_t len) {
 
 #ifdef GL_EXT_debug_marker
-#if DEBUG_MARKER_LEVEL & DEBUG_MARKER_OPENGL
     if (UTILS_LIKELY(mContext.ext.EXT_debug_marker)) {
         glPushGroupMarkerEXT(GLsizei(len ? len : strlen(string)), string);
     }
-#endif
 #endif
 
 #if DEBUG_MARKER_LEVEL & DEBUG_MARKER_BACKEND
@@ -3032,11 +3030,9 @@ void OpenGLDriver::pushGroupMarker(char const* string, uint32_t len) {
 
 void OpenGLDriver::popGroupMarker(int) {
 #ifdef GL_EXT_debug_marker
-#if DEBUG_MARKER_LEVEL & DEBUG_MARKER_OPENGL
     if (UTILS_LIKELY(mContext.ext.EXT_debug_marker)) {
         glPopGroupMarkerEXT();
     }
-#endif
 #endif
 
 #if DEBUG_MARKER_LEVEL & DEBUG_MARKER_BACKEND
