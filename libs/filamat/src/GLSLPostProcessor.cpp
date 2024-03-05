@@ -16,9 +16,6 @@
 
 #include "GLSLPostProcessor.h"
 
-#include <string>
-#include <string_view>
-
 #include <GlslangToSpv.h>
 #include <SPVRemapper.h>
 #include <spirv-tools/libspirv.hpp>
