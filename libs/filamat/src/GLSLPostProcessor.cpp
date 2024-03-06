@@ -16,9 +16,6 @@
 
 #include "GLSLPostProcessor.h"
 
-#include <string>
-#include <string_view>
-
 #include <GlslangToSpv.h>
 #include <SPVRemapper.h>
 #include <spirv-tools/libspirv.hpp>
@@ -57,53 +54,6 @@ namespace filamat {
 using namespace utils;
 
 namespace msl {  // this is only used for MSL
-
-std::string addMaybeUnusedToVariables(const std::string& mslShader) {
-    // Since we turned off SPIRV optimization unused variables are not stripped and
-    // generate runtime warnings. In order to silence them, we tag them with [[maybe_unused]].
-    constexpr std::string_view unusedVariables[] = {
-        // global variables in common_shading.fs
-        "float3x3 shading_tangentToWorld;",
-        "float3 shading_position;",
-        "float3 shading_view;",
-        "float3 shading_normal;",
-        "float3 shading_geometricNormal;",
-        "float3 shading_reflected;",
-        "float shading_NoV;",
-        "float3 shading_bentNormal;",
-        "float3 shading_clearCoatNormal;",
-        "float2 shading_normalizedViewportCoord;",
-
-        // unused variable in main.fs and depth_main.fs
-        "float filament_lodBias =",
-
-        // generateSpecializationConstant() emits these:
-        "constant int BACKEND_FEATURE_LEVEL =",
-        "constant int CONFIG_MAX_INSTANCES =",
-        "constant int CONFIG_FROXEL_BUFFER_HEIGHT =",
-        "constant bool CONFIG_DEBUG_DIRECTIONAL_SHADOWMAP =",
-        "constant bool CONFIG_DEBUG_FROXEL_VISUALIZATION =",
-        "constant bool CONFIG_STATIC_TEXTURE_TARGET_WORKAROUND =",
-        "constant bool CONFIG_POWER_VR_SHADER_WORKAROUNDS =",
-        "constant int CONFIG_STEREO_EYE_COUNT =",
-        "constant bool CONFIG_SRGB_SWAPCHAIN_EMULATION =",
-
-        // ...
-    };
-
-    constexpr std::string_view maybeUnused = "[[maybe_unused]] ";
-
-    std::string patchedMslShader;
-    patchedMslShader.reserve(std::size(maybeUnused) * std::size(unusedVariables) + std::size(mslShader));
-    patchedMslShader = mslShader;
-    for (const auto& variable : unusedVariables) {
-        auto pos = patchedMslShader.find(variable);
-        if (pos != std::string::npos) {
-            patchedMslShader.insert(pos, maybeUnused);
-        }
-    }
-    return patchedMslShader;
-}
 
 using BindingIndexMap = std::unordered_map<std::string, uint16_t>;
 
@@ -333,7 +283,6 @@ void GLSLPostProcessor::spirvToMsl(const SpirvBlob *spirv, std::string *outMsl,
     mslCompiler.add_discrete_descriptor_set(0);
 
     *outMsl = mslCompiler.compile();
-    *outMsl = addMaybeUnusedToVariables(*outMsl);
     if (minifier) {
         *outMsl = minifier->removeWhitespace(*outMsl);
     }
@@ -710,7 +659,7 @@ void GLSLPostProcessor::registerPerformancePasses(Optimizer& optimizer, Config c
     RegisterPass(CreateWrapOpKillPass());
     RegisterPass(CreateDeadBranchElimPass());
     RegisterPass(CreateMergeReturnPass(), MaterialBuilder::TargetApi::METAL);
-    RegisterPass(CreateInlineExhaustivePass());
+    RegisterPass(CreateInlineExhaustivePass(), MaterialBuilder::TargetApi::OPENGL | MaterialBuilder::TargetApi::VULKAN);
     RegisterPass(CreateAggressiveDCEPass());
     RegisterPass(CreatePrivateToLocalPass());
     RegisterPass(CreateLocalSingleBlockLoadStoreElimPass());
@@ -786,6 +735,7 @@ void GLSLPostProcessor::registerSizePasses(Optimizer& optimizer, Config const& c
     RegisterPass(CreateSimplificationPass(), MaterialBuilder::TargetApi::METAL);
     RegisterPass(CreateAggressiveDCEPass());
     RegisterPass(CreateCFGCleanupPass());
+    RegisterPass(CreateEliminateDeadConstantPass());
 }
 
 } // namespace filamat
