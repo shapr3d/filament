@@ -225,7 +225,7 @@ BiplanarAxes ComputeBiplanarPlanes(vec3 weights) {
     return result;
 }
 
-BiplanarData GenerateBiplanarData(BiplanarAxes axes, float scaler, highp vec3 pos, lowp vec3 normal, lowp vec3 weights) {
+BiplanarData GenerateBiplanarData(BiplanarAxes axes, float scaler, highp vec3 pos, lowp vec3 weights) {
     // Depending on the resolution of the texture, we may want to multiply the texture coordinates
     vec3 queryPos = scaler * (pos - getMaterialOrientationCenter());
     queryPos *= getMaterialOrientationMatrix();
@@ -233,7 +233,7 @@ BiplanarData GenerateBiplanarData(BiplanarAxes axes, float scaler, highp vec3 po
     // Store the query data
     BiplanarData result = DEFAULT_BIPLANAR_DATA;
 
-    // Position needs some fixed flipping-fu so that textures are oriented as intended
+    // Position requires fixed flipping operations for correct texture orientation, especially for wrapping around the Z-axis.
     vec2 uvQueries[3] = vec2[3](
         queryPos.yz * vec2(1.0, -1.0),
         -queryPos.xz,
@@ -278,7 +278,7 @@ vec4 BiplanarTexture(sampler2D tex, float scaler, highp vec3 pos, lowp vec3 norm
     // We sort triplanar plane relevance by the relative ordering of the weights and not by the normal
     vec3 weights = ComputeWeights(normal);
     BiplanarAxes axes = ComputeBiplanarPlanes(weights);
-    BiplanarData queryData = GenerateBiplanarData(axes, scaler, pos, normal, weights);
+    BiplanarData queryData = GenerateBiplanarData(axes, scaler, pos, weights);
 
     vec4 mainPlaneSample = textureGrad( tex, queryData.maxPos, queryData.maxDpDx, queryData.maxDpDy );
     vec4 secondaryPlaneSample = textureGrad( tex, queryData.medPos, queryData.medDpDx, queryData.medDpDy );
@@ -335,7 +335,7 @@ vec3 BiplanarNormalMap(sampler2D normalMap, float scaler, highp vec3 pos, lowp v
     // We sort triplanar plane relevance by the relative ordering of the weights and not by the normal
     vec3 weights = ComputeWeights(normal);
     BiplanarAxes axes = ComputeBiplanarPlanes(weights);
-    BiplanarData queryData = GenerateBiplanarData(axes, scaler, pos, normal, weights);
+    BiplanarData queryData = GenerateBiplanarData(axes, scaler, pos, weights);
 
     // Tangent space normal maps in a quasi world space. 2-channel XY TS normal texture: this saves 33% on storage
     vec2 packedNormalMax = SampleNormalMap(normalMap, queryData.maxPos, queryData.maxDpDx, queryData.maxDpDy, useSwizzledNormalMaps);
@@ -354,8 +354,8 @@ vec3 BiplanarNormalMap(sampler2D normalMap, float scaler, highp vec3 pos, lowp v
 
     // Swizzle tangent normals to match world orientation
     const ivec3 worldSwizzles[3] = ivec3[3](ivec3(2, 0, 1), ivec3(0, 2, 1), ivec3(0, 1, 2));
-    vec3 worldMultipliers[3] = vec3[3]( vec3(SIGN_NO_ZERO(rotatedNormal.x), SIGN_NO_ZERO(rotatedNormal.x), 1),
-                                          vec3(-SIGN_NO_ZERO(rotatedNormal.y), SIGN_NO_ZERO(rotatedNormal.y), 1),
+    vec3 worldMultipliers[3] = vec3[3]( vec3(SIGN_NO_ZERO(normal.x), SIGN_NO_ZERO(normal.x), 1),
+                                          vec3(-SIGN_NO_ZERO(normal.y), SIGN_NO_ZERO(normal.y), 1),
                                           vec3(SIGN_NO_ZERO(normal.z), -1, SIGN_NO_ZERO(normal.z)) );
 
     // Blend and normalize
