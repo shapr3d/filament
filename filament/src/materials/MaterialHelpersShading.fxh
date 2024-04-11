@@ -361,7 +361,7 @@ vec3 BiplanarNormalMap(sampler2D normalMap, float scaler, highp vec3 pos, lowp v
     // Blend and normalize
     vec3 r = swizzleIvec(tNormalMax, worldSwizzles[maxAxis]) * queryData.mainWeight * worldMultipliers[maxAxis] +
              swizzleIvec(tNormalMed, worldSwizzles[medAxis]) * queryData.medianWeight * worldMultipliers[medAxis];
-    return normalize(r);
+    return getMaterialOrientationMatrix() * normalize(r);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -382,9 +382,9 @@ void ApplyNormalMap(inout MaterialInputs material, inout FragmentData fragmentDa
                                           IsNormalMapSwizzled(),
                                           GetNormalIntensity());
 #if defined(SHAPR_USE_WORLD_NORMALS)
-        material.normal = getMaterialOrientationMatrix() * normalWS;
+        material.normal = normalWS;
 #else
-        material.normal = getMaterialOrientationMatrix() * normalWS * getWorldTangentFrame();
+        material.normal = normalWS * getWorldTangentFrame();
 #endif // SHAPR_USE_WORLD_NORMALS
     } else {
 #if defined(SHAPR_USE_WORLD_NORMALS)
@@ -405,9 +405,9 @@ void ApplyClearCoatNormalMap(inout MaterialInputs material, inout FragmentData f
                                                    IsNormalMapSwizzled(),
                                                    GetClearCoatNormalIntensity());
 #if defined(SHAPR_USE_WORLD_NORMALS)
-        material.clearCoatNormal = getMaterialOrientationMatrix() * clearCoatNormalWS;
+        material.clearCoatNormal = clearCoatNormalWS;
 #else
-        material.clearCoatNormal = getMaterialOrientationMatrix() * clearCoatNormalWS * getWorldTangentFrame();
+        material.clearCoatNormal = clearCoatNormalWS * getWorldTangentFrame();
 #endif // SHAPR_USE_WORLD_NORMALS
     } else {
 #if defined(SHAPR_USE_WORLD_NORMALS)
