@@ -225,7 +225,7 @@ BiplanarAxes ComputeBiplanarPlanes(vec3 weights) {
     return result;
 }
 
-BiplanarData GenerateBiplanarData(BiplanarAxes axes, float scaler, highp vec3 pos, lowp vec3 normal, lowp vec3 weights) {
+BiplanarData GenerateBiplanarData(BiplanarAxes axes, float scaler, highp vec3 pos, lowp vec3 weights) {
     // Depending on the resolution of the texture, we may want to multiply the texture coordinates
     vec3 queryPos = scaler * (pos - getMaterialOrientationCenter());
     queryPos *= getMaterialOrientationMatrix();
@@ -233,11 +233,12 @@ BiplanarData GenerateBiplanarData(BiplanarAxes axes, float scaler, highp vec3 po
     // Store the query data
     BiplanarData result = DEFAULT_BIPLANAR_DATA;
 
-    // Position needs some fixed flipping-fu so that textures are oriented as intended
-    vec3 materialOrientedNormal = normal * getMaterialOrientationMatrix();
-    vec2 uvQueries[3] = vec2[3](queryPos.yz * vec2(SIGN_NO_ZERO(materialOrientedNormal.x), -1.0), 
-                                queryPos.xz * vec2(SIGN_NO_ZERO(materialOrientedNormal.y), -1.0), 
-                                queryPos.xy * vec2(1.0, SIGN_NO_ZERO(materialOrientedNormal.z)));
+    // Position requires fixed flipping operations for correct texture orientation, especially for wrapping around the Z-axis.
+    vec2 uvQueries[3] = vec2[3](
+        queryPos.yz * vec2(1.0, -1.0),
+        -queryPos.xz,
+        queryPos.xy
+    );
 
     result.maxPos = uvQueries[axes.maximum.x];
     result.medPos = uvQueries[axes.median.x];
@@ -277,7 +278,7 @@ vec4 BiplanarTexture(sampler2D tex, float scaler, highp vec3 pos, lowp vec3 norm
     // We sort triplanar plane relevance by the relative ordering of the weights and not by the normal
     vec3 weights = ComputeWeights(normal);
     BiplanarAxes axes = ComputeBiplanarPlanes(weights);
-    BiplanarData queryData = GenerateBiplanarData(axes, scaler, pos, normal, weights);
+    BiplanarData queryData = GenerateBiplanarData(axes, scaler, pos, weights);
 
     vec4 mainPlaneSample = textureGrad( tex, queryData.maxPos, queryData.maxDpDx, queryData.maxDpDy );
     vec4 secondaryPlaneSample = textureGrad( tex, queryData.medPos, queryData.medDpDx, queryData.medDpDy );
@@ -334,31 +335,33 @@ vec3 BiplanarNormalMap(sampler2D normalMap, float scaler, highp vec3 pos, lowp v
     // We sort triplanar plane relevance by the relative ordering of the weights and not by the normal
     vec3 weights = ComputeWeights(normal);
     BiplanarAxes axes = ComputeBiplanarPlanes(weights);
-    BiplanarData queryData = GenerateBiplanarData(axes, scaler, pos, normal, weights);
+    BiplanarData queryData = GenerateBiplanarData(axes, scaler, pos, weights);
 
     // Tangent space normal maps in a quasi world space. 2-channel XY TS normal texture: this saves 33% on storage
     vec2 packedNormalMax = SampleNormalMap(normalMap, queryData.maxPos, queryData.maxDpDx, queryData.maxDpDy, useSwizzledNormalMaps);
     vec2 packedNormalMed = SampleNormalMap(normalMap, queryData.medPos, queryData.medDpDx, queryData.medDpDy, useSwizzledNormalMaps);
     int maxAxis = axes.maximum.x;
     int medAxis = axes.median.x;
+    normal = normal * getMaterialOrientationMatrix();
     vec3 tNormalMax = UnpackNormal(packedNormalMax, NormalMapScale(normal, maxAxis, normalIntensity) );
     vec3 tNormalMed = UnpackNormal(packedNormalMed, NormalMapScale(normal, medAxis, normalIntensity) );
 
     // Swizzle the above normals to tangent space and apply Whiteout blend
-    const ivec2 tangentSwizzles[3] = ivec2[3](ivec2(1, 2), ivec2(0, 2), ivec2(1, 0)); // YZ, XZ, YX
+    const ivec2 tangentSwizzles[3] = ivec2[3](ivec2(1, 2), ivec2(0, 2), ivec2(0, 1)); // YZ, XZ, XY
     const vec2 tangentMultipliers[3] = vec2[3]( vec2(1, 1), vec2(-1, 1), vec2(1, -1) );
     tNormalMax = vec3(tNormalMax.xy + swizzleIvec(normal, tangentSwizzles[maxAxis]) * tangentMultipliers[maxAxis] * vec2( SIGN_NO_ZERO(normal[maxAxis]),  1), abs(tNormalMax.z) * abs(normal[maxAxis]));
     tNormalMed = vec3(tNormalMed.xy + swizzleIvec(normal, tangentSwizzles[medAxis]) * tangentMultipliers[medAxis] * vec2( SIGN_NO_ZERO(normal[medAxis]),  1), abs(tNormalMed.z) * abs(normal[medAxis]));
 
     // Swizzle tangent normals to match world orientation
-    const ivec3 worldSwizzles[3] = ivec3[3](ivec3(2, 0, 1), ivec3(0, 2, 1), ivec3(1, 0, 2));
+    const ivec3 worldSwizzles[3] = ivec3[3](ivec3(2, 0, 1), ivec3(0, 2, 1), ivec3(0, 1, 2));
     vec3 worldMultipliers[3] = vec3[3]( vec3(SIGN_NO_ZERO(normal.x), SIGN_NO_ZERO(normal.x), 1),
                                           vec3(-SIGN_NO_ZERO(normal.y), SIGN_NO_ZERO(normal.y), 1),
-                                          vec3(-1, SIGN_NO_ZERO(normal.z), SIGN_NO_ZERO(normal.z)) );
+                                          vec3(SIGN_NO_ZERO(normal.z), -1, SIGN_NO_ZERO(normal.z)) );
+
     // Blend and normalize
     vec3 r = swizzleIvec(tNormalMax, worldSwizzles[maxAxis]) * queryData.mainWeight * worldMultipliers[maxAxis] +
              swizzleIvec(tNormalMed, worldSwizzles[medAxis]) * queryData.medianWeight * worldMultipliers[medAxis];
-    return normalize(r);
+    return getMaterialOrientationMatrix() * normalize(r);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
