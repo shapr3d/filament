@@ -73,7 +73,7 @@ public:
     // set sampler at given index
     void setSampler(size_t index, backend::SamplerDescriptor sampler) noexcept;
 
-    inline void clearSampler(size_t index) {
+    inline void clearSampler(size_t index) noexcept {
         setSampler(index, {});
     }
 

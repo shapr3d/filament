@@ -179,6 +179,11 @@ void FMaterialInstance::setParameter(std::string_view name,
     mSamplers.setSampler(index, { texture, params });
 }
 
+void FMaterialInstance::clearParameter(std::string_view name) noexcept {
+    size_t const index = mMaterial->getSamplerInterfaceBlock().getSamplerInfo(name)->offset;
+    mSamplers.clearSampler(index);
+}
+
 void FMaterialInstance::setParameterImpl(std::string_view name,
         FTexture const* texture, TextureSampler const& sampler) {
 

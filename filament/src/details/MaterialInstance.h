@@ -210,6 +210,8 @@ public:
     void setParameter(std::string_view name,
             backend::Handle<backend::HwTexture> texture, backend::SamplerParams params) noexcept;
 
+    void clearParameter(std::string_view name) noexcept;
+
     using MaterialInstance::setParameter;
 
 private:

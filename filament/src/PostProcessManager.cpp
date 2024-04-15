@@ -2450,6 +2450,9 @@ FrameGraphId<FrameGraphTexture> PostProcessManager::colorGrading(FrameGraph& fg,
                             PostProcessVariant::TRANSLUCENT : PostProcessVariant::OPAQUE);
 
                 commitAndRender(out, material, variant, driver);
+
+                // Clear reference to LUT texture of color grading, in case it gets destroyed
+                mi->clearParameter("lut");
             }
     );
 
