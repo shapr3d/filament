@@ -39,7 +39,15 @@ namespace filament {
 namespace backend {
 
 static inline MTLTextureUsage getMetalTextureUsage(TextureUsage usage) {
-    NSUInteger u = 0;
+    NSUInteger u = MTLTextureUsageUnknown;
+
+    if (any(usage & TextureUsage::SAMPLEABLE)) {
+        u |= MTLTextureUsageShaderRead;
+    }
+    if (any(usage & TextureUsage::UPLOADABLE)) {
+        // This is only needed because of the slowpath is MetalBlitter
+        u |= MTLTextureUsageRenderTarget;
+    }
     if (any(usage & TextureUsage::COLOR_ATTACHMENT)) {
         u |= MTLTextureUsageRenderTarget;
     }
@@ -49,9 +57,13 @@ static inline MTLTextureUsage getMetalTextureUsage(TextureUsage usage) {
     if (any(usage & TextureUsage::STENCIL_ATTACHMENT)) {
         u |= MTLTextureUsageRenderTarget;
     }
-
-    // All textures can be blitted from, so they must have the UsageShaderRead flag.
-    u |= MTLTextureUsageShaderRead;
+    if (any(usage & TextureUsage::BLIT_DST)) {
+        // This is only needed because of the slowpath is MetalBlitter
+        u |= MTLTextureUsageRenderTarget;
+    }
+    if (any(usage & TextureUsage::BLIT_SRC)) {
+        u |= MTLTextureUsageShaderRead;
+    }
 
     return MTLTextureUsage(u);
 }
@@ -228,13 +240,53 @@ void MetalSwapChain::present() {
     }
 }
 
-void presentDrawable(bool presentFrame, void* user) {
-    // CFBridgingRelease here is used to balance the CFBridgingRetain inside of acquireDrawable.
-    id<CAMetalDrawable> drawable = (id<CAMetalDrawable>) CFBridgingRelease(user);
-    if (presentFrame) {
-        [drawable present];
+#ifndef FILAMENT_RELEASE_PRESENT_DRAWABLE_MAIN_THREAD
+#define FILAMENT_RELEASE_PRESENT_DRAWABLE_MAIN_THREAD 1
+#endif
+
+class PresentDrawableData {
+public:
+    PresentDrawableData() = delete;
+    PresentDrawableData(const PresentDrawableData&) = delete;
+    PresentDrawableData& operator=(const PresentDrawableData&) = delete;
+
+    static PresentDrawableData* create(id<CAMetalDrawable> drawable, MetalDriver* driver) {
+        assert_invariant(driver);
+        return new PresentDrawableData(drawable, driver);
     }
-    // The drawable will be released here when the "drawable" variable goes out of scope.
+
+    static void maybePresentAndDestroyAsync(PresentDrawableData* that, bool shouldPresent) {
+        if (shouldPresent) {
+           [that->mDrawable present];
+        }
+
+#if FILAMENT_RELEASE_PRESENT_DRAWABLE_MAIN_THREAD == 1
+        // mDrawable is acquired on the driver thread. Typically, we would release this object on
+        // the same thread, but after receiving consistent crash reports from within
+        // [CAMetalDrawable dealloc], we suspect this object requires releasing on the main thread.
+        dispatch_async(dispatch_get_main_queue(), ^{ cleanupAndDestroy(that); });
+#else
+        that->mDriver->runAtNextTick([that]() { cleanupAndDestroy(that); });
+#endif
+    }
+
+private:
+    PresentDrawableData(id<CAMetalDrawable> drawable, MetalDriver* driver)
+        : mDrawable(drawable), mDriver(driver) {}
+
+    static void cleanupAndDestroy(PresentDrawableData *that) {
+        that->mDrawable = nil;
+        that->mDriver = nullptr;
+        delete that;
+    }
+
+    id<CAMetalDrawable> mDrawable;
+    MetalDriver* mDriver = nullptr;
+};
+
+void presentDrawable(bool presentFrame, void* user) {
+    auto* presentDrawableData = static_cast<PresentDrawableData*>(user);
+    PresentDrawableData::maybePresentAndDestroyAsync(presentDrawableData, presentFrame);
 }
 
 void MetalSwapChain::scheduleFrameScheduledCallback() {
@@ -243,19 +295,16 @@ void MetalSwapChain::scheduleFrameScheduledCallback() {
     }
 
     assert_invariant(drawable);
-    FrameScheduledCallback callback = frameScheduledCallback;
-    // This block strongly captures drawable to keep it alive until the handler executes.
-    // We cannot simply reference this->drawable inside the block because the block would then only
-    // capture the _this_ pointer (MetalSwapChain*) instead of the drawable.
-    id<CAMetalDrawable> d = drawable;
+
+    // Destroy this by calling maybePresentAndDestroyAsync() later.
+    auto* presentData = PresentDrawableData::create(drawable, context.driver);
+
+    FrameScheduledCallback userCallback = frameScheduledCallback;
     void* userData = frameScheduledUserData;
+
     [getPendingCommandBuffer(&context) addScheduledHandler:^(id<MTLCommandBuffer> cb) {
-        // CFBridgingRetain is used here to give the drawable a +1 retain count before
-        // casting it to a void*.
-        PresentCallable callable(presentDrawable, (void*) CFBridgingRetain(d));
-        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-            callback(callable, userData);
-        });
+        PresentCallable callable(presentDrawable, static_cast<void*>(presentData));
+        userCallback(callable, userData);
     }];
 }
 
@@ -748,6 +797,7 @@ void MetalTexture::loadWithBlit(uint32_t level, uint32_t slice, MTLRegion region
 
 
     id<MTLTexture> stagingTexture = [context.device newTextureWithDescriptor:descriptor];
+    // FIXME? Why is this not just `MTLRegion sourceRegion = region;` ?
     MTLRegion sourceRegion = MTLRegionMake3D(0, 0, 0,
             region.size.width, region.size.height, region.size.depth);
     [stagingTexture replaceRegion:sourceRegion
@@ -774,16 +824,16 @@ void MetalTexture::loadWithBlit(uint32_t level, uint32_t slice, MTLRegion region
                                                              slices:NSMakeRange(0, slices)];
     }
 
-    MetalBlitter::BlitArgs args;
+    MetalBlitter::BlitArgs args{};
     args.filter = SamplerMagFilter::NEAREST;
     args.source.level = 0;
     args.source.slice = 0;
     args.source.region = sourceRegion;
+    args.source.texture = stagingTexture;
     args.destination.level = level;
     args.destination.slice = slice;
     args.destination.region = region;
-    args.source.color = stagingTexture;
-    args.destination.color = destinationTexture;
+    args.destination.texture = destinationTexture;
     context.blitter->blit(getPendingCommandBuffer(&context), args, "Texture upload blit");
 }
 

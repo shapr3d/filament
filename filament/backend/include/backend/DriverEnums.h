@@ -28,7 +28,8 @@
 
 #include <math/vec4.h>
 
-#include <array>    // FIXME: STL headers are not allowed in public headers
+#include <array>        // FIXME: STL headers are not allowed in public headers
+#include <type_traits>  // FIXME: STL headers are not allowed in public headers
 
 #include <stddef.h>
 #include <stdint.h>
@@ -226,6 +227,7 @@ struct Viewport {
     //! get the top coordinate in window space of the viewport
     int32_t top() const noexcept { return bottom + int32_t(height); }
 };
+
 
 /**
  * Specifies the mapping of the near and far clipping plane to window coordinates.
@@ -659,13 +661,15 @@ enum class TextureFormat : uint16_t {
 
 //! Bitmask describing the intended Texture Usage
 enum class TextureUsage : uint8_t {
-    NONE                = 0x0,
-    COLOR_ATTACHMENT    = 0x1,                      //!< Texture can be used as a color attachment
-    DEPTH_ATTACHMENT    = 0x2,                      //!< Texture can be used as a depth attachment
-    STENCIL_ATTACHMENT  = 0x4,                      //!< Texture can be used as a stencil attachment
-    UPLOADABLE          = 0x8,                      //!< Data can be uploaded into this texture (default)
+    NONE                = 0x00,
+    COLOR_ATTACHMENT    = 0x01,                     //!< Texture can be used as a color attachment
+    DEPTH_ATTACHMENT    = 0x02,                     //!< Texture can be used as a depth attachment
+    STENCIL_ATTACHMENT  = 0x04,                     //!< Texture can be used as a stencil attachment
+    UPLOADABLE          = 0x08,                     //!< Data can be uploaded into this texture (default)
     SAMPLEABLE          = 0x10,                     //!< Texture can be sampled (default)
     SUBPASS_INPUT       = 0x20,                     //!< Texture can be used as a subpass input
+    BLIT_SRC            = 0x40,                     //!< Texture can be used the source of a blit()
+    BLIT_DST            = 0x80,                     //!< Texture can be used the destination of a blit()
     DEFAULT             = UPLOADABLE | SAMPLEABLE   //!< Default texture usage
 };
 
@@ -687,6 +691,17 @@ static constexpr bool isDepthFormat(TextureFormat format) noexcept {
         case TextureFormat::DEPTH16:
         case TextureFormat::DEPTH32F_STENCIL8:
         case TextureFormat::DEPTH24_STENCIL8:
+            return true;
+        default:
+            return false;
+    }
+}
+
+static constexpr bool isStencilFormat(TextureFormat format) noexcept {
+    switch (format) {
+        case TextureFormat::STENCIL8:
+        case TextureFormat::DEPTH24_STENCIL8:
+        case TextureFormat::DEPTH32F_STENCIL8:
             return true;
         default:
             return false;

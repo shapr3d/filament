@@ -258,7 +258,7 @@ void FEngine::init() {
     slog.i << "FEngine feature level: " << int(mActiveFeatureLevel) << io::endl;
 
 
-    mResourceAllocator = new ResourceAllocator(driverApi);
+    mResourceAllocator = new ResourceAllocator(mConfig, driverApi);
 
     mFullScreenTriangleVb = downcast(VertexBuffer::Builder()
             .vertexCount(3)
@@ -418,8 +418,13 @@ void FEngine::init() {
 
     mDebugRegistry.registerProperty("d.shadowmap.debug_directional_shadowmap",
             &debug.shadowmap.debug_directional_shadowmap, [this]() {
-                mMaterials.forEach([](FMaterial* material) {
+                mMaterials.forEach([this](FMaterial* material) {
                     if (material->getMaterialDomain() == MaterialDomain::SURFACE) {
+
+                        material->setConstant(
+                                +ReservedSpecializationConstants::CONFIG_DEBUG_DIRECTIONAL_SHADOWMAP,
+                                debug.shadowmap.debug_directional_shadowmap);
+
                         material->invalidate(
                                 Variant::DIR | Variant::SRE | Variant::DEP,
                                 Variant::DIR | Variant::SRE);
@@ -429,8 +434,13 @@ void FEngine::init() {
 
     mDebugRegistry.registerProperty("d.lighting.debug_froxel_visualization",
             &debug.lighting.debug_froxel_visualization, [this]() {
-                mMaterials.forEach([](FMaterial* material) {
+                mMaterials.forEach([this](FMaterial* material) {
                     if (material->getMaterialDomain() == MaterialDomain::SURFACE) {
+
+                        material->setConstant(
+                                +ReservedSpecializationConstants::CONFIG_DEBUG_FROXEL_VISUALIZATION,
+                                debug.lighting.debug_froxel_visualization);
+
                         material->invalidate(
                                 Variant::DYN | Variant::DEP,
                                 Variant::DYN);
@@ -749,7 +759,9 @@ const FMaterial* FEngine::getSkyboxMaterial() const noexcept {
 template<typename T>
 inline T* FEngine::create(ResourceList<T>& list, typename T::Builder const& builder) noexcept {
     T* p = mHeapAllocator.make<T>(*this, builder);
-    list.insert(p);
+    if (UTILS_UNLIKELY(p)) { // this should never happen
+        list.insert(p);
+    }
     return p;
 }
 
@@ -811,7 +823,7 @@ FRenderTarget* FEngine::createRenderTarget(const RenderTarget::Builder& builder)
 
 FRenderer* FEngine::createRenderer() noexcept {
     FRenderer* p = mHeapAllocator.make<FRenderer>(*this);
-    if (p) {
+    if (UTILS_UNLIKELY(p)) { // should never happen
         mRenderers.insert(p);
     }
     return p;
@@ -820,7 +832,7 @@ FRenderer* FEngine::createRenderer() noexcept {
 FMaterialInstance* FEngine::createMaterialInstance(const FMaterial* material,
         const FMaterialInstance* other, const char* name) noexcept {
     FMaterialInstance* p = mHeapAllocator.make<FMaterialInstance>(*this, other, name);
-    if (p) {
+    if (UTILS_UNLIKELY(p)) { // should never happen
         auto pos = mMaterialInstances.emplace(material, "MaterialInstance");
         pos.first->second.insert(p);
     }
@@ -833,7 +845,7 @@ FMaterialInstance* FEngine::createMaterialInstance(const FMaterial* material,
 
 FScene* FEngine::createScene() noexcept {
     FScene* p = mHeapAllocator.make<FScene>(*this);
-    if (p) {
+    if (UTILS_UNLIKELY(p)) { // should never happen
         mScenes.insert(p);
     }
     return p;
@@ -841,7 +853,7 @@ FScene* FEngine::createScene() noexcept {
 
 FView* FEngine::createView() noexcept {
     FView* p = mHeapAllocator.make<FView>(*this);
-    if (p) {
+    if (UTILS_UNLIKELY(p)) { // should never happen
         mViews.insert(p);
     }
     return p;
@@ -849,7 +861,7 @@ FView* FEngine::createView() noexcept {
 
 FFence* FEngine::createFence() noexcept {
     FFence* p = mHeapAllocator.make<FFence>(*this);
-    if (p) {
+    if (UTILS_UNLIKELY(p)) { // should never happen
         std::lock_guard const guard(mFenceListLock);
         mFences.insert(p);
     }
@@ -865,7 +877,7 @@ FSwapChain* FEngine::createSwapChain(void* nativeWindow, uint64_t flags) noexcep
         getDriverApi().setupExternalResource((intptr_t) nativeWindow);
     }
     FSwapChain* p = mHeapAllocator.make<FSwapChain>(*this, nativeWindow, flags);
-    if (p) {
+    if (UTILS_UNLIKELY(p)) { // should never happen
         mSwapChains.insert(p);
     }
     return p;

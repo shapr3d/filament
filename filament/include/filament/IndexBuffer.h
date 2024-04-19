@@ -27,6 +27,7 @@
 
 #include <utils/compiler.h>
 
+#include <stdint.h>
 #include <stddef.h>
 
 namespace filament {
@@ -100,8 +101,7 @@ public:
          *
          * @param engine Reference to the filament::Engine to associate this IndexBuffer with.
          *
-         * @return pointer to the newly created object or nullptr if exceptions are disabled and
-         *         an error occurred.
+         * @return pointer to the newly created object.
          *
          * @exception utils::PostConditionPanic if a runtime error occurred, such as running out of
          *            memory or other resources.
@@ -109,7 +109,7 @@ public:
          *
          * @see IndexBuffer::setBuffer
          */
-        IndexBuffer* build(Engine& engine);
+        IndexBuffer* UTILS_NONNULL build(Engine& engine);
     private:
         friend class FIndexBuffer;
     };
@@ -133,7 +133,7 @@ public:
      * @param engine Reference to the filament::Engine to associate this IndexBuffer with.
      * @param bufferObject The handle to the GPU data that will be used in this buffer.
      */
-    void setBufferObject(Engine& engine, BufferObject const* bufferObject);
+    void setBufferObject(Engine& engine, BufferObject const* UTILS_NONNULL bufferObject);
 
     /**
      * Returns the size of this IndexBuffer in elements.

@@ -247,7 +247,7 @@ FrameGraphId<FrameGraphTexture> ShadowMapManager::render(FEngine& engine, FrameG
 
 
                         // cameraInfo only valid after calling update
-                        const CameraInfo cameraInfo{ shadowMap.getCamera() };
+                        const CameraInfo cameraInfo{ shadowMap.getCamera(), mainCameraInfo };
 
                         auto transaction = ShadowMap::open(driver);
                         ShadowMap::prepareCamera(transaction, engine, cameraInfo);
@@ -293,6 +293,8 @@ FrameGraphId<FrameGraphTexture> ShadowMapManager::render(FEngine& engine, FrameG
     // -------------------------------------------------------------------------------------------
     // Shadow Passes
     // -------------------------------------------------------------------------------------------
+
+    fg.getBlackboard()["shadowmap"] = prepareShadowPass->shadows;
 
     struct ShadowPassData {
         FrameGraphId<FrameGraphTexture> tempBlurSrc{};  // temporary shadowmap when blurring
@@ -844,7 +846,7 @@ ShadowMapManager::ShadowTechnique ShadowMapManager::updateSpotShadowMaps(FEngine
         FScene::LightSoa const& lightData) noexcept {
 
     // The const_cast here is a little ugly, but conceptually lightData should be const,
-    // it's just that we're using it to store some temporary data. with SoA we can't have
+    // it's just that we're using it to store some temporary data. With SoA we can't have
     // a `mutable` element, so that's a workaround.
     FScene::ShadowInfo* const shadowInfo = const_cast<FScene::ShadowInfo*>(
             lightData.data<FScene::SHADOW_INFO>());
@@ -855,7 +857,7 @@ ShadowMapManager::ShadowTechnique ShadowMapManager::updateSpotShadowMaps(FEngine
         shadowTechnique |= ShadowTechnique::SHADOW_MAP;
         for (ShadowMap const& shadowMap : spotShadowMaps) {
             const size_t lightIndex = shadowMap.getLightIndex();
-            // gather the per-light (not per shadow map) information. For point lights we will
+            // Gather the per-light (not per shadow map) information. For point lights we will
             // "see" 6 shadowmaps (one per face), we must use the first face one, the shader
             // knows how to find the entry for other faces (they're guaranteed to be sequential).
             if (shadowMap.getFace() == 0) {
@@ -942,6 +944,10 @@ void ShadowMapManager::calculateTextureRequirements(FEngine& engine, FView& view
         int const lowMipmapLevel = 7;    // log2(256) - 1
         mipLevels = std::max(1, FTexture::maxLevelCount(maxDimension) - lowMipmapLevel);
     }
+
+    // publish the debugging data
+    engine.debug.shadowmap.display_shadow_texture_layer_count = layersNeeded;
+    engine.debug.shadowmap.display_shadow_texture_level_count = mipLevels;
 
     mTextureAtlasRequirements = {
             (uint16_t)maxDimension,

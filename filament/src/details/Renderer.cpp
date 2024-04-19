@@ -70,6 +70,22 @@ FRenderer::FRenderer(FEngine& engine) :
             &engine.debug.renderer.doFrameCapture);
     debugRegistry.registerProperty("d.renderer.disable_buffer_padding",
             &engine.debug.renderer.disable_buffer_padding);
+    debugRegistry.registerProperty("d.shadowmap.display_shadow_texture",
+            &engine.debug.shadowmap.display_shadow_texture);
+    debugRegistry.registerProperty("d.shadowmap.display_shadow_texture_scale",
+            &engine.debug.shadowmap.display_shadow_texture_scale);
+    debugRegistry.registerProperty("d.shadowmap.display_shadow_texture_layer",
+            &engine.debug.shadowmap.display_shadow_texture_layer);
+    debugRegistry.registerProperty("d.shadowmap.display_shadow_texture_level",
+            &engine.debug.shadowmap.display_shadow_texture_level);
+    debugRegistry.registerProperty("d.shadowmap.display_shadow_texture_channel",
+            &engine.debug.shadowmap.display_shadow_texture_channel);
+    debugRegistry.registerProperty("d.shadowmap.display_shadow_texture_layer_count",
+            &engine.debug.shadowmap.display_shadow_texture_layer_count);
+    debugRegistry.registerProperty("d.shadowmap.display_shadow_texture_level_count",
+            &engine.debug.shadowmap.display_shadow_texture_level_count);
+    debugRegistry.registerProperty("d.shadowmap.display_shadow_texture_power",
+            &engine.debug.shadowmap.display_shadow_texture_power);
 
     DriverApi& driver = engine.getDriverApi();
 
@@ -353,18 +369,18 @@ void FRenderer::copyFrame(FSwapChain* dstSwapChain, filament::Viewport const& ds
         params.viewport.bottom = 0;
         params.viewport.width = std::numeric_limits<uint32_t>::max();
         params.viewport.height = std::numeric_limits<uint32_t>::max();
+        driver.beginRenderPass(mRenderTargetHandle, params);
+        driver.endRenderPass();
     }
-    driver.beginRenderPass(mRenderTargetHandle, params);
 
     // Verify that the source swap chain is readable.
     assert_invariant(mSwapChain->isReadable());
-    driver.blit(TargetBufferFlags::COLOR,
-            mRenderTargetHandle, dstViewport, mRenderTargetHandle, srcViewport, SamplerMagFilter::LINEAR);
+    driver.blitDEPRECATED(TargetBufferFlags::COLOR, mRenderTargetHandle,
+            dstViewport, mRenderTargetHandle, srcViewport, SamplerMagFilter::LINEAR);
+
     if (flags & SET_PRESENTATION_TIME) {
         // TODO: Implement this properly, see https://github.com/google/filament/issues/633
     }
-
-    driver.endRenderPass();
 
     if (flags & COMMIT) {
         dstSwapChain->commit(driver);
@@ -497,6 +513,19 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
         hasDithering = false;
         hasFXAA = false;
         scale = 1.0f;
+    } else {
+        // This configures post-process materials by setting constant parameters
+        if (taaOptions.enabled) {
+            ppm.configureTemporalAntiAliasingMaterial(taaOptions);
+            if (taaOptions.upscaling) {
+                // for now TAA upscaling is incompatible with regular dsr
+                dsrOptions.enabled = false;
+                // also, upscaling doesn't work well with quater-resolution SSAO
+                aoOptions.resolution = 1.0;
+                // Currently we only support a fixed TAA upscaling ratio
+                scale = 0.5f;
+            }
+        }
     }
 
     const bool blendModeTranslucent = view.getBlendMode() == BlendMode::TRANSLUCENT;
@@ -526,7 +555,7 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
     };
 
     // whether we're scaled at all
-    const bool scaled = any(notEqual(scale, float2(1.0f)));
+     bool scaled = any(notEqual(scale, float2(1.0f)));
 
     // vp is the user defined viewport within the View
     filament::Viewport const& vp = view.getViewport();
@@ -615,7 +644,7 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
 
     view.prepare(engine, driver, arena, svp, cameraInfo, getShaderUserTime(), needsAlphaChannel);
 
-    view.prepareUpscaler(scale);
+    view.prepareUpscaler(scale, taaOptions, dsrOptions);
 
     /*
      * Allocate command buffer
@@ -819,14 +848,14 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
                 [=, &view](FrameGraphResources const& resources,
                         auto const&, DriverApi& driver) mutable {
                     auto out = resources.getRenderPassInfo();
-                    view.executePickingQueries(driver, out.target, aoOptions.resolution);
+                    view.executePickingQueries(driver, out.target, scale * aoOptions.resolution);
                 });
     }
 
     // Store this frame's camera projection in the frame history.
     if (UTILS_UNLIKELY(taaOptions.enabled)) {
         // Apply the TAA jitter to everything after the structure pass, starting with the color pass.
-        ppm.prepareTaa(fg, svp, view.getFrameHistory(), &FrameHistoryEntry::taa,
+        ppm.prepareTaa(fg, svp, taaOptions, view.getFrameHistory(), &FrameHistoryEntry::taa,
                 &cameraInfo, view.getPerViewUniforms());
     }
 
@@ -980,8 +1009,7 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
                     auto& history = view.getFrameHistory();
                     auto& current = history.getCurrent();
                     current.ssr.projection = projection;
-                    resources.detach(data.history,
-                            &current.ssr.color, &current.ssr.desc);
+                    resources.detach(data.history, &current.ssr.color, &current.ssr.desc);
                 });
     }
 
@@ -992,10 +1020,12 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
         view.commitUniforms(driver);
     });
 
-    // resolve depth -- which might be needed because of TAA or DoF. This pass will be culled
-    // if the depth is not used below.
-    auto const depth = ppm.resolveBaseLevel(fg, "Resolved Depth Buffer",
-            blackboard.get<FrameGraphTexture>("depth"));
+    // Resolve depth -- which might be needed because of TAA or DoF. This pass will be culled
+    // if the depth is not used below or if the depth is not MS (e.g. it could have been
+    // auto-resolved).
+    // In practice, this is used on Vulkan and older Metal devices.
+    auto depth = blackboard.get<FrameGraphTexture>("depth");
+    depth = ppm.resolve(fg, "Resolved Depth Buffer", depth, { .levels = 1 });
 
     // Debug: CSM visualisation
     if (UTILS_UNLIKELY(engine.debug.shadowmap.visualize_cascades &&
@@ -1012,6 +1042,15 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
     if (taaOptions.enabled) {
         input = ppm.taa(fg, input, depth, view.getFrameHistory(), &FrameHistoryEntry::taa,
                 taaOptions, colorGradingConfig);
+        if (taaOptions.upscaling) {
+            scale = 1.0f;
+            scaled = false;
+            UTILS_UNUSED_IN_RELEASE auto const& inputDesc = fg.getDescriptor(input);
+            svp.width = inputDesc.width;
+            svp.height = inputDesc.height;
+            xvp.width *= 2;
+            xvp.height *= 2;
+        }
     }
 
     // --------------------------------------------------------------------------------------------
@@ -1027,16 +1066,21 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
             // The bokeh height is always correct regardless of the dynamic resolution scaling.
             // (because the CoC is calculated w.r.t. the height), so we only need to adjust
             // the width.
-            float const bokehAspectRatio = scale.x / scale.y;
+            float const aspect = (scale.x / scale.y) * dofOptions.cocAspectRatio;
+            float2 const bokehScale{
+                aspect < 1.0f ? aspect : 1.0f,
+                aspect > 1.0f ? 1.0f / aspect : 1.0f
+            };
             input = ppm.dof(fg, input, depth, cameraInfo, needsAlphaChannel,
-                    bokehAspectRatio, dofOptions);
+                    bokehScale, dofOptions);
         }
 
         FrameGraphId<FrameGraphTexture> bloom, flare;
         if (bloomOptions.enabled) {
-            // generate the bloom buffer, which is stored in the blackboard as "bloom". This is
+            // Generate the bloom buffer, which is stored in the blackboard as "bloom". This is
             // consumed by the colorGrading pass and will be culled if colorGrading is disabled.
-            auto [bloom_, flare_] = ppm.bloom(fg, input, bloomOptions, TextureFormat::R11F_G11F_B10F, scale);
+            auto [bloom_, flare_] = ppm.bloom(fg, input, TextureFormat::R11F_G11F_B10F,
+                    bloomOptions, taaOptions, scale);
             bloom = bloom_;
             flare = flare_;
         }
@@ -1065,7 +1109,7 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
             auto viewport = DEBUG_DYNAMIC_SCALING ? xvp : vp;
             input = ppm.upscale(fg, needsAlphaChannel, dsrOptions, input, xvp, {
                     .width = viewport.width, .height = viewport.height,
-                    .format = colorGradingConfig.ldrFormat });
+                    .format = colorGradingConfig.ldrFormat }, SamplerMagFilter::LINEAR);
             xvp.left = xvp.bottom = 0;
             svp = xvp;
         }
@@ -1088,7 +1132,8 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
     //   TODO: in that specific scenario it would be better to just not use xvp
     // The intermediate buffer is accomplished with a "fake" opaqueBlit (i.e. blit) operation.
 
-    const bool outputIsSwapChain = (input == colorPassOutput) && (viewRenderTarget == mRenderTargetHandle);
+    const bool outputIsSwapChain =
+            (input == colorPassOutput) && (viewRenderTarget == mRenderTargetHandle);
     if (mightNeedFinalBlit) {
         if (blendModeTranslucent ||
             xvp != svp ||
@@ -1099,8 +1144,9 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
                     ssReflectionsOptions.enabled))) {
             assert_invariant(!scaled);
             input = ppm.blit(fg, blendModeTranslucent, input, xvp, {
-                    .width = vp.width, .height = vp.height,
-                    .format = colorGradingConfig.ldrFormat }, SamplerMagFilter::NEAREST);
+                            .width = vp.width, .height = vp.height,
+                            .format = colorGradingConfig.ldrFormat },
+                    SamplerMagFilter::NEAREST, SamplerMinFilter::NEAREST);
         }
     }
 
@@ -1109,6 +1155,16 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
         ASSERT_PRECONDITION(mSwapChain->hasStencilBuffer(),
                 "View has stencil buffer enabled, but SwapChain does not have "
                 "SwapChain::CONFIG_HAS_STENCIL_BUFFER flag set.");
+    }
+
+    if (UTILS_UNLIKELY(engine.debug.shadowmap.display_shadow_texture)) {
+        auto shadowmap = blackboard.get<FrameGraphTexture>("shadowmap");
+        input = ppm.debugDisplayShadowTexture(fg, input, shadowmap,
+                engine.debug.shadowmap.display_shadow_texture_scale,
+                engine.debug.shadowmap.display_shadow_texture_layer,
+                engine.debug.shadowmap.display_shadow_texture_level,
+                engine.debug.shadowmap.display_shadow_texture_channel,
+                engine.debug.shadowmap.display_shadow_texture_power);
     }
 
 //    auto debug = structure

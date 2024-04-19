@@ -25,6 +25,7 @@
 #include <utils/compiler.h>
 #include <utils/Log.h>
 #include <utils/Panic.h>
+#include <utils/unwindows.h>
 
 #ifndef EGL_CONTEXT_OPENGL_BACKWARDS_COMPATIBLE_ANGLE
 #   define EGL_CONTEXT_OPENGL_BACKWARDS_COMPATIBLE_ANGLE 0x3483

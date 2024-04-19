@@ -117,7 +117,7 @@ void FMaterialInstance::initDefaultInstance(FEngine& engine, FMaterial const* ma
     if (!material->getSamplerInterfaceBlock().isEmpty()) {
         mSamplers = SamplerGroup(material->getSamplerInterfaceBlock().getSize());
         mSbHandle = driver.createSamplerGroup(
-                mSamplers.getSize(), utils::FixedSizeString<32>("Default material"));
+                mSamplers.getSize(), utils::FixedSizeString<32>(mMaterial->getName().c_str_safe()));
     }
 
     const RasterState& rasterState = material->getRasterState();
@@ -274,7 +274,7 @@ const char* FMaterialInstance::getName() const noexcept {
     // the instance's CString rather than calling empty(). This allows instances to override the
     // parent material's name with a blank string.
     if (mName.data() == nullptr) {
-        return mMaterial->getName().c_str();
+        return mMaterial->getName().c_str_safe();
     }
     return mName.c_str();
 }

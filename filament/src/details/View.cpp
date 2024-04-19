@@ -313,6 +313,10 @@ void FView::prepareShadowing(FEngine& engine, FScene::RenderableSoa& renderableD
         }
 
         if (UTILS_LIKELY(!lcm.isShadowCaster(li))) {
+            // Because we early exit here, we need to make sure we mark the light as non-casting.
+            // See `ShadowMapManager::updateSpotShadowMaps` for const_cast<> justification.
+            const_cast<FScene::ShadowInfo&>(
+                    lightData.elementAt<FScene::SHADOW_INFO>(l)).castsShadows = false;
             continue; // doesn't cast shadows
         }
 
@@ -711,11 +715,22 @@ UTILS_NOINLINE
     });
 }
 
-void FView::prepareUpscaler(float2 scale) const noexcept {
+void FView::prepareUpscaler(float2 scale,
+        TemporalAntiAliasingOptions const& taaOptions,
+        DynamicResolutionOptions const& dsrOptions) const noexcept {
     SYSTRACE_CALL();
-    const float bias = (mDynamicResolution.quality >= QualityLevel::HIGH) ?
-            std::log2(std::min(scale.x, scale.y)) : 0.0f;
-    mPerViewUniforms.prepareLodBias(bias);
+    float bias = 0.0f;
+    float2 derivativesScale{ 1.0f };
+    if (dsrOptions.enabled && dsrOptions.quality >= QualityLevel::HIGH) {
+        bias = std::log2(std::min(scale.x, scale.y));
+    }
+    if (taaOptions.enabled) {
+        bias += taaOptions.lodBias;
+        if (taaOptions.upscaling) {
+            derivativesScale = 0.5f;
+        }
+    }
+    mPerViewUniforms.prepareLodBias(bias, derivativesScale);
 }
 
 void FView::prepareCamera(FEngine& engine, const CameraInfo& cameraInfo) const noexcept {
@@ -971,15 +986,15 @@ void FView::drainFrameHistory(FEngine& engine) noexcept {
 }
 
 void FView::executePickingQueries(backend::DriverApi& driver,
-        backend::RenderTargetHandle handle, float scale) noexcept {
+        backend::RenderTargetHandle handle, float2 scale) noexcept {
 
     while (mActivePickingQueriesList) {
         FPickingQuery* const pQuery = mActivePickingQueriesList;
         mActivePickingQueriesList = pQuery->next;
 
         // adjust for dynamic resolution and structure buffer scale
-        const uint32_t x = uint32_t(float(pQuery->x) * (scale * mScale.x));
-        const uint32_t y = uint32_t(float(pQuery->y) * (scale * mScale.y));
+        const uint32_t x = uint32_t(float(pQuery->x) * scale.x);
+        const uint32_t y = uint32_t(float(pQuery->y) * scale.y);
 
         if (UTILS_UNLIKELY(driver.getFeatureLevel() == FeatureLevel::FEATURE_LEVEL_0)) {
             driver.readPixels(handle, x, y, 1, 1, {
