@@ -111,7 +111,7 @@ void MetalShaderCompiler::terminate() noexcept {
         // This ensures that operations adhere to IEEE standards for floating-point arithmetic,
         // which is crucial for half precision floats in scenarios where fast math optimizations
         // lead to inaccuracies, such as in handling special values like NaN or Infinity.
-        options.fastMathEnabled = NO;
+        options.fastMathEnabled = YES;
 
         NSError* error = nil;
         id<MTLLibrary> library = [device newLibraryWithSource:objcSource
