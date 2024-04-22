@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.19)
-project(viewer)
+project(viewer C ASM)
 
 set(TARGET viewer)
 set(PUBLIC_HDR_DIR include)
