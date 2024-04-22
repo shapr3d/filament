@@ -828,8 +828,6 @@ public:
      */
     Material const* UTILS_NONNULL getDefaultMaterial() const noexcept;
 
-    const Material* UTILS_NONNULL getShaprMaterial(size_t index) const noexcept;
-
     /**
      * Returns the resolved backend.
      */

@@ -148,7 +148,6 @@ public:
     uint32_t getMaterialId() const noexcept { return mMaterialId++; }
 
     const FMaterial* getDefaultMaterial() const noexcept { return mDefaultMaterial; }
-    const FMaterial* getShaprMaterial(size_t index) const noexcept { return mShaprGeneralMaterials[index]; }
     const FMaterial* getSkyboxMaterial() const noexcept;
     const FIndirectLight* getDefaultIndirectLight() const noexcept { return mDefaultIbl; }
     const FTexture* getDummyCubemap() const noexcept { return mDefaultIblTexture; }
@@ -522,7 +521,6 @@ private:
     Epoch mEngineEpoch;
 
     mutable FMaterial const* mDefaultMaterial = nullptr;
-    mutable FMaterial const* mShaprGeneralMaterials[5]{};
     mutable FMaterial const* mSkyboxMaterial = nullptr;
 
     mutable FTexture* mDefaultIblTexture = nullptr;

@@ -360,33 +360,6 @@ void FEngine::init() {
                 MATERIALS_DEFAULTMATERIAL_DATA, MATERIALS_DEFAULTMATERIAL_SIZE);
         mDefaultMaterial = downcast(defaultMaterialBuilder.build(*const_cast<FEngine*>(this)));
 
-        mShaprGeneralMaterials[0] = downcast(
-            FMaterial::Builder()
-            .package(MATERIALS_OPAQUE_DATA, MATERIALS_OPAQUE_SIZE)
-            .build(*const_cast<FEngine*>(this))
-        );
-        mShaprGeneralMaterials[1] = downcast(
-            FMaterial::Builder()
-            .package(MATERIALS_TRANSPARENT_DATA, MATERIALS_TRANSPARENT_SIZE)
-            .build(*const_cast<FEngine*>(this))
-        );
-        // for legacy reasons
-        mShaprGeneralMaterials[2] = downcast(
-            FMaterial::Builder()
-            .package(MATERIALS_REFRACTIVE_DATA, MATERIALS_REFRACTIVE_SIZE)
-            .build(*const_cast<FEngine*>(this))
-        );
-        mShaprGeneralMaterials[3] = downcast(
-            FMaterial::Builder()
-            .package(MATERIALS_CLOTH_DATA, MATERIALS_CLOTH_SIZE)
-            .build(*const_cast<FEngine*>(this))
-        );
-        mShaprGeneralMaterials[4] = downcast(
-            FMaterial::Builder()
-            .package(MATERIALS_SUBSURFACE_DATA, MATERIALS_SUBSURFACE_SIZE)
-            .build(*const_cast<FEngine*>(this))
-        );
-
         float3 dummyPositions[1] = {};
         short4 dummyTangents[1] = {};
         mDummyMorphTargetBuffer->setPositionsAt(*this, 0, dummyPositions, 1, 0);
@@ -498,9 +471,6 @@ void FEngine::shutdown() {
     destroy(mDefaultColorGrading);
 
     destroy(mDefaultMaterial);
-    for (auto& shaprMat : mShaprGeneralMaterials) {
-        destroy(shaprMat);
-    }
 
     /*
      * clean-up after the user -- we call terminate on each "leaked" object and clear each list.
