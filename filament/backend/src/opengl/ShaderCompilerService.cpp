@@ -165,10 +165,13 @@ void ShaderCompilerService::init() noexcept {
     // In practice, we already know that with ANGLE, Mode::ASYNCHRONOUS can cause very long
     // pauses at glDraw() time in the situation where glLinkProgram() has been emitted, but has
     // other programs ahead of it in ANGLE's queue.
+#ifndef FILAMENT_USE_ANGLE
     if (mDriver.mPlatform.isExtraContextSupported()) {
         // our thread-pool if possible
         mMode = Mode::THREAD_POOL;
-    } else if (mDriver.getContext().ext.KHR_parallel_shader_compile) {
+    } else
+#endif // FILAMENT_USE_ANGLE
+    if (mDriver.getContext().ext.KHR_parallel_shader_compile) {
         // if not, async shader compilation and link if the driver supports it
         mMode = Mode::ASYNCHRONOUS;
     } else {
