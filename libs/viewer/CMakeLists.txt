@@ -47,6 +47,7 @@ set(MATERIAL_SRCS
 
 get_resgen_vars(${RESOURCE_DIR} materials)
 list(APPEND PRIVATE_HDRS ${RESGEN_HEADER})
+list(APPEND SRCS ${RESGEN_SOURCE})
 
 if (APPLE)
     list(APPEND SRCS
