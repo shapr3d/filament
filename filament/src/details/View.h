@@ -133,7 +133,9 @@ public:
         return mName.c_str_safe();
     }
 
-    void prepareUpscaler(math::float2 scale) const noexcept;
+    void prepareUpscaler(math::float2 scale,
+            TemporalAntiAliasingOptions const& taaOptions,
+            DynamicResolutionOptions const& dsrOptions) const noexcept;
     void prepareCamera(FEngine& engine, const CameraInfo& cameraInfo) const noexcept;
 
     void prepareViewport(
@@ -417,7 +419,7 @@ public:
             View::PickingQueryResultCallback callback) noexcept;
 
     void executePickingQueries(backend::DriverApi& driver,
-            backend::RenderTargetHandle handle, float scale) noexcept;
+            backend::RenderTargetHandle handle, math::float2 scale) noexcept;
 
     void setMaterialGlobal(uint32_t index, math::float4 const& value);
 
@@ -488,7 +490,7 @@ private:
 
     FScene* mScene = nullptr;
     // The camera set by the user, used for culling and viewing
-    FCamera* mCullingCamera = nullptr;
+    FCamera* /* UTILS_NONNULL */ mCullingCamera = nullptr; // FIXME: should alaways be non-null
     // The optional (debug) camera, used only for viewing
     FCamera* mViewingCamera = nullptr;
 

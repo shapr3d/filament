@@ -1093,7 +1093,7 @@ public class View {
      * @see #setStereoscopicOptions
      */
     @NonNull
-    public StereoscopicOptions getStereoscoopicOptions() {
+    public StereoscopicOptions getStereoscopicOptions() {
         if (mStereoscopicOptions == null) {
             mStereoscopicOptions = new StereoscopicOptions();
         }
@@ -1638,6 +1638,10 @@ public class View {
          */
         public float cocScale = 1.0f;
         /**
+         * width/height aspect ratio of the circle of confusion (simulate anamorphic lenses)
+         */
+        public float cocAspectRatio = 1.0f;
+        /**
          * maximum aperture diameter in meters (zero to disable rotation)
          */
         public float maxApertureDiameter = 0.01f;
@@ -1852,7 +1856,7 @@ public class View {
     }
 
     /**
-     * Options for Temporal Multi-Sample Anti-aliasing (MSAA)
+     * Options for Multi-Sample Anti-aliasing (MSAA)
      * @see setMultiSampleAntiAliasingOptions()
      */
     public static class MultiSampleAntiAliasingOptions {
@@ -1876,21 +1880,111 @@ public class View {
 
     /**
      * Options for Temporal Anti-aliasing (TAA)
+     * Most TAA parameters are extremely costly to change, as they will trigger the TAA post-process
+     * shaders to be recompiled. These options should be changed or set during initialization.
+     * `filterWidth`, `feedback` and `jitterPattern`, however, can be changed at any time.
+     *
+     * `feedback` of 0.1 effectively accumulates a maximum of 19 samples in steady state.
+     * see "A Survey of Temporal Antialiasing Techniques" by Lei Yang and all for more information.
+     *
      * @see setTemporalAntiAliasingOptions()
      */
     public static class TemporalAntiAliasingOptions {
+        public enum BoxType {
+            /**
+             * use an AABB neighborhood
+             */
+            AABB,
+            /**
+             * use the variance of the neighborhood (not recommended)
+             */
+            VARIANCE,
+            /**
+             * use both AABB and variance
+             */
+            AABB_VARIANCE,
+        }
+
+        public enum BoxClipping {
+            /**
+             * Accurate box clipping
+             */
+            ACCURATE,
+            /**
+             * clamping
+             */
+            CLAMP,
+            /**
+             * no rejections (use for debugging)
+             */
+            NONE,
+        }
+
+        public enum JitterPattern {
+            RGSS_X4,
+            UNIFORM_HELIX_X4,
+            HALTON_23_X8,
+            HALTON_23_X16,
+            HALTON_23_X32,
+        }
+
         /**
-         * reconstruction filter width typically between 0 (sharper, aliased) and 1 (smoother)
+         * reconstruction filter width typically between 0.2 (sharper, aliased) and 1.5 (smoother)
          */
         public float filterWidth = 1.0f;
         /**
          * history feedback, between 0 (maximum temporal AA) and 1 (no temporal AA).
          */
-        public float feedback = 0.04f;
+        public float feedback = 0.12f;
+        /**
+         * texturing lod bias (typically -1 or -2)
+         */
+        public float lodBias = -1.0f;
+        /**
+         * post-TAA sharpen, especially useful when upscaling is true.
+         */
+        public float sharpness = 0.0f;
         /**
          * enables or disables temporal anti-aliasing
          */
         public boolean enabled = false;
+        /**
+         * 4x TAA upscaling. Disables Dynamic Resolution. [BETA]
+         */
+        public boolean upscaling = false;
+        /**
+         * whether to filter the history buffer
+         */
+        public boolean filterHistory = true;
+        /**
+         * whether to apply the reconstruction filter to the input
+         */
+        public boolean filterInput = true;
+        /**
+         * whether to use the YcoCg color-space for history rejection
+         */
+        public boolean useYCoCg = false;
+        /**
+         * type of color gamut box
+         */
+        @NonNull
+        public TemporalAntiAliasingOptions.BoxType boxType = TemporalAntiAliasingOptions.BoxType.AABB;
+        /**
+         * clipping algorithm
+         */
+        @NonNull
+        public TemporalAntiAliasingOptions.BoxClipping boxClipping = TemporalAntiAliasingOptions.BoxClipping.ACCURATE;
+        @NonNull
+        public TemporalAntiAliasingOptions.JitterPattern jitterPattern = TemporalAntiAliasingOptions.JitterPattern.HALTON_23_X16;
+        public float varianceGamma = 1.0f;
+        /**
+         * adjust the feedback dynamically to reduce flickering
+         */
+        public boolean preventFlickering = false;
+        /**
+         * whether to apply history reprojection (debug option)
+         */
+        public boolean historyReprojection = true;
     }
 
     /**

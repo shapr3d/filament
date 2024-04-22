@@ -147,9 +147,9 @@ Driver* OpenGLDriver::create(OpenGLPlatform* const platform,
 #endif
 
     size_t const defaultSize = FILAMENT_OPENGL_HANDLE_ARENA_SIZE_IN_MB * 1024U * 1024U;
-    Platform::DriverConfig validConfig {driverConfig};
+    Platform::DriverConfig validConfig{ driverConfig };
     validConfig.handleArenaSize = std::max(driverConfig.handleArenaSize, defaultSize);
-    OpenGLDriver* const driver = new OpenGLDriver(ec, validConfig);
+    OpenGLDriver* const driver = new(std::nothrow) OpenGLDriver(ec, validConfig);
     return driver;
 }
 
@@ -171,7 +171,8 @@ OpenGLDriver::OpenGLDriver(OpenGLPlatform* platform, const Platform::DriverConfi
           mContext(),
           mShaderCompilerService(*this),
           mHandleAllocator("Handles", driverConfig.handleArenaSize, {1,84,15}),
-          mSamplerMap(32) {
+          mSamplerMap(32),
+          mDriverConfig(driverConfig) {
 
     std::fill(mSamplerBindings.begin(), mSamplerBindings.end(), nullptr);
 
@@ -550,7 +551,7 @@ void OpenGLDriver::createProgramR(Handle<HwProgram> ph, Program&& program) {
 
 
     if (UTILS_UNLIKELY(mContext.isES2())) {
-        // Here we patch the specification constants to enable or not the rec709 output
+        // Here we patch the specialization constants to enable or not the rec709 output
         // color space emulation in this program. Obviously, the backend shouldn't know about
         // specific spec-constants, so we need to handle failures gracefully. This cannot be
         // done at Material creation time because only the backend has access to
@@ -1088,6 +1089,7 @@ void OpenGLDriver::framebufferTexture(TargetBufferInfo const& binfo,
         }
         CHECK_GL_ERROR(utils::slog.e)
     } else
+#ifndef __EMSCRIPTEN__
 #ifdef GL_EXT_multisampled_render_to_texture
         // EXT_multisampled_render_to_texture only support GL_COLOR_ATTACHMENT0
     if (!attachmentTypeNotSupportedByMSRTT && (t->depth <= 1)
@@ -1100,7 +1102,7 @@ void OpenGLDriver::framebufferTexture(TargetBufferInfo const& binfo,
         // This extension only exists on OpenGL ES.
         gl.bindFramebuffer(GL_FRAMEBUFFER, rt->gl.fbo);
         if (any(t->usage & TextureUsage::SAMPLEABLE)) {
-            glext::glFramebufferTexture2DMultisampleEXT(GL_FRAMEBUFFER,
+            glFramebufferTexture2DMultisampleEXT(GL_FRAMEBUFFER,
                     attachment, target, t->gl.id, binfo.level, rt->gl.samples);
         } else {
             glFramebufferRenderbuffer(GL_FRAMEBUFFER, attachment,
@@ -1108,7 +1110,8 @@ void OpenGLDriver::framebufferTexture(TargetBufferInfo const& binfo,
         }
         CHECK_GL_ERROR(utils::slog.e)
     } else
-#endif
+#endif // GL_EXT_multisampled_render_to_texture
+#endif // __EMSCRIPTEN__
     if (!any(t->usage & TextureUsage::SAMPLEABLE) && t->samples > 1) {
         assert_invariant(rt->gl.samples > 1);
         assert_invariant(glIsRenderbuffer(t->gl.id));
@@ -1207,6 +1210,7 @@ void OpenGLDriver::renderBufferStorage(GLuint rbo, GLenum internalformat, uint32
         uint32_t height, uint8_t samples) const noexcept {
     glBindRenderbuffer(GL_RENDERBUFFER, rbo);
     if (samples > 1) {
+#ifndef __EMSCRIPTEN__
 #ifdef GL_EXT_multisampled_render_to_texture
         auto& gl = mContext;
         if (gl.ext.EXT_multisampled_render_to_texture ||
@@ -1214,7 +1218,8 @@ void OpenGLDriver::renderBufferStorage(GLuint rbo, GLenum internalformat, uint32
             glext::glRenderbufferStorageMultisampleEXT(GL_RENDERBUFFER,
                     samples, internalformat, width, height);
         } else
-#endif
+#endif // GL_EXT_multisampled_render_to_texture
+#endif // __EMSCRIPTEN__
         {
 #ifndef FILAMENT_SILENCE_NOT_SUPPORTED_BY_ES2
             glRenderbufferStorageMultisample(GL_RENDERBUFFER,
@@ -1924,6 +1929,10 @@ bool OpenGLDriver::isParallelShaderCompileSupported() {
     return mShaderCompilerService.isParallelShaderCompileSupported();
 }
 
+bool OpenGLDriver::isDepthStencilResolveSupported() {
+    return true;
+}
+
 bool OpenGLDriver::isWorkaroundNeeded(Workaround workaround) {
     switch (workaround) {
         case Workaround::SPLIT_EASU:
@@ -2251,8 +2260,7 @@ void OpenGLDriver::setMinMaxLevels(Handle<HwTexture> th, uint32_t minLevel, uint
         t->gl.baseLevel = (int8_t)minLevel;
         glTexParameteri(t->gl.target, GL_TEXTURE_BASE_LEVEL, t->gl.baseLevel);
 
-        t->gl
-         .maxLevel = (int8_t)maxLevel; // NOTE: according to the GL spec, the default value of this 1000
+        t->gl.maxLevel = (int8_t)maxLevel; // NOTE: according to the GL spec, the default value of this 1000
         glTexParameteri(t->gl.target, GL_TEXTURE_MAX_LEVEL, t->gl.maxLevel);
     }
 #endif
@@ -2302,16 +2310,13 @@ void OpenGLDriver::generateMipmaps(Handle<HwTexture> th) {
     CHECK_GL_ERROR(utils::slog.e)
 }
 
-bool OpenGLDriver::canGenerateMipmaps() {
-    return true;
-}
-
 void OpenGLDriver::setTextureData(GLTexture* t, uint32_t level,
         uint32_t xoffset, uint32_t yoffset, uint32_t zoffset,
         uint32_t width, uint32_t height, uint32_t depth,
         PixelBufferDescriptor&& p) {
     auto& gl = mContext;
 
+    assert_invariant(t != nullptr);
     assert_invariant(xoffset + width <= std::max(1u, t->width >> level));
     assert_invariant(yoffset + height <= std::max(1u, t->height >> level));
     assert_invariant(t->samples <= 1);
@@ -3006,16 +3011,18 @@ GLuint OpenGLDriver::getSamplerSlow(SamplerParams params) const noexcept {
 #endif
 
 void OpenGLDriver::insertEventMarker(char const* string, uint32_t len) {
+#ifndef __EMSCRIPTEN__
 #ifdef GL_EXT_debug_marker
     auto& gl = mContext;
     if (gl.ext.EXT_debug_marker) {
         glInsertEventMarkerEXT(GLsizei(len ? len : strlen(string)), string);
     }
 #endif
+#endif
 }
 
 void OpenGLDriver::pushGroupMarker(char const* string, uint32_t len) {
-
+#ifndef __EMSCRIPTEN__
 #ifdef GL_EXT_debug_marker
 #if DEBUG_MARKER_LEVEL & DEBUG_MARKER_OPENGL
     if (UTILS_LIKELY(mContext.ext.EXT_debug_marker)) {
@@ -3028,9 +3035,11 @@ void OpenGLDriver::pushGroupMarker(char const* string, uint32_t len) {
     SYSTRACE_CONTEXT();
     SYSTRACE_NAME_BEGIN(string);
 #endif
+#endif
 }
 
 void OpenGLDriver::popGroupMarker(int) {
+#ifndef __EMSCRIPTEN__
 #ifdef GL_EXT_debug_marker
 #if DEBUG_MARKER_LEVEL & DEBUG_MARKER_OPENGL
     if (UTILS_LIKELY(mContext.ext.EXT_debug_marker)) {
@@ -3042,6 +3051,7 @@ void OpenGLDriver::popGroupMarker(int) {
 #if DEBUG_MARKER_LEVEL & DEBUG_MARKER_BACKEND
     SYSTRACE_CONTEXT();
     SYSTRACE_NAME_END();
+#endif
 #endif
 }
 
@@ -3458,75 +3468,230 @@ void OpenGLDriver::clearWithRasterPipe(TargetBufferFlags clearFlags,
     CHECK_GL_ERROR(utils::slog.e)
 }
 
-void OpenGLDriver::blit(TargetBufferFlags buffers,
-        Handle<HwRenderTarget> dst, Viewport dstRect,
-        Handle<HwRenderTarget> src, Viewport srcRect,
-        SamplerMagFilter filter) {
+void OpenGLDriver::resolve(
+        Handle<HwTexture> dst, uint8_t srcLevel, uint8_t srcLayer,
+        Handle<HwTexture> src, uint8_t dstLevel, uint8_t dstLayer) {
+    DEBUG_MARKER()
+    GLTexture const* const s = handle_cast<GLTexture*>(src);
+    GLTexture const* const d = handle_cast<GLTexture*>(dst);
+    assert_invariant(s);
+    assert_invariant(d);
+
+    ASSERT_PRECONDITION(
+            d->width == s->width && d->height == s->height,
+            "invalid resolve: src and dst sizes don't match");
+
+    ASSERT_PRECONDITION(s->samples > 1 && d->samples == 1,
+            "invalid resolve: src.samples=%u, dst.samples=%u",
+            +s->samples, +d->samples);
+
+    blit(   dst, dstLevel, dstLayer, {},
+            src, srcLevel, srcLayer, {},
+            { d->width, d->height });
+}
+
+void OpenGLDriver::blit(
+        Handle<HwTexture> dst, uint8_t srcLevel, uint8_t srcLayer, uint2 dstOrigin,
+        Handle<HwTexture> src, uint8_t dstLevel, uint8_t dstLayer, uint2 srcOrigin,
+        uint2 size) {
     DEBUG_MARKER()
     UTILS_UNUSED_IN_RELEASE auto& gl = mContext;
     assert_invariant(!gl.isES2());
 
 #ifndef FILAMENT_SILENCE_NOT_SUPPORTED_BY_ES2
-    GLbitfield const mask = getAttachmentBitfield(buffers);
-    if (mask) {
-        GLenum glFilterMode = (filter == SamplerMagFilter::NEAREST) ? GL_NEAREST : GL_LINEAR;
-        if (mask & (GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT)) {
-            // GL_INVALID_OPERATION is generated if mask contains any of the GL_DEPTH_BUFFER_BIT or
-            // GL_STENCIL_BUFFER_BIT and filter is not GL_NEAREST.
-            glFilterMode = GL_NEAREST;
-        }
 
-        // note: for msaa RenderTargets with non-msaa attachments, we copy from the msaa sidecar
-        // buffer -- this should produce the same output that if we copied from the resolved
-        // texture. EXT_multisampled_render_to_texture seems to allow both behaviours, and this
-        // is an emulation of that.  We cannot use the resolved texture easily because it's not
-        // actually attached to the RenderTarget. Another implementation would be to do a
-        // reverse-resolve, but that wouldn't buy us anything.
-        GLRenderTarget const* s = handle_cast<GLRenderTarget const*>(src);
-        GLRenderTarget const* d = handle_cast<GLRenderTarget const*>(dst);
+    GLTexture* d = handle_cast<GLTexture*>(dst);
+    GLTexture* s = handle_cast<GLTexture*>(src);
+    assert_invariant(d);
+    assert_invariant(s);
 
-        // blit operations are only supported from RenderTargets that have only COLOR0 (or
-        // no color buffer at all)
-        assert_invariant(
-                !(s->targets & (TargetBufferFlags::COLOR_ALL & ~TargetBufferFlags::COLOR0)));
+    ASSERT_PRECONDITION_NON_FATAL(any(d->usage & TextureUsage::BLIT_DST),
+            "texture doesn't have BLIT_DST");
 
-        assert_invariant(
-                !(d->targets & (TargetBufferFlags::COLOR_ALL & ~TargetBufferFlags::COLOR0)));
+    ASSERT_PRECONDITION_NON_FATAL(any(s->usage & TextureUsage::BLIT_SRC),
+            "texture doesn't have BLIT_SRC");
 
-        // With GLES 3.x, GL_INVALID_OPERATION is generated if the value of GL_SAMPLE_BUFFERS
-        // for the draw buffer is greater than zero. This works with OpenGL, so we want to
-        // make sure to catch this scenario.
-        assert_invariant(d->gl.samples <= 1);
+    ASSERT_PRECONDITION_NON_FATAL(s->format == d->format,
+            "src and dst texture format don't match");
 
-        // GL_INVALID_OPERATION is generated if GL_SAMPLE_BUFFERS for the read buffer is greater
-        // than zero and the formats of draw and read buffers are not identical.
-        // However, it's not well-defined in the spec what "format" means. So it's difficult
-        // to have an assert here -- especially when dealing with the default framebuffer
+    enum class AttachmentType : GLenum {
+        COLOR = GL_COLOR_ATTACHMENT0,
+        DEPTH = GL_DEPTH_ATTACHMENT,
+        STENCIL = GL_STENCIL_ATTACHMENT,
+        DEPTH_STENCIL = GL_DEPTH_STENCIL_ATTACHMENT,
+    };
 
-        // GL_INVALID_OPERATION is generated if GL_SAMPLE_BUFFERS for the read buffer is greater
-        // than zero and (...) the source and destination rectangles are not defined with the
-        // same (X0, Y0) and (X1, Y1) bounds.
+    auto getFormatType = [](TextureFormat format) -> AttachmentType {
+        bool const depth = isDepthFormat(format);
+        bool const stencil = isStencilFormat(format);
+        if (depth && stencil) return AttachmentType::DEPTH_STENCIL;
+        if (depth) return AttachmentType::DEPTH;
+        if (stencil) return AttachmentType::STENCIL;
+        return AttachmentType::COLOR;
+    };
 
-        // Additionally, the EXT_multisampled_render_to_texture extension doesn't specify what
-        // happens when blitting from an "implicit" resolve render target (does it work?), so
-        // to ere on the safe side, we don't allow it.
-        if (s->gl.samples > 1) {
-            assert_invariant(!memcmp(&dstRect, &srcRect, sizeof(srcRect)));
-        }
+    AttachmentType const type = getFormatType(d->format);
+    assert_invariant(type == getFormatType(s->format));
 
-        gl.bindFramebuffer(GL_READ_FRAMEBUFFER, s->gl.fbo);
-        gl.bindFramebuffer(GL_DRAW_FRAMEBUFFER, d->gl.fbo);
+    // GL_INVALID_OPERATION is generated if mask contains any of the GL_DEPTH_BUFFER_BIT or
+    // GL_STENCIL_BUFFER_BIT and filter is not GL_NEAREST.
+    GLbitfield mask = {};
+    switch (type) {
+        case AttachmentType::COLOR:
+            mask = GL_COLOR_BUFFER_BIT;
+            break;
+        case AttachmentType::DEPTH:
+            mask = GL_DEPTH_BUFFER_BIT;
+            break;
+        case AttachmentType::STENCIL:
+            mask = GL_STENCIL_BUFFER_BIT;
+            break;
+        case AttachmentType::DEPTH_STENCIL:
+            mask = GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT;
+            break;
+    };
 
-        CHECK_GL_FRAMEBUFFER_STATUS(utils::slog.e, GL_READ_FRAMEBUFFER)
-        CHECK_GL_FRAMEBUFFER_STATUS(utils::slog.e, GL_DRAW_FRAMEBUFFER)
+    GLuint fbo[2] = {};
+    glGenFramebuffers(2, fbo);
 
-        gl.disable(GL_SCISSOR_TEST);
-        glBlitFramebuffer(
-                srcRect.left, srcRect.bottom, srcRect.right(), srcRect.top(),
-                dstRect.left, dstRect.bottom, dstRect.right(), dstRect.top(),
-                mask, glFilterMode);
-        CHECK_GL_ERROR(utils::slog.e)
+    gl.bindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo[0]);
+    switch (d->target) {
+        case SamplerType::SAMPLER_2D:
+            if (any(d->usage & TextureUsage::SAMPLEABLE)) {
+                glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GLenum(type),
+                        GL_TEXTURE_2D, d->gl.id, dstLevel);
+            } else {
+                glFramebufferRenderbuffer(GL_DRAW_FRAMEBUFFER, GLenum(type),
+                        GL_RENDERBUFFER, d->gl.id);
+            }
+            break;
+        case SamplerType::SAMPLER_CUBEMAP:
+            glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GLenum(type),
+                    GL_TEXTURE_CUBE_MAP_POSITIVE_X + dstLayer, d->gl.id, dstLevel);
+            break;
+        case SamplerType::SAMPLER_2D_ARRAY:
+        case SamplerType::SAMPLER_CUBEMAP_ARRAY:
+        case SamplerType::SAMPLER_3D:
+            glFramebufferTextureLayer(GL_DRAW_FRAMEBUFFER, GLenum(type),
+                    d->gl.id, dstLevel, dstLayer);
+            break;
+        case SamplerType::SAMPLER_EXTERNAL:
+            break;
     }
+    CHECK_GL_FRAMEBUFFER_STATUS(utils::slog.e, GL_READ_FRAMEBUFFER)
+
+    gl.bindFramebuffer(GL_READ_FRAMEBUFFER, fbo[1]);
+    switch (s->target) {
+        case SamplerType::SAMPLER_2D:
+            if (any(s->usage & TextureUsage::SAMPLEABLE)) {
+                glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GLenum(type),
+                        GL_TEXTURE_2D, s->gl.id, srcLevel);
+            } else {
+                glFramebufferRenderbuffer(GL_READ_FRAMEBUFFER, GLenum(type),
+                        GL_RENDERBUFFER, s->gl.id);
+            }
+            break;
+        case SamplerType::SAMPLER_CUBEMAP:
+            glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GLenum(type),
+                    GL_TEXTURE_CUBE_MAP_POSITIVE_X + srcLayer, s->gl.id, srcLevel);
+            break;
+        case SamplerType::SAMPLER_2D_ARRAY:
+        case SamplerType::SAMPLER_CUBEMAP_ARRAY:
+        case SamplerType::SAMPLER_3D:
+            glFramebufferTextureLayer(GL_READ_FRAMEBUFFER, GLenum(type),
+                    s->gl.id, srcLevel, srcLayer);
+            break;
+        case SamplerType::SAMPLER_EXTERNAL:
+            break;
+    }
+    CHECK_GL_FRAMEBUFFER_STATUS(utils::slog.e, GL_DRAW_FRAMEBUFFER)
+
+    gl.disable(GL_SCISSOR_TEST);
+    glBlitFramebuffer(
+            srcOrigin.x, srcOrigin.y, srcOrigin.x + size.x, srcOrigin.y + size.y,
+            dstOrigin.x, dstOrigin.y, dstOrigin.x + size.x, dstOrigin.y + size.y,
+            mask, GL_NEAREST);
+    CHECK_GL_ERROR(utils::slog.e)
+
+    gl.bindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    gl.bindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+    glDeleteFramebuffers(2, fbo);
+
+    if (any(d->usage & TextureUsage::SAMPLEABLE)) {
+        // In a sense, blitting to a texture level is similar to calling setTextureData on it; in
+        // both cases, we update the base/max LOD to give shaders access to levels as they become
+        // available.  Note that this can only expand the LOD range (never shrink it), and that
+        // users can override this range by calling setMinMaxLevels().
+        updateTextureLodRange(d, int8_t(dstLevel));
+    }
+
+#endif
+}
+
+void OpenGLDriver::blitDEPRECATED(TargetBufferFlags buffers,
+        Handle<HwRenderTarget> dst, Viewport dstRect,
+        Handle<HwRenderTarget> src, Viewport srcRect,
+        SamplerMagFilter filter) {
+
+    // Note: blitDEPRECATED is only used by Renderer::copyFrame
+
+    DEBUG_MARKER()
+    UTILS_UNUSED_IN_RELEASE auto& gl = mContext;
+    assert_invariant(!gl.isES2());
+
+    ASSERT_PRECONDITION(buffers == TargetBufferFlags::COLOR0,
+            "blitDEPRECATED only supports COLOR0");
+
+    ASSERT_PRECONDITION(srcRect.left >= 0 && srcRect.bottom >= 0 &&
+                        dstRect.left >= 0 && dstRect.bottom >= 0,
+            "Source and destination rects must be positive.");
+
+#ifndef FILAMENT_SILENCE_NOT_SUPPORTED_BY_ES2
+
+    GLenum const glFilterMode = (filter == SamplerMagFilter::NEAREST) ? GL_NEAREST : GL_LINEAR;
+
+    // note: for msaa RenderTargets with non-msaa attachments, we copy from the msaa sidecar
+    // buffer -- this should produce the same output that if we copied from the resolved
+    // texture. EXT_multisampled_render_to_texture seems to allow both behaviours, and this
+    // is an emulation of that.  We cannot use the resolved texture easily because it's not
+    // actually attached to the RenderTarget. Another implementation would be to do a
+    // reverse-resolve, but that wouldn't buy us anything.
+    GLRenderTarget const* s = handle_cast<GLRenderTarget const*>(src);
+    GLRenderTarget const* d = handle_cast<GLRenderTarget const*>(dst);
+
+    // With GLES 3.x, GL_INVALID_OPERATION is generated if the value of GL_SAMPLE_BUFFERS
+    // for the draw buffer is greater than zero. This works with OpenGL, so we want to
+    // make sure to catch this scenario.
+    assert_invariant(d->gl.samples <= 1);
+
+    // GL_INVALID_OPERATION is generated if GL_SAMPLE_BUFFERS for the read buffer is greater
+    // than zero and the formats of draw and read buffers are not identical.
+    // However, it's not well-defined in the spec what "format" means. So it's difficult
+    // to have an assert here -- especially when dealing with the default framebuffer
+
+    // GL_INVALID_OPERATION is generated if GL_SAMPLE_BUFFERS for the read buffer is greater
+    // than zero and (...) the source and destination rectangles are not defined with the
+    // same (X0, Y0) and (X1, Y1) bounds.
+
+    // Additionally, the EXT_multisampled_render_to_texture extension doesn't specify what
+    // happens when blitting from an "implicit" resolve render target (does it work?), so
+    // to ere on the safe side, we don't allow it.
+    if (s->gl.samples > 1) {
+        assert_invariant(!memcmp(&dstRect, &srcRect, sizeof(srcRect)));
+    }
+
+    gl.bindFramebuffer(GL_READ_FRAMEBUFFER, s->gl.fbo);
+    gl.bindFramebuffer(GL_DRAW_FRAMEBUFFER, d->gl.fbo);
+
+    CHECK_GL_FRAMEBUFFER_STATUS(utils::slog.e, GL_READ_FRAMEBUFFER)
+    CHECK_GL_FRAMEBUFFER_STATUS(utils::slog.e, GL_DRAW_FRAMEBUFFER)
+
+    gl.disable(GL_SCISSOR_TEST);
+    glBlitFramebuffer(
+            srcRect.left, srcRect.bottom, srcRect.right(), srcRect.top(),
+            dstRect.left, dstRect.bottom, dstRect.right(), dstRect.top(),
+            GL_COLOR_BUFFER_BIT, glFilterMode);
+    CHECK_GL_ERROR(utils::slog.e)
 #endif
 }
 

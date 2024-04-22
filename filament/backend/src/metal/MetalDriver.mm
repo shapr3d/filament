@@ -174,6 +174,7 @@ MetalDriver::~MetalDriver() noexcept {
 }
 
 void MetalDriver::tick(int) {
+    executeTickOps();
 }
 
 void MetalDriver::beginFrame(int64_t monotonic_clock_ns, uint32_t frameId) {
@@ -601,6 +602,8 @@ void MetalDriver::terminate() {
     // This must be done before calling bufferPool->reset() to ensure no buffers are in flight.
     finish();
 
+    executeTickOps();
+
     mContext->bufferPool->reset();
     mContext->commandQueue = nil;
 
@@ -745,6 +748,10 @@ bool MetalDriver::isParallelShaderCompileSupported() {
     return true;
 }
 
+bool MetalDriver::isDepthStencilResolveSupported() {
+    return false;
+}
+
 bool MetalDriver::isWorkaroundNeeded(Workaround workaround) {
     switch (workaround) {
         case Workaround::SPLIT_EASU:
@@ -882,10 +889,6 @@ void MetalDriver::generateMipmaps(Handle<HwTexture> th) {
                         "generateMipmaps must be called outside of a render pass.");
     auto tex = handle_cast<MetalTexture>(th);
     tex->generateMipmaps();
-}
-
-bool MetalDriver::canGenerateMipmaps() {
-    return true;
 }
 
 void MetalDriver::updateSamplerGroup(Handle<HwSamplerGroup> sbh, BufferDescriptor&& data) {
@@ -1270,14 +1273,14 @@ void MetalDriver::readPixels(Handle<HwRenderTarget> src, uint32_t x, uint32_t y,
     textureDescriptor.usage = MTLTextureUsageShaderWrite | MTLTextureUsageRenderTarget;
     id<MTLTexture> readPixelsTexture = [mContext->device newTextureWithDescriptor:textureDescriptor];
 
-    MetalBlitter::BlitArgs args;
+    MetalBlitter::BlitArgs args{};
     args.filter = SamplerMagFilter::NEAREST;
     args.source.level = miplevel;
     args.source.region = MTLRegionMake2D(0, 0, srcTexture.width >> miplevel, srcTexture.height >> miplevel);
+    args.source.texture = srcTexture;
     args.destination.level = 0;
     args.destination.region = MTLRegionMake2D(0, 0, readPixelsTexture.width, readPixelsTexture.height);
-    args.source.color = srcTexture;
-    args.destination.color = readPixelsTexture;
+    args.destination.texture = readPixelsTexture;
 
     mContext->blitter->blit(getPendingCommandBuffer(mContext), args, "readPixels blit");
 
@@ -1315,24 +1318,123 @@ void MetalDriver::readBufferSubData(backend::BufferObjectHandle boh,
     scheduleDestroy(std::move(p));
 }
 
-void MetalDriver::blit(TargetBufferFlags buffers,
+void MetalDriver::resolve(
+        Handle<HwTexture> dst, uint8_t srcLevel, uint8_t srcLayer,
+        Handle<HwTexture> src, uint8_t dstLevel, uint8_t dstLayer) {
+    auto* const srcTexture = handle_cast<MetalTexture>(src);
+    auto* const dstTexture = handle_cast<MetalTexture>(dst);
+    assert_invariant(srcTexture);
+    assert_invariant(dstTexture);
+
+    ASSERT_PRECONDITION(mContext->currentRenderPassEncoder == nil,
+            "resolve() cannot be invoked inside a render pass.");
+
+    ASSERT_PRECONDITION(
+            dstTexture->width == srcTexture->width && dstTexture->height == srcTexture->height,
+            "invalid resolve: src and dst sizes don't match");
+
+    ASSERT_PRECONDITION(srcTexture->samples > 1 && dstTexture->samples == 1,
+            "invalid resolve: src.samples=%u, dst.samples=%u",
+            +srcTexture->samples, +dstTexture->samples);
+
+    ASSERT_PRECONDITION(srcTexture->format == dstTexture->format,
+            "src and dst texture format don't match");
+
+    ASSERT_PRECONDITION(!isDepthFormat(srcTexture->format),
+            "can't resolve depth formats");
+
+    ASSERT_PRECONDITION(!isStencilFormat(srcTexture->format),
+            "can't resolve stencil formats");
+
+    ASSERT_PRECONDITION(any(dstTexture->usage & TextureUsage::BLIT_DST),
+            "texture doesn't have BLIT_DST");
+
+    ASSERT_PRECONDITION(any(srcTexture->usage & TextureUsage::BLIT_SRC),
+            "texture doesn't have BLIT_SRC");
+
+    // FIXME: on metal the blit() call below always take the slow path (using a shader)
+
+    blit(   dst, dstLevel, dstLayer, {},
+            src, srcLevel, srcLayer, {},
+            { dstTexture->width, dstTexture->height });
+}
+
+void MetalDriver::blit(
+        Handle<HwTexture> dst, uint8_t srcLevel, uint8_t srcLayer, math::uint2 dstOrigin,
+        Handle<HwTexture> src, uint8_t dstLevel, uint8_t dstLayer, math::uint2 srcOrigin,
+        math::uint2 size) {
+
+
+    auto isBlitableTextureType = [](MTLTextureType t) -> bool {
+        return t == MTLTextureType2D || t == MTLTextureType2DMultisample ||
+               t == MTLTextureType2DArray;
+    };
+
+    auto* const srcTexture = handle_cast<MetalTexture>(src);
+    auto* const dstTexture = handle_cast<MetalTexture>(dst);
+    assert_invariant(srcTexture);
+    assert_invariant(dstTexture);
+
+    ASSERT_PRECONDITION(mContext->currentRenderPassEncoder == nil,
+            "blit() cannot be invoked inside a render pass.");
+
+    ASSERT_PRECONDITION(any(dstTexture->usage & TextureUsage::BLIT_DST),
+            "texture doesn't have BLIT_DST");
+
+    ASSERT_PRECONDITION(any(srcTexture->usage & TextureUsage::BLIT_SRC),
+            "texture doesn't have BLIT_SRC");
+
+    ASSERT_PRECONDITION(srcTexture->format == dstTexture->format,
+            "src and dst texture format don't match");
+
+    ASSERT_PRECONDITION(isBlitableTextureType(srcTexture->getMtlTextureForRead().textureType) &&
+                        isBlitableTextureType(dstTexture->getMtlTextureForWrite().textureType),
+            "Metal does not support blitting to/from non-2D textures.");
+
+    MetalBlitter::BlitArgs args{};
+    args.filter = SamplerMagFilter::NEAREST;
+    args.source.region = MTLRegionMake2D(
+            (NSUInteger)srcOrigin.x,
+            std::max(srcTexture->height - (int64_t)srcOrigin.y - size.y, (int64_t)0),
+            size.x,  size.y);
+    args.destination.region = MTLRegionMake2D(
+            (NSUInteger)dstOrigin.x,
+            std::max(dstTexture->height - (int64_t)dstOrigin.y - size.y, (int64_t)0),
+            size.x,  size.y);
+
+    // FIXME: we shouldn't need to know the type here. This is an artifact of using the old API.
+
+    args.source.texture = srcTexture->getMtlTextureForRead();
+    args.destination.texture = dstTexture->getMtlTextureForWrite();
+    args.source.level = srcLevel;
+    args.source.slice = srcLayer;
+    args.destination.level = dstLevel;
+    args.destination.slice = dstLayer;
+
+    // TODO: The blit() call below always take the fast path.
+
+    mContext->blitter->blit(getPendingCommandBuffer(mContext), args, "blit/resolve");
+
+    dstTexture->extendLodRangeTo(dstLevel);
+}
+
+void MetalDriver::blitDEPRECATED(TargetBufferFlags buffers,
         Handle<HwRenderTarget> dst, Viewport dstRect,
         Handle<HwRenderTarget> src, Viewport srcRect,
         SamplerMagFilter filter) {
-    // If we're the in middle of a render pass, finish it.
-    // This condition should only occur during copyFrame. It's okay to end the render pass because
-    // we don't issue any other rendering commands.
-    if (mContext->currentRenderPassEncoder) {
-        [mContext->currentRenderPassEncoder endEncoding];
-        mContext->currentRenderPassEncoder = nil;
-    }
+
+    // Note: blitDEPRECATED is only used by Renderer::copyFrame
+    // It is called between beginFrame and endFrame, but should never be called in the middle of
+    // a render pass.
+
+    ASSERT_PRECONDITION(mContext->currentRenderPassEncoder == nil,
+            "blitDEPRECATED() cannot be invoked inside a render pass.");
 
     auto srcTarget = handle_cast<MetalRenderTarget>(src);
     auto dstTarget = handle_cast<MetalRenderTarget>(dst);
 
-    ASSERT_PRECONDITION(
-            !(buffers & (TargetBufferFlags::COLOR_ALL & ~TargetBufferFlags::COLOR0)),
-            "Blitting only supports COLOR0");
+    ASSERT_PRECONDITION(buffers == TargetBufferFlags::COLOR0,
+            "blitDEPRECATED only supports COLOR0");
 
     ASSERT_PRECONDITION(srcRect.left >= 0 && srcRect.bottom >= 0 &&
                         dstRect.left >= 0 && dstRect.bottom >= 0,
@@ -1343,54 +1445,28 @@ void MetalDriver::blit(TargetBufferFlags buffers,
                t == MTLTextureType2DArray;
     };
 
-    // MetalBlitter supports blitting color and depth simultaneously, but for simplicitly we'll blit
-    // them separately. In practice, Filament only ever blits a single buffer at a time anyway.
+    // We always blit from/to the COLOR0 attachment.
+    MetalRenderTarget::Attachment const srcColorAttachment = srcTarget->getReadColorAttachment(0);
+    MetalRenderTarget::Attachment const dstColorAttachment = dstTarget->getDrawColorAttachment(0);
 
-    if (any(buffers & TargetBufferFlags::COLOR_ALL)) {
-        // We always blit from/to the COLOR0 attachment.
-        MetalRenderTarget::Attachment srcColorAttachment = srcTarget->getReadColorAttachment(0);
-        MetalRenderTarget::Attachment dstColorAttachment = dstTarget->getDrawColorAttachment(0);
+    if (srcColorAttachment && dstColorAttachment) {
+        ASSERT_PRECONDITION(isBlitableTextureType(srcColorAttachment.getTexture().textureType) &&
+                            isBlitableTextureType(dstColorAttachment.getTexture().textureType),
+                           "Metal does not support blitting to/from non-2D textures.");
 
-        if (srcColorAttachment && dstColorAttachment) {
-            ASSERT_PRECONDITION(isBlitableTextureType(srcColorAttachment.getTexture().textureType) &&
-                                isBlitableTextureType(dstColorAttachment.getTexture().textureType),
-                               "Metal does not support blitting to/from non-2D textures.");
+        MetalBlitter::BlitArgs args{};
+        args.filter = filter;
+        args.source.region = srcTarget->getRegionFromClientRect(srcRect);
+        args.source.texture = srcColorAttachment.getTexture();
+        args.source.level = srcColorAttachment.level;
+        args.source.slice = srcColorAttachment.layer;
 
-            MetalBlitter::BlitArgs args;
-            args.filter = filter;
-            args.source.region = srcTarget->getRegionFromClientRect(srcRect);
-            args.destination.region = dstTarget->getRegionFromClientRect(dstRect);
-            args.source.color = srcColorAttachment.getTexture();
-            args.destination.color = dstColorAttachment.getTexture();
-            args.source.level = srcColorAttachment.level;
-            args.destination.level = dstColorAttachment.level;
-            args.source.slice = srcColorAttachment.layer;
-            args.destination.slice = dstColorAttachment.layer;
-            mContext->blitter->blit(getPendingCommandBuffer(mContext), args, "Color blit");
-        }
-    }
+        args.destination.region = dstTarget->getRegionFromClientRect(dstRect);
+        args.destination.texture = dstColorAttachment.getTexture();
+        args.destination.level = dstColorAttachment.level;
+        args.destination.slice = dstColorAttachment.layer;
 
-    if (any(buffers & TargetBufferFlags::DEPTH)) {
-        MetalRenderTarget::Attachment srcDepthAttachment = srcTarget->getDepthAttachment();
-        MetalRenderTarget::Attachment dstDepthAttachment = dstTarget->getDepthAttachment();
-
-        if (srcDepthAttachment && dstDepthAttachment) {
-            ASSERT_PRECONDITION(isBlitableTextureType(srcDepthAttachment.getTexture().textureType) &&
-                                isBlitableTextureType(dstDepthAttachment.getTexture().textureType),
-                               "Metal does not support blitting to/from non-2D textures.");
-
-            MetalBlitter::BlitArgs args;
-            args.filter = filter;
-            args.source.region = srcTarget->getRegionFromClientRect(srcRect);
-            args.destination.region = dstTarget->getRegionFromClientRect(dstRect);
-            args.source.depth = srcDepthAttachment.getTexture();
-            args.destination.depth = dstDepthAttachment.getTexture();
-            args.source.level = srcDepthAttachment.level;
-            args.destination.level = dstDepthAttachment.level;
-            args.source.slice = srcDepthAttachment.layer;
-            args.destination.slice = dstDepthAttachment.layer;
-            mContext->blitter->blit(getPendingCommandBuffer(mContext), args, "Depth blit");
-        }
+        mContext->blitter->blit(getPendingCommandBuffer(mContext), args, "blitDEPRECATED");
     }
 }
 
@@ -1528,7 +1604,7 @@ void MetalDriver::draw(PipelineState ps, Handle<HwRenderPrimitive> rph, uint32_t
         stencilPixelFormat = stencilAttachment.getPixelFormat();
         assert_invariant(isMetalFormatStencil(stencilPixelFormat));
     }
-    MetalPipelineState pipelineState {
+    MetalPipelineState const pipelineState {
         .vertexFunction = vertex,
         .fragmentFunction = fragment,
         .vertexDescription = primitive->vertexDescription,
@@ -1546,13 +1622,13 @@ void MetalDriver::draw(PipelineState ps, Handle<HwRenderPrimitive> rph, uint32_t
         .stencilAttachmentPixelFormat = stencilPixelFormat,
         .sampleCount = mContext->currentRenderTarget->getSamples(),
         .blendState = BlendState {
-            .blendingEnabled = rs.hasBlending(),
-            .rgbBlendOperation = getMetalBlendOperation(rs.blendEquationRGB),
             .alphaBlendOperation = getMetalBlendOperation(rs.blendEquationAlpha),
-            .sourceRGBBlendFactor = getMetalBlendFactor(rs.blendFunctionSrcRGB),
-            .sourceAlphaBlendFactor = getMetalBlendFactor(rs.blendFunctionSrcAlpha),
+            .rgbBlendOperation = getMetalBlendOperation(rs.blendEquationRGB),
+            .destinationAlphaBlendFactor = getMetalBlendFactor(rs.blendFunctionDstAlpha),
             .destinationRGBBlendFactor = getMetalBlendFactor(rs.blendFunctionDstRGB),
-            .destinationAlphaBlendFactor = getMetalBlendFactor(rs.blendFunctionDstAlpha)
+            .sourceAlphaBlendFactor = getMetalBlendFactor(rs.blendFunctionSrcAlpha),
+            .sourceRGBBlendFactor = getMetalBlendFactor(rs.blendFunctionSrcRGB),
+            .blendingEnabled = rs.hasBlending(),
         },
         .colorWrite = rs.colorWrite
     };
@@ -1849,6 +1925,21 @@ void MetalDriver::enumerateBoundBuffers(BufferObjectBinding bindingType,
 }
 
 void MetalDriver::resetState(int) {
+}
+
+void MetalDriver::runAtNextTick(const std::function<void()>& fn) noexcept {
+    std::lock_guard<std::mutex> const lock(mTickOpsLock);
+    mTickOps.push_back(fn);
+}
+
+void MetalDriver::executeTickOps() noexcept {
+    std::vector<std::function<void()>> ops;
+    mTickOpsLock.lock();
+    std::swap(ops, mTickOps);
+    mTickOpsLock.unlock();
+    for (const auto& f : ops) {
+        f();
+    }
 }
 
 // explicit instantiation of the Dispatcher

@@ -182,6 +182,10 @@ bool NoopDriver::isParallelShaderCompileSupported() {
     return false;
 }
 
+bool NoopDriver::isDepthStencilResolveSupported() {
+    return true;
+}
+
 bool NoopDriver::isWorkaroundNeeded(Workaround) {
     return false;
 }
@@ -250,10 +254,6 @@ void NoopDriver::setExternalStream(Handle<HwTexture> th, Handle<HwStream> sh) {
 
 void NoopDriver::generateMipmaps(Handle<HwTexture> th) { }
 
-bool NoopDriver::canGenerateMipmaps() {
-    return true;
-}
-
 void NoopDriver::updateSamplerGroup(Handle<HwSamplerGroup> sbh,
         BufferDescriptor&& data) {
     scheduleDestroy(std::move(data));
@@ -320,10 +320,21 @@ void NoopDriver::readBufferSubData(backend::BufferObjectHandle boh,
     scheduleDestroy(std::move(p));
 }
 
-void NoopDriver::blit(TargetBufferFlags buffers,
+void NoopDriver::blitDEPRECATED(TargetBufferFlags buffers,
         Handle<HwRenderTarget> dst, Viewport dstRect,
         Handle<HwRenderTarget> src, Viewport srcRect,
         SamplerMagFilter filter) {
+}
+
+void NoopDriver::resolve(
+        Handle<HwTexture> dst, uint8_t srcLevel, uint8_t srcLayer,
+        Handle<HwTexture> src, uint8_t dstLevel, uint8_t dstLayer) {
+}
+
+void NoopDriver::blit(
+        Handle<HwTexture> dst, uint8_t srcLevel, uint8_t srcLayer, math::uint2 dstOrigin,
+        Handle<HwTexture> src, uint8_t dstLevel, uint8_t dstLayer, math::uint2 srcOrigin,
+        math::uint2 size) {
 }
 
 void NoopDriver::draw(PipelineState pipelineState, Handle<HwRenderPrimitive> rph,

@@ -7,10 +7,34 @@ A new header is inserted each time a *tag* is created.
 Instead, if you are authoring a PR for the main branch, add your release note to
 [NEW_RELEASE_NOTES.md](./NEW_RELEASE_NOTES.md).
 
+## v1.50.3
+
+
+## v1.50.2
+
+
+## v1.50.1
+
+- Metal: fix some shader artifacts by disabling fast math optimizations.
+- backend: remove `atan2` overload which had a typo and wasn't useful. Fixes b/320856413.
+- utils: remove usages of `SpinLock`. Fixes b/321101014.
+
+## v1.50.0
+- engine: TAA now supports 4x upscaling [BETA] [⚠️ **New Material Version**]
+
+## v1.49.3
+
+- matc: Generate stereo variants for FL0 materials [⚠️ **Recompile materials**]
+
+## v1.49.2
+
+
+## v1.49.1
+
+
 ## v1.49.0
 
 - matc: Fix ESSL 1.0 codegen when using external samplers [⚠️ **Recompile materials**]
-- matc: Generate skinning variants for FL0 materials [⚠️ **Recompile materials**]
 
 ## v1.48.0
 

@@ -45,6 +45,8 @@ option(FILAMENT_LINUX_IS_MOBILE "Treat Linux as Mobile" OFF)
 
 option(FILAMENT_ENABLE_ASAN_UBSAN "Enable Address and Undefined Behavior Sanitizers" OFF)
 
+option(FILAMENT_ENABLE_TSAN "Enable Thread Sanitizer" OFF)
+
 option(FILAMENT_ENABLE_FEATURE_LEVEL_0 "Enable Feature Level 0" ON)
 
 set(FILAMENT_NDK_VERSION "" CACHE STRING
@@ -237,6 +239,21 @@ if (WIN32)
             # we don't need them on CI.
             string(REPLACE "/INCREMENTAL" "/INCREMENTAL:NO" ${LinkerFlag} ${${LinkerFlag}})
         endforeach()
+
+        # We turn off compile-time optimizations for CI, as options that speed up the compile-time
+        # (e.g. /MP) might increase memory usage, leading to instabilities on limited CI machines.
+        option(FILAMENT_SHORTEN_MSVC_COMPILATION "Shorten compile-time in Visual Studio" OFF)
+    else()
+        option(FILAMENT_SHORTEN_MSVC_COMPILATION "Shorten compile-time in Visual Studio" ON)
+    endif()
+
+    if (MSVC)
+        if (FILAMENT_SHORTEN_MSVC_COMPILATION)
+            # enable multi-processor compilation
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
+            # disable run-time STL checks to improve tools (e.g. matc) performance
+            set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /D_ITERATOR_DEBUG_LEVEL=2")
+        endif()
     endif()
 endif()
 
@@ -426,7 +443,13 @@ endif()
 if (FILAMENT_ENABLE_ASAN_UBSAN)
    set(EXTRA_SANITIZE_OPTIONS "-fsanitize=address -fsanitize=undefined")
 endif()
-
+if (FILAMENT_ENABLE_TSAN)
+   set(EXTRA_SANITIZE_OPTIONS "-fsanitize=thread")
+endif()
+if (ANDROID)
+    # keep STL debug infos (mimics what the NDK does)
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-limit-debug-info")
+endif()
 if (NOT MSVC AND NOT WEBGL)
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fstack-protector")
 endif()
@@ -626,9 +649,9 @@ function(combine_static_libs TARGET OUTPUT DEPS)
     # Loop through the dependent libraries and query their location on disk.
     set(DEPS_FILES )
     foreach(DEPENDENCY ${DEPS})
-        if(TARGET ${DEPENDENCY})
+        if (TARGET ${DEPENDENCY})
             get_property(dep_type TARGET ${DEPENDENCY} PROPERTY TYPE)
-            if(dep_type STREQUAL "STATIC_LIBRARY")
+            if (dep_type STREQUAL "STATIC_LIBRARY")
                 list(APPEND DEPS_FILES "$<TARGET_FILE:${DEPENDENCY}>")
             endif()
         endif()
@@ -698,7 +721,7 @@ function(get_resgen_vars ARCHIVE_DIR ARCHIVE_NAME)
         set(RESGEN_OUTPUTS "${OUTPUTS}" PARENT_SCOPE)
         set(RESGEN_FLAGS -qx ${ARCHIVE_DIR} -p ${ARCHIVE_NAME} PARENT_SCOPE)
         set(RESGEN_SOURCE "${ARCHIVE_DIR}/${ARCHIVE_NAME}${ASM_SUFFIX}.S" PARENT_SCOPE)
-        set(RESGEN_SOURCE_FLAGS "-I${ARCHIVE_DIR} ${ASM_ARCH_FLAG}" PARENT_SCOPE)
+        set(RESGEN_SOURCE_FLAGS "-I'${ARCHIVE_DIR}' ${ASM_ARCH_FLAG}" PARENT_SCOPE)
     endif()
 endfunction()
 
@@ -713,7 +736,6 @@ add_subdirectory(${LIBRARIES}/filabridge)
 add_subdirectory(${LIBRARIES}/filaflat)
 add_subdirectory(${LIBRARIES}/filagui)
 add_subdirectory(${LIBRARIES}/filameshio)
-add_subdirectory(${LIBRARIES}/geometry)
 add_subdirectory(${LIBRARIES}/gltfio)
 add_subdirectory(${LIBRARIES}/ibl)
 add_subdirectory(${LIBRARIES}/iblprefilter)
@@ -740,6 +762,9 @@ add_subdirectory(${EXTERNAL}/draco/tnt)
 add_subdirectory(${EXTERNAL}/jsmn/tnt)
 add_subdirectory(${EXTERNAL}/stb/tnt)
 add_subdirectory(${EXTERNAL}/getopt)
+
+# Note that this has to be placed after mikktspace in order for combine_static_libs to work.
+add_subdirectory(${LIBRARIES}/geometry)
 
 if (FILAMENT_BUILD_FILAMAT OR IS_HOST_PLATFORM)
     # spirv-tools must come before filamat, as filamat relies on the presence of the
