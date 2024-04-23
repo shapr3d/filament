@@ -320,6 +320,7 @@ private:
     std::string mLastSavedFileName;
     std::unordered_map<std::string, TweakableMaterial> mTweakedMaterials{};
     std::vector<filament::MaterialInstance*> mMaterialInstances{};
+    Material const* mShaprGeneralMaterials[5]{};
     std::unordered_map<std::string, filament::Texture*> mTextures{};
     std::unordered_map<std::string, int> mTextureFileChannels{};
     bool mVisibility[10]{ true, true, true, true, true, true, true, true, true, true };

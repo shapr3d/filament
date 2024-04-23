@@ -221,11 +221,6 @@ set(MATERIAL_SRCS
         src/materials/colorGrading/customResolveAsSubpass.mat
         src/materials/debugShadowCascades.mat
         src/materials/defaultMaterial.mat
-        src/materials/Opaque.mat
-        src/materials/Transparent.mat
-        src/materials/Refractive.mat
-        src/materials/Subsurface.mat
-        src/materials/Cloth.mat
         src/materials/dof/dof.mat
         src/materials/dof/dofCoc.mat
         src/materials/dof/dofCombine.mat

@@ -72,10 +72,6 @@ const Material* Engine::getDefaultMaterial() const noexcept {
     return downcast(this)->getDefaultMaterial();
 }
 
-const Material* Engine::getShaprMaterial(size_t index) const noexcept {
-    return downcast(this)->getShaprMaterial(index);
-}
-
 Backend Engine::getBackend() const noexcept {
     return downcast(this)->getBackend();
 }

@@ -45,6 +45,8 @@
 #include <string>
 #include <vector>
 
+#include "generated/resources/shapr_materials.h"
+
 using namespace filagui;
 using namespace filament::math;
 
@@ -483,6 +485,28 @@ ViewerGui::ViewerGui(filament::Engine* engine, filament::Scene* scene, filament:
         mScene->addEntity(mSunlight);
     }
     view->setAmbientOcclusionOptions({ .upsampling = View::QualityLevel::HIGH });
+
+    mShaprGeneralMaterials[0] =
+        Material::Builder()
+        .package(SHAPR_MATERIALS_OPAQUE_DATA, SHAPR_MATERIALS_OPAQUE_SIZE)
+        .build(*mEngine);
+    mShaprGeneralMaterials[1] =
+        Material::Builder()
+        .package(SHAPR_MATERIALS_TRANSPARENT_DATA, SHAPR_MATERIALS_TRANSPARENT_SIZE)
+        .build(*mEngine);
+    // for legacy reasons
+    mShaprGeneralMaterials[2] =
+        Material::Builder()
+        .package(SHAPR_MATERIALS_REFRACTIVE_DATA, SHAPR_MATERIALS_REFRACTIVE_SIZE)
+        .build(*mEngine);
+    mShaprGeneralMaterials[3] =
+        Material::Builder()
+        .package(SHAPR_MATERIALS_CLOTH_DATA, SHAPR_MATERIALS_CLOTH_SIZE)
+        .build(*mEngine);
+    mShaprGeneralMaterials[4] =
+        Material::Builder()
+        .package(SHAPR_MATERIALS_SUBSURFACE_DATA, SHAPR_MATERIALS_SUBSURFACE_SIZE)
+        .build(*mEngine);
 }
 
 ViewerGui::~ViewerGui() {
@@ -491,6 +515,10 @@ ViewerGui::~ViewerGui() {
             mEngine->destroy(mi);
         }
     }
+    for (auto* shaprMat : mShaprGeneralMaterials) {
+        mEngine->destroy(shaprMat);
+    }
+
     for (auto textureEntry : mTextures) {
         mEngine->destroy(textureEntry.second);
     }
@@ -1047,7 +1075,7 @@ void ViewerGui::updateUserInterface() {
                 // Only allow adding a new material, nothing else
                 if (ImGui::Button("Add custom material")) {                
                     mTweakedMaterials.emplace(std::pair<std::string, TweakableMaterial>(entityName, TweakableMaterial{}));
-                    filament::MaterialInstance* newInstance = mEngine->getShaprMaterial(0)->createInstance();
+                    filament::MaterialInstance* newInstance = mShaprGeneralMaterials[0]->createInstance();
                     mMaterialInstances.push_back(newInstance);
                     rm.setMaterialInstanceAt(instance, prim, newInstance);
                 }
@@ -1071,7 +1099,7 @@ void ViewerGui::updateUserInterface() {
                                 for (auto& mat : mMaterialInstances) if (mat == currentInstance) mat = nullptr;
                                 mEngine->destroy(currentInstance);
 
-                                filament::MaterialInstance* newInstance = mEngine->getShaprMaterial(tweaks.mShaderType)->createInstance();
+                                filament::MaterialInstance* newInstance = mShaprGeneralMaterials[tweaks.mShaderType]->createInstance();
                                 mMaterialInstances.push_back(newInstance);
                                 rm.setMaterialInstanceAt(instance, prim, newInstance);
                             }
@@ -1100,7 +1128,7 @@ void ViewerGui::updateUserInterface() {
                                     for (auto& mat : mMaterialInstances) if (mat == currentInstance) mat = nullptr;
                                     mEngine->destroy(currentInstance);
 
-                                    filament::MaterialInstance* newInstance = mEngine->getShaprMaterial(materialType)->createInstance();
+                                    filament::MaterialInstance* newInstance = mShaprGeneralMaterials[materialType]->createInstance();
                                     mMaterialInstances.push_back(newInstance);
                                     rm.setMaterialInstanceAt(instance, prim, newInstance);
                                 }
