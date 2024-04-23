@@ -45,7 +45,7 @@
 #include <string>
 #include <vector>
 
-#include "generated/resources/materials.h"
+#include "generated/resources/shapr_materials.h"
 
 using namespace filagui;
 using namespace filament::math;
@@ -488,24 +488,24 @@ ViewerGui::ViewerGui(filament::Engine* engine, filament::Scene* scene, filament:
 
     mShaprGeneralMaterials[0] =
         Material::Builder()
-        .package(MATERIALS_OPAQUE_DATA, MATERIALS_OPAQUE_SIZE)
+        .package(SHAPR_MATERIALS_OPAQUE_DATA, SHAPR_MATERIALS_OPAQUE_SIZE)
         .build(*mEngine);
     mShaprGeneralMaterials[1] =
         Material::Builder()
-        .package(MATERIALS_TRANSPARENT_DATA, MATERIALS_TRANSPARENT_SIZE)
+        .package(SHAPR_MATERIALS_TRANSPARENT_DATA, SHAPR_MATERIALS_TRANSPARENT_SIZE)
         .build(*mEngine);
     // for legacy reasons
     mShaprGeneralMaterials[2] =
         Material::Builder()
-        .package(MATERIALS_REFRACTIVE_DATA, MATERIALS_REFRACTIVE_SIZE)
+        .package(SHAPR_MATERIALS_REFRACTIVE_DATA, SHAPR_MATERIALS_REFRACTIVE_SIZE)
         .build(*mEngine);
     mShaprGeneralMaterials[3] =
         Material::Builder()
-        .package(MATERIALS_CLOTH_DATA, MATERIALS_CLOTH_SIZE)
+        .package(SHAPR_MATERIALS_CLOTH_DATA, SHAPR_MATERIALS_CLOTH_SIZE)
         .build(*mEngine);
     mShaprGeneralMaterials[4] =
         Material::Builder()
-        .package(MATERIALS_SUBSURFACE_DATA, MATERIALS_SUBSURFACE_SIZE)
+        .package(SHAPR_MATERIALS_SUBSURFACE_DATA, SHAPR_MATERIALS_SUBSURFACE_SIZE)
         .build(*mEngine);
 }
 

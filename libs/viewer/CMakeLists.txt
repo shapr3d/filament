@@ -45,7 +45,7 @@ set(MATERIAL_SRCS
         src/materials/Cloth.mat
 )
 
-get_resgen_vars(${RESOURCE_DIR} materials)
+get_resgen_vars(${RESOURCE_DIR} shapr_materials)
 list(APPEND PRIVATE_HDRS ${RESGEN_HEADER})
 list(APPEND SRCS ${RESGEN_SOURCE})
 
