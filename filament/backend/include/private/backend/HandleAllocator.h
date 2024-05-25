@@ -30,9 +30,11 @@
 #include <exception>
 #include <type_traits>
 #include <unordered_map>
+#include <map>
 
 #include <stddef.h>
 #include <stdint.h>
+#include <iostream>
 
 #if !defined(NDEBUG) && UTILS_HAS_RTTI
 #   define HANDLE_TYPE_SAFETY 1
@@ -52,6 +54,8 @@ namespace filament::backend {
 template <size_t P0, size_t P1, size_t P2>
 class HandleAllocator {
 public:
+    std::map<size_t, size_t> handleDistribution;
+
     struct PoolRatios {
         size_t pool0;
         size_t pool1;
@@ -270,6 +274,7 @@ private:
     // allocateHandleInPool()/deallocateHandleFromPool() with the right pool size.
     template<size_t SIZE>
     HandleBase::HandleId allocateHandle() noexcept {
+        handleDistribution[SIZE]++;
         if constexpr (SIZE <= P0) { return allocateHandleInPool<P0>(); }
         if constexpr (SIZE <= P1) { return allocateHandleInPool<P1>(); }
         static_assert(SIZE <= P2);
@@ -278,6 +283,10 @@ private:
 
     template<size_t SIZE>
     void deallocateHandle(HandleBase::HandleId id) noexcept {
+        handleDistribution[SIZE]--;
+        if (handleDistribution[SIZE] == 0) {
+            handleDistribution.erase(SIZE);
+        }
         if constexpr (SIZE <= P0) {
             deallocateHandleFromPool<P0>(id);
         } else if constexpr (SIZE <= P1) {
