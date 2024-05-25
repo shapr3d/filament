@@ -3364,8 +3364,11 @@ void OpenGLDriver::setPresentationTime(int64_t monotonic_clock_ns) {
     mPlatform.setPresentationTime(monotonic_clock_ns);
 }
 
-void OpenGLDriver::endFrame(UTILS_UNUSED uint32_t frameId) {
+void OpenGLDriver::endFrame(uint32_t frameId) {
     DEBUG_MARKER()
+    if (frameId % 60 == 0) {
+        mHandleAllocator.Print();
+    }
 #if defined(__EMSCRIPTEN__)
     // WebGL builds are single-threaded so users might manipulate various GL state after we're
     // done with the frame. We do NOT officially support using Filament in this way, but we can

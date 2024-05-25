@@ -67,6 +67,30 @@ public:
     HandleAllocator& operator=(HandleAllocator const& rhs) = delete;
     ~HandleAllocator();
 
+    void Print() {
+        std::cout << "===========HANDLE ARENA ================" << std::endl;
+        size_t totalArenaSize = 0;
+        size_t poolSizes[3] = {0, 0, 0};
+        for (const auto& [sz, count] : handleDistribution) {
+            std::cout << "== " << sz << " B: " << count << std::endl;
+            const size_t sizeOfHandles = sz * count;
+            if (sz <= P0) {
+                poolSizes[0] += sizeOfHandles;
+            } else if (sz <= P1) {
+                poolSizes[1] += sizeOfHandles;
+            } else if (sz <= P2) {
+                poolSizes[2] += sizeOfHandles;
+            }
+            totalArenaSize += sizeOfHandles;
+        }
+        std::cout << "== Total arena size: " << totalArenaSize / 1024 << " KiB" << std::endl;
+        std::cout << "==----------POOLS---------------==" << std::endl;
+        for (size_t i = 0; i < std::size(poolSizes); ++i) {
+            std::cout << "== Pool " << i << ": " << poolSizes[i] / 1024 << " KiB (" << poolSizes[i] / double(totalArenaSize) * 100  << "%)" << std::endl;
+        }
+
+    }
+
     /*
      * Constructs a D object and returns a Handle<D>
      *

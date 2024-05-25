@@ -231,6 +231,9 @@ void MetalDriver::endFrame(uint32_t frameId) {
         }
         mContext->supportsMemorylessRenderTargets = false;
     }
+    if (frameId % 60 == 0) {
+        mHandleAllocator.Print();
+    }
 
     // Print the size of each handle type we use in Shapr3D (we don't use all types of handles, e.g. MetalSwapChain)
 //    static_assert(sizeof(MetalRenderPrimitive) == -1, "Hello World!");
