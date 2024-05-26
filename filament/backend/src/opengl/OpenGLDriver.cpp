@@ -87,6 +87,20 @@ Driver* OpenGLDriver::create(OpenGLPlatform* const platform,
     assert_invariant(platform);
     OpenGLPlatform* const ec = platform;
 
+    // Print the size of each handle type we use in Shapr3D (we don't use all types of handles, e.g. MetalSwapChain)
+//    static_assert(sizeof(GLRenderPrimitive) == -1, "Hello World!");
+//    static_assert(sizeof(GLRenderTarget) == -1, "Hello World!");
+//    static_assert(sizeof(GLVertexBuffer) == -1, "Hello World!");
+//    static_assert(sizeof(OpenGLProgram) == -1, "Hello World!");
+//    static_assert(sizeof(GLTexture) == -1, "Hello World!");
+//    static_assert(sizeof(GLBufferObject) == -1, "Hello World!");
+//    static_assert(sizeof(GLFence) == -1, "Hello World!");
+//    static_assert(sizeof(GLStream) == -1, "Hello World!");
+//    static_assert(sizeof(GLIndexBuffer) == -1, "Hello World!");
+//    static_assert(sizeof(GLTimerQuery) == -1, "Hello World!");
+//    static_assert(sizeof(GLSamplerGroup) == -1, "Hello World!");
+//    static_assert(sizeof(HwSwapChain) == -1, "Hello World!");
+
 #if 0
     // this is useful for development, but too verbose even for debug builds
     // For reference on a 64-bits machine in Release mode:

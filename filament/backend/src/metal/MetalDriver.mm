@@ -232,6 +232,18 @@ void MetalDriver::endFrame(uint32_t frameId) {
         mContext->supportsMemorylessRenderTargets = false;
     }
 
+    // Print the size of each handle type we use in Shapr3D (we don't use all types of handles, e.g. MetalSwapChain)
+//    static_assert(sizeof(MetalRenderPrimitive) == -1, "Hello World!");
+//    static_assert(sizeof(MetalRenderTarget) == -1, "Hello World!");
+//    static_assert(sizeof(MetalVertexBuffer) == -1, "Hello World!");
+//    static_assert(sizeof(MetalProgram) == -1, "Hello World!");
+//    static_assert(sizeof(MetalFence) == -1, "Hello World!");
+//    static_assert(sizeof(MetalTexture) == -1, "Hello World!");
+//    static_assert(sizeof(MetalBufferObject) == -1, "Hello World!");
+//    static_assert(sizeof(MetalIndexBuffer) == -1, "Hello World!");
+//    static_assert(sizeof(MetalTimerQuery) == -1, "Hello World!");
+//    static_assert(sizeof(MetalSamplerGroup) == -1, "Hello World!");
+
 #if defined(FILAMENT_METAL_PROFILING)
     os_signpost_interval_end(mContext->log, mContext->signpostId, "Frame encoding");
 #endif
