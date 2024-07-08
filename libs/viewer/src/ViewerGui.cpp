@@ -1311,12 +1311,11 @@ void ViewerGui::updateUserInterface() {
                     usageFlags |= static_cast<std::uint32_t>(tweaks.mRoughness.isFile) << 6u;
                     usageFlags |= static_cast<std::uint32_t>(tweaks.mSheenRoughness.isFile) << 7u;
                     usageFlags |= 0u << 8u; // useSwizzledNormalMaps bit
-                    usageFlags |= static_cast<std::uint32_t>(tweaks.mThickness.isFile) << 9u;
-                    usageFlags |= static_cast<std::uint32_t>(tweaks.mTransmission.isFile) << 10u;
-                    usageFlags |= static_cast<std::uint32_t>(tweaks.mUseWard) << 11u;
-                    usageFlags |= static_cast<std::uint32_t>(tweaks.mAbsorption.useDerivedQuantity) << 12u;
-                    usageFlags |= static_cast<std::uint32_t>(tweaks.mSheenColor.useDerivedQuantity) << 13u;
-                    usageFlags |= static_cast<std::uint32_t>(tweaks.mSubsurfaceColor.useDerivedQuantity) << 14u;
+                    usageFlags |= static_cast<std::uint32_t>(tweaks.mTransmission.isFile) << 9u;
+                    usageFlags |= static_cast<std::uint32_t>(tweaks.mUseWard) << 10u;
+                    usageFlags |= static_cast<std::uint32_t>(tweaks.mAbsorption.useDerivedQuantity) << 11u;
+                    usageFlags |= static_cast<std::uint32_t>(tweaks.mSheenColor.useDerivedQuantity) << 12u;
+                    usageFlags |= static_cast<std::uint32_t>(tweaks.mSubsurfaceColor.useDerivedQuantity) << 13u;
                     matInstance->setParameter("usageFlags", usageFlags);
 
                     setTextureIfPresent(tweaks.mBaseColor.isFile, tweaks.mBaseColor.filename, "baseColor");
