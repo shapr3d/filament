@@ -26,13 +26,13 @@ struct BoneData {
 struct PerRenderableData {
     highp mat4 worldFromModelMatrix;
     highp mat3 worldFromModelNormalMatrix;
-    highp mat3 materialOrientationMatrix;
+    highp vec4 materialOrientation;
     highp int morphTargetCount;
     highp int flagsChannels;                   // see packFlags() below (0x00000fll)
     highp int objectId;                        // used for picking
     highp float userData;   // TODO: We need a better solution, this currently holds the average local scale for the renderable
     highp vec3 materialOrientationCenter;
-    highp vec4 reserved[4];
+    highp vec4 reserved[6];
 };
 
 // Bits for flagsChannels
