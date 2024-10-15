@@ -225,10 +225,21 @@ BiplanarAxes ComputeBiplanarPlanes(vec3 weights) {
     return result;
 }
 
+vec3 rotateVectorByQuaternion(vec3 v, vec4 rotation) {
+    float s = rotation.w;
+    vec3 u = rotation.xyz;
+    vec3 uCrossv = cross(u,v);
+    return v + 2.0 * s * uCrossv + 2.0 * cross(u, uCrossv);
+}
+
+vec4 conjugateQuaternion(vec4 quat) {
+    return vec4(-quat.xyz, quat.w);
+}
+
 BiplanarData GenerateBiplanarData(BiplanarAxes axes, float scaler, highp vec3 pos, lowp vec3 weights) {
     // Depending on the resolution of the texture, we may want to multiply the texture coordinates
     vec3 queryPos = scaler * (pos - getMaterialOrientationCenter());
-    queryPos *= getMaterialOrientationMatrix();
+    queryPos = rotateVectorByQuaternion(queryPos, conjugateQuaternion(getMaterialOrientation()));
 
     // Store the query data
     BiplanarData result = DEFAULT_BIPLANAR_DATA;
@@ -263,7 +274,7 @@ BiplanarData GenerateBiplanarData(BiplanarAxes axes, float scaler, highp vec3 po
 // A simple linear blend with normalization
 vec3 ComputeWeights(vec3 normal) {
     // We transform the normal only here for material rotation
-    normal = normal * getMaterialOrientationMatrix();
+    normal = rotateVectorByQuaternion(normal, conjugateQuaternion(getMaterialOrientation()));
 
     // This one has a region where there is no blend, creating more defined interpolations
     const float blendBias = 0.2;
@@ -342,7 +353,7 @@ vec3 BiplanarNormalMap(sampler2D normalMap, float scaler, highp vec3 pos, lowp v
     vec2 packedNormalMed = SampleNormalMap(normalMap, queryData.medPos, queryData.medDpDx, queryData.medDpDy, useSwizzledNormalMaps);
     int maxAxis = axes.maximum.x;
     int medAxis = axes.median.x;
-    normal = normal * getMaterialOrientationMatrix();
+    normal = rotateVectorByQuaternion(normal, conjugateQuaternion(getMaterialOrientation()));
     vec3 tNormalMax = UnpackNormal(packedNormalMax, NormalMapScale(normal, maxAxis, normalIntensity) );
     vec3 tNormalMed = UnpackNormal(packedNormalMed, NormalMapScale(normal, medAxis, normalIntensity) );
 
@@ -361,7 +372,8 @@ vec3 BiplanarNormalMap(sampler2D normalMap, float scaler, highp vec3 pos, lowp v
     // Blend and normalize
     vec3 r = swizzleIvec(tNormalMax, worldSwizzles[maxAxis]) * queryData.mainWeight * worldMultipliers[maxAxis] +
              swizzleIvec(tNormalMed, worldSwizzles[medAxis]) * queryData.medianWeight * worldMultipliers[medAxis];
-    return getMaterialOrientationMatrix() * normalize(r);
+
+    return rotateVectorByQuaternion(normalize(r), getMaterialOrientation());
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -447,7 +459,7 @@ void ApplyBaseColor(inout MaterialInputs material, inout FragmentData fragmentDa
 
 #if defined(DRAW_WEIGHTS)
     if((materialParams.debugUsageFlags & 1u ) != 0u) {
-        vec3 vn = material.normal.xyz * getMaterialOrientationMatrix();
+        vec3 vn = rotateVectorByQuaternion(material.normal.xyz, conjugateQuaternion(getMaterialOrientation()));
         // If an axis has negative value, a complementer color is calculated using the following matrix
         mat3 complementerMatrix = mat3(0.0, 1.0, 1.0,    // -X => cyan
                                     1.0, 0.0, 1.0,    // -Y => magenta
