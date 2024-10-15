@@ -61,6 +61,7 @@ void FTransformManager::create(Entity entity, Instance parent, const mat4f& loca
     assert_invariant(i != parent);
 
     manager[i].applyWorldToMaterialOrientation = true;
+    manager[i].materialLocalOrientation = {0, 0, 0, 1};
 
     if (i && i != parent) {
         manager[i].parent = 0;
@@ -85,6 +86,7 @@ void FTransformManager::create(Entity entity, Instance parent, const mat4& local
     assert_invariant(i != parent);
 
     manager[i].applyWorldToMaterialOrientation = true;
+    manager[i].materialLocalOrientation = {0, 0, 0, 1};
 
     if (i && i != parent) {
         manager[i].parent = 0;
@@ -240,7 +242,7 @@ void FTransformManager::updateNodeTransform(Instance i) noexcept {
             mAccurateTranslations);
 
     // we apply the parent orientation
-    computeMaterialWorldOrientation(manager[i].materialOrientation, manager[parent].materialOrientation,
+    computeMaterialWorldOrientation(manager[i].materialOrientation, parent.isValid() ? manager[parent].materialOrientation : quatf{0, 0, 0, 1},
             manager[i].materialLocalOrientation, manager[i].materialOrientationCenter, manager[parent].materialOrientationCenter,
             manager[i].materialLocalOrientationCenter);
 
@@ -284,9 +286,9 @@ void FTransformManager::computeAllWorldTransforms() noexcept {
                 manager[parent].worldTranslationLo, manager[i].localTranslationLo,
                 accurate);
         
-        computeMaterialWorldOrientation(manager[i].materialOrientation, manager[parent].materialOrientation, 
-                manager[i].materialLocalOrientation, manager[i].materialOrientationCenter, 
-                manager[parent].materialOrientationCenter, manager[i].materialLocalOrientationCenter);
+        computeMaterialWorldOrientation(manager[i].materialOrientation, parent.isValid() ? manager[parent].materialOrientation : quatf{0, 0, 0, 1},
+            manager[i].materialLocalOrientation, manager[i].materialOrientationCenter, manager[parent].materialOrientationCenter,
+            manager[i].materialLocalOrientationCenter);
     }
 }
 
@@ -424,9 +426,9 @@ void FTransformManager::transformChildren(Sim& manager, Instance i) noexcept {
                 accurate);
 
         // we need to update our orientation too
-        computeMaterialWorldOrientation(manager[i].materialOrientation, manager[parent].materialOrientation, 
-                manager[i].materialLocalOrientation, manager[i].materialOrientationCenter, 
-                manager[parent].materialOrientationCenter, manager[i].materialLocalOrientationCenter);
+        computeMaterialWorldOrientation(manager[i].materialOrientation, parent.isValid() ? manager[parent].materialOrientation : quatf{0, 0, 0, 1},
+            manager[i].materialLocalOrientation, manager[i].materialOrientationCenter, manager[parent].materialOrientationCenter,
+            manager[i].materialLocalOrientationCenter);
 
         // assume we don't have a deep hierarchy
         Instance const child = manager[i].firstChild;
