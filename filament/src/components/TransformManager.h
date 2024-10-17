@@ -133,7 +133,7 @@ public:
         return r;
     }
 
-    void setMaterialOrientation(Instance ci, const math::quatf & rotation) noexcept;
+    void setMaterialOrientation(Instance ci, const math::quatf& rotation) noexcept;
 
     void applyWorldTransformToMaterialOrientation(Instance ci, bool apply) noexcept;
     bool isWorldTransformAppliedToMaterialOrientation(Instance ci) const noexcept {

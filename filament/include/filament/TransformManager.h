@@ -309,7 +309,7 @@ public:
      * Sets a local material orientation of a transform component. This enables changing texture
      * bi/triplanar mapping direction.
      * @param ci              The instance of the transform component to set the local material orientation to.
-     * @param localTransform  The local material orientation (i.e. relative to the parent).
+     * @param rotation        The local material orientation (i.e. relative to the parent).
      * @see getMaterialOrientation()
      * @attention This operation can be slow if the hierarchy of transform is too deep, and this
      *            will be particularly bad when updating a lot of transforms. In that case,
