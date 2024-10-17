@@ -27,7 +27,10 @@ using namespace filament::math;
 
 namespace filament {
 
-FTransformManager::FTransformManager() noexcept = default;
+FTransformManager::FTransformManager() noexcept {
+    mManager[0].materialOrientation = {0, 0, 0, 1};
+    mManager[0].materialLocalOrientation = {0, 0, 0, 1};
+}
 
 FTransformManager::~FTransformManager() noexcept = default;
 
@@ -242,7 +245,7 @@ void FTransformManager::updateNodeTransform(Instance i) noexcept {
             mAccurateTranslations);
 
     // we apply the parent orientation
-    computeMaterialWorldOrientation(manager[i].materialOrientation, parent.isValid() ? manager[parent].materialOrientation : quatf{0, 0, 0, 1},
+    computeMaterialWorldOrientation(manager[i].materialOrientation, manager[parent].materialOrientation,
             manager[i].materialLocalOrientation, manager[i].materialOrientationCenter, manager[parent].materialOrientationCenter,
             manager[i].materialLocalOrientationCenter);
 
@@ -286,7 +289,7 @@ void FTransformManager::computeAllWorldTransforms() noexcept {
                 manager[parent].worldTranslationLo, manager[i].localTranslationLo,
                 accurate);
         
-        computeMaterialWorldOrientation(manager[i].materialOrientation, parent.isValid() ? manager[parent].materialOrientation : quatf{0, 0, 0, 1},
+        computeMaterialWorldOrientation(manager[i].materialOrientation, manager[parent].materialOrientation,
             manager[i].materialLocalOrientation, manager[i].materialOrientationCenter, manager[parent].materialOrientationCenter,
             manager[i].materialLocalOrientationCenter);
     }
@@ -426,7 +429,7 @@ void FTransformManager::transformChildren(Sim& manager, Instance i) noexcept {
                 accurate);
 
         // we need to update our orientation too
-        computeMaterialWorldOrientation(manager[i].materialOrientation, parent.isValid() ? manager[parent].materialOrientation : quatf{0, 0, 0, 1},
+        computeMaterialWorldOrientation(manager[i].materialOrientation, manager[parent].materialOrientation,
             manager[i].materialLocalOrientation, manager[i].materialOrientationCenter, manager[parent].materialOrientationCenter,
             manager[i].materialLocalOrientationCenter);
 
