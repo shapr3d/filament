@@ -491,13 +491,13 @@ math::quatf FTransformManager::getMaterialCompoundOrientation(Instance ci) const
     const mat4f& world = mManager[ci].world;
     const quatf& orientation = mManager[ci].materialOrientation;
 
-    quatf worldRotationQuaternion = world.toQuaternion();
+    const quatf worldRotationQuaternion = world.toQuaternion();
 
     // We need to apply the inverse of the world transformation's rotation component
-    // then apply our own orientation. Multiplying with worldRotation on the right is
-    // equivalent to multiplying on the left with the transpose of it, which in this
-    // case is equal to the inverse (orthonormal matrix). This allows us to compute only
-    // one matrix multiplication, instead of two (one on the left, one on the right).
+    // then apply our own orientation. Since the worldRotation is already applied to the material, 
+    // applying the inverse worldRotation to it will leave us with an identity transform. After that
+    // orientation can be applied and worldRotation re-applied. Leveraging that an identity transform occurs
+    // in an intermediate step, instead of two quaternion-vector operation only one needs to be done.
     return worldRotationQuaternion * orientation;
 }
 

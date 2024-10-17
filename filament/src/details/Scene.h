@@ -117,7 +117,7 @@ public:
     using RenderableSoa = utils::StructureOfArrays<
             utils::EntityInstance<RenderableManager>,   // RENDERABLE_INSTANCE
             math::mat4f,                                // WORLD_TRANSFORM
-            math::quatf,                               // MATERIAL_ORIENTATION
+            math::quatf,                                // MATERIAL_ORIENTATION
             math::float3,                               // MATERIAL_ORIENTATION_CENTER
             FRenderableManager::Visibility,             // VISIBILITY_STATE
             FRenderableManager::SkinningBindingInfo,    // SKINNING_BUFFER

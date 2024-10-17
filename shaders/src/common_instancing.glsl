@@ -43,7 +43,7 @@ void initObjectUniforms() {
 #endif
     object_uniforms_worldFromModelMatrix        = objectUniforms.data[i].worldFromModelMatrix;
     object_uniforms_worldFromModelNormalMatrix  = objectUniforms.data[i].worldFromModelNormalMatrix;
-    object_uniforms_materialOrientation     = objectUniforms.data[i].materialOrientation;
+    object_uniforms_materialOrientation         = objectUniforms.data[i].materialOrientation;
     object_uniforms_morphTargetCount            = objectUniforms.data[i].morphTargetCount;
     object_uniforms_flagsChannels               = objectUniforms.data[i].flagsChannels;
     object_uniforms_objectId                    = objectUniforms.data[i].objectId;

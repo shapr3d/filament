@@ -189,8 +189,8 @@ private:
         WORLD,          // world transform
         LOCAL_LO,       // accurate local translation
         WORLD_LO,       // accurate world translation
-        MATERIAL_LOCAL_ORIENTATION,    // local orientation quaternion of bi/triplanar mapping
-        MATERIAL_ORIENTATION,          // bi/triplanar mapping rotation quaternion, composed with parent transforms
+        MATERIAL_LOCAL_ORIENTATION,         // local orientation quaternion of bi/triplanar mapping
+        MATERIAL_ORIENTATION,               // bi/triplanar mapping rotation quaternion, composed with parent transforms
         MATERIAL_LOCAL_ORIENTATION_CENTER,  // local center of bi/triplanar mapping
         MATERIAL_ORIENTATION_CENTER,        // bi/triplanar mapping center, composed with parent center
         APPLY_WORLD_TO_MATERIAL_ORIENTATION,// whether to concatenate the world transform to material orientation quaternion
@@ -205,8 +205,8 @@ private:
             math::mat4f,    // world
             math::float3,   // accurate local translation
             math::float3,   // accurate world translation
-            math::quatf,   // local orientation quaternion
-            math::quatf,   // orientation quaternion
+            math::quatf,    // local orientation quaternion
+            math::quatf,    // orientation quaternion
             math::float3,   // local orientation center
             math::float3,   // orientation center
             bool,           // apply world to material orientation quaternion
@@ -234,8 +234,8 @@ private:
                 Field<WORLD>        world;
                 Field<LOCAL_LO>     localTranslationLo;
                 Field<WORLD_LO>     worldTranslationLo;
-                Field<MATERIAL_LOCAL_ORIENTATION>      materialLocalOrientation;
-                Field<MATERIAL_ORIENTATION>            materialOrientation;
+                Field<MATERIAL_LOCAL_ORIENTATION>           materialLocalOrientation;
+                Field<MATERIAL_ORIENTATION>                 materialOrientation;
                 Field<MATERIAL_LOCAL_ORIENTATION_CENTER>    materialLocalOrientationCenter;
                 Field<MATERIAL_ORIENTATION_CENTER>          materialOrientationCenter;
                 Field<APPLY_WORLD_TO_MATERIAL_ORIENTATION>  applyWorldToMaterialOrientation;

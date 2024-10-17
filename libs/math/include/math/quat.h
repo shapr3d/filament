@@ -90,7 +90,7 @@ public:
     explicit constexpr TQuaternion(no_init) {}
 
     // default constructor. sets all values to zero.
-    constexpr TQuaternion() : x(0), y(0), z(0), w(0) {}
+    constexpr TQuaternion() : x(0), y(0), z(0), w(1) {}
 
     // Handles implicit conversion to a quat. Must not be explicit.
     template<typename A, typename = enable_if_arithmetic_t<A>>

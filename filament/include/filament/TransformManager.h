@@ -315,7 +315,7 @@ public:
      *            will be particularly bad when updating a lot of transforms. In that case,
      *            consider using openLocalTransformTransaction() / commitLocalTransformTransaction().
      */
-    void setMaterialOrientation(Instance ci, const math::quatf & rotation) noexcept;
+    void setMaterialOrientation(Instance ci, const math::quatf& rotation) noexcept;
 
     /**
      * Returns the local material orientation of a transform component.

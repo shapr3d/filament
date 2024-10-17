@@ -225,7 +225,7 @@ static_assert(sizeof(PerViewUib) == sizeof(math::float4) * 128,
 struct PerRenderableData {
     std140::mat44 worldFromModelMatrix;
     std140::mat33 worldFromModelNormalMatrix;
-    std140::vec4 materialOrientation;
+    math::float4 materialOrientation;
     int32_t morphTargetCount;
     int32_t flagsChannels;                   // see packFlags() below (0x00000fll)
     int32_t objectId;                        // used for picking

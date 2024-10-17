@@ -115,7 +115,7 @@ void TransformManager::applyWorldTransformToMaterialOrientation(Instance ci, boo
     downcast(this)->applyWorldTransformToMaterialOrientation(ci, apply);
 }
 
-const quatf &TransformManager::getMaterialWorldOrientation(Instance ci) const noexcept {
+const quatf& TransformManager::getMaterialWorldOrientation(Instance ci) const noexcept {
     return downcast(this)->getMaterialWorldOrientation(ci);
 }
 

@@ -370,10 +370,7 @@ void FScene::prepareVisibleRenderables(Range<uint32_t> visibleRenderables) noexc
 
         uboData.worldFromModelNormalMatrix = m;
 
-        uboData.materialOrientation = {sceneData.elementAt<MATERIAL_ORIENTATION>(i).x, 
-                                       sceneData.elementAt<MATERIAL_ORIENTATION>(i).y, 
-                                       sceneData.elementAt<MATERIAL_ORIENTATION>(i).z, 
-                                       sceneData.elementAt<MATERIAL_ORIENTATION>(i).w};
+        uboData.materialOrientation = sceneData.elementAt<MATERIAL_ORIENTATION>(i).xyzw;
 
         uboData.materialOrientationCenter = sceneData.elementAt<MATERIAL_ORIENTATION_CENTER>(i);
 
