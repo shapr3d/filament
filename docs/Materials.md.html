@@ -2409,7 +2409,7 @@ The following APIs are only available from the fragment block:
 **getWorldGeometricNormalVector()**     | float3   |  Normalized normal in world space, before bump mapping (can be used before `prepareMaterial()`)
 **getWorldReflectedVector()**           | float3   |  Reflection of the view vector about the normal (must be used after `prepareMaterial()`)
 **getNormalizedViewportCoord()**        | float3   |  Normalized user viewport position (i.e. NDC coordinates normalized to [0, 1] for the position, [1, 0] for the depth), can be used before `prepareMaterial()`). Because the user viewport is smaller than the actual physical viewport, these coordinates can be negative or superior to 1 in the non-visible area of the physical viewport.
-**getMaterialOrientation()**            | float4    |  Rotation represented as quaternion to apply to bi/triplanar mapping. ![](images/shapr-logo.png)  
+**getMaterialOrientation()**            | float4   |  Rotation represented as quaternion to apply to bi/triplanar mapping. ![](images/shapr-logo.png)  
 **getMaterialOrientationCenter()**      | float3   |  World space position to apply bi/triplanar mapping from. World space caveats do not apply. ![](images/shapr-logo.png)
 **getNdotV()**                          | float    |  The result of `dot(normal, view)`, always strictly greater than 0 (must be used after `prepareMaterial()`)
 **getColor()**                          | float4   |  Interpolated color of the fragment, if the color attribute is required
