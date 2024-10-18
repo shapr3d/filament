@@ -103,11 +103,11 @@ size_t TransformManager::getChildren(Instance i, utils::Entity* children,
     return downcast(this)->getChildren(i, children, count);
 }
 
-void TransformManager::setMaterialOrientation(Instance ci, const mat3f& rotation) noexcept {
+void TransformManager::setMaterialOrientation(Instance ci, const quatf& rotation) noexcept {
     downcast(this)->setMaterialOrientation(ci, rotation);
 }
 
-const mat3f& TransformManager::getMaterialOrientation(Instance ci) const noexcept {
+const quatf& TransformManager::getMaterialOrientation(Instance ci) const noexcept {
     return downcast(this)->getMaterialOrientation(ci);
 }
 
@@ -115,7 +115,7 @@ void TransformManager::applyWorldTransformToMaterialOrientation(Instance ci, boo
     downcast(this)->applyWorldTransformToMaterialOrientation(ci, apply);
 }
 
-const mat3f &TransformManager::getMaterialWorldOrientation(Instance ci) const noexcept {
+const quatf& TransformManager::getMaterialWorldOrientation(Instance ci) const noexcept {
     return downcast(this)->getMaterialWorldOrientation(ci);
 }
 

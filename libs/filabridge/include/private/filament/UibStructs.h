@@ -225,7 +225,7 @@ static_assert(sizeof(PerViewUib) == sizeof(math::float4) * 128,
 struct PerRenderableData {
     std140::mat44 worldFromModelMatrix;
     std140::mat33 worldFromModelNormalMatrix;
-    std140::mat33 materialOrientationMatrix;
+    math::float4 materialOrientation;
     int32_t morphTargetCount;
     int32_t flagsChannels;                   // see packFlags() below (0x00000fll)
     int32_t objectId;                        // used for picking
@@ -233,7 +233,7 @@ struct PerRenderableData {
     float userData;
     alignas(16) math::float3 materialOrientationCenter;   // center of renderable's material mapping in world space
 
-    math::float4 reserved[4];
+    math::float4 reserved[6];
 
     static uint32_t packFlagsChannels(
             bool skinning, bool morphing, bool contactShadows, bool hasInstanceBuffer,

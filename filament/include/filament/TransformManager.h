@@ -309,13 +309,13 @@ public:
      * Sets a local material orientation of a transform component. This enables changing texture
      * bi/triplanar mapping direction.
      * @param ci              The instance of the transform component to set the local material orientation to.
-     * @param localTransform  The local material orientation (i.e. relative to the parent).
+     * @param rotation        The local material orientation (i.e. relative to the parent).
      * @see getMaterialOrientation()
      * @attention This operation can be slow if the hierarchy of transform is too deep, and this
      *            will be particularly bad when updating a lot of transforms. In that case,
      *            consider using openLocalTransformTransaction() / commitLocalTransformTransaction().
      */
-    void setMaterialOrientation(Instance ci, const math::mat3f& rotation) noexcept;
+    void setMaterialOrientation(Instance ci, const math::quatf& rotation) noexcept;
 
     /**
      * Returns the local material orientation of a transform component.
@@ -324,7 +324,7 @@ public:
      *         returns the value set by setMaterialOrientation()).
      * @see setMaterialOrientation()
      */
-    const math::mat3f& getMaterialOrientation(Instance ci) const noexcept;
+    const math::quatf& getMaterialOrientation(Instance ci) const noexcept;
 
     /**
      * Sets whether the world transformation's rotation component should be applied to the material
@@ -351,7 +351,7 @@ public:
      *         material orientation.
      * @see setMaterialOrientation()
      */
-    const math::mat3f& getMaterialWorldOrientation(Instance ci) const noexcept;
+    const math::quatf& getMaterialWorldOrientation(Instance ci) const noexcept;
 
     /**
      * Sets the center of material texture mapping of a transform component in local space.

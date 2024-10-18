@@ -91,7 +91,7 @@ public:
     enum {
         RENDERABLE_INSTANCE,    //   4 | instance of the Renderable component
         WORLD_TRANSFORM,        //  16 | instance of the Transform component
-        MATERIAL_ORIENTATION,           // 36 | orientation matrix for bi/triplanar mapping
+        MATERIAL_ORIENTATION,      // 16 | orientation quaternion for bi/triplanar mapping
         MATERIAL_ORIENTATION_CENTER,    // 12 | orientation center for bi/triplanar mapping
         VISIBILITY_STATE,       //   2 | visibility data of the component
         SKINNING_BUFFER,        //   8 | bones uniform buffer handle, offset, indices and weights
@@ -117,7 +117,7 @@ public:
     using RenderableSoa = utils::StructureOfArrays<
             utils::EntityInstance<RenderableManager>,   // RENDERABLE_INSTANCE
             math::mat4f,                                // WORLD_TRANSFORM
-            math::mat3f,                                // MATERIAL_ORIENTATION
+            math::quatf,                                // MATERIAL_ORIENTATION
             math::float3,                               // MATERIAL_ORIENTATION_CENTER
             FRenderableManager::Visibility,             // VISIBILITY_STATE
             FRenderableManager::SkinningBindingInfo,    // SKINNING_BUFFER

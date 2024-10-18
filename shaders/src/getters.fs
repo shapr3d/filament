@@ -83,8 +83,8 @@ float getNdotV() {
     return shading_NoV;
 }
 
-mat3 getMaterialOrientationMatrix() {
-    return object_uniforms_materialOrientationMatrix;
+vec4 getMaterialOrientation() {
+    return object_uniforms_materialOrientation;
 }
 
 vec3 getMaterialOrientationCenter() {

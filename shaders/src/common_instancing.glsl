@@ -4,7 +4,7 @@
 
 highp mat4 object_uniforms_worldFromModelMatrix;
 highp mat3 object_uniforms_worldFromModelNormalMatrix;
-highp mat3 object_uniforms_materialOrientationMatrix;
+highp vec4 object_uniforms_materialOrientation;
 highp int object_uniforms_morphTargetCount;
 highp int object_uniforms_flagsChannels;                   // see packFlags() below (0x00000fll)
 highp int object_uniforms_objectId;                        // used for picking
@@ -43,7 +43,7 @@ void initObjectUniforms() {
 #endif
     object_uniforms_worldFromModelMatrix        = objectUniforms.data[i].worldFromModelMatrix;
     object_uniforms_worldFromModelNormalMatrix  = objectUniforms.data[i].worldFromModelNormalMatrix;
-    object_uniforms_materialOrientationMatrix   = objectUniforms.data[i].materialOrientationMatrix;
+    object_uniforms_materialOrientation         = objectUniforms.data[i].materialOrientation;
     object_uniforms_morphTargetCount            = objectUniforms.data[i].morphTargetCount;
     object_uniforms_flagsChannels               = objectUniforms.data[i].flagsChannels;
     object_uniforms_objectId                    = objectUniforms.data[i].objectId;

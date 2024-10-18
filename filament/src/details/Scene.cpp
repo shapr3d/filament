@@ -183,7 +183,7 @@ void FScene::prepare(utils::JobSystem& js,
             const bool reversedWindingOrder = det(shaderWorldTransform.upperLeft()) < 0;
 
             const bool applyWorldToMaterialOrientation = tcm.isWorldTransformAppliedToMaterialOrientation(ti);
-            const mat3f materialOrientation = applyWorldToMaterialOrientation ? tcm.getMaterialCompoundOrientation(ti) : tcm.getMaterialOrientation(ti);
+            const quatf materialOrientation = applyWorldToMaterialOrientation ? tcm.getMaterialCompoundOrientation(ti) : tcm.getMaterialOrientation(ti);
             const float3 materialOrientationCenter = tcm.getMaterialWorldOrientationCenter(ti);
 
             // compute the world AABB so we can perform culling
@@ -370,7 +370,8 @@ void FScene::prepareVisibleRenderables(Range<uint32_t> visibleRenderables) noexc
 
         uboData.worldFromModelNormalMatrix = m;
 
-        uboData.materialOrientationMatrix = sceneData.elementAt<MATERIAL_ORIENTATION>(i);
+        uboData.materialOrientation = sceneData.elementAt<MATERIAL_ORIENTATION>(i).xyzw;
+
         uboData.materialOrientationCenter = sceneData.elementAt<MATERIAL_ORIENTATION_CENTER>(i);
 
         uboData.flagsChannels = PerRenderableData::packFlagsChannels(
