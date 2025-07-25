@@ -169,8 +169,7 @@ add_library(gltfio_core STATIC ${PUBLIC_HDRS} ${SRCS})
 target_include_directories(gltfio_core PUBLIC ${PUBLIC_HDR_DIR})
 set_target_properties(gltfio_core PROPERTIES FOLDER Libs)
 
-target_compile_definitions(gltfio_core PRIVATE -DGLTFIO_DRACO_SUPPORTED=1)
-target_link_libraries(gltfio_core PRIVATE dracodec meshoptimizer)
+target_compile_definitions(gltfio_core PRIVATE -DGLTFIO_DRACO_SUPPORTED=0)
 
 if (WEBGL_PTHREADS)
     target_compile_definitions(gltfio_core PUBLIC -DFILAMENT_WASM_THREADS)

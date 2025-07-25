@@ -28,7 +28,6 @@ include_directories(${PUBLIC_HDR_DIR})
 add_library(${TARGET} STATIC ${PUBLIC_HDRS} ${SRCS})
 
 set(GEOMETRY_DEPS
-    meshoptimizer
     mikktspace
 )
 

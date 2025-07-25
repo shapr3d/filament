@@ -19,8 +19,6 @@
 #include <math/mat3.h>
 #include <math/norm.h>
 
-
-#include <meshoptimizer.h>
 #include <mikktspace/mikktspace.h>
 
 #include <vector>
@@ -143,42 +141,45 @@ inline const uint3 MikktspaceImpl::getTriangle(int const triangleIndex) const no
 }
 
 void MikktspaceImpl::run(TangentSpaceMeshOutput* output) noexcept {
-    SMikkTSpaceInterface interface {
-        .m_getNumFaces = MikktspaceImpl::getNumFaces,
-        .m_getNumVerticesOfFace = MikktspaceImpl::getNumVerticesOfFace,
-        .m_getPosition = MikktspaceImpl::getPosition,
-        .m_getNormal = MikktspaceImpl::getNormal,
-        .m_getTexCoord = MikktspaceImpl::getTexCoord,
-        .m_setTSpaceBasic = MikktspaceImpl::setTSpaceBasic,
-    };
-    SMikkTSpaceContext context{.m_pInterface = &interface, .m_pUserData = this};
-    genTangSpaceDefault(&context);
-
-    size_t oVertexCount = mOutputData.size() / mOutputElementSize;
-
-    std::vector<unsigned int> remap(oVertexCount);
-    size_t vertexCount = meshopt_generateVertexRemap(remap.data(), NULL, remap.size(),
-            mOutputData.data(), oVertexCount, mOutputElementSize);
-
-    std::vector<IOVertex> newVertices(vertexCount);
-    meshopt_remapVertexBuffer((void*) newVertices.data(), mOutputData.data(), oVertexCount,
-            mOutputElementSize, remap.data());
-
-    uint3* triangles32 = output->triangles32.allocate(mFaceCount);
-    meshopt_remapIndexBuffer((uint32_t*) triangles32, NULL, remap.size(), remap.data());
-
-    float3* outPositions = output->positions().allocate(vertexCount);
-    float2* outUVs = output->uvs().allocate(vertexCount);
-    quatf* outQuats = output->tspace().allocate(vertexCount);
-
-    for (size_t i = 0; i < vertexCount; ++i) {
-        outPositions[i] = newVertices[i].position;
-        outUVs[i] = newVertices[i].uv;
-        outQuats[i] = newVertices[i].tangentSpace;
-    }
-
-    output->vertexCount = vertexCount;
-    output->triangleCount = mFaceCount;
+//    SMikkTSpaceInterface interface {
+//        .m_getNumFaces = MikktspaceImpl::getNumFaces,
+//        .m_getNumVerticesOfFace = MikktspaceImpl::getNumVerticesOfFace,
+//        .m_getPosition = MikktspaceImpl::getPosition,
+//        .m_getNormal = MikktspaceImpl::getNormal,
+//        .m_getTexCoord = MikktspaceImpl::getTexCoord,
+//        .m_setTSpaceBasic = MikktspaceImpl::setTSpaceBasic,
+//    };
+//    SMikkTSpaceContext context{.m_pInterface = &interface, .m_pUserData = this};
+//    genTangSpaceDefault(&context);
+//
+//    // Interpret raw vertex buffer
+//    const IOVertex* inputVertices = reinterpret_cast<const IOVertex*>(mOutputData.data());
+//    size_t vertexCount = mOutputData.size() / sizeof(IOVertex);
+//
+//    output->vertexCount = vertexCount;
+//    output->triangleCount = mFaceCount;
+//
+//    // Allocate outputs
+//    float3* outPositions = output->positions().allocate(vertexCount);
+//    float2* outUVs       = output->uvs().allocate(vertexCount);
+//    quatf*  outQuats     = output->tspace().allocate(vertexCount);
+//    uint3*  triangles32  = output->triangles32.allocate(mFaceCount);
+//
+//    // Copy vertex data
+//    for (size_t i = 0; i < vertexCount; ++i) {
+//        outPositions[i] = inputVertices[i].position;
+//        outUVs[i]       = inputVertices[i].uv;
+//        outQuats[i]     = inputVertices[i].tangentSpace;
+//    }
+//
+//    // Copy index data (assuming flat list of uint32_t indices)
+//    for (size_t i = 0; i < mFaceCount; ++i) {
+//        triangles32[i] = {
+//            mRawIndices[i * 3 + 0],
+//            mRawIndices[i * 3 + 1],
+//            mRawIndices[i * 3 + 2]
+//        };
+//    }
 }
 
 }// namespace filament::geometry

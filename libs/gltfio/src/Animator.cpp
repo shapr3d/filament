@@ -92,14 +92,11 @@ static void createSampler(const cgltf_animation_sampler& src, Sampler& dst) {
     const cgltf_accessor* timelineAccessor = src.input;
     const uint8_t* timelineBlob = nullptr;
     const float* timelineFloats = nullptr;
-    if (timelineAccessor->buffer_view->has_meshopt_compression) {
-        timelineBlob = (const uint8_t*) timelineAccessor->buffer_view->data;
-        timelineFloats = (const float*) (timelineBlob + timelineAccessor->offset);
-    } else {
-        timelineBlob = (const uint8_t*) timelineAccessor->buffer_view->buffer->data;
-        timelineFloats = (const float*) (timelineBlob + timelineAccessor->offset +
-                timelineAccessor->buffer_view->offset);
-    }
+
+    timelineBlob = (const uint8_t*) timelineAccessor->buffer_view->buffer->data;
+    timelineFloats = (const float*) (timelineBlob + timelineAccessor->offset +
+            timelineAccessor->buffer_view->offset);
+
     for (size_t i = 0, len = timelineAccessor->count; i < len; ++i) {
         dst.times[timelineFloats[i]] = i;
     }
