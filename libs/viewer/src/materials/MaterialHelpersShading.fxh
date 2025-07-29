@@ -598,6 +598,11 @@ void ApplyShaprScalars(inout MaterialInputs material) {
     // All of our materials have specularIntensity and useWard, so no need to define-guard these
     material.specularIntensity = GetSpecularIntensity();
     material.useWard = IsWard();
+    material.F90 = materialParams.F90;
+    material.F82 = materialParams.F82;
+    material.iorK = materialParams.iorK;
+    material.iorND = materialParams.iorND;
+    material.specularIntensity *= materialParams.F90;
 }
 
 // As all-black cloth materials require positive sheen contribution in order to be visible (read: not pitch black),

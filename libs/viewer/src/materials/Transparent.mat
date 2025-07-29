@@ -64,6 +64,22 @@ material {
             name : roughnessUvScaler
         },
         {
+            type : float,
+            name : F90
+        },
+        {
+            type : float,
+            name : F82
+        },
+        {
+            type : float,
+            name : iorND
+        },
+        {
+            type : float,
+            name : iorK
+        },
+        {
             type : float2,
             name : emissiveControl
         },

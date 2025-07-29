@@ -27,6 +27,26 @@ float clearCoatLobe(const PixelParams pixel, const vec3 h, float NoH, float LoH,
 }
 #endif
 
+
+vec3 F_artists(float cosTheta, float nd, float k,
+                float F90, float F82)
+{
+    return vec3(1.0, 1.0, 1.0) * F90;
+    // float F0 = (((nd - 1.0)*(nd - 1.0) + k*k) / ((nd + 1.0)*(nd + 1.0) + k*k));
+
+    // // Solve exponent once per material (put this in a pre‑compute block!)
+    // const float cos82 = 0.1391731;         // cos(82)
+    // const float oneMcos82 = 1.0 - cos82;     // 0.8608269
+    // float s = log((F82 - F0) / (F90 - F0)) / log(oneMcos82);
+
+    // // Clamp to avoid NaNs if artist gives bad numbers
+    // s = max(s, 0.0);
+
+    // // Fresnel evaluation
+    // float oneMcos = 1.0 - cosTheta;
+    // return vec3(1.0, 1.0, 1.0) * (F0 + (F90 - F0) * pow(oneMcos, s));
+}
+
 #if defined(MATERIAL_HAS_ANISOTROPY)
 vec3 anisotropicLobe(const MaterialInputs material, const PixelParams pixel, const Light light, const vec3 h,
         float NoV, float NoL, float NoH, float LoH) {
@@ -57,8 +77,10 @@ vec3 anisotropicLobe(const MaterialInputs material, const PixelParams pixel, con
         D = distributionAnisotropicWard(at, ab, ToH, BoH, NoH, NoL, NoV); // Ward
     }
     float V = visibilityAnisotropic(pixel.roughness, at, ab, ToV, BoV, ToL, BoL, NoV, NoL);
-    vec3  F = material.specularIntensity * fresnel(pixel.f0, LoH);
-
+    //vec3 myF = F_artists(LoH, material.iorND, material.iorK, material.F90, material.F82);
+    //vec3  F = material.specularIntensity * fresnel(pixel.f0, LoH);
+    vec3 F = material.F90 * material.specularIntensity * fresnel(pixel.f0, LoH);
+    //vec3 F = myF * material.specularIntensity;
     return (D * V) * F;
 }
 #endif
@@ -68,7 +90,10 @@ vec3 isotropicLobe(const MaterialInputs material, const PixelParams pixel, const
 
     float D = distribution(pixel.roughness, NoH, h);
     float V = visibility(pixel.roughness, NoV, NoL);
-    vec3  F = material.specularIntensity * fresnel(pixel.f0, LoH);
+    //vec3  F = material.specularIntensity * fresnel(pixel.f0, LoH);
+    //vec3 myF = F_artists(LoH, material.iorND, material.iorK, material.F90, material.F82);
+    vec3 F = material.F90 * material.specularIntensity * fresnel(pixel.f0, LoH);
+    //vec3 F = myF * material.specularIntensity;
 
     return (D * V) * F;
 }

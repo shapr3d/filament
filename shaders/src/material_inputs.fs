@@ -12,6 +12,10 @@
 struct MaterialInputs {
     vec4  baseColor;
     bool  useWard;
+    float F90;
+    float F82;
+    float iorND;
+    float iorK;
 #if !defined(SHADING_MODEL_UNLIT)
 #if !defined(SHADING_MODEL_SPECULAR_GLOSSINESS)
     float roughness;
@@ -95,6 +99,11 @@ struct MaterialInputs {
 void initMaterial(out MaterialInputs material) {
     material.baseColor = vec4(1.0);
     material.useWard = false;
+    material.F90 = 1.0;
+    material.F82 = 0.52;
+    material.iorND = 1.5;
+    material.iorK = 0.0;
+
 #if !defined(SHADING_MODEL_UNLIT)
 #if !defined(SHADING_MODEL_SPECULAR_GLOSSINESS)
     material.roughness = 1.0;

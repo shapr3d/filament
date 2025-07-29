@@ -12,6 +12,10 @@ TweakableMaterial::TweakableMaterial() {
     mRoughnessScale.value = 1.0f;
     mRoughnessUvScaler.value = 1.0f;
     mOcclusionIntensity.value = 1.0f;
+    mF90.value = 1.0f; 
+    mF82.value = 0.52f; 
+    mIorND.value = 1.5f;
+    mIorK.value = 0.0f; 
 }
 
 json TweakableMaterial::toJson() {
@@ -70,6 +74,10 @@ json TweakableMaterial::toJson() {
     result["isAbsorptionDerived"] = mAbsorption.useDerivedQuantity;
     result["iorScale"] = mIorScale.value;
     writeTexturedToJson(result, "ior", mIor);
+    result["F90"] = mF90.value;
+    result["F82"] = mF82.value;
+    result["iorND"] = mIorND.value;
+    result["iorK"] = mIorK.value;
     result["thickness"] = mThickness.value;
     writeTexturedToJson(result, "transmission", mTransmission);
     result["maxThickness"] = mMaxThickness.value;
@@ -137,6 +145,10 @@ void TweakableMaterial::fromJson(const json& source) {
     readValueFromJson(source, "isAbsorptionDerived", mAbsorption.useDerivedQuantity, false);
     readValueFromJson(source, "iorScale", mIorScale, 1.0f);
     readValueFromJson(source, "ior", mIor);
+    readValueFromJson(source, "F90", mF90, 1.0f);
+    readValueFromJson(source, "F82", mF82, 0.52f);
+    readValueFromJson(source, "iorND", mIorND, 1.5f);
+    readValueFromJson(source, "iorK", mIorK, 0.0f);
     readValueFromJson(source, "thickness", mThickness);
     readTexturedFromJson(source, "transmission", mTransmission);
     readValueFromJson(source, "maxThickness", mMaxThickness, 1.0f);
@@ -216,6 +228,10 @@ void TweakableMaterial::resetWithType(MaterialType newType) {
     resetMemberToValue(mThickness, {});
     resetMemberToValue(mIorScale, 1.0f);
     resetMemberToValue(mIor, 1.5f);
+    resetMemberToValue(mF90, 1.0f);
+    resetMemberToValue(mF82, 0.52f);
+    resetMemberToValue(mIorND, 1.5f);
+    resetMemberToValue(mIorK, 0.0f);    
 
     mAbsorption.useDerivedQuantity = false;
     mSheenColor.useDerivedQuantity = false;
@@ -329,6 +345,10 @@ void TweakableMaterial::drawUI(const std::string& header) {
 
             mIorScale.addWidget("ior scale", 0.0f, 4.0f);
             mIor.addWidget("ior", 1.0f, 2.0f);
+            mF90.addWidget("F90", 0.0f, 1.0f);
+            mF82.addWidget("F82", 0.0f, 1.0f);
+            mIorND.addWidget("ior ND", 1.0f, 3.0f);
+            mIorK.addWidget("ior K", 0.0f, 10.0f);   
             mAbsorption.addWidget("absorption");
             mTransmission.addWidget("transmission");
             mMaxThickness.addWidget("thickness scale", 1.0f, 32.0f);

@@ -72,7 +72,22 @@ material {
             type : float,
             name : roughnessUvScaler
         },
-
+        {
+            type : float,
+            name : F90
+        },
+        {
+            type : float,
+            name : F82
+        },
+        {
+            type : float,
+            name : iorND
+        },
+        {
+            type : float,
+            name : iorK
+        },
         //////////////////////////////////////////////////////////////////////////////////////////////////
         // Texture lookup scaling that transforms world coordinates to triplanar coordinates
         //////////////////////////////////////////////////////////////////////////////////////////////////

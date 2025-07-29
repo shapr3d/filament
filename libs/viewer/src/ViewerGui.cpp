@@ -1406,6 +1406,10 @@ void ViewerGui::updateUserInterface() {
 
                             matInstance->setParameter("iorScale", tweaks.mIorScale.value);
                             matInstance->setParameter("ior", tweaks.mIor.value);
+                            matInstance->setParameter("F90", tweaks.mF90.value);
+                            matInstance->setParameter("F82", tweaks.mF82.value);
+                            matInstance->setParameter("iorND", tweaks.mIorND.value);
+                            matInstance->setParameter("iorK", tweaks.mIorK.value);
                             matInstance->setParameter("transmission", tweaks.mTransmission.value);
                             matInstance->setParameter("thickness", tweaks.mThickness.value);
                             matInstance->setParameter("maxThickness", tweaks.mMaxThickness.value);

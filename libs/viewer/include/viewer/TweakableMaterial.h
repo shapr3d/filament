@@ -129,6 +129,10 @@ public:
     TweakableProperty<float> mThickness{}; // for refractive and subsurface
     TweakableProperty<float> mIorScale{}; // for refractive
     TweakableProperty<float> mIor{}; // for refractive
+    TweakableProperty<float> mF90{ 1.0f };
+    TweakableProperty<float> mF82{ 0.52f };
+    TweakableProperty<float> mIorND{ 1.5f };
+    TweakableProperty<float> mIorK{ 0.0f };
 
     bool mUseWard{};
     bool mDoRelease{}; // this notifies the material integrator tool that this material needs to be checked into the codebase
