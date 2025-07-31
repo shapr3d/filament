@@ -154,8 +154,13 @@ std::string shaderFromKey(const MaterialKey& config) {
 
     if (!config.unlit) {
         // This is a custom Shapr3D property that controls specular reflectance of materials on all lighting paths
+                //         material.F90 = 1.0;
+                // material.F82 = 0.52;
+                // material.iorK = 0.0;
+                // material.iorND = 1.5;
         shader += R"SHADER(
                 material.specularIntensity = 1.0;
+
             )SHADER";
 
         if (config.useSpecularGlossiness) {

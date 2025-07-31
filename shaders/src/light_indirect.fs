@@ -257,6 +257,7 @@ float prefilteredImportanceSampling(float ipdf, float omegaP) {
 }
 
 vec3 isEvaluateSpecularIBL(const MaterialInputs material, const PixelParams pixel, const vec3 n, const vec3 v, const float NoV) {
+    return vec3(0.0, 1.0, 0.0);
     const int numSamples = IBL_INTEGRATION_IMPORTANCE_SAMPLING_COUNT;
     const float invNumSamples = 1.0 / float(numSamples);
     const vec3 up = vec3(0.0, 0.0, 1.0);
@@ -305,8 +306,14 @@ vec3 isEvaluateSpecularIBL(const MaterialInputs material, const PixelParams pixe
 
             float D = distribution(roughness, NoH, h);
             float V = visibility(roughness, NoV, NoL);
-            vec3 F = material.specularIntensity * fresnel(pixel.f0, LoH);
-            vec3 Fr = F * (D * V * NoL * ipdf * invNumSamples);
+            vec3 F = material.specularIntensity;
+            if (material.useCustomFresnel) {
+                F *= fresnel(pixel.f0, material.F90, material.iorND, material.iorK, LoH);
+            }  
+            else {
+                F *= fresnel(pixel.f0, LoH);
+            } 
+            //vec3 F = material.specularIntensity * fresnel(pixel.f0, LoH);
 
             indirectSpecular += (Fr * L);
         }
@@ -635,6 +642,10 @@ void evaluateIBL(const MaterialInputs material, const PixelParams pixel, inout v
 
 #if IBL_INTEGRATION == IBL_INTEGRATION_PREFILTERED_CUBEMAP
     vec3 E = specularDFG(pixel);
+    if (material.useCustomFresnel) {
+        E = fresnel(pixel.f0, material.F90, material.iorND, material.iorK, shading_NoV);
+    }
+
     if (ssrFr.a < 1.0) { // prevent reading the IBL if possible
         // we have to modify the IBL specular evaluation direction for anisotropic materials
         vec3 r = getReflectedVector(pixel, shading_view, shading_normal);
@@ -704,6 +715,7 @@ void evaluateIBL(const MaterialInputs material, const PixelParams pixel, inout v
 #endif
     Fr *= material.specularIntensity;
 
+    //Fr = vec3(0.0, 0.0, 1.0);
     // Combine all terms
     // Note: iblLuminance is already premultiplied by the exposure
 

@@ -12,6 +12,7 @@
 struct MaterialInputs {
     vec4  baseColor;
     bool  useWard;
+    bool useCustomFresnel;
     float F90;
     float F82;
     float iorND;
@@ -99,10 +100,7 @@ struct MaterialInputs {
 void initMaterial(out MaterialInputs material) {
     material.baseColor = vec4(1.0);
     material.useWard = false;
-    material.F90 = 1.0;
-    material.F82 = 0.52;
-    material.iorND = 1.5;
-    material.iorK = 0.0;
+    material.useCustomFresnel = false;
 
 #if !defined(SHADING_MODEL_UNLIT)
 #if !defined(SHADING_MODEL_SPECULAR_GLOSSINESS)
@@ -116,6 +114,10 @@ void initMaterial(out MaterialInputs material) {
 #endif
     material.emissive = vec4(vec3(0.0), 1.0);
     material.specularIntensity = 1.0;
+    material.F90 = 1.0;
+    material.F82 = 0.52;
+    material.iorND = 1.5;
+    material.iorK = 0.0;
 
 #if !defined(SHADING_MODEL_CLOTH) && !defined(SHADING_MODEL_SUBSURFACE) && !defined(SHADING_MODEL_UNLIT)
 #if defined(MATERIAL_HAS_SHEEN_COLOR)

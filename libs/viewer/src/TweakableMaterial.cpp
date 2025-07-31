@@ -25,6 +25,7 @@ json TweakableMaterial::toJson() {
     result["shaderType"] = mShaderType;
 
     result["useWard"] = mUseWard;
+    result["useCustomFresnel"] = mUseCustomFresnel;
 
     writeTexturedToJson(result, "baseColor", mBaseColor);
     result["tintColor"] = mTintColor.value;
@@ -98,6 +99,7 @@ void TweakableMaterial::fromJson(const json& source) {
     bool isAlpha = (mShaderType == TweakableMaterial::MaterialType::Transparent) || (mShaderType == TweakableMaterial::MaterialType::Refractive);
 
     readValueFromJson(source, "useWard", mUseWard, false);
+    readValueFromJson(source, "useCustomFresnel", mUseCustomFresnel, false);
 
     readTexturedFromJson(source, "baseColor", mBaseColor, true, isAlpha, isAlpha ? 4 : 3);
     readValueFromJson(source, "tintColor", mTintColor, { 1.0f, 1.0f, 1.0f });
@@ -236,6 +238,7 @@ void TweakableMaterial::resetWithType(MaterialType newType) {
     mAbsorption.useDerivedQuantity = false;
     mSheenColor.useDerivedQuantity = false;
     mUseWard = false;
+    mUseCustomFresnel = false;
     mDoRelease = false;
 
     mShaderType = newType;
@@ -347,7 +350,7 @@ void TweakableMaterial::drawUI(const std::string& header) {
             mIor.addWidget("ior", 1.0f, 2.0f);
             mF90.addWidget("F90", 0.0f, 1.0f);
             mF82.addWidget("F82", 0.0f, 1.0f);
-            mIorND.addWidget("ior ND", 1.0f, 3.0f);
+            mIorND.addWidget("ior ND", 1.0f, 100.0f);
             mIorK.addWidget("ior K", 0.0f, 10.0f);   
             mAbsorption.addWidget("absorption");
             mTransmission.addWidget("transmission");
@@ -394,6 +397,7 @@ void TweakableMaterial::drawUI(const std::string& header) {
 
     if (ImGui::CollapsingHeader("Shader setup")) {
         ImGui::Checkbox("Use Ward specular normal distribution", &mUseWard);
+        ImGui::Checkbox("Use custom Fresnel", &mUseCustomFresnel);
     }
 }
 

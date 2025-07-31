@@ -98,6 +98,10 @@ bool DoDeriveSubsurfaceColor() {
     return ( materialParams.usageFlags & 8192u ) != 0u;
 }
 
+bool IsCustomFresnel() {
+    return ( materialParams.usageFlags & 16384u ) != 0u;
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Various attributes have scalers associated with them. These are their human-readable getters
@@ -125,6 +129,22 @@ float GetSpecularIntensity() {
 
 float GetOcclusionIntensity() {
     return materialParams.basicIntensities.w;
+}
+
+float GetF90() {
+    return materialParams.F90;
+}
+
+float GetF82() {
+    return materialParams.F82;
+}
+
+float GetIorK() {
+    return materialParams.iorK;
+}
+
+float GetIorND() {
+    return materialParams.iorND;
 }
 
 float GetSheenIntensity() {
@@ -598,11 +618,11 @@ void ApplyShaprScalars(inout MaterialInputs material) {
     // All of our materials have specularIntensity and useWard, so no need to define-guard these
     material.specularIntensity = GetSpecularIntensity();
     material.useWard = IsWard();
-    material.F90 = materialParams.F90;
-    material.F82 = materialParams.F82;
-    material.iorK = materialParams.iorK;
-    material.iorND = materialParams.iorND;
-    material.specularIntensity *= materialParams.F90;
+    material.useCustomFresnel = IsCustomFresnel();
+    material.F90 = GetF90();
+    material.F82 = GetF82();
+    material.iorK = GetIorK();
+    material.iorND = GetIorND();
 }
 
 // As all-black cloth materials require positive sheen contribution in order to be visible (read: not pitch black),

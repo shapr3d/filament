@@ -199,6 +199,13 @@ vec3 fresnel(const vec3 f0, float LoH) {
 #endif
 }
 
+
+vec3 fresnel(const vec3 f0, float f90, float nd, float k, float LoH) {
+    float coef = exp(-nd);
+    vec3 newf0 = f0*coef + (1.0 - coef) * f90;
+    return newf0 + (f90 - newf0) * pow5(1.0 - LoH);   
+}
+
 float distributionAnisotropicWard(float at, float ab, float ToH, float BoH, float NoH, float NoL, float NoV) {
 #if BRDF_ANISOTROPIC_D == SPECULAR_D_GGX_ANISOTROPIC                                  
     return D_GGX_Anisotropic_Ward(at, ab, ToH, BoH, NoH, NoL, NoV);

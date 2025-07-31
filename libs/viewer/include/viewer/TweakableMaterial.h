@@ -133,8 +133,8 @@ public:
     TweakableProperty<float> mF82{ 0.52f };
     TweakableProperty<float> mIorND{ 1.5f };
     TweakableProperty<float> mIorK{ 0.0f };
-
     bool mUseWard{};
+    bool mUseCustomFresnel{};
     bool mDoRelease{}; // this notifies the material integrator tool that this material needs to be checked into the codebase
 
     enum MaterialType { Opaque, Transparent, Refractive, Cloth, Subsurface };
