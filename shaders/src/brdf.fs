@@ -201,9 +201,9 @@ vec3 fresnel(const vec3 f0, float LoH) {
 
 
 vec3 fresnel(const vec3 f0, float f90, float nd, float k, float LoH) {
-    float coef = exp(-nd);
+    float coef = exp(-nd) / exp(-1.5);
     vec3 newf0 = f0*coef + (1.0 - coef) * f90;
-    return newf0 + (f90 - newf0) * pow5(1.0 - LoH);   
+    return newf0 + max(f90- newf0, 0.0) * pow5(1.0 - LoH);   
 }
 
 float distributionAnisotropicWard(float at, float ab, float ToH, float BoH, float NoH, float NoL, float NoV) {

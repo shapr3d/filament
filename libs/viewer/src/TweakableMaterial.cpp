@@ -350,7 +350,7 @@ void TweakableMaterial::drawUI(const std::string& header) {
             mIor.addWidget("ior", 1.0f, 2.0f);
             mF90.addWidget("F90", 0.0f, 1.0f);
             mF82.addWidget("F82", 0.0f, 1.0f);
-            mIorND.addWidget("ior ND", 1.0f, 100.0f);
+            mIorND.addWidget("ior ND", 1.5f, 100.0f);
             mIorK.addWidget("ior K", 0.0f, 10.0f);   
             mAbsorption.addWidget("absorption");
             mTransmission.addWidget("transmission");

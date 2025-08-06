@@ -829,6 +829,7 @@ static float2 DFV_Multiscatter(float NoV, float linearRoughness, size_t numSampl
             r.y += v;
         }
     }
+    //r = 0;
     return r * (4.0f / numSamples);
 }
 
@@ -1026,6 +1027,8 @@ void CubemapIBL::DFG(JobSystem& js, Image& dst, bool multiscatter, bool cloth) {
                         // const float NoV = float(x) / (width-1);
                         const float NoV = saturate((x + 0.5f) / width);
                         float3 r = { dfvFunction(NoV, linear_roughness, 1024), 0 };
+                        //r.r = 0.0;
+                        //r.b = 0.0;
                         if (cloth) {
                             r.b = float(DFV_Charlie_Uniform(NoV, linear_roughness, 4096));
                         }

@@ -165,11 +165,24 @@ vec3 getSpecularDominantDirection(const vec3 n, const vec3 r, float roughness) {
     return mix(r, n, roughness * roughness);
 }
 
-vec3 specularDFG(const PixelParams pixel) {
+vec3 specularDFG(const PixelParams pixel, const MaterialInputs material) {
 #if defined(SHADING_MODEL_CLOTH)
     return pixel.f0 * pixel.dfg.z;
 #else
-    return mix(pixel.dfg.xxx, pixel.dfg.yyy, pixel.f0);
+
+    // float Fc = pow(1 - VoH, 5.0f);
+    // r.x += Gv * Fc;
+    // r.y += Gv;
+    // R(θ) = R₀ + (1 - R₀) * (1 - cos(θ))^5
+    // (1 - f0) * dfg.x + f0 * dfg.y
+    // F90 - F0
+    //add so that for default nd it was okay
+    float coef = exp(-material.iorND) / exp(-1.5);
+    //coef = 1.0;
+    vec3 newf0 = pixel.f0*coef + (1.0 - coef) * material.F90;
+
+    return newf0 * pixel.dfg.xxx + max(material.F90 - newf0, 0.0) * pixel.dfg.yyy;
+    //return mix(pixel.dfg.xxx, pixel.dfg.yyy, pixel.f0);
 #endif
 }
 
@@ -641,10 +654,10 @@ void evaluateIBL(const MaterialInputs material, const PixelParams pixel, inout v
     // skip sampling the IBL down below.
 
 #if IBL_INTEGRATION == IBL_INTEGRATION_PREFILTERED_CUBEMAP
-    vec3 E = specularDFG(pixel);
-    if (material.useCustomFresnel) {
-        E = fresnel(pixel.f0, material.F90, material.iorND, material.iorK, shading_NoV);
-    }
+    vec3 E = specularDFG(pixel, material);
+    // if (material.useCustomFresnel) {
+    //     E = fresnel(pixel.f0, material.F90, material.iorND, material.iorK, shading_NoV);
+    // }
 
     if (ssrFr.a < 1.0) { // prevent reading the IBL if possible
         // we have to modify the IBL specular evaluation direction for anisotropic materials
