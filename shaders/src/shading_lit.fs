@@ -64,9 +64,17 @@ void getCommonPixelParams(const MaterialInputs material, inout PixelParams pixel
     // This is from KHR_materials_pbrSpecularGlossiness.
     vec3 specularColor = material.specularColor;
     float metallic = computeMetallicFromSpecularColor(specularColor);
-
     pixel.diffuseColor = computeDiffuseColor(baseColor, metallic);
+    // float nd = material.iorND;
+    // float k = material.iorK;
+    // bool  useCustomIOR = (abs(k) > 1e-5 || abs(nd - 1.5) > 1e-3);
+    // float F0phys = useCustomIOR ? F0scalar(nd,k) : 1.0;
+    // float F0mix = F0phys; //mix(1.0, F0phys, iorFade(material.roughness));
+
+    //pixel.f0 = specularColor * F0mix;
+
     pixel.f0 = specularColor;
+
 #elif !defined(SHADING_MODEL_CLOTH)
     pixel.diffuseColor = computeDiffuseColor(baseColor, material.metallic);
 #if !defined(SHADING_MODEL_SUBSURFACE) && (!defined(MATERIAL_HAS_REFLECTANCE) && defined(MATERIAL_HAS_IOR))
@@ -75,8 +83,12 @@ void getCommonPixelParams(const MaterialInputs material, inout PixelParams pixel
     // Assumes an interface from air to an IOR of 1.5 for dielectrics
     float reflectance = computeDielectricF0(material.reflectance);
 #endif
-    //pixel.f0 = computeF0(baseColor, material.metallic, reflectance);
-    pixel.f0 = computeF0(baseColor, material.metallic, reflectance, material.iorND, material.iorK);
+    if (material.useCustomFresnel) {
+        pixel.f0 = computeF0(baseColor, material.metallic, reflectance, material.iorND, material.iorK, 
+            material.roughness); //probably need to change roughness
+    } else {
+        pixel.f0 = computeF0(baseColor, material.metallic, reflectance);
+    }
 
 #else
     pixel.diffuseColor = baseColor.rgb;

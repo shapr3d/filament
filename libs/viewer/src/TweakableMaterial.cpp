@@ -316,6 +316,13 @@ void TweakableMaterial::drawUI(const std::string& header) {
         if (mClearCoatRoughness.isFile) enqueueTextureRequest(mClearCoatRoughness);
     }
 
+    if (ImGui::CollapsingHeader("Fresnel parameters")) {
+        mF90.addWidget("F90", -10.0f, 10.0f);
+        mF82.addWidget("F82", 0.0f, 1.0f);
+        mIorND.addWidget("ior ND", 1.0f, 100.0f);
+        mIorK.addWidget("ior K", 0.0f, 10.0f);
+    }
+
     switch (mShaderType) {
     case MaterialType::Opaque: {
         if (ImGui::CollapsingHeader("Sheen settings")) {
@@ -348,10 +355,6 @@ void TweakableMaterial::drawUI(const std::string& header) {
 
             mIorScale.addWidget("ior scale", 0.0f, 4.0f);
             mIor.addWidget("ior", 1.0f, 2.0f);
-            mF90.addWidget("F90", 0.0f, 1.0f);
-            mF82.addWidget("F82", 0.0f, 1.0f);
-            mIorND.addWidget("ior ND", 1.5f, 100.0f);
-            mIorK.addWidget("ior K", 0.0f, 10.0f);   
             mAbsorption.addWidget("absorption");
             mTransmission.addWidget("transmission");
             mMaxThickness.addWidget("thickness scale", 1.0f, 32.0f);

@@ -77,7 +77,16 @@ vec3 anisotropicLobe(const MaterialInputs material, const PixelParams pixel, con
         D = distributionAnisotropicWard(at, ab, ToH, BoH, NoH, NoL, NoV); // Ward
     }
     float V = visibilityAnisotropic(pixel.roughness, at, ab, ToV, BoV, ToL, BoL, NoV, NoL);
-    vec3 F = material.specularIntensity * fresnel(pixel.f0, LoH);
+    vec3 F;
+
+    if (material.useCustomFresnel) {
+        // Use the custom Fresnel term
+        F = fresnel(pixel.f0, LoH) * material.specularIntensity;
+    }
+    else {
+        F = fresnel(pixel.f0, LoH, material.F90) * material.specularIntensity;
+    }
+
     // vec3 F = vec3(material.specularIntensity);
     // if (material.useCustomFresnel) {
     //     F *= fresnel(pixel.f0, material.F90, material.iorND, material.iorK, LoH);
