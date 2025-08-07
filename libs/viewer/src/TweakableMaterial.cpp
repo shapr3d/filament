@@ -259,6 +259,20 @@ void TweakableMaterial::drawUI(const std::string& header) {
             ImGui::TextColored({ 0,1,0,1 }, "OK");
         }
     }
+
+
+    if (ImGui::CollapsingHeader("Custom fresnel parameters")) {
+        mF90.addWidget("F90", 0.0f, 1.0f);
+        mF82.addWidget("F82 (dummy for now)", 0.0f, 1.0f);
+        mIorND.addWidget("ior ND", 1.0f, 100.0f);
+        mIorK.addWidget("ior K", 0.0f, 10.0f);
+        if (mShaderType != MaterialType::Cloth) {
+            mMetallic.addWidget("metallic");
+            if (mMetallic.isFile) enqueueTextureRequest(mMetallic);
+        }
+        ImGui::Checkbox("Use custom Fresnel", &mUseCustomFresnel);
+    }
+
     if (ImGui::CollapsingHeader("Base color")) {
         ImGui::SliderFloat("Tile: albedo texture", &mBaseTextureScale, 1.0f / 1024.0f, 32.0f);
         ImGui::Separator();
@@ -314,13 +328,6 @@ void TweakableMaterial::drawUI(const std::string& header) {
 
         mClearCoatRoughness.addWidget("clearCoat roughness");
         if (mClearCoatRoughness.isFile) enqueueTextureRequest(mClearCoatRoughness);
-    }
-
-    if (ImGui::CollapsingHeader("Fresnel parameters")) {
-        mF90.addWidget("F90", -10.0f, 10.0f);
-        mF82.addWidget("F82", 0.0f, 1.0f);
-        mIorND.addWidget("ior ND", 1.0f, 100.0f);
-        mIorK.addWidget("ior K", 0.0f, 10.0f);
     }
 
     switch (mShaderType) {
@@ -400,7 +407,6 @@ void TweakableMaterial::drawUI(const std::string& header) {
 
     if (ImGui::CollapsingHeader("Shader setup")) {
         ImGui::Checkbox("Use Ward specular normal distribution", &mUseWard);
-        ImGui::Checkbox("Use custom Fresnel", &mUseCustomFresnel);
     }
 }
 

@@ -170,7 +170,15 @@ vec3 specularDFG(const PixelParams pixel, const MaterialInputs material) {
     return pixel.f0 * pixel.dfg.z;
 #else
 
-    return mix(pixel.dfg.xxx, pixel.dfg.yyy, pixel.f0);
+    // if (material.useCustomFresnel) {
+    //     // Use the custom Fresnel term
+    //     return pixel.f0 * pixel.dfg.xxx + max(material.F90 - pixel.f0, 0.0) * pixel.dfg.yyy;
+    // }
+    //return mix(pixel.dfg.xxx, pixel.dfg.yyy, pixel.f0);
+    return max(material.F90 - pixel.f0, 0.0) * pixel.dfg.xxx + pixel.f0 * pixel.dfg.yyy;
+
+    //return pixel.f0 * pixel.dfg.xxx + max(material.F90 - pixel.f0, 0.0) * pixel.dfg.yyy;
+
     // float Fc = pow(1 - VoH, 5.0f);
     // r.x += Gv * Fc;
     // r.y += Gv;
