@@ -170,6 +170,7 @@ vec3 specularDFG(const PixelParams pixel, const MaterialInputs material) {
     return pixel.f0 * pixel.dfg.z;
 #else
 
+    return mix(pixel.dfg.xxx, pixel.dfg.yyy, pixel.f0);
     // float Fc = pow(1 - VoH, 5.0f);
     // r.x += Gv * Fc;
     // r.y += Gv;
@@ -177,11 +178,17 @@ vec3 specularDFG(const PixelParams pixel, const MaterialInputs material) {
     // (1 - f0) * dfg.x + f0 * dfg.y
     // F90 - F0
     //add so that for default nd it was okay
-    float coef = exp(-material.iorND) / exp(-1.5);
+    //float coef = exp(-material.iorND) / exp(-1.5);
     //coef = 1.0;
-    vec3 newf0 = pixel.f0*coef + (1.0 - coef) * material.F90;
+    //vec3 newf0 = pixel.f0*coef + (1.0 - coef) * material.F90;
 
-    return newf0 * pixel.dfg.xxx + max(material.F90 - newf0, 0.0) * pixel.dfg.yyy;
+    //return newf0 * pixel.dfg.xxx + max(material.F90 - newf0, 0.0) * pixel.dfg.yyy;
+
+    //return pixel.f0;
+    // float nd = material.iorND;
+    // float f0Coef = (nd - 1.0) * (nd - 1.0) / ((nd + 1.0) * (nd + 1.0));
+    // vec3 newf0 = pixel.f0 * f0Coef;
+    // return newf0 * pixel.dfg.xxx + max(material.F90 - newf0, 0.0) * pixel.dfg.yyy;
     //return mix(pixel.dfg.xxx, pixel.dfg.yyy, pixel.f0);
 #endif
 }
@@ -319,14 +326,14 @@ vec3 isEvaluateSpecularIBL(const MaterialInputs material, const PixelParams pixe
 
             float D = distribution(roughness, NoH, h);
             float V = visibility(roughness, NoV, NoL);
-            vec3 F = material.specularIntensity;
-            if (material.useCustomFresnel) {
-                F *= fresnel(pixel.f0, material.F90, material.iorND, material.iorK, LoH);
-            }  
-            else {
-                F *= fresnel(pixel.f0, LoH);
-            } 
-            //vec3 F = material.specularIntensity * fresnel(pixel.f0, LoH);
+            // vec3 F = material.specularIntensity;
+            // if (material.useCustomFresnel) {
+            //     F *= fresnel(pixel.f0, material.F90, material.iorND, material.iorK, LoH);
+            // }  
+            // else {
+            //     F *= fresnel(pixel.f0, LoH);
+            // } 
+            vec3 F = material.specularIntensity * fresnel(pixel.f0, LoH);
 
             indirectSpecular += (Fr * L);
         }

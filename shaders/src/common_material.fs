@@ -22,6 +22,36 @@ vec3 computeF0(const vec4 baseColor, float metallic, float reflectance) {
     return baseColor.rgb * metallic + (reflectance * (1.0 - metallic));
 }
 
+float  F0scalar(float n, float k) {
+    float n1 = n - 1.0, n2 = n + 1.0;
+    float num = n1 * n1 + k * k;
+    float den = n2 * n2 + k * k;
+    return num / den;                                   // 0‒1, never negative
+}
+
+vec3 computeF0(const vec4  baseColor,    // RGB = albedo for metals
+               float       metallic,     // 0 → dielectric, 1 → metal
+               float       reflectance,  // Filament’s scalar slider (0‒1)
+               float       nd,           // real part of IOR  (per‑material)
+               float       k,            // imaginary part (0 for plastics)
+               float       perceptualRoughness)            
+{
+    // --- dielectric branch -----------------------------------------------
+    // Filament maps   Rslider ∈[0,1] ⇒ F0 = 0.16 * Rslider²  (Burley 2012)
+    float F0_dielectric = 0.16 * reflectance * reflectance;
+    float F0_lambert = 1.0; 
+    // --- conductor branch -------------------------------------------------
+    float F0_conductor  = F0scalar(nd, k);     // physical formula above
+
+    float iorFade = 1.0 - smoothstep(0.95, 1.0, perceptualRoughness);
+    float F0_mix = mix(F0_lambert, F0_conductor, iorFade);
+    vec3 F0_metal = baseColor.rgb * F0_mix;
+
+    // --- final blend ------------------------------------------------------
+    // metallic==0 ⇒ pure dielectric; metallic==1 ⇒ pure conductor
+    return mix(vec3(F0_dielectric), F0_metal, metallic);
+}
+
 float computeDielectricF0(float reflectance) {
     return 0.16 * reflectance * reflectance;
 }

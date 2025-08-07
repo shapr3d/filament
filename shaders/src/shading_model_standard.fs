@@ -77,14 +77,14 @@ vec3 anisotropicLobe(const MaterialInputs material, const PixelParams pixel, con
         D = distributionAnisotropicWard(at, ab, ToH, BoH, NoH, NoL, NoV); // Ward
     }
     float V = visibilityAnisotropic(pixel.roughness, at, ab, ToV, BoV, ToL, BoL, NoV, NoL);
-    //vec3 F = material.specularIntensity * fresnel(pixel.f0, LoH);
-    vec3 F = vec3(material.specularIntensity);
-    if (material.useCustomFresnel) {
-        F *= fresnel(pixel.f0, material.F90, material.iorND, material.iorK, LoH);
-    }  
-    else {
-        F *= fresnel(pixel.f0, LoH);
-    } 
+    vec3 F = material.specularIntensity * fresnel(pixel.f0, LoH);
+    // vec3 F = vec3(material.specularIntensity);
+    // if (material.useCustomFresnel) {
+    //     F *= fresnel(pixel.f0, material.F90, material.iorND, material.iorK, LoH);
+    // }  
+    // else {
+    //     F *= fresnel(pixel.f0, LoH);
+    // } 
     return (D * V) * F;
 }
 #endif
@@ -94,15 +94,15 @@ vec3 isotropicLobe(const MaterialInputs material, const PixelParams pixel, const
 
     float D = distribution(pixel.roughness, NoH, h);
     float V = visibility(pixel.roughness, NoV, NoL);
-    //vec3 F = material.specularIntensity * fresnel(pixel.f0, LoH);
+    vec3 F = material.specularIntensity * fresnel(pixel.f0, LoH);
 
-    vec3 F = vec3(material.specularIntensity);
-    if (material.useCustomFresnel) {
-        F *= fresnel(pixel.f0, material.F90, material.iorND, material.iorK, LoH);
-    }  
-    else {
-        F *= fresnel(pixel.f0, LoH);
-    } 
+    // vec3 F = vec3(material.specularIntensity);
+    // if (material.useCustomFresnel) {
+    //     F *= fresnel(pixel.f0, material.F90, material.iorND, material.iorK, LoH);
+    // }  
+    // else {
+    //     F *= fresnel(pixel.f0, LoH);
+    // } 
     return (D * V) * F;
 }
 

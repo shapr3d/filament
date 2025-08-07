@@ -75,7 +75,9 @@ void getCommonPixelParams(const MaterialInputs material, inout PixelParams pixel
     // Assumes an interface from air to an IOR of 1.5 for dielectrics
     float reflectance = computeDielectricF0(material.reflectance);
 #endif
-    pixel.f0 = computeF0(baseColor, material.metallic, reflectance);
+    //pixel.f0 = computeF0(baseColor, material.metallic, reflectance);
+    pixel.f0 = computeF0(baseColor, material.metallic, reflectance, material.iorND, material.iorK);
+
 #else
     pixel.diffuseColor = baseColor.rgb;
     pixel.f0 = material.sheenColor;
