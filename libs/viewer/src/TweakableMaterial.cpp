@@ -15,7 +15,7 @@ TweakableMaterial::TweakableMaterial() {
     mF90.value = 1.0f; 
     mF82.value = 0.52f; 
     mIorND.value = 1.5f;
-    mIorK.value = 0.0f; 
+    mIorK.value = 1.0f; 
 }
 
 json TweakableMaterial::toJson() {

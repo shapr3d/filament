@@ -217,9 +217,9 @@ void getSubsurfacePixelParams(const MaterialInputs material, inout PixelParams p
 #endif
 }
 
-void getEnergyCompensationPixelParams(inout PixelParams pixel) {
+void getEnergyCompensationPixelParams(inout PixelParams pixel, float iorK) {
     // Pre-filtered DFG term used for image-based lighting
-    pixel.dfg = prefilteredDFG(pixel.perceptualRoughness, shading_NoV);
+    pixel.dfg = prefilteredDFG(pixel.perceptualRoughness, pow(shading_NoV, iorK));
 
 #if !defined(SHADING_MODEL_CLOTH)
     // Energy compensation for multiple scattering in a microfacet model
@@ -252,7 +252,7 @@ void getPixelParams(const MaterialInputs material, out PixelParams pixel) {
     getRoughnessPixelParams(material, pixel);
     getSubsurfacePixelParams(material, pixel);
     getAnisotropyPixelParams(material, pixel);
-    getEnergyCompensationPixelParams(pixel);
+    getEnergyCompensationPixelParams(pixel, material.iorK);
 }
 
 /**

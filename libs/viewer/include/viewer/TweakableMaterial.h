@@ -132,7 +132,7 @@ public:
     TweakableProperty<float> mF90{ 1.0f };
     TweakableProperty<float> mF82{ 0.52f };
     TweakableProperty<float> mIorND{ 1.5f };
-    TweakableProperty<float> mIorK{ 0.0f };
+    TweakableProperty<float> mIorK{ 1.0f }; //changed meaning og the parameter
     bool mUseWard{};
     bool mUseCustomFresnel{};
     bool mDoRelease{}; // this notifies the material integrator tool that this material needs to be checked into the codebase

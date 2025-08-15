@@ -117,7 +117,7 @@ void initMaterial(out MaterialInputs material) {
     material.F90 = 1.0;
     material.F82 = 0.52;
     material.iorND = 1.5;
-    material.iorK = 0.0;
+    material.iorK = 1.0;
 
 #if !defined(SHADING_MODEL_CLOTH) && !defined(SHADING_MODEL_SUBSURFACE) && !defined(SHADING_MODEL_UNLIT)
 #if defined(MATERIAL_HAS_SHEEN_COLOR)

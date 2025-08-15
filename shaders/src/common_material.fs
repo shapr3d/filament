@@ -22,9 +22,9 @@ vec3 computeF0(const vec4 baseColor, float metallic, float reflectance) {
     return baseColor.rgb * metallic + (reflectance * (1.0 - metallic));
 }
 
-float F0scalar(float n, float k) {
+float F0scalar(float n) {
     float n1 = n - 1.0, n2 = n + 1.0;
-    return (n1*n1 + k*k) / (n2*n2 + k*k); 
+    return (n1*n1) / (n2*n2); 
 }
 
 // ---------- Fade factor: 1 at glossy … 0 at very rough ----------
@@ -32,6 +32,7 @@ float iorFade(float perceptualRoughness) {
     return 1.0 - smoothstep(0.95, 1.0, perceptualRoughness);
 }
 
+//removed k for now
 vec3 computeF0(const vec4  baseColor,
                float       metallic,
                float       reflectance,      // 0‑1 slider for plastics
@@ -44,7 +45,7 @@ vec3 computeF0(const vec4  baseColor,
     F0_dielectric = reflectance;
     // -- Metal branch with IOR + fade -------------------------------------
     //loat  F0_phys   = F0scalar(nd, k) / F0scalar(1.5, 0.0);          // R₀ from (n,k)
-    float  F0_phys   = F0scalar(nd, k);
+    float  F0_phys   = F0scalar(nd);
     float  F0_mix    = mix(1.0, F0_phys, iorFade(perceptualRoughness));
     vec3   F0_metal  = baseColor.rgb * F0_mix;   // tint * Fresnel
 
