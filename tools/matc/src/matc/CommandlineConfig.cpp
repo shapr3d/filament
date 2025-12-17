@@ -57,7 +57,7 @@ static void usage(char* name) {
             "   --optimize-size, -S\n"
             "       Optimize generated shader code for size instead of just performance\n\n"
             "   --api, -a\n"
-            "       Specify the target API: opengl (default), vulkan, metal, or all\n"
+            "       Specify the target API: opengl (default), vulkan, metal, direct3d, or all\n"
             "       This flag can be repeated to individually select APIs for inclusion:\n"
             "           MATC --api opengl --api metal ...\n\n"
             "   --feature-level, -l\n"
@@ -253,10 +253,12 @@ bool CommandlineConfig::parse() {
                     mTargetApi |= TargetApi::VULKAN;
                 } else if (arg == "metal") {
                     mTargetApi |= TargetApi::METAL;
+                } else if (arg == "direct3d") {
+                    mTargetApi |= TargetApi::DIRECT3D;
                 } else if (arg == "all") {
                     mTargetApi |= TargetApi::ALL;
                 } else {
-                    std::cerr << "Unrecognized target API. Must be 'opengl'|'vulkan'|'metal'|'all'."
+                    std::cerr << "Unrecognized target API. Must be 'opengl'|'vulkan'|'metal'|'direct3d'|'all'."
                             << std::endl;
                     return false;
                 }
