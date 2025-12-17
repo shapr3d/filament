@@ -80,7 +80,8 @@ public:
         OPENGL      = 0x01u,
         VULKAN      = 0x02u,
         METAL       = 0x04u,
-        ALL         = OPENGL | VULKAN | METAL
+        DIRECT3D    = 0x08u,
+        ALL         = OPENGL | VULKAN | METAL | DIRECT3D
     };
 
     /*
