@@ -166,6 +166,14 @@ void MaterialBuilderBase::prepare(bool vulkanSemantics,
                 effectiveFeatureLevel,
             });
         }
+        if (any(mTargetApi & TargetApi::DIRECT3D)) {
+            mCodeGenPermutations.push_back({
+                shaderModel,
+                TargetApi::DIRECT3D,
+                TargetLanguage::SPIRV,
+                effectiveFeatureLevel,
+            });
+        }
     }
 }
 
@@ -758,6 +766,9 @@ static void showErrorMessage(const char* materialName, filament::Variant variant
         case TargetApi::METAL:
             targetApiString = "Metal.\n";
             break;
+        case TargetApi::DIRECT3D:
+            targetApiString = "Direct3D.\n";
+            break;
         case TargetApi::ALL:
             assert(0); // Unreachable.
             break;
@@ -801,6 +812,7 @@ bool MaterialBuilder::generateShaders(JobSystem& jobSystem, const std::vector<Va
     std::vector<TextEntry> essl1Entries;
     std::vector<SpirvEntry> spirvEntries;
     std::vector<TextEntry> metalEntries;
+    std::vector<TextEntry> hlslEntries;
     LineDictionary textDictionary;
     BlobDictionary spirvDictionary;
     // End: must be protected by lock
@@ -829,9 +841,10 @@ bool MaterialBuilder::generateShaders(JobSystem& jobSystem, const std::vector<Va
 
         // Metal Shading Language is cross-compiled from Vulkan.
         const bool targetApiNeedsSpirv =
-                (targetApi == TargetApi::VULKAN || targetApi == TargetApi::METAL);
+            (targetApi == TargetApi::VULKAN || targetApi == TargetApi::METAL || targetApi == TargetApi::DIRECT3D);
         const bool targetApiNeedsMsl = targetApi == TargetApi::METAL;
         const bool targetApiNeedsGlsl = targetApi == TargetApi::OPENGL;
+        const bool targetApiNeedsHlsl = targetApi == TargetApi::DIRECT3D;
 
         // Set when a job fails
         JobSystem::Job* parent = jobSystem.createJob();
@@ -845,21 +858,26 @@ bool MaterialBuilder::generateShaders(JobSystem& jobSystem, const std::vector<Va
                 // TODO: avoid allocations when not required
                 std::vector<uint32_t> spirv;
                 std::string msl;
+                std::string hlsl;
 
                 std::vector<uint32_t>* pSpirv = targetApiNeedsSpirv ? &spirv : nullptr;
                 std::string* pMsl = targetApiNeedsMsl ? &msl : nullptr;
+                std::string* pHlsl = targetApiNeedsHlsl ? &hlsl : nullptr;
 
                 TextEntry glslEntry{};
                 SpirvEntry spirvEntry{};
                 TextEntry metalEntry{};
+                TextEntry hlslEntry{};
 
                 glslEntry.shaderModel  = params.shaderModel;
                 spirvEntry.shaderModel = params.shaderModel;
                 metalEntry.shaderModel = params.shaderModel;
+                hlslEntry.shaderModel = params.shaderModel;
 
                 glslEntry.variant  = v.variant;
                 spirvEntry.variant = v.variant;
                 metalEntry.variant = v.variant;
+                hlslEntry.variant = v.variant;
 
                 // Generate raw shader code.
                 // The quotes in Google-style line directives cause problems with certain drivers. These
@@ -902,7 +920,7 @@ bool MaterialBuilder::generateShaders(JobSystem& jobSystem, const std::vector<Va
                     config.glsl.subpassInputToColorLocation.emplace_back(0, 0);
                 }
 
-                bool const ok = postProcessor.process(shader, config, pGlsl, pSpirv, pMsl);
+                bool const ok = postProcessor.process(shader, config, pGlsl, pSpirv, pMsl, pHlsl);
                 if (!ok) {
                     showErrorMessage(mMaterialName.c_str_safe(), v.variant, targetApi, v.stage,
                                      featureLevel, shader);
@@ -954,6 +972,13 @@ bool MaterialBuilder::generateShaders(JobSystem& jobSystem, const std::vector<Va
                         metalEntry.shader = msl;
                         metalEntries.push_back(metalEntry);
                         break;
+                    case TargetApi::DIRECT3D:
+                        assert(!spirv.empty());
+                        assert(hlsl.length() > 0);
+                        hlslEntry.stage = v.stage;
+                        hlslEntry.shader = hlsl;
+                        hlslEntries.push_back(hlslEntry);
+                        break;
                 }
             });
 
@@ -987,6 +1012,7 @@ bool MaterialBuilder::generateShaders(JobSystem& jobSystem, const std::vector<Va
     std::sort(essl1Entries.begin(), essl1Entries.end(), compare);
     std::sort(spirvEntries.begin(), spirvEntries.end(), compare);
     std::sort(metalEntries.begin(), metalEntries.end(), compare);
+    std::sort(hlslEntries.begin(), hlslEntries.end(), compare);
 
     // Generate the dictionaries.
     for (const auto& s : glslEntries) {
@@ -1000,6 +1026,9 @@ bool MaterialBuilder::generateShaders(JobSystem& jobSystem, const std::vector<Va
         s.dictionaryIndex = spirvDictionary.addBlob(spirv);
     }
     for (const auto& s : metalEntries) {
+        textDictionary.addText(s.shader);
+    }
+    for (const auto& s : hlslEntries) {
         textDictionary.addText(s.shader);
     }
 
@@ -1030,6 +1059,12 @@ bool MaterialBuilder::generateShaders(JobSystem& jobSystem, const std::vector<Va
     if (!metalEntries.empty()) {
         container.push<MaterialTextChunk>(std::move(metalEntries),
                 dictionaryChunk.getDictionary(), ChunkType::MaterialMetal);
+    }
+
+    // Emit HLSL chunk (MaterialTextChunk).
+    if (!hlslEntries.empty()) {
+        container.push<MaterialTextChunk>(std::move(hlslEntries),
+                dictionaryChunk.getDictionary(), ChunkType::MaterialHLSL);
     }
 
     return true;
