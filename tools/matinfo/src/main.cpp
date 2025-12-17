@@ -50,10 +50,12 @@ struct Config {
     bool printESSL1 = false;
     bool printSPIRV = false;
     bool printMetal = false;
+    bool printHLSL = false;
     bool printDictionaryGLSL = false;
     bool printDictionaryESSL1 = false;
     bool printDictionarySPIRV = false;
     bool printDictionaryMetal = false;
+    bool printDictionaryHLSL = false;
     bool transpile = false;
     bool binary = false;
     bool analyze = false;
@@ -84,6 +86,8 @@ static void printUsage(const char* name) {
             "       Validate and print disasm for the nth shader (0 is the first Vulkan shader)\n\n"
             "   --print-metal=[index], -m\n"
             "       Print Metal Shading Language for the nth shader (0 is the first Metal shader)\n\n"
+            "   --print-hlsl=[index], -m\n"
+            "       Print High-Level Shading Language for the nth shader (0 is the first HLSL shader)\n\n"
             "   --print-vkglsl=[index], -v\n"
             "       Print the nth Vulkan shader transpiled into GLSL\n\n"
             "   --print-dic-glsl\n"
@@ -92,6 +96,8 @@ static void printUsage(const char* name) {
             "       Print the ESSL1 dictionary\n\n"
             "   --print-dic-metal\n"
             "       Print the Metal dictionary\n\n"
+            "   --print-dic-hlsl\n"
+            "       Print the HLSL dictionary\n\n"
             "   --print-dic-vk\n"
             "       Print the Vulkan dictionary\n\n"
             "   --web-server=[port], -w\n"
@@ -133,9 +139,11 @@ static int handleArguments(int argc, char* argv[], Config* config) {
             { "print-spirv",     required_argument, nullptr, 's' },
             { "print-vkglsl",    required_argument, nullptr, 'v' },
             { "print-metal",     required_argument, nullptr, 'm' },
+            { "print-hlsl",      required_argument, nullptr, 'H' },
             { "print-dic-glsl",  no_argument,       nullptr, 'x' },
             { "print-dic-essl1", no_argument,       nullptr, 'X' },
             { "print-dic-metal", no_argument,       nullptr, 'y' },
+            { "print-dic-hlsl",  no_argument,       nullptr, 'q' },
             { "print-dic-vk",    no_argument,       nullptr, 'z' },
             { "dump-binary",     required_argument, nullptr, 'b' },
             { "web-server",      required_argument, nullptr, 'w' },
@@ -186,6 +194,10 @@ static int handleArguments(int argc, char* argv[], Config* config) {
                 config->printMetal = true;
                 config->shaderIndex = static_cast<uint64_t>(std::stoi(arg));
                 break;
+            case 'H':
+                config->printHLSL = true;
+                config->shaderIndex = static_cast<uint64_t>(std::stoi(arg));
+                break;
             case 'w':
                 config->serverPort = std::stoi(arg);
                 break;
@@ -197,6 +209,9 @@ static int handleArguments(int argc, char* argv[], Config* config) {
                 break;
             case 'y':
                 config->printDictionaryMetal = true;
+                break;
+            case 'q':
+                config->printDictionaryHLSL = true;
                 break;
             case 'z':
                 config->printDictionarySPIRV = true;
@@ -424,7 +439,7 @@ static bool parseChunks(Config config, void* data, size_t size) {
         return true;
     }
 
-    if (config.printGLSL || config.printESSL1 || config.printSPIRV || config.printMetal) {
+    if (config.printGLSL || config.printESSL1 || config.printSPIRV || config.printMetal || config.printHLSL) {
         filaflat::ShaderContent content;
         std::vector<ShaderInfo> info;
 
@@ -539,16 +554,42 @@ static bool parseChunks(Config config, void* data, size_t size) {
 
             return true;
         }
+
+        if (config.printHLSL) {
+            ShaderExtractor parser(filament::backend::ShaderLanguage::HLSL, data, size);
+            if (!parser.parse()) {
+                return false;
+            }
+
+            info.resize(getShaderCount(container, filamat::ChunkType::MaterialHLSL));
+            if (!getShaderInfo(container, info.data(), filamat::ChunkType::MaterialHLSL)) {
+                std::cerr << "Failed to parse HLSL chunk." << std::endl;
+                return false;
+            }
+
+            if (config.shaderIndex >= info.size()) {
+                std::cerr << "Shader index out of range." << std::endl;
+                return false;
+            }
+
+            const auto& item = info[config.shaderIndex];
+            parser.getShader(item.shaderModel, item.variant, item.pipelineStage, content);
+            std::cout << (const char*) content.data();
+
+            return true;
+        }
     }
 
     TextWriter writer;
 
-    if (config.printDictionaryGLSL || config.printDictionaryESSL1 || config.printDictionarySPIRV || config.printDictionaryMetal) {
+    if (config.printDictionaryGLSL || config.printDictionaryESSL1 || config.printDictionarySPIRV || config.printDictionaryMetal
+        || config.printDictionaryHLSL) {
         ShaderExtractor parser(
             (config.printDictionaryGLSL ? filament::backend::ShaderLanguage::ESSL3 :
              (config.printDictionaryESSL1 ? filament::backend::ShaderLanguage::ESSL1 :
               (config.printDictionarySPIRV ? filament::backend::ShaderLanguage::SPIRV :
-               filament::backend::ShaderLanguage::MSL))), data, size);
+               (config.printDictionaryMetal ? filament::backend::ShaderLanguage::MSL :
+                filament::backend::ShaderLanguage::HLSL)))), data, size);
 
         if (!parser.parse()) {
             return false;

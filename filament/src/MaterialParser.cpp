@@ -61,6 +61,10 @@ MaterialParser::MaterialParserDetails::MaterialParserDetails(ShaderLanguage lang
             mMaterialTag = ChunkType::MaterialMetal;
             mDictionaryTag = ChunkType::DictionaryText;
             break;
+        case ShaderLanguage::HLSL:
+            mMaterialTag = ChunkType::MaterialHLSL;
+            mDictionaryTag = ChunkType::DictionaryText;
+            break;
         case ShaderLanguage::SPIRV:
             mMaterialTag = ChunkType::MaterialSpirv;
             mDictionaryTag = ChunkType::DictionarySpirv;

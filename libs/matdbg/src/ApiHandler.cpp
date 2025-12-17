@@ -100,6 +100,7 @@ bool ApiHandler::handleGetApiShader(struct mg_connection* conn,
 
     std::string_view const glsl("glsl");
     std::string_view const msl("msl");
+    std::string_view const hlsl("hlsl");
     std::string_view const spirv("spirv");
     size_t const qlength = strlen(request->query_string);
 
@@ -113,11 +114,13 @@ bool ApiHandler::handleGetApiShader(struct mg_connection* conn,
     char glindex[4] = {};
     char vkindex[4] = {};
     char metalindex[4] = {};
+    char hlslindex[4] = {};
     mg_get_var(request->query_string, qlength, "glindex", glindex, sizeof(glindex));
     mg_get_var(request->query_string, qlength, "vkindex", vkindex, sizeof(vkindex));
     mg_get_var(request->query_string, qlength, "metalindex", metalindex, sizeof(metalindex));
+    mg_get_var(request->query_string, qlength, "hlslindex", hlslindex, sizeof(hlslindex));
 
-    if (!glindex[0] && !vkindex[0] && !metalindex[0]) {
+    if (!glindex[0] && !vkindex[0] && !metalindex[0] && !hlslindex[0]) {
         return error(__LINE__, uri);
     }
 
@@ -210,6 +213,35 @@ bool ApiHandler::handleGetApiShader(struct mg_connection* conn,
         }
 
         return softError("Only MSL is supported.");
+    }
+
+    if (hlslindex[0]) {
+        ShaderExtractor extractor(ShaderLanguage::HLSL, result->package, result->packageSize);
+        if (!extractor.parse()) {
+            return error(__LINE__, uri);
+        }
+
+        FixedCapacityVector<ShaderInfo> info(getShaderCount(package, ChunkType::MaterialHLSL));
+        if (!getShaderInfo(package, info.data(), ChunkType::MaterialHLSL)) {
+            return error(__LINE__, uri);
+        }
+
+        int const shaderIndex = std::stoi(hlslindex);
+        if (shaderIndex >= info.size()) {
+            return error(__LINE__, uri);
+        }
+
+        auto const& item = info[shaderIndex];
+        filaflat::ShaderContent content;
+        extractor.getShader(item.shaderModel, item.variant, item.pipelineStage, content);
+
+        if (language == hlsl) {
+            mg_printf(conn, kSuccessHeader.data(), "application/txt");
+            mg_write(conn, content.data(), content.size() - 1);
+            return true;
+        }
+
+        return softError("Only HLSL is supported.");
     }
     return error(__LINE__, uri);
 }

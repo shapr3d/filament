@@ -153,6 +153,7 @@ enum class ShaderLanguage {
     ESSL3 = 1,
     SPIRV = 2,
     MSL = 3,
+    HLSL = 4,
 };
 
 static constexpr const char* shaderLanguageToString(ShaderLanguage shaderLanguage) {
@@ -165,6 +166,8 @@ static constexpr const char* shaderLanguageToString(ShaderLanguage shaderLanguag
             return "SPIR-V";
         case ShaderLanguage::MSL:
             return "MSL";
+        case ShaderLanguage::HLSL:
+            return "HLSL";
     }
 }
 
