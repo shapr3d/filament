@@ -63,6 +63,10 @@ filament::backend::Platform* createDefaultMetalPlatform();
 }
 #endif
 
+#if defined(FILAMENT_SUPPORTS_GFX)
+    #include "backend/platforms/GfxPlatform.h"
+#endif
+
 #include "noop/PlatformNoop.h"
 
 namespace filament::backend {
@@ -115,8 +119,11 @@ Platform* PlatformFactory::create(Backend* backend, void* nativeDisplay) noexcep
 #endif
     }
     if (*backend == Backend::GFX) {
-        // TODO: Implement Gfx platform creation
+#if defined(FILAMENT_SUPPORTS_GFX)
+        return new GfxPlatform();
+#else
         return nullptr;
+#endif
     }
     assert_invariant(*backend == Backend::OPENGL);
     #if defined(FILAMENT_SUPPORTS_OPENGL)

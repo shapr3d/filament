@@ -226,6 +226,10 @@ endif()
 
 if (FILAMENT_SUPPORTS_GFX)
     # TODO: add sources
+    list(APPEND SRCS
+            include/backend/platforms/GfxPlatform.h
+            src/gfx/platform/GfxPlatform.cpp
+    )
 endif()
 
 # ==================================================================================================
