@@ -126,7 +126,8 @@ enum class Backend : uint8_t {
     OPENGL = 1,   //!< Selects the OpenGL/ES driver (default on Android)
     VULKAN = 2,   //!< Selects the Vulkan driver if the platform supports it (default on Linux/Windows)
     METAL = 3,    //!< Selects the Metal driver if the platform supports it (default on MacOS/iOS).
-    NOOP = 4,     //!< Selects the no-op driver for testing purposes.
+    GFX = 4,      //!< Selects the Gfx driver if the platform supports it.
+    NOOP = 5,     //!< Selects the no-op driver for testing purposes.
 };
 
 static constexpr const char* backendToString(Backend backend) {
@@ -139,6 +140,8 @@ static constexpr const char* backendToString(Backend backend) {
             return "Vulkan";
         case Backend::METAL:
             return "Metal";
+        case Backend::GFX:
+            return "Gfx";
         default:
             return "Unknown";
     }
