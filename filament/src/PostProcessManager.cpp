@@ -2598,6 +2598,7 @@ void PostProcessManager::prepareTaa(FrameGraph& fg,
     switch (mEngine.getBackend()) {
         case Backend::VULKAN:
         case Backend::METAL:
+        case Backend::GFX:
             jitter.y = -jitter.y;
             UTILS_FALLTHROUGH;
         case Backend::OPENGL:

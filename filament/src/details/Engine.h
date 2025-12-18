@@ -241,6 +241,14 @@ public:
                 return backend::ShaderLanguage::SPIRV;
             case Backend::METAL:
                 return backend::ShaderLanguage::MSL;
+            case Backend::GFX:
+#if defined(__APPLE__)
+                return backend::ShaderLanguage::MSL;
+#elif defined(WIN32)
+                return backend::ShaderLanguage::HLSL;
+#else
+                return backend::ShaderLanguage::ESSL3;
+#endif
         }
     }
 

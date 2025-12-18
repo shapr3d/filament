@@ -255,6 +255,11 @@ bool JsonWriter::writeActiveInfo(const filaflat::ChunkContainer& package,
             getShaderInfo(package, shaders.data(), ChunkType::MaterialMetal);
             json << "metal";
             break;
+        case Backend::GFX:
+            shaders.resize(getShaderCount(package, preferredShaderChunkTypeOnPlatform()));
+            getShaderInfo(package, shaders.data(), preferredShaderChunkTypeOnPlatform());
+            json << "metal";
+            break;
         default:
             return false;
     }

@@ -114,6 +114,10 @@ Platform* PlatformFactory::create(Backend* backend, void* nativeDisplay) noexcep
         return nullptr;
 #endif
     }
+    if (*backend == Backend::GFX) {
+        // TODO: Implement Gfx platform creation
+        return nullptr;
+    }
     assert_invariant(*backend == Backend::OPENGL);
     #if defined(FILAMENT_SUPPORTS_OPENGL)
         #if defined(FILAMENT_USE_EXTERNAL_GLES3) || defined(FILAMENT_USE_SWIFTSHADER)

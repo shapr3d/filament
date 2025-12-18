@@ -105,6 +105,10 @@ ShaderReplacer::ShaderReplacer(Backend backend, const void* data, size_t size) :
             mMaterialTag = ChunkType::MaterialMetal;
             mDictionaryTag = ChunkType::DictionaryText;
             break;
+        case Backend::GFX:
+            mMaterialTag = preferredShaderChunkTypeOnPlatform();
+            mDictionaryTag = ChunkType::DictionaryText;
+            break;
         case Backend::VULKAN:
             mMaterialTag = ChunkType::MaterialSpirv;
             mDictionaryTag = ChunkType::DictionarySpirv;

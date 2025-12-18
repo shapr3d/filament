@@ -280,6 +280,15 @@ bool DebugServer::handleEditCommand(const MaterialKey& key, backend::Backend api
             }
             break;
         }
+        case backend::Backend::GFX: {
+            shaderCount = getShaderCount(package, preferredShaderChunkTypeOnPlatform());
+            infos.reserve(shaderCount);
+            infos.resize(shaderCount);
+            if (!getShaderInfo(package, infos.data(), preferredShaderChunkTypeOnPlatform())) {
+                return error(__LINE__);
+            }
+            break;
+        }
         default:
             error(__LINE__);
     }

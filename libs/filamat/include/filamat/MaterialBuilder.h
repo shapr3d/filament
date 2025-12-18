@@ -163,6 +163,15 @@ inline constexpr MaterialBuilderBase::TargetApi targetApiFromBackend(
         case Backend::OPENGL:  return TargetApi::OPENGL;
         case Backend::VULKAN:  return TargetApi::VULKAN;
         case Backend::METAL:   return TargetApi::METAL;
+        case Backend::GFX:
+#if defined(__APPLE__)
+            return TargetApi::METAL;
+#elif defined(WIN32)
+            return TargetApi::Direct3D;
+#else
+            assert(false && "Unsupported platform for Gfx");
+            return TargetApi::OPENGL
+#endif
         case Backend::NOOP:    return TargetApi::OPENGL;
     }
 }

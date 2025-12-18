@@ -95,6 +95,16 @@ enum UTILS_PUBLIC ChunkType : uint64_t {
     DictionarySpirv = charTo64bitNum("DIC_SPIR"),
 };
 
+constexpr inline ChunkType preferredShaderChunkTypeOnPlatform() noexcept {
+#if defined(__APPLE__)
+    return ChunkType::MaterialMetal;
+#elif defined(WIN32)
+    return ChunkType::MaterialHLSL;
+#else
+    return ChunkType::MaterialGlsl;
+#endif
+}
+
 } // namespace filamat
 
 #endif // TNT_FILAMAT_MATERIAL_CHUNK_TYPES_H
