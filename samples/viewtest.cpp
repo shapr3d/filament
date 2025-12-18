@@ -56,7 +56,7 @@ static void printUsage(char* name) {
             "   --help, -h\n"
             "       Prints this message\n\n"
             "   --api, -a\n"
-            "       Specify the backend API: opengl (default), vulkan, or metal\n\n"
+            "       Specify the backend API: opengl (default), vulkan, gfx, or metal\n\n"
     );
     const std::string from("SHOWCASE");
     for (size_t pos = usage.find(from); pos != std::string::npos; pos = usage.find(from, pos)) {
@@ -88,8 +88,10 @@ static int handleCommandLineArguments(int argc, char* argv[], App* app) {
                     app->config.backend = Engine::Backend::VULKAN;
                 } else if (arg == "metal") {
                     app->config.backend = Engine::Backend::METAL;
+                } else if (arg == "gfx") {
+                    app->config.backend = Engine::Backend::GFX;
                 } else {
-                    std::cerr << "Unrecognized backend. Must be 'opengl'|'vulkan'|'metal'.\n";
+                    std::cerr << "Unrecognized backend. Must be 'opengl'|'vulkan'|'gfx'|'metal'.\n";
                 }
                 break;
         }

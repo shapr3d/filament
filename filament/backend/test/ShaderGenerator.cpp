@@ -101,6 +101,12 @@ ShaderGenerator::Blob ShaderGenerator::transpileShader(
         shader.insert(pos, "#define TARGET_METAL_ENVIRONMENT\n");
     } else if (backend == Backend::VULKAN) {
         shader.insert(pos, "#define TARGET_VULKAN_ENVIRONMENT\n");
+    } else if (backend == Backend::GFX) {
+#if defined(__APPLE__)
+        shader.insert(pos, "#define TARGET_METAL_ENVIRONMENT\n");
+#elif defined(WIN32)
+        shader.insert(pos, "#define TARGET_DIRECT3D_ENVIRONMENT\n");
+#endif
     }
 
     const char* shaderCString = shader.c_str();
@@ -136,7 +142,8 @@ ShaderGenerator::Blob ShaderGenerator::transpileShader(
 
     assert_invariant(backend == Backend::OPENGL ||
            backend == Backend::METAL  ||
-           backend == Backend::VULKAN);
+           backend == Backend::VULKAN ||
+           backend == Backend::GFX);
 
     if (backend == Backend::OPENGL) {
         if (isMobile) {
@@ -153,6 +160,16 @@ ShaderGenerator::Blob ShaderGenerator::transpileShader(
         return { result.c_str(), result.c_str() + result.length() + 1 };
     } else if (backend == Backend::VULKAN) {
         return { (uint8_t*)spirv.data(), (uint8_t*)(spirv.data() + spirv.size()) };
+    } else if (backend == Backend::GFX) {
+        const auto sm = isMobile ? ShaderModel::MOBILE : ShaderModel::DESKTOP;
+        filamat::SibVector sibs = filamat::SibVector::with_capacity(1);
+        if (sib) { sibs.emplace_back(0, sib); }
+#if defined(__APPLE__)
+        filamat::GLSLPostProcessor::spirvToMsl(&spirv, &result, sm, false, sibs, nullptr);
+#elif defined(WIN32)
+        filamat::GLSLPostProcessor::spirvToHlsl(&spirv, &result, sibs, nullptr);
+#endif
+        return { result.c_str(), result.c_str() + result.length() + 1 };
     }
 
     return {};

@@ -131,7 +131,7 @@ static void printUsage(char* name) {
         "   --help, -h\n"
         "       Prints this message\n\n"
         "   --api, -a\n"
-        "       Specify the backend API: opengl (default), vulkan, or metal\n"
+        "       Specify the backend API: opengl (default), vulkan, gfx, or metal\n"
         "   --mode, -m\n"
         "       Specify the reflection mode: camera (default), or renderables\n\n"
     );
@@ -166,8 +166,10 @@ static int handleCommandLineArguments(int argc, char* argv[], App* app) {
                     app->config.backend = Engine::Backend::VULKAN;
                 } else if (arg == "metal") {
                     app->config.backend = Engine::Backend::METAL;
+                } else if (arg == "gfx") {
+                    app->config.backend = Engine::Backend::GFX;
                 } else {
-                    std::cerr << "Unrecognized backend. Must be 'opengl'|'vulkan'|'metal'.\n";
+                    std::cerr << "Unrecognized backend. Must be 'opengl'|'vulkan'|'gfx'|'metal'.\n";
                     exit(1);
                 }
                 break;

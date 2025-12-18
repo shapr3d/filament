@@ -46,8 +46,10 @@ Backend parseArgumentsForBackend(int argc, char* argv[]) {
                     backend = Backend::VULKAN;
                 } else if (arg == "metal") {
                     backend = Backend::METAL;
+                } else if (arg == "gfx") {
+                    backend = Backend::GFX;
                 } else {
-                    std::cerr << "Unrecognized target API. Must be 'opengl'|'vulkan'|'metal'."
+                    std::cerr << "Unrecognized target API. Must be 'opengl'|'vulkan'|'metal'|'gfx'."
                               << std::endl
                               << "Defaulting to OpenGL."
                               << std::endl;

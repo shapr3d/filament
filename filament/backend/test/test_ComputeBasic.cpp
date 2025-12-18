@@ -53,6 +53,14 @@ kernel void main0() {}
         case Backend::OPENGL:   shader = isMobile() ? shader_gles310 : shader_gl450;    break;
         case Backend::VULKAN:   shader = shader_spirv;  break;
         case Backend::METAL:    shader = shader_msl;    break;
+        case Backend::GFX:
+#if defined(__APPLE__)
+            shader = shader_msl; break;
+#elif defined(WIN32)
+            shader = shader_hlsl; break;
+#else
+#endif
+            UTILS_FALLTHROUGH;
         default:
             GTEST_FATAL_FAILURE_("unexpected backend");
     }
@@ -118,11 +126,23 @@ kernel void main0(device Output_data& output_data [[buffer(0)]],
 // TODO: spirv test
 )"};
 
+    std::string shader_hlsl = {R"(
+// TODO: HLSL test
+)"};
+
     std::string_view shader;
     switch (getBackend()) {
         case Backend::OPENGL:   shader = isMobile() ? shader_gles310 : shader_gl450;    break;
         case Backend::VULKAN:   shader = shader_spirv;  break;
         case Backend::METAL:    shader = shader_msl;    break;
+        case Backend::GFX:
+#if defined(__APPLE__)
+            shader = shader_msl; break;
+#elif defined(WIN32)
+            shader = shader_hlsl; break;
+#else
+#endif
+            UTILS_FALLTHROUGH;
         default:
             GTEST_FATAL_FAILURE_("unexpected backend");
     }

@@ -49,6 +49,10 @@ test::NativeView getNativeView() {
     if (self.backend == test::Backend::VULKAN) {
         nativeView.ptr = (void*) view;
     }
+    if (self.backend == test::Backend::GFX) {
+        // TODO: Determine appropriate native view handling for Gfx backend
+        nativeView.ptr = (void*) view;
+    }
     CGSize drawableSize = ((CAMetalLayer*) view.layer).drawableSize;
     nativeView.width = static_cast<size_t>(drawableSize.width);
     nativeView.height = static_cast<size_t>(drawableSize.height);

@@ -156,11 +156,11 @@ static void printUsage(char* name) {
 
 // Matches logic in filament/backend/src/PlatformFactory.cpp for Backend::DEFAULT
 #if defined(IOS) || defined(__APPLE__)
-        "opengl, vulkan, or metal (default)"
+        "opengl, vulkan, gfx, or metal (default)"
 #elif defined(FILAMENT_DRIVER_SUPPORTS_VULKAN)
-        "opengl, vulkan (default), or metal"
+        "opengl, vulkan (default), gfx, or metal"
 #else
-        "opengl (default), vulkan, or metal"
+        "opengl (default), vulkan, gfx, or metal"
 #endif
         "\n\n"
 
@@ -261,8 +261,10 @@ static int handleCommandLineArguments(int argc, char* argv[], App* app) {
                     app->config.backend = Engine::Backend::VULKAN;
                 } else if (arg == "metal") {
                     app->config.backend = Engine::Backend::METAL;
+                } else if (arg == "gfx") {
+                    app->config.backend = Engine::Backend::GFX;
                 } else {
-                    std::cerr << "Unrecognized backend. Must be 'opengl'|'vulkan'|'metal'.\n";
+                    std::cerr << "Unrecognized backend. Must be 'opengl'|'vulkan'|'gfx'|'metal'.\n";
                 }
                 break;
             case 'f':
