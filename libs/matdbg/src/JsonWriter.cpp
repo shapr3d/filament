@@ -172,6 +172,18 @@ static bool printMetalInfo(ostream& json, const ChunkContainer& container) {
     return true;
 }
 
+static bool printHlslInfo(ostream& json, const ChunkContainer& container) {
+    std::vector<ShaderInfo> info;
+    info.resize(getShaderCount(container, ChunkType::MaterialHLSL));
+    if (!getShaderInfo(container, info.data(), ChunkType::MaterialHLSL)) {
+        return false;
+    }
+    json << "\"hlsl\": [\n";
+    printShaderInfo(json, info, container);
+    json << "],\n";
+    return true;
+}
+
 bool JsonWriter::writeMaterialInfo(const filaflat::ChunkContainer& container) {
     ostringstream json;
     if (!printMaterial(json, container)) {
@@ -187,6 +199,9 @@ bool JsonWriter::writeMaterialInfo(const filaflat::ChunkContainer& container) {
         return false;
     }
     if (!printMetalInfo(json, container)) {
+        return false;
+    }
+    if (!printHlslInfo(json, container)) {
         return false;
     }
 

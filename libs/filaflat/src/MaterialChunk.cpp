@@ -184,6 +184,7 @@ bool MaterialChunk::getShader(ShaderContent& shaderContent, BlobDictionary const
         case filamat::ChunkType::MaterialGlsl:
         case filamat::ChunkType::MaterialEssl1:
         case filamat::ChunkType::MaterialMetal:
+        case filamat::ChunkType::MaterialHLSL:
             return getTextShader(mUnflattener, dictionary, shaderContent, shaderModel, variant, stage);
         case filamat::ChunkType::MaterialSpirv:
             return getSpirvShader(dictionary, shaderContent, shaderModel, variant, stage);
