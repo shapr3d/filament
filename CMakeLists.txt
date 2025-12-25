@@ -796,6 +796,10 @@ if (FILAMENT_SUPPORTS_VULKAN)
     add_subdirectory(${EXTERNAL}/spirv-headers)
 endif()
 
+if (FILAMENT_SUPPORTS_GFX)
+    add_subdirectory(${EXTERNAL}/Gfx/tnt)
+endif()
+
 if (FILAMENT_USE_ANGLE)
     add_subdirectory(${EXTERNAL}/angle/tnt)
 endif()
