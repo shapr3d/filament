@@ -54,7 +54,7 @@ class OpenGLProgram;
 class OpenGLTimerQueryInterface;
 
 class OpenGLDriver final : public DriverBase {
-    inline explicit OpenGLDriver(OpenGLPlatform* platform, const Platform::DriverConfig& driverConfig) noexcept;
+    inline OpenGLDriver(OpenGLPlatform* platform, const Platform::DriverConfig& driverConfig) noexcept;
     ~OpenGLDriver() noexcept final;
     Dispatcher getDispatcher() const noexcept final;
 
