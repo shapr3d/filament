@@ -126,6 +126,9 @@ utils::io::sstream& CodeGenerator::generateProlog(utils::io::sstream& out, Shade
         case TargetApi::METAL:
             out << "#define TARGET_METAL_ENVIRONMENT\n";
             break;
+        case TargetApi::DIRECT3D:
+            out << "#define TARGET_DIRECT3D_ENVIRONMENT\n";
+            break;
         case TargetApi::ALL:
             // invalid should never happen
             break;
@@ -142,6 +145,7 @@ utils::io::sstream& CodeGenerator::generateProlog(utils::io::sstream& out, Shade
 
     if (mTargetApi == TargetApi::VULKAN ||
         mTargetApi == TargetApi::METAL ||
+        mTargetApi == TargetApi::DIRECT3D ||
         (mTargetApi == TargetApi::OPENGL && mShaderModel == ShaderModel::DESKTOP) ||
         mFeatureLevel >= FeatureLevel::FEATURE_LEVEL_2) {
         out << "#define FILAMENT_HAS_FEATURE_TEXTURE_GATHER\n";
@@ -476,13 +480,13 @@ io::sstream& CodeGenerator::generateOutput(io::sstream& out, ShaderStage type,
 
     const char* swizzleString = "";
 
-    // Metal doesn't support some 3-component texture formats, so the backend uses 4-component
+    // Metal and Direct3D don't support some 3-component texture formats, so the backend uses 4-component
     // formats behind the scenes. It's an error to output fewer components than the attachment
     // needs, so we always output a float4 instead of a float3. It's never an error to output extra
     // components.
     //
     // Meanwhile, ESSL 1.0 must always write to gl_FragColor, a vec4.
-    if (mTargetApi == TargetApi::METAL || mFeatureLevel == FeatureLevel::FEATURE_LEVEL_0) {
+    if (mTargetApi == TargetApi::METAL || mTargetApi == TargetApi::DIRECT3D || mFeatureLevel == FeatureLevel::FEATURE_LEVEL_0) {
         if (outputType == MaterialBuilder::OutputType::FLOAT3) {
             outputType = MaterialBuilder::OutputType::FLOAT4;
             swizzleString = ".rgb";
@@ -653,6 +657,8 @@ io::sstream& CodeGenerator::generateBufferInterfaceBlock(io::sstream& out, Shade
             case TargetApi::OPENGL:
                 // GLSL 4.5 / ESSL 3.1 require the 'binding' layout qualifier
             case TargetApi::VULKAN:
+            case TargetApi::DIRECT3D:
+                // TODO: Does Direct3D need an offset like Metal?
                 out << "binding = " << binding << ", ";
                 break;
 
@@ -741,6 +747,11 @@ io::sstream& CodeGenerator::generateSamplers(
                 case TargetApi::METAL:
                     out << "layout(binding = " << (uint32_t) info.offset
                         << ", set = " << (uint32_t) bindingPoint + 1 << ") ";
+                    break;
+
+                // TODO: Determine appropriate sampler layout for Direct3D
+                case TargetApi::DIRECT3D:
+                    out << "layout(binding = " << bindingIndex << ", set = 1) ";
                     break;
 
                 default:

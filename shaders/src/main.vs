@@ -8,7 +8,7 @@
 
 void main() {
 #if defined(FILAMENT_HAS_FEATURE_INSTANCING)
-#   if defined(TARGET_METAL_ENVIRONMENT) || defined(TARGET_VULKAN_ENVIRONMENT)
+#   if defined(TARGET_METAL_ENVIRONMENT) || defined(TARGET_VULKAN_ENVIRONMENT) || defined(TARGET_DIRECT3D_ENVIRONMENT)
     instance_index = gl_InstanceIndex;
 #   else
     // PowerVR drivers don't initialize gl_InstanceID correctly if it's assigned to the varying
@@ -256,12 +256,12 @@ void main() {
 #endif
 
 #if defined(TARGET_VULKAN_ENVIRONMENT)
-    // In Vulkan, clip space is Y-down. In OpenGL and Metal, clip space is Y-up.
+    // In Vulkan, clip space is Y-down. In OpenGL, Direct3D and Metal, clip space is Y-up.
     position.y = -position.y;
 #endif
 
-#if !defined(TARGET_VULKAN_ENVIRONMENT) && !defined(TARGET_METAL_ENVIRONMENT)
-    // This is not needed in Vulkan or Metal because clipControl is always (1, 0)
+#if !defined(TARGET_VULKAN_ENVIRONMENT) && !defined(TARGET_METAL_ENVIRONMENT) && !defined(TARGET_DIRECT3D_ENVIRONMENT)
+    // This is not needed in Vulkan, Direct3D or Metal because clipControl is always (1, 0)
     // (We don't use a dot() here because it workaround a spirv-opt optimization that in turn
     //  causes a crash on PowerVR, see #5118)
     position.z = position.z * frameUniforms.clipControl.x + position.w * frameUniforms.clipControl.y;

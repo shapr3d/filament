@@ -42,7 +42,7 @@ uniform Params { highp vec4 color; highp vec4 scale; } params;
 void main() {
     gl_Position = vec4((mesh_position.xy + 0.5) * params.scale.xy, params.scale.z, 1.0);
 #if defined(TARGET_VULKAN_ENVIRONMENT)
-    // In Vulkan, clip space is Y-down. In OpenGL and Metal, clip space is Y-up.
+    // In Vulkan, clip space is Y-down. In OpenGL, Direct3D and Metal, clip space is Y-up.
     gl_Position.y = -gl_Position.y;
 #endif
 })";

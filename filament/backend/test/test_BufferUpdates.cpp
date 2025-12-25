@@ -41,7 +41,7 @@ uniform Params {
 void main() {
     gl_Position = vec4(mesh_position.xy + params.offset.xy, 0.0, 1.0);
 #if defined(TARGET_VULKAN_ENVIRONMENT)
-    // In Vulkan, clip space is Y-down. In OpenGL and Metal, clip space is Y-up.
+    // In Vulkan, clip space is Y-down. In OpenGL, Direct3D and Metal, clip space is Y-up.
     gl_Position.y = -gl_Position.y;
 #endif
 }

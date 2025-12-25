@@ -44,7 +44,7 @@ layout(location = 0) in vec4 mesh_position;
 void main() {
     gl_Position = vec4(mesh_position.xy, 0.0, 1.0);
 #if defined(TARGET_VULKAN_ENVIRONMENT)
-    // In Vulkan, clip space is Y-down. In OpenGL and Metal, clip space is Y-up.
+    // In Vulkan, clip space is Y-down. In OpenGL, Direct3D and Metal, clip space is Y-up.
     gl_Position.y *= -1.0f;
 #endif
 }
@@ -61,7 +61,7 @@ layout(location = 0, set = 1) uniform {samplerType} test_tex;
 void main() {
     vec2 fbsize = vec2(512);
     vec2 uv = gl_FragCoord.xy / fbsize;
-#if defined(TARGET_METAL_ENVIRONMENT) || defined(TARGET_VULKAN_ENVIRONMENT)
+#if defined(TARGET_METAL_ENVIRONMENT) || defined(TARGET_VULKAN_ENVIRONMENT) || defined(TARGET_DIRECT3D_ENVIRONMENT)
     uv.y = 1.0 - uv.y;
 #endif
     fragColor = vec4(texture(test_tex, uv).rgb, 1.0f);
@@ -82,7 +82,7 @@ float getLayer(in sampler2DArray s) { return 2.0f; }
 void main() {
     vec2 fbsize = vec2(512);
     vec2 uv = gl_FragCoord.xy / fbsize;
-#if defined(TARGET_METAL_ENVIRONMENT) || defined(TARGET_VULKAN_ENVIRONMENT)
+#if defined(TARGET_METAL_ENVIRONMENT) || defined(TARGET_VULKAN_ENVIRONMENT) || defined(TARGET_DIRECT3D_ENVIRONMENT)
     uv.y = 1.0 - uv.y;
 #endif
     fragColor = vec4(texture(test_tex, vec3(uv, getLayer(test_tex))).rgb, 1.0f);
@@ -100,7 +100,7 @@ layout(location = 0, set = 1) uniform sampler2D test_tex;
 void main() {
     vec2 fbsize = vec2(512);
     vec2 uv = gl_FragCoord.xy / fbsize;
-#if defined(TARGET_METAL_ENVIRONMENT) || defined(TARGET_VULKAN_ENVIRONMENT)
+#if defined(TARGET_METAL_ENVIRONMENT) || defined(TARGET_VULKAN_ENVIRONMENT) || defined(TARGET_DIRECT3D_ENVIRONMENT)
     uv.y = 1.0 - uv.y;
 #endif
     fragColor = vec4(textureLod(test_tex, uv, 1.0f).rgb, 1.0f);
