@@ -335,7 +335,7 @@ if (FILAMENT_SUPPORTS_METAL)
 endif()
 
 if (FILAMENT_SUPPORTS_GFX)
-    # TODO: Add Gfx backend library dependencies
+    target_link_libraries(${TARGET} PUBLIC Gfx)
 endif()
 
 if (LINUX)
