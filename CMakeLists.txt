@@ -517,6 +517,16 @@ if (FILAMENT_SUPPORTS_METAL)
     add_definitions(-DFILAMENT_SUPPORTS_METAL)
 endif()
 
+# Build with Gfx support on Apple and Windows platforms.
+if (APPLE OR WIN32)
+    option(FILAMENT_SUPPORTS_GFX "Include the Gfx backend" ON)
+else()
+    option(FILAMENT_SUPPORTS_GFX "Include the Gfx backend" OFF)
+endif()
+if (FILAMENT_SUPPORTS_GFX)
+    add_definitions(-DFILAMENT_SUPPORTS_GFX)
+endif()
+
 # Building filamat increases build times and isn't required for web, so turn it off by default.
 if (NOT WEBGL)
     option(FILAMENT_BUILD_FILAMAT "Build filamat and JNI buildings" ON)
@@ -559,6 +569,13 @@ if (FILAMENT_SUPPORTS_VULKAN)
 endif()
 if (FILAMENT_SUPPORTS_METAL)
     set(MATC_API_FLAGS ${MATC_API_FLAGS} -a metal)
+endif()
+if (FILAMENT_SUPPORTS_GFX)
+    if (WIN32)
+        set(MATC_API_FLAGS ${MATC_API_FLAGS} -a direct3d)
+    else()
+        set(MATC_API_FLAGS ${MATC_API_FLAGS} -a metal)
+    endif()
 endif()
 
 # Disable ESSL 1.0 code generation.

@@ -221,6 +221,14 @@ if (FILAMENT_SUPPORTS_VULKAN)
 endif()
 
 # ==================================================================================================
+# Gfx Sources
+# ==================================================================================================
+
+if (FILAMENT_SUPPORTS_GFX)
+    # TODO: add sources
+endif()
+
+# ==================================================================================================
 # Definitions
 # ==================================================================================================
 # "2" corresponds to SYSTRACE_TAG_FILEMENT (See: utils/Systrace.h)
@@ -324,6 +332,10 @@ endif()
 
 if (FILAMENT_SUPPORTS_METAL)
     target_link_libraries(${TARGET} PUBLIC "-framework Metal -framework CoreVideo")
+endif()
+
+if (FILAMENT_SUPPORTS_GFX)
+    # TODO: Add Gfx backend library dependencies
 endif()
 
 if (LINUX)
