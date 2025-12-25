@@ -22,6 +22,7 @@
 
 #include <spirv_glsl.hpp>
 #include <spirv_msl.hpp>
+#include <spirv_hlsl.hpp>
 
 #include "backend/DriverEnums.h"
 #include "sca/builtinResource.h"
@@ -53,10 +54,11 @@ namespace filamat {
 
 using namespace utils;
 
-namespace msl {  // this is only used for MSL
+namespace mslAndHlsl {  // this is only used for MSL and HLSL
 
 using BindingIndexMap = std::unordered_map<std::string, uint16_t>;
 
+// TODO: Does this apply to HLSL too?
 static void collectSibs(const GLSLPostProcessor::Config& config, SibVector& sibs) {
     switch (config.domain) {
         case MaterialDomain::SURFACE:
@@ -79,7 +81,7 @@ static void collectSibs(const GLSLPostProcessor::Config& config, SibVector& sibs
             &config.materialInfo->sib);
 }
 
-} // namespace msl
+} // namespace mslAndHlsl
 
 GLSLPostProcessor::GLSLPostProcessor(MaterialBuilder::Optimization optimization, uint32_t flags)
         : mOptimization(optimization),
@@ -144,7 +146,7 @@ void GLSLPostProcessor::spirvToMsl(const SpirvBlob *spirv, std::string *outMsl,
         filament::backend::ShaderModel shaderModel, bool useFramebufferFetch, const SibVector& sibs,
         const ShaderMinifier* minifier) {
 
-    using namespace msl;
+    using namespace mslAndHlsl;
 
     CompilerMSL mslCompiler(*spirv);
     CompilerGLSL::Options const options;
@@ -295,8 +297,58 @@ void GLSLPostProcessor::spirvToMsl(const SpirvBlob *spirv, std::string *outMsl,
     }
 }
 
+void GLSLPostProcessor::spirvToHlsl(const SpirvBlob *spirv, std::string *outHlsl,
+        const SibVector& sibs, const ShaderMinifier* minifier) {
+
+    CompilerHLSL hlslCompiler(*spirv);
+    CompilerGLSL::Options const options;
+    hlslCompiler.set_common_options(options);
+
+    CompilerHLSL::Options hlslOptions = {};
+    hlslOptions.shader_model = 50;
+
+    hlslCompiler.set_hlsl_options(hlslOptions);
+
+    auto executionModel = hlslCompiler.get_execution_model();
+    for (auto [bindingPoint, sib] : sibs) {
+        // This HLSLResourceBinding is how we control the [[buffer(n)]] binding of the argument
+        // buffer itself;
+        HLSLResourceBinding argBufferBinding;
+        argBufferBinding.stage = executionModel;
+        argBufferBinding.desc_set = bindingPoint + 1;
+        argBufferBinding.binding = kArgumentBufferBinding;
+        // TODO: fill in cbv, uav, srv, sampler
+        hlslCompiler.add_hlsl_resource_binding(argBufferBinding);
+    }
+
+    auto updateResourceBindingDefault = [executionModel, &hlslCompiler](const auto& resource) {
+        auto set = hlslCompiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
+        auto binding = hlslCompiler.get_decoration(resource.id, spv::DecorationBinding);
+        HLSLResourceBinding newBinding;
+        newBinding.stage = executionModel;
+        newBinding.desc_set = set;
+        newBinding.binding = binding;
+        // TODO: fill in cbv, uav, srv, sampler
+        hlslCompiler.add_hlsl_resource_binding(newBinding);
+    };
+
+    auto uniformResources = hlslCompiler.get_shader_resources();
+    for (const auto& resource : uniformResources.uniform_buffers) {
+        updateResourceBindingDefault(resource);
+    }
+    auto ssboResources = hlslCompiler.get_shader_resources();
+    for (const auto& resource : ssboResources.storage_buffers) {
+        updateResourceBindingDefault(resource);
+    }
+
+    *outHlsl = hlslCompiler.compile();
+    if (minifier) {
+        *outHlsl = minifier->removeWhitespace(*outHlsl);
+    }
+}
+
 bool GLSLPostProcessor::process(const std::string& inputShader, Config const& config,
-        std::string* outputGlsl, SpirvBlob* outputSpirv, std::string* outputMsl) {
+        std::string* outputGlsl, SpirvBlob* outputSpirv, std::string* outputMsl, std::string* outputHlsl) {
     using TargetLanguage = MaterialBuilder::TargetLanguage;
 
     if (config.targetLanguage == TargetLanguage::GLSL) {
@@ -311,6 +363,7 @@ bool GLSLPostProcessor::process(const std::string& inputShader, Config const& co
             .glslOutput = outputGlsl,
             .spirvOutput = outputSpirv,
             .mslOutput = outputMsl,
+            .hlslOutput = outputHlsl,
     };
 
     switch (config.shaderType) {
@@ -382,10 +435,15 @@ bool GLSLPostProcessor::process(const std::string& inputShader, Config const& co
                 fixupClipDistance(*internalConfig.spirvOutput, config);
                 if (internalConfig.mslOutput) {
                     auto sibs = SibVector::with_capacity(CONFIG_SAMPLER_BINDING_COUNT);
-                    msl::collectSibs(config, sibs);
+                    mslAndHlsl::collectSibs(config, sibs);
                     spirvToMsl(internalConfig.spirvOutput, internalConfig.mslOutput,
                             config.shaderModel, config.hasFramebufferFetch, sibs,
                             mGenerateDebugInfo ? &internalConfig.minifier : nullptr);
+                } else if (internalConfig.hlslOutput) {
+                    auto sibs = SibVector::with_capacity(CONFIG_SAMPLER_BINDING_COUNT);
+                    mslAndHlsl::collectSibs(config, sibs);
+                    spirvToHlsl(internalConfig.spirvOutput, internalConfig.hlslOutput,
+                            sibs, mGenerateDebugInfo ? &internalConfig.minifier : nullptr);
                 }
             } else {
                 slog.e << "GLSL post-processor invoked with optimization level NONE"
@@ -471,10 +529,17 @@ void GLSLPostProcessor::preprocessOptimization(glslang::TShader& tShader,
 
     if (internalConfig.mslOutput) {
         auto sibs = SibVector::with_capacity(CONFIG_SAMPLER_BINDING_COUNT);
-        msl::collectSibs(config, sibs);
+        mslAndHlsl::collectSibs(config, sibs);
         spirvToMsl(internalConfig.spirvOutput, internalConfig.mslOutput, config.shaderModel,
                 config.hasFramebufferFetch, sibs,
                 mGenerateDebugInfo ? &internalConfig.minifier : nullptr);
+    }
+
+    if (internalConfig.hlslOutput) {
+        auto sibs = SibVector::with_capacity(CONFIG_SAMPLER_BINDING_COUNT);
+        mslAndHlsl::collectSibs(config, sibs);
+        spirvToHlsl(internalConfig.spirvOutput, internalConfig.hlslOutput,
+                sibs, mGenerateDebugInfo ? &internalConfig.minifier : nullptr);
     }
 
     if (internalConfig.glslOutput) {
@@ -512,8 +577,15 @@ bool GLSLPostProcessor::fullOptimization(const TShader& tShader,
 
     if (internalConfig.mslOutput) {
         auto sibs = SibVector::with_capacity(CONFIG_SAMPLER_BINDING_COUNT);
-        msl::collectSibs(config, sibs);
+        mslAndHlsl::collectSibs(config, sibs);
         spirvToMsl(&spirv, internalConfig.mslOutput, config.shaderModel, config.hasFramebufferFetch,
+                sibs, mGenerateDebugInfo ? &internalConfig.minifier : nullptr);
+    }
+
+    if (internalConfig.hlslOutput) {
+        auto sibs = SibVector::with_capacity(CONFIG_SAMPLER_BINDING_COUNT);
+        mslAndHlsl::collectSibs(config, sibs);
+        spirvToHlsl(&spirv, internalConfig.hlslOutput,
                 sibs, mGenerateDebugInfo ? &internalConfig.minifier : nullptr);
     }
 

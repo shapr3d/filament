@@ -75,11 +75,16 @@ public:
     bool process(const std::string& inputShader, Config const& config,
             std::string* outputGlsl,
             SpirvBlob* outputSpirv,
-            std::string* outputMsl);
+            std::string* outputMsl,
+            std::string* outputHlsl);
 
     // public so backend_test can also use it
     static void spirvToMsl(const SpirvBlob* spirv, std::string* outMsl,
             filament::backend::ShaderModel shaderModel, bool useFramebufferFetch,
+            const SibVector& sibs, const ShaderMinifier* minifier);
+
+    // public so backend_test can also use it
+    static void spirvToHlsl(const SpirvBlob* spirv, std::string* outHlsl,
             const SibVector& sibs, const ShaderMinifier* minifier);
 
 private:
@@ -87,6 +92,7 @@ private:
         std::string* glslOutput = nullptr;
         SpirvBlob* spirvOutput = nullptr;
         std::string* mslOutput = nullptr;
+        std::string* hlslOutput = nullptr;
         EShLanguage shLang = EShLangFragment;
         // use 100 for ES environment, 110 for desktop
          int langVersion = 0;

@@ -525,6 +525,12 @@ EShMessages GLSLTools::glslangFlagsFromTargetApi(
                 //        choke on gl_VertexIndex.
                 msg |= (Type)EShMessages::EShMsgVulkanRules;
             }
+            if (targetApi == TargetApi::DIRECT3D) {
+                msg |= (Type)EShMessages::EShMsgVulkanRules; // TODO: is this needed?
+                // TODO: Use these too?
+//                msg |= (Type)EShMessages::EShMsgReadHlsl;
+//                msg |= (Type)EShMessages::EShMsgHlslOffsets;
+            }
             return (EShMessages)msg;
     }
 }
@@ -542,6 +548,7 @@ void GLSLTools::prepareShaderParser(MaterialBuilder::TargetApi targetApi,
                 break;
             case MaterialBuilderBase::TargetApi::VULKAN:
             case MaterialBuilderBase::TargetApi::METAL:
+            case MaterialBuilderBase::TargetApi::DIRECT3D:
                 shader.setEnvInput(EShSourceGlsl, stage, EShClientVulkan, version);
                 shader.setEnvClient(EShClientVulkan, EShTargetVulkan_1_1);
                 break;

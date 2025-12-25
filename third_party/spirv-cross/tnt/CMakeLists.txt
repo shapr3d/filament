@@ -91,8 +91,13 @@ spirv_cross_add_library(spirv-cross-msl spirv_cross_msl STATIC
     ../spirv_msl.cpp
     ../spirv_msl.hpp)
 
-target_link_libraries(spirv-cross-glsl spirv-cross-msl spirv-cross-core)
+spirv_cross_add_library(spirv-cross-hlsl spirv_cross_hlsl STATIC
+    ../spirv_hlsl.cpp
+    ../spirv_hlsl.hpp)
+
+target_link_libraries(spirv-cross-glsl spirv-cross-msl spirv-cross-hlsl spirv-cross-core)
 
 set_target_properties(spirv-cross-glsl PROPERTIES FOLDER ThirdParty)
 set_target_properties(spirv-cross-msl PROPERTIES FOLDER ThirdParty)
+set_target_properties(spirv-cross-hlsl PROPERTIES FOLDER ThirdParty)
 set_target_properties(spirv-cross-core PROPERTIES FOLDER ThirdParty)
