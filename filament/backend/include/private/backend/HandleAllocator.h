@@ -43,6 +43,7 @@
 #define HandleAllocatorGL  HandleAllocator<16, 64, 208>
 #define HandleAllocatorVK  HandleAllocator<16, 64, 880>
 #define HandleAllocatorMTL HandleAllocator<16, 64, 584>
+#define HandleAllocatorGFX HandleAllocator<16, 64, 200> // TODO: Update the last number with the largest possible handle size
 
 namespace filament::backend {
 

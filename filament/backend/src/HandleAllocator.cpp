@@ -113,4 +113,8 @@ template class HandleAllocatorVK;
 template class HandleAllocatorMTL;
 #endif
 
+#if defined (FILAMENT_SUPPORTS_GFX)
+template class HandleAllocatorGFX;
+#endif
+
 } // namespace filament::backend

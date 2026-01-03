@@ -16,6 +16,8 @@
 
 #include <backend/platforms/GfxPlatform.h>
 
+#include "gfx/GfxDriver.h"
+
 #include <utils/Log.h>
 
 namespace filament::backend {
@@ -25,10 +27,8 @@ GfxPlatform::GfxPlatform() = default;
 GfxPlatform::~GfxPlatform() = default;
 
 Driver* GfxPlatform::createDriver(void* /*sharedContext*/,
-        const Platform::DriverConfig& /*driverConfig*/) noexcept {
-    // TODO: Implement GfxDriverFactory and create the driver
-    utils::slog.e << "Gfx backend driver creation not yet implemented" << utils::io::endl;
-    return nullptr;
+        const Platform::DriverConfig& driverConfig) noexcept {
+    return GfxDriver::create(driverConfig);
 }
 
 } // namespace filament::backend

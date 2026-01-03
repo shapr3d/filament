@@ -225,10 +225,11 @@ endif()
 # ==================================================================================================
 
 if (FILAMENT_SUPPORTS_GFX)
-    # TODO: add sources
     list(APPEND SRCS
             include/backend/platforms/GfxPlatform.h
             src/gfx/platform/GfxPlatform.cpp
+            src/gfx/GfxDriver.h
+            src/gfx/GfxDriver.cpp
     )
 endif()
 
