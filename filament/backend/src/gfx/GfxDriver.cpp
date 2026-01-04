@@ -278,6 +278,7 @@ Handle<HwProgram> GfxDriver::createProgramS() noexcept {
 }
 
 void GfxDriver::createProgramR(Handle<HwProgram> ph, Program&& program) {
+    construct_handle<HwProgram>(ph, program.getName());
 }
 
 Handle<HwRenderTarget> GfxDriver::createDefaultRenderTargetS() noexcept {
