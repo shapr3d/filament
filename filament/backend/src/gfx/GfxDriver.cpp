@@ -192,7 +192,7 @@ void GfxDriver::resetState(int) {
 // Resource creation (return handles)
 
 Handle<HwVertexBuffer> GfxDriver::createVertexBufferS() noexcept {
-    return {};
+    return alloc_handle<HwVertexBuffer>();
 }
 
 void GfxDriver::createVertexBufferR(Handle<HwVertexBuffer> vbh,
@@ -201,7 +201,7 @@ void GfxDriver::createVertexBufferR(Handle<HwVertexBuffer> vbh,
 }
 
 Handle<HwIndexBuffer> GfxDriver::createIndexBufferS() noexcept {
-    return {};
+    return alloc_handle<HwIndexBuffer>();
 }
 
 void GfxDriver::createIndexBufferR(Handle<HwIndexBuffer> ibh,
@@ -209,7 +209,7 @@ void GfxDriver::createIndexBufferR(Handle<HwIndexBuffer> ibh,
 }
 
 Handle<HwBufferObject> GfxDriver::createBufferObjectS() noexcept {
-    return {};
+    return alloc_handle<HwBufferObject>();
 }
 
 void GfxDriver::createBufferObjectR(Handle<HwBufferObject> boh,
@@ -217,7 +217,7 @@ void GfxDriver::createBufferObjectR(Handle<HwBufferObject> boh,
 }
 
 Handle<HwBufferObject> GfxDriver::importBufferObjectS() noexcept {
-    return {};
+    return alloc_handle<HwBufferObject>();
 }
 
 void GfxDriver::importBufferObjectR(Handle<HwBufferObject> boh,
@@ -225,7 +225,7 @@ void GfxDriver::importBufferObjectR(Handle<HwBufferObject> boh,
 }
 
 Handle<HwTexture> GfxDriver::createTextureS() noexcept {
-    return {};
+    return alloc_handle<HwTexture>();
 }
 
 void GfxDriver::createTextureR(Handle<HwTexture> th,
@@ -235,7 +235,7 @@ void GfxDriver::createTextureR(Handle<HwTexture> th,
 }
 
 Handle<HwTexture> GfxDriver::createTextureSwizzledS() noexcept {
-    return {};
+    return alloc_handle<HwTexture>();
 }
 
 void GfxDriver::createTextureSwizzledR(Handle<HwTexture> th,
@@ -246,7 +246,7 @@ void GfxDriver::createTextureSwizzledR(Handle<HwTexture> th,
 }
 
 Handle<HwTexture> GfxDriver::importTextureS() noexcept {
-    return {};
+    return alloc_handle<HwTexture>();
 }
 
 void GfxDriver::importTextureR(Handle<HwTexture> th,
@@ -256,7 +256,7 @@ void GfxDriver::importTextureR(Handle<HwTexture> th,
 }
 
 Handle<HwSamplerGroup> GfxDriver::createSamplerGroupS() noexcept {
-    return {};
+    return alloc_handle<HwSamplerGroup>();
 }
 
 void GfxDriver::createSamplerGroupR(Handle<HwSamplerGroup> sbh,
@@ -264,7 +264,7 @@ void GfxDriver::createSamplerGroupR(Handle<HwSamplerGroup> sbh,
 }
 
 Handle<HwRenderPrimitive> GfxDriver::createRenderPrimitiveS() noexcept {
-    return {};
+    return alloc_handle<HwRenderPrimitive>();
 }
 
 void GfxDriver::createRenderPrimitiveR(Handle<HwRenderPrimitive> rph,
@@ -274,21 +274,21 @@ void GfxDriver::createRenderPrimitiveR(Handle<HwRenderPrimitive> rph,
 }
 
 Handle<HwProgram> GfxDriver::createProgramS() noexcept {
-    return {};
+    return alloc_handle<HwProgram>();
 }
 
 void GfxDriver::createProgramR(Handle<HwProgram> ph, Program&& program) {
 }
 
 Handle<HwRenderTarget> GfxDriver::createDefaultRenderTargetS() noexcept {
-    return {};
+    return alloc_handle<HwRenderTarget>();
 }
 
 void GfxDriver::createDefaultRenderTargetR(Handle<HwRenderTarget> rth, int) {
 }
 
 Handle<HwRenderTarget> GfxDriver::createRenderTargetS() noexcept {
-    return {};
+    return alloc_handle<HwRenderTarget>();
 }
 
 void GfxDriver::createRenderTargetR(Handle<HwRenderTarget> rth,
@@ -298,21 +298,21 @@ void GfxDriver::createRenderTargetR(Handle<HwRenderTarget> rth,
 }
 
 Handle<HwFence> GfxDriver::createFenceS() noexcept {
-    return {};
+    return alloc_handle<HwFence>();
 }
 
 void GfxDriver::createFenceR(Handle<HwFence> fh, int) {
 }
 
 Handle<HwSwapChain> GfxDriver::createSwapChainS() noexcept {
-    return {};
+    return alloc_handle<HwSwapChain>();
 }
 
 void GfxDriver::createSwapChainR(Handle<HwSwapChain> sch, void* nativeWindow, uint64_t flags) {
 }
 
 Handle<HwSwapChain> GfxDriver::createSwapChainHeadlessS() noexcept {
-    return {};
+    return alloc_handle<HwSwapChain>();
 }
 
 void GfxDriver::createSwapChainHeadlessR(Handle<HwSwapChain> sch,
@@ -320,7 +320,7 @@ void GfxDriver::createSwapChainHeadlessR(Handle<HwSwapChain> sch,
 }
 
 Handle<HwTimerQuery> GfxDriver::createTimerQueryS() noexcept {
-    return {};
+    return alloc_handle<HwTimerQuery>();
 }
 
 void GfxDriver::createTimerQueryR(Handle<HwTimerQuery> tqh, int) {
@@ -329,39 +329,75 @@ void GfxDriver::createTimerQueryR(Handle<HwTimerQuery> tqh, int) {
 // Resource destruction
 
 void GfxDriver::destroyVertexBuffer(Handle<HwVertexBuffer> vbh) {
+    if (vbh) {
+        destruct_handle<HwVertexBuffer>(vbh);
+    }
 }
 
 void GfxDriver::destroyIndexBuffer(Handle<HwIndexBuffer> ibh) {
+    if (ibh) {
+        destruct_handle<HwIndexBuffer>(ibh);
+    }
 }
 
 void GfxDriver::destroyBufferObject(Handle<HwBufferObject> boh) {
+    if (boh) {
+        destruct_handle<HwBufferObject>(boh);
+    }
 }
 
 void GfxDriver::destroyRenderPrimitive(Handle<HwRenderPrimitive> rph) {
+    if (rph) {
+        destruct_handle<HwRenderPrimitive>(rph);
+    }
 }
 
 void GfxDriver::destroyProgram(Handle<HwProgram> ph) {
+    if (ph) {
+        destruct_handle<HwProgram>(ph);
+    }
 }
 
 void GfxDriver::destroyRenderTarget(Handle<HwRenderTarget> rth) {
+    if (rth) {
+        destruct_handle<HwRenderTarget>(rth);
+    }
 }
 
 void GfxDriver::destroySamplerGroup(Handle<HwSamplerGroup> sbh) {
+    if (sbh) {
+        destruct_handle<HwSamplerGroup>(sbh);
+    }
 }
 
 void GfxDriver::destroyTexture(Handle<HwTexture> th) {
+    if (th) {
+        destruct_handle<HwTexture>(th);
+    }
 }
 
 void GfxDriver::destroySwapChain(Handle<HwSwapChain> sch) {
+    if (sch) {
+        destruct_handle<HwSwapChain>(sch);
+    }
 }
 
 void GfxDriver::destroyStream(Handle<HwStream> sh) {
+    if (sh) {
+        destruct_handle<HwStream>(sh);
+    }
 }
 
 void GfxDriver::destroyTimerQuery(Handle<HwTimerQuery> tqh) {
+    if (tqh) {
+        destruct_handle<HwTimerQuery>(tqh);
+    }
 }
 
 void GfxDriver::destroyFence(Handle<HwFence> fh) {
+    if (fh) {
+        destruct_handle<HwFence>(fh);
+    }
 }
 
 // Resource updates

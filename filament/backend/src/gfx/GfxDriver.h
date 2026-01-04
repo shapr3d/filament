@@ -63,6 +63,22 @@ private:
 
     HandleAllocatorGFX mHandleAllocator;
 
+    template<typename D>
+    Handle<D> alloc_handle() {
+        return mHandleAllocator.allocate<D>();
+    }
+
+        template<typename D, typename B, typename ... ARGS>
+    D* construct_handle(Handle<B>& handle, ARGS&& ... args) noexcept {
+        return mHandleAllocator.construct<D>(handle, std::forward<ARGS>(args)...);
+    }
+
+    template<typename D, typename B>
+    void destruct_handle(Handle<B>& handle) noexcept {
+        auto* p = mHandleAllocator.handle_cast<D*>(handle);
+        mHandleAllocator.deallocate(handle, p);
+    }
+
 };
 
 } // namespace filament::backend
