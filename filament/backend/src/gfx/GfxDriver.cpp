@@ -17,7 +17,11 @@
 #include "gfx/GfxDriver.h"
 #include "CommandStreamDispatcher.h"
 
+#include "Gfx/Gfx_Core.h"
+
 #include <algorithm>
+
+namespace Gfx = ::Shapr::Gfx;
 
 namespace filament::backend {
 
