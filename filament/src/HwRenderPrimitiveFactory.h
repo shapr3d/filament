@@ -80,7 +80,7 @@ private:
     // Shapr: Each entry in this set corresponds to a RenderableBatch.
     // We saw workspaces with over 100K batches, so we had to increase the arena size from 4 to 16 MBs to accommodate 100K+ entires.
     // The pool below uses 64B entries so 16 MB is enough for ~260K entries. Watch out when bumping Filament!
-    // The pool entry size was replaced with sizeof(Key) in v1.71.2 and arena size was decreased in v1.71.3!
+    // The pool entry size was replaced with sizeof(Key) in v1.50.5 and arena size was decreased in v1.55.0!
     static constexpr size_t SET_ARENA_SIZE = 16 * 1024 * 1024;
 
     // Arena for the set<>, using a pool allocator inside a heap area.
