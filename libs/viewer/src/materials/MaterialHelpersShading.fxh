@@ -35,6 +35,7 @@
 // 11    doDeriveAbsorption             materialParams.usageFlags & 2048
 // 12    doDeriveSheenColor             materialParams.usageFlags & 4096
 // 13    doDeriveSubsurfaceColor        materialParams.usageFlags & 8192
+// 14    maskedColorChange              materialParams.usageFlags & 16384
 //
 // Our ASTC compressor lays out the coordinates as XXXY but our BC5 compressor lays them out as XY.
 // The useSwizzledNormalMaps flag indicates if data is stored as XY or XXXY (so we can sample the 
@@ -96,6 +97,10 @@ bool DoDeriveSheenColor() {
 
 bool DoDeriveSubsurfaceColor() {
     return ( materialParams.usageFlags & 8192u ) != 0u;
+}
+
+bool IsMaskedColorChange() {
+    return ( materialParams.usageFlags & 16384u ) != 0u;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -433,7 +438,7 @@ void ApplyClearCoatNormalMap(inout MaterialInputs material, in BiplanarCommonDat
 void ApplyBaseColor(inout MaterialInputs material, in BiplanarCommonData btCommon) {
 #if defined(MATERIAL_HAS_BASE_COLOR)
     if (IsBaseColorTextured()) {
-#if defined(BLENDING_ENABLED) || defined(MATERIAL_HAS_REFRACTION)
+#if defined(BLENDING_ENABLED) || defined(MATERIAL_HAS_REFRACTION) || defined(BLEND_MODE_MASKED)
         material.baseColor.rgba = BiplanarTexture(materialParams_baseColorTexture,
                                                 materialParams.textureScaler.x,
                                                 btCommon)
@@ -445,15 +450,16 @@ void ApplyBaseColor(inout MaterialInputs material, in BiplanarCommonData btCommo
                                     .rgb;
 #endif
     } else {
-#if defined(BLENDING_ENABLED) || defined(MATERIAL_HAS_REFRACTION)
+#if defined(BLENDING_ENABLED) || defined(MATERIAL_HAS_REFRACTION) || defined(BLEND_MODE_MASKED)
         material.baseColor.rgba = materialParams.baseColor.rgba;
 #else
         material.baseColor.rgb = materialParams.baseColor.rgb;
 #endif
     }
 
-    // Naive multiplicative tinting seems to be fine enough for now
-    material.baseColor.rgb *= materialParams.tintColor.rgb;
+    if (!IsMaskedColorChange() || material.baseColor.a > 0.5) {
+        material.baseColor.rgb *= materialParams.tintColor.rgb;
+    }
 
 #if defined(DRAW_WEIGHTS)
     if((materialParams.debugUsageFlags & 1u ) != 0u) {
@@ -469,7 +475,7 @@ void ApplyBaseColor(inout MaterialInputs material, in BiplanarCommonData btCommo
 #if defined(BLENDING_ENABLED)
     material.baseColor.rgb *= material.baseColor.a;
     material.baseColor.a = 0.0;
-#else
+#elif !defined(BLEND_MODE_MASKED)
     material.baseColor.a = 1.0;
 #endif
 #endif

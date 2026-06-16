@@ -507,6 +507,10 @@ ViewerGui::ViewerGui(filament::Engine* engine, filament::Scene* scene, filament:
         Material::Builder()
         .package(SHAPR_MATERIALS_SUBSURFACE_DATA, SHAPR_MATERIALS_SUBSURFACE_SIZE)
         .build(*mEngine);
+    mShaprGeneralMaterials[5] =
+        Material::Builder()
+        .package(SHAPR_MATERIALS_MASKED_DATA, SHAPR_MATERIALS_MASKED_SIZE)
+        .build(*mEngine);
 }
 
 ViewerGui::~ViewerGui() {
@@ -973,7 +977,7 @@ std::string ViewerGui::validateTweaks(const TweakableMaterial& tweaks) {
         // Infer the expected texture format if no explicit cue was given by the caller
         if (expectedFormat == filament::Texture::InternalFormat::UNUSED) {
             if (IsColor) {
-                if (tweaks.mShaderType == TweakableMaterial::MaterialType::Transparent || tweaks.mShaderType == TweakableMaterial::MaterialType::Refractive) {
+                if (tweaks.mShaderType == TweakableMaterial::MaterialType::Transparent || tweaks.mShaderType == TweakableMaterial::MaterialType::Refractive || tweaks.mShaderType == TweakableMaterial::MaterialType::Masked) {
                     expectedFormat = filament::Texture::InternalFormat::SRGB8_A8;
                     expectedChannelCount = 4;
                 }
@@ -1155,6 +1159,10 @@ void ViewerGui::updateUserInterface() {
                             if (ImGui::RadioButton("Subsurface", tweaks.mShaderType == TweakableMaterial::MaterialType::Subsurface)) {
                                 changeMaterialTypeTo(TweakableMaterial::MaterialType::Subsurface);
                             }
+                            ImGui::SameLine();
+                            if (ImGui::RadioButton("Masked", tweaks.mShaderType == TweakableMaterial::MaterialType::Masked)) {
+                                changeMaterialTypeTo(TweakableMaterial::MaterialType::Masked);
+                            }
                         }
                     }
 
@@ -1316,6 +1324,7 @@ void ViewerGui::updateUserInterface() {
                     usageFlags |= static_cast<std::uint32_t>(tweaks.mAbsorption.useDerivedQuantity) << 11u;
                     usageFlags |= static_cast<std::uint32_t>(tweaks.mSheenColor.useDerivedQuantity) << 12u;
                     usageFlags |= static_cast<std::uint32_t>(tweaks.mSubsurfaceColor.useDerivedQuantity) << 13u;
+                    usageFlags |= static_cast<std::uint32_t>(tweaks.mMaskedColorChange) << 14u;
                     matInstance->setParameter("usageFlags", usageFlags);
 
                     setTextureIfPresent(tweaks.mBaseColor.isFile, tweaks.mBaseColor.filename, "baseColor");
@@ -1339,7 +1348,7 @@ void ViewerGui::updateUserInterface() {
                     matInstance->setParameter("roughnessScale", tweaks.mRoughnessScale.value);
                     setTextureIfPresent(tweaks.mRoughness.isFile, tweaks.mRoughness.filename, "roughness");
                     matInstance->setParameter("roughnessUvScaler", tweaks.mRoughnessUvScaler.value);
-                    if (tweaks.mShaderType == TweakableMaterial::MaterialType::Opaque || tweaks.mShaderType == TweakableMaterial::MaterialType::Cloth || tweaks.mShaderType == TweakableMaterial::MaterialType::Subsurface || tweaks.mShaderType == TweakableMaterial::MaterialType::Refractive) {
+                    if (tweaks.mShaderType == TweakableMaterial::MaterialType::Opaque || tweaks.mShaderType == TweakableMaterial::MaterialType::Cloth || tweaks.mShaderType == TweakableMaterial::MaterialType::Subsurface || tweaks.mShaderType == TweakableMaterial::MaterialType::Refractive || tweaks.mShaderType == TweakableMaterial::MaterialType::Masked) {
                         setTextureIfPresent(tweaks.mOcclusion.isFile, tweaks.mOcclusion.filename, "occlusion");
                         matInstance->setParameter("occlusion", tweaks.mOcclusion.value);
                     }
@@ -1379,7 +1388,7 @@ void ViewerGui::updateUserInterface() {
                         matInstance->setParameter("subsurfaceTint", tweaks.mSubsurfaceTint.value * tweaks.mSubsurfaceIntensity.value);
                     }
 
-                    if (tweaks.mShaderType == TweakableMaterial::MaterialType::Opaque || tweaks.mShaderType == TweakableMaterial::MaterialType::Refractive) {
+                    if (tweaks.mShaderType == TweakableMaterial::MaterialType::Opaque || tweaks.mShaderType == TweakableMaterial::MaterialType::Refractive || tweaks.mShaderType == TweakableMaterial::MaterialType::Masked) {
                         // Transparent materials do not expose anisotropy and sheen, these are not present in their UBOs
                         matInstance->setParameter("anisotropy", tweaks.mAnisotropy.value);
                         matInstance->setParameter("anisotropyDirection", normalize(tweaks.mAnisotropyDirection.value));
@@ -1391,7 +1400,7 @@ void ViewerGui::updateUserInterface() {
                             matInstance->setParameter("sheenColor", tweaks.mSheenColor.value);
                             matInstance->setParameter("sheenIntensity", 1.0f);
                         }
-                        if (tweaks.mShaderType == TweakableMaterial::MaterialType::Opaque) {
+                        if (tweaks.mShaderType == TweakableMaterial::MaterialType::Opaque || tweaks.mShaderType == TweakableMaterial::MaterialType::Masked) {
                             setTextureIfPresent(tweaks.mSheenRoughness.isFile, tweaks.mSheenRoughness.filename, "sheenRoughness");
                         }
                         matInstance->setParameter("sheenRoughness", tweaks.mSheenRoughness.value);
