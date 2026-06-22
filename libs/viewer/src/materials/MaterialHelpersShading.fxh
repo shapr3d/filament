@@ -436,6 +436,7 @@ void ApplyClearCoatNormalMap(inout MaterialInputs material, in BiplanarCommonDat
 }
 
 void ApplyBaseColor(inout MaterialInputs material, in BiplanarCommonData btCommon) {
+    float checkA = 1.0;
 #if defined(MATERIAL_HAS_BASE_COLOR)
     if (IsBaseColorTextured()) {
 #if defined(BLENDING_ENABLED) || defined(MATERIAL_HAS_REFRACTION) || defined(BLEND_MODE_MASKED)
@@ -444,10 +445,12 @@ void ApplyBaseColor(inout MaterialInputs material, in BiplanarCommonData btCommo
                                                 btCommon)
                                     .rgba;
 #else
-        material.baseColor.rgb = BiplanarTexture(materialParams_baseColorTexture,
+        vec4 colorT = BiplanarTexture(materialParams_baseColorTexture,
                                                  materialParams.textureScaler.x,
                                                  btCommon)
-                                    .rgb;
+                                    .rgba;
+        material.baseColor.rgb = colorT.rgb;
+        checkA = colorT.a;
 #endif
     } else {
 #if defined(BLENDING_ENABLED) || defined(MATERIAL_HAS_REFRACTION) || defined(BLEND_MODE_MASKED)
@@ -457,8 +460,14 @@ void ApplyBaseColor(inout MaterialInputs material, in BiplanarCommonData btCommo
 #endif
     }
 
-    if (!IsMaskedColorChange() || material.baseColor.a > 0.5) {
+    if (!IsMaskedColorChange()) {
         material.baseColor.rgb *= materialParams.tintColor.rgb;
+    }
+
+    if (IsMaskedColorChange()) {
+        if (checkA > 0.5) {
+            material.baseColor.rgb *= materialParams.tintColor.rgb;
+        }
     }
 
 #if defined(DRAW_WEIGHTS)

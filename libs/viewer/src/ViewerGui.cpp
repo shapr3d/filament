@@ -977,7 +977,7 @@ std::string ViewerGui::validateTweaks(const TweakableMaterial& tweaks) {
         // Infer the expected texture format if no explicit cue was given by the caller
         if (expectedFormat == filament::Texture::InternalFormat::UNUSED) {
             if (IsColor) {
-                if (tweaks.mShaderType == TweakableMaterial::MaterialType::Transparent || tweaks.mShaderType == TweakableMaterial::MaterialType::Refractive || tweaks.mShaderType == TweakableMaterial::MaterialType::Masked) {
+                if (tweaks.mMaskedColorChange || tweaks.mShaderType == TweakableMaterial::MaterialType::Transparent || tweaks.mShaderType == TweakableMaterial::MaterialType::Refractive || tweaks.mShaderType == TweakableMaterial::MaterialType::Masked) {
                     expectedFormat = filament::Texture::InternalFormat::SRGB8_A8;
                     expectedChannelCount = 4;
                 }
