@@ -41,7 +41,8 @@ json TweakableMaterial::toJson() {
     result["shaderType"] = materialTypeToString(mShaderType);
 
     result["useWard"] = mUseWard;
-    result["maskedColorChange"] = mMaskedColorChange;       //what is this
+    result["maskedColorChange"] = mMaskedColorChange;       
+    result["notOrientDefault"] = mNotOrientDefault;    
 
     writeTexturedToJson(result, "baseColor", mBaseColor);
     result["tintColor"] = mTintColor.value;
@@ -119,6 +120,7 @@ void TweakableMaterial::fromJson(const json& source) {
 
     readValueFromJson(source, "useWard", mUseWard, false);
     readValueFromJson(source, "maskedColorChange", mMaskedColorChange, false);
+    readValueFromJson(source, "notOrientDefault", mNotOrientDefault, false);
 
     readTexturedFromJson(source, "baseColor", mBaseColor, true, isAlpha, isAlpha ? 4 : 3);
     readValueFromJson(source, "tintColor", mTintColor, { 1.0f, 1.0f, 1.0f });
@@ -250,6 +252,7 @@ void TweakableMaterial::resetWithType(MaterialType newType) {
     mSheenColor.useDerivedQuantity = false;
     mUseWard = false;
     mMaskedColorChange = false;
+    mNotOrientDefault = false;
     mDoRelease = false;
 
     mShaderType = newType;
@@ -425,6 +428,7 @@ void TweakableMaterial::drawUI(const std::string& header) {
     if (ImGui::CollapsingHeader("Shader setup")) {
         ImGui::Checkbox("Use Ward specular normal distribution", &mUseWard);
         ImGui::Checkbox("Apply tint only where alpha > 0.5", &mMaskedColorChange);
+        ImGui::Checkbox("Not orient default", &mNotOrientDefault);
     }
 }
 
