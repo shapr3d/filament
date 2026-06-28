@@ -99,7 +99,9 @@ void ApplySpotlightState(filament::Engine* engine, filament::Scene* scene, Debug
 
     const float innerRad = s.innerConeDeg * kDegToRad;
     const float outerRad = std::max(s.outerConeDeg * kDegToRad, innerRad + 1e-3f);
-    const float falloff = std::max(s.falloffMultiplier * 2.0f, 1.0f);
+    
+    // FIX 1: Ensure the falloff actually reaches the origin by scaling it with the radial distance
+    const float falloff = std::max(s.radialDistance * s.falloffMultiplier * 2.0f, 1.0f);
 
     const auto linearColor = filament::Color::toLinear(filament::RgbType::sRGB,
                                                        filament::math::float3{s.color[0], s.color[1], s.color[2]});
@@ -109,6 +111,10 @@ void ApplySpotlightState(filament::Engine* engine, filament::Scene* scene, Debug
         filament::LightManager::Builder(filament::LightManager::Type::FOCUSED_SPOT)
             .castShadows(true)
             .build(*engine, s.entity);
+            
+        // FIX 2: Attach a Transform component so the light can exist in 3D space
+        engine->getTransformManager().create(s.entity);
+        
         s.created = true;
     }
 
