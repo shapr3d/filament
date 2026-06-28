@@ -166,7 +166,7 @@ void AutomationEngine::applySettings(Engine* engine, const char* json, size_t js
     for (size_t i = 0; i < content.materialCount; i++) {
         viewer::applySettings(engine, mSettings->material, content.materials[i]);
     }
-    viewer::applySettings(engine, mSettings->lighting, content.indirectLight, content.sunlight,
+    viewer::applySettings(engine, mSettings->lighting, content.indirectLight, content.sunlight, content.spotlight,
             content.assetLights, content.assetLightCount, content.lightManager, content.scene, content.view);
     Camera* camera = &content.view->getCamera();
     Skybox* skybox = content.scene->getSkybox();

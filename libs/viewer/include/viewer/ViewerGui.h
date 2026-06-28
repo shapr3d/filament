@@ -271,6 +271,7 @@ private:
     Scene* const mScene;
     View* const mView;
     const utils::Entity mSunlight;
+    const utils::Entity mSpotlight;
 
     // Lazily instantiated fields.
     filagui::ImGuiHelper* mImGuiHelper = nullptr;

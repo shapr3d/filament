@@ -84,7 +84,7 @@ using LightManager = filament::LightManager;
 // These functions push all editable property values to their respective Filament objects.
 void applySettings(Engine* engine, const ViewSettings& settings, View* dest);
 void applySettings(Engine* engine, const MaterialSettings& settings, MaterialInstance* dest);
-void applySettings(Engine* engine, const LightSettings& settings, IndirectLight* ibl, utils::Entity sunlight,
+void applySettings(Engine* engine, const LightSettings& settings, IndirectLight* ibl, utils::Entity sunlight, utils::Entity spotlight,
         const utils::Entity* sceneLights, size_t sceneLightCount, LightManager* lm, Scene* scene, View* view);
 void applySettings(Engine* engine, const ViewerOptions& settings, Camera* camera, Skybox* skybox,
         Renderer* renderer);
@@ -217,8 +217,9 @@ struct MaterialSettings {
 struct LightSettings {
     bool enableShadows = true;
     bool enableSunlight = true;
+    bool enableSpotlight = true;
     LightManager::ShadowOptions shadowOptions;
-    SoftShadowOptions softShadowOptions;
+    SoftShadowOptions softShadowOptions; //check this later
     float sunlightIntensity = 100000.0f;
     float sunlightHaloSize = 10.0f;
     float sunlightHaloFalloff = 80.0f;

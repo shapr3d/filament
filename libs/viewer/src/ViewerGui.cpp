@@ -55,6 +55,79 @@ std::string g_ArtRootPathStr {};
 namespace filament {
 namespace viewer {
 
+    namespace {
+
+struct DebugSpotlightState {
+    bool enabled = false;
+    float intensity = 10000.0f; // lumens
+    std::array<float, 3> color = {1.0f, 1.0f, 1.0f}; // sRGB
+    float outerConeDeg = 45.0f;
+    float innerConeDeg = 30.0f;
+    float azimuthDeg = 0.0f;
+    float elevationDeg = 45.0f;
+    float radialDistance = 5.0f;
+    float falloffMultiplier = 1.0f;
+    std::array<float, 3> direction = {0.0f, 0.0f, -1.0f};
+
+    utils::Entity entity;
+    bool created = false;
+};
+
+constexpr int kDebugSpotlightCount = 3;
+static std::array<DebugSpotlightState, kDebugSpotlightCount> g_debugSpotlights{};
+
+void ApplySpotlightState(filament::Engine* engine, filament::Scene* scene, DebugSpotlightState& s) {
+    if (!s.enabled) {
+        if (s.created) {
+            scene->remove(s.entity);
+        }
+        return;
+    }
+
+    constexpr float kDegToRad = float(M_PI) / 180.0f;
+    const float azRad = s.azimuthDeg * kDegToRad;
+    const float elRad = s.elevationDeg * kDegToRad;
+    const float cosEl = std::cos(elRad);
+    
+    const filament::math::float3 position{s.radialDistance * cosEl * std::cos(azRad),
+                                          s.radialDistance * cosEl * std::sin(azRad),
+                                          s.radialDistance * std::sin(elRad)};
+
+    filament::math::float3 direction{s.direction[0], s.direction[1], s.direction[2]};
+    const float dirLen = std::sqrt(direction.x * direction.x + direction.y * direction.y + direction.z * direction.z);
+    direction = (dirLen > 1e-6f) ? direction / dirLen : filament::math::float3{0.0f, 0.0f, -1.0f};
+
+    const float innerRad = s.innerConeDeg * kDegToRad;
+    const float outerRad = std::max(s.outerConeDeg * kDegToRad, innerRad + 1e-3f);
+    const float falloff = std::max(s.falloffMultiplier * 2.0f, 1.0f);
+
+    const auto linearColor = filament::Color::toLinear(filament::RgbType::sRGB,
+                                                       filament::math::float3{s.color[0], s.color[1], s.color[2]});
+
+    if (!s.created) {
+        s.entity = utils::EntityManager::get().create();
+        filament::LightManager::Builder(filament::LightManager::Type::FOCUSED_SPOT)
+            .castShadows(true)
+            .build(*engine, s.entity);
+        s.created = true;
+    }
+
+    auto& lm = engine->getLightManager();
+    auto inst = lm.getInstance(s.entity);
+    lm.setPosition(inst, position);
+    lm.setDirection(inst, direction);
+    lm.setColor(inst, linearColor);
+    lm.setIntensity(inst, s.intensity);
+    lm.setFalloff(inst, falloff);
+    lm.setSpotLightCone(inst, innerRad, outerRad);
+
+    if (!scene->hasEntity(s.entity)) {
+        scene->addEntity(s.entity);
+    }
+}
+
+} // anonymous namespace
+
 // Taken from MeshAssimp.cpp
 static int loadTexture(Engine* engine, const std::string& filePath, Texture** map,
     bool sRGB, bool hasAlpha, int numChannels, const std::string& artRootPathStr) {
@@ -461,6 +534,7 @@ ViewerGui::ViewerGui(filament::Engine* engine, filament::Scene* scene, filament:
         int sidebarWidth) :
         mEngine(engine), mScene(scene), mView(view),
         mSunlight(utils::EntityManager::get().create()),
+        mSpotlight(utils::EntityManager::get().create()),
         mSidebarWidth(sidebarWidth) {
 
     mSettings.view.shadowType = ShadowType::PCF;
@@ -484,6 +558,19 @@ ViewerGui::ViewerGui(filament::Engine* engine, filament::Scene* scene, filament:
     if (mSettings.lighting.enableSunlight) {
         mScene->addEntity(mSunlight);
     }
+    LightManager::Builder(LightManager::Type::FOCUSED_SPOT)
+        .position({0.0f, 10.0f, 0.0f})
+        .direction({0.0f, -1.0f, 0.0f})
+        .color({0.0f, 255.0f, 0.0f})
+        .intensity(100000.0f)
+        .falloff(100.0f)
+        .spotLightCone(0.523599f, 0.785398f)
+        .castShadows(true)
+        .build(*engine, mSpotlight);
+    if (mSettings.lighting.enableSunlight) {
+        mScene->addEntity(mSpotlight);
+    }
+
     view->setAmbientOcclusionOptions({ .upsampling = View::QualityLevel::HIGH });
 
     mShaprGeneralMaterials[0] =
@@ -527,6 +614,13 @@ ViewerGui::~ViewerGui() {
         mEngine->destroy(textureEntry.second);
     }
     mEngine->destroy(mSunlight);
+    mEngine->destroy(mSpotlight);
+    for (auto& state : g_debugSpotlights) {
+        if (state.created) {
+            mEngine->destroy(state.entity);
+        }
+    }
+
     delete mImGuiHelper;
 }
 
@@ -1652,6 +1746,62 @@ void ViewerGui::updateUserInterface() {
                 });
             }
         }
+
+    if (ImGui::CollapsingHeader("Debug Spotlights")) {
+        ImGui::Indent();
+        ImGui::TextDisabled("Three debug spotlights, each pointing at the workspace origin.");
+        ImGui::Separator();
+
+        for (int i = 0; i < kDebugSpotlightCount; ++i) {
+            ImGui::PushID(i);
+            auto& state = g_debugSpotlights[i];
+            bool changed = false;
+
+            const std::string header = "Spotlight " + std::to_string(i + 1) + (state.enabled ? " (on)" : " (off)");
+            if (ImGui::CollapsingHeader(header.c_str(), i == 0 ? ImGuiTreeNodeFlags_DefaultOpen : 0)) {
+                changed |= ImGui::Checkbox("Enabled", &state.enabled);
+                ImGui::BeginDisabled(!state.enabled);
+
+                changed |= ImGui::DragFloat("Intensity (lm)", &state.intensity, 100.0f, 0.0f, 1'000'000.0f);
+                changed |= ImGui::ColorEdit3("Color", state.color.data());
+                changed |= ImGui::DragFloat("Outer cone / umbra (°)", &state.outerConeDeg, 0.5f, 1.0f, 89.0f);
+                changed |= ImGui::DragFloat("Inner cone / penumbra (°)", &state.innerConeDeg, 0.5f, 0.0f, 89.0f);
+                state.innerConeDeg = std::min(state.innerConeDeg, state.outerConeDeg);
+
+                //ImGui::SeparatorText("Position");
+                changed |= ImGui::DragFloat("Azimuth (°)", &state.azimuthDeg, 1.0f, -360.0f, 360.0f);
+                changed |= ImGui::DragFloat("Elevation around Z (°)", &state.elevationDeg, 1.0f, -89.0f, 89.0f);
+                changed |= ImGui::DragFloat("Radial distance (m)", &state.radialDistance, 0.1f, 0.01f, 100.0f);
+                changed |= ImGui::DragFloat("Falloff multiplier", &state.falloffMultiplier, 0.1f, 0.01f, 100.0f);
+
+                //ImGui::SeparatorText("Direction");
+                changed |= ImGui::DragFloat3("Forward vector", state.direction.data(), 0.05f, -1.0f, 1.0f);
+                if (ImGui::Button("Aim at workspace center")) {
+                    constexpr float kDegToRad = 3.14159265358979323846f / 180.0f;
+                    const float az = state.azimuthDeg * kDegToRad;
+                    const float el = state.elevationDeg * kDegToRad;
+                    const float cosEl = std::cos(el);
+                    const float px = state.radialDistance * cosEl * std::cos(az);
+                    const float py = state.radialDistance * cosEl * std::sin(az);
+                    const float pz = state.radialDistance * std::sin(el);
+                    const float len = std::sqrt(px * px + py * py + pz * pz);
+                    if (len > 1e-6f) {
+                        state.direction = {-px / len, -py / len, -pz / len};
+                        changed = true;
+                    }
+                }
+                ImGui::EndDisabled();
+            }
+
+            // Immediately update Filament light components if the user dragged a slider
+            if (changed) {
+                ApplySpotlightState(mEngine, mScene, state);
+            }
+            ImGui::PopID();
+        }
+        ImGui::Unindent();
+    }
+
         if (ImGui::CollapsingHeader("Shadows")) {
             ImGui::Checkbox("Enable shadows", &light.enableShadows);
             int mapSize = light.shadowOptions.mapSize;
@@ -1875,8 +2025,8 @@ void ViewerGui::updateUserInterface() {
         }
     });
 
-    applySettings(mEngine, mSettings.lighting, mIndirectLight, mSunlight,
-            lights.data(), lights.size(), &lm, mScene, mView);
+    applySettings(mEngine, mSettings.lighting, mIndirectLight, mSunlight, mSpotlight,
+                lights.data(), lights.size(), &lm, mScene, mView);
 
     // Set IBL options
     {        

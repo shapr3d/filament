@@ -296,7 +296,7 @@ void FView::prepareShadowing(FEngine& engine, FScene::RenderableSoa& renderableD
     }
 
     // Find all shadow-casting spotlights.
-    size_t shadowMapCount = CONFIG_MAX_SHADOW_CASCADES;
+    size_t shadowMapCount = CONFIG_MAX_SHADOW_CASCADES; //this
 
     // We allow a max of CONFIG_MAX_SHADOWMAPS point/spotlight shadows. Any additional
     // shadow-casting spotlights are ignored.
@@ -322,7 +322,7 @@ void FView::prepareShadowing(FEngine& engine, FScene::RenderableSoa& renderableD
 
         const bool spotLight = lcm.isSpotLight(li);
 
-        const size_t shadowMapCountNeeded = spotLight ? 1 : 6;
+        const size_t shadowMapCountNeeded = spotLight ? 1 : 6; //shadow map
         if (shadowMapCount + shadowMapCountNeeded <= CONFIG_MAX_SHADOWMAPS) {
             shadowMapCount += shadowMapCountNeeded;
             const auto& shadowOptions = lcm.getShadowOptions(li);

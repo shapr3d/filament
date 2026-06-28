@@ -96,6 +96,7 @@ public:
         Scene* scene;
         IndirectLight* indirectLight;
         utils::Entity sunlight;
+        utils::Entity spotlight;
         utils::Entity* assetLights;
         size_t assetLightCount;
     };
