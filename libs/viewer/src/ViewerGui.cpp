@@ -59,15 +59,16 @@ namespace viewer {
 
 struct DebugSpotlightState {
     bool enabled = false;
-    float intensity = 10000.0f; // lumens
-    std::array<float, 3> color = {1.0f, 1.0f, 1.0f}; // sRGB
-    float outerConeDeg = 45.0f;
-    float innerConeDeg = 30.0f;
-    float azimuthDeg = 0.0f;
-    float elevationDeg = 45.0f;
-    float radialDistance = 5.0f;
-    float falloffMultiplier = 1.0f;
-    std::array<float, 3> direction = {0.0f, 0.0f, -1.0f};
+    float intensity = 32800.0f; // lumens
+    std::array<float, 3> color = {1.0f, 0.0f, 0.0f}; // sRGB
+    float outerConeDeg = 9.5f;
+    float innerConeDeg = 1.0f;
+    
+    // Explicit 3D position (X, Y, Z) in meters from workspace origin
+    std::array<float, 3> position = {0.0f, 0.0f, -1.664f}; 
+    
+    float falloffMultiplier = 4.010f;
+    std::array<float, 3> direction = {0.0f, 0.0f, 1.0f};
 
     utils::Entity entity;
     bool created = false;
@@ -84,24 +85,17 @@ void ApplySpotlightState(filament::Engine* engine, filament::Scene* scene, Debug
         return;
     }
 
-    constexpr float kDegToRad = float(M_PI) / 180.0f;
-    const float azRad = s.azimuthDeg * kDegToRad;
-    const float elRad = s.elevationDeg * kDegToRad;
-    const float cosEl = std::cos(elRad);
-    
-    const filament::math::float3 position{s.radialDistance * cosEl * std::cos(azRad),
-                                          s.radialDistance * cosEl * std::sin(azRad),
-                                          s.radialDistance * std::sin(elRad)};
+    // Read Cartesian coordinates directly
+    const filament::math::float3 position{s.position[0], s.position[1], s.position[2]};
 
     filament::math::float3 direction{s.direction[0], s.direction[1], s.direction[2]};
     const float dirLen = std::sqrt(direction.x * direction.x + direction.y * direction.y + direction.z * direction.z);
     direction = (dirLen > 1e-6f) ? direction / dirLen : filament::math::float3{0.0f, 0.0f, -1.0f};
 
+    constexpr float kDegToRad = float(M_PI) / 180.0f;
     const float innerRad = s.innerConeDeg * kDegToRad;
     const float outerRad = std::max(s.outerConeDeg * kDegToRad, innerRad + 1e-3f);
-    
-    // FIX 1: Ensure the falloff actually reaches the origin by scaling it with the radial distance
-    const float falloff = std::max(s.radialDistance * s.falloffMultiplier * 2.0f, 1.0f);
+    const float falloff = std::max(s.falloffMultiplier * 2.0f, 1.0f);
 
     const auto linearColor = filament::Color::toLinear(filament::RgbType::sRGB,
                                                        filament::math::float3{s.color[0], s.color[1], s.color[2]});
@@ -111,10 +105,6 @@ void ApplySpotlightState(filament::Engine* engine, filament::Scene* scene, Debug
         filament::LightManager::Builder(filament::LightManager::Type::FOCUSED_SPOT)
             .castShadows(true)
             .build(*engine, s.entity);
-            
-        // FIX 2: Attach a Transform component so the light can exist in 3D space
-        engine->getTransformManager().create(s.entity);
-        
         s.created = true;
     }
 
@@ -564,18 +554,18 @@ ViewerGui::ViewerGui(filament::Engine* engine, filament::Scene* scene, filament:
     if (mSettings.lighting.enableSunlight) {
         mScene->addEntity(mSunlight);
     }
-    LightManager::Builder(LightManager::Type::FOCUSED_SPOT)
-        .position({0.0f, 10.0f, 0.0f})
-        .direction({0.0f, -1.0f, 0.0f})
-        .color({0.0f, 255.0f, 0.0f})
-        .intensity(100000.0f)
-        .falloff(100.0f)
-        .spotLightCone(0.523599f, 0.785398f)
-        .castShadows(true)
-        .build(*engine, mSpotlight);
-    if (mSettings.lighting.enableSunlight) {
-        mScene->addEntity(mSpotlight);
-    }
+    // LightManager::Builder(LightManager::Type::FOCUSED_SPOT)
+    //     .position({0.0f, 10.0f, 0.0f})
+    //     .direction({0.0f, -1.0f, 0.0f})
+    //     .color({0.0f, 255.0f, 0.0f})
+    //     .intensity(100000.0f)
+    //     .falloff(100.0f)
+    //     .spotLightCone(0.523599f, 0.785398f)
+    //     .castShadows(true)
+    //     .build(*engine, mSpotlight);
+    // if (mSettings.lighting.enableSunlight) {
+    //     mScene->addEntity(mSpotlight);
+    // }
 
     view->setAmbientOcclusionOptions({ .upsampling = View::QualityLevel::HIGH });
 
@@ -1754,59 +1744,56 @@ void ViewerGui::updateUserInterface() {
         }
 
     if (ImGui::CollapsingHeader("Debug Spotlights")) {
-        ImGui::Indent();
-        ImGui::TextDisabled("Three debug spotlights, each pointing at the workspace origin.");
-        ImGui::Separator();
+    ImGui::Indent();
+    ImGui::TextDisabled("Three debug spotlights, each pointing at the workspace origin.");
+    ImGui::Separator();
 
-        for (int i = 0; i < kDebugSpotlightCount; ++i) {
-            ImGui::PushID(i);
-            auto& state = g_debugSpotlights[i];
-            bool changed = false;
+    for (int i = 0; i < kDebugSpotlightCount; ++i) {
+        ImGui::PushID(i);
+        auto& state = g_debugSpotlights[i];
+        bool changed = false;
 
-            const std::string header = "Spotlight " + std::to_string(i + 1) + (state.enabled ? " (on)" : " (off)");
-            if (ImGui::CollapsingHeader(header.c_str(), i == 0 ? ImGuiTreeNodeFlags_DefaultOpen : 0)) {
-                changed |= ImGui::Checkbox("Enabled", &state.enabled);
-                ImGui::BeginDisabled(!state.enabled);
+        const std::string header = "Spotlight " + std::to_string(i + 1) + (state.enabled ? " (on)" : " (off)");
+        if (ImGui::CollapsingHeader(header.c_str(), i == 0 ? ImGuiTreeNodeFlags_DefaultOpen : 0)) {
+            changed |= ImGui::Checkbox("Enabled", &state.enabled);
+            ImGui::BeginDisabled(!state.enabled);
 
-                changed |= ImGui::DragFloat("Intensity (lm)", &state.intensity, 100.0f, 0.0f, 1'000'000.0f);
-                changed |= ImGui::ColorEdit3("Color", state.color.data());
-                changed |= ImGui::DragFloat("Outer cone / umbra (°)", &state.outerConeDeg, 0.5f, 1.0f, 89.0f);
-                changed |= ImGui::DragFloat("Inner cone / penumbra (°)", &state.innerConeDeg, 0.5f, 0.0f, 89.0f);
-                state.innerConeDeg = std::min(state.innerConeDeg, state.outerConeDeg);
+            changed |= ImGui::DragFloat("Intensity (lm)", &state.intensity, 100.0f, 0.0f, 1'000'000.0f);
+            changed |= ImGui::ColorEdit3("Color", state.color.data());
+            changed |= ImGui::DragFloat("Outer cone / umbra (°)", &state.outerConeDeg, 0.5f, 1.0f, 89.0f);
+            changed |= ImGui::DragFloat("Inner cone / penumbra (°)", &state.innerConeDeg, 0.5f, 0.0f, 89.0f);
+            
+            // Penumbra clamping logic (guarantees `changed` flag is ticked)
+            if (state.innerConeDeg > state.outerConeDeg) {
+                state.innerConeDeg = state.outerConeDeg;
+                changed = true;
+            }
 
-                //ImGui::SeparatorText("Position");
-                changed |= ImGui::DragFloat("Azimuth (°)", &state.azimuthDeg, 1.0f, -360.0f, 360.0f);
-                changed |= ImGui::DragFloat("Elevation around Z (°)", &state.elevationDeg, 1.0f, -89.0f, 89.0f);
-                changed |= ImGui::DragFloat("Radial distance (m)", &state.radialDistance, 0.1f, 0.01f, 100.0f);
-                changed |= ImGui::DragFloat("Falloff multiplier", &state.falloffMultiplier, 0.1f, 0.01f, 100.0f);
+            // Modified Position Section
+            changed |= ImGui::DragFloat3("Position (XYZ)", state.position.data(), 0.1f);
+            changed |= ImGui::DragFloat("Falloff multiplier", &state.falloffMultiplier, 0.1f, 0.01f, 100.0f);
 
-                //ImGui::SeparatorText("Direction");
-                changed |= ImGui::DragFloat3("Forward vector", state.direction.data(), 0.05f, -1.0f, 1.0f);
-                if (ImGui::Button("Aim at workspace center")) {
-                    constexpr float kDegToRad = 3.14159265358979323846f / 180.0f;
-                    const float az = state.azimuthDeg * kDegToRad;
-                    const float el = state.elevationDeg * kDegToRad;
-                    const float cosEl = std::cos(el);
-                    const float px = state.radialDistance * cosEl * std::cos(az);
-                    const float py = state.radialDistance * cosEl * std::sin(az);
-                    const float pz = state.radialDistance * std::sin(el);
-                    const float len = std::sqrt(px * px + py * py + pz * pz);
-                    if (len > 1e-6f) {
-                        state.direction = {-px / len, -py / len, -pz / len};
-                        changed = true;
-                    }
+            changed |= ImGui::DragFloat3("Forward vector", state.direction.data(), 0.05f, -1.0f, 1.0f);
+            if (ImGui::Button("Aim at workspace center")) {
+                const float px = state.position[0];
+                const float py = state.position[1];
+                const float pz = state.position[2];
+                const float len = std::sqrt(px * px + py * py + pz * pz);
+                if (len > 1e-6f) {
+                    state.direction = {-px / len, -py / len, -pz / len};
+                    changed = true;
                 }
-                ImGui::EndDisabled();
             }
-
-            // Immediately update Filament light components if the user dragged a slider
-            if (changed) {
-                ApplySpotlightState(mEngine, mScene, state);
-            }
-            ImGui::PopID();
+            ImGui::EndDisabled();
         }
-        ImGui::Unindent();
+
+        if (changed) {
+            ApplySpotlightState(mEngine, mScene, state);
+        }
+        ImGui::PopID();
     }
+    ImGui::Unindent();
+}
 
         if (ImGui::CollapsingHeader("Shadows")) {
             ImGui::Checkbox("Enable shadows", &light.enableShadows);
