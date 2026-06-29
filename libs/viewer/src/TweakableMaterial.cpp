@@ -280,8 +280,8 @@ void TweakableMaterial::drawUI(const std::string& header) {
         mBaseColor.addWidget("baseColor");
         if (mBaseColor.isFile) {
             bool isAlpha = (mMaskedColorChange || mShaderType == MaterialType::Transparent || mShaderType == MaterialType::Refractive || mShaderType == MaterialType::Masked);
-            //enqueueTextureRequest(mBaseColor, true, isAlpha, isAlpha ? 4 : 3);
-            enqueueTextureRequest(mBaseColor, true, isAlpha, 4 );
+            enqueueTextureRequest(mBaseColor, true, isAlpha, isAlpha ? 4 : 3);
+            //enqueueTextureRequest(mBaseColor, true, isAlpha, 4 );
         }
 
         mTintColor.addWidget("tintColor");

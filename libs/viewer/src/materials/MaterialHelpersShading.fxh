@@ -465,8 +465,8 @@ void ApplyBaseColor(inout MaterialInputs material, in BiplanarCommonData btCommo
     }
 
     if (IsMaskedColorChange()) {
-        if (checkA > 0.5) {
-            material.baseColor.rgb *= materialParams.tintColor.rgb;
+        if (checkA > 0.3) {
+            material.baseColor.rgb *= (materialParams.tintColor.rgb*checkA + (1.0-checkA)*vec3(1.0, 1.0, 1.0));
         }
     }
 
