@@ -116,6 +116,10 @@ int GetNotOrientedVerticalAxis() {
     return ( materialParams.usageFlags & 65536u ) != 0u ? 1 : 2;
 }
 
+bool IsNotOrientedAxisY() {
+    return ( materialParams.usageFlags & 65536u ) != 0u;
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Various attributes have scalers associated with them. These are their human-readable getters
@@ -235,6 +239,7 @@ BiplanarAxes ComputeBiplanarPlanes(vec3 weights) {
                                                                   ivec3(2,0,1);
         
     // 'median axis (in x;  yz are following axis)'
+    
     ivec3 me = ivec3(3) - mi - ma;
 
     BiplanarAxes result;
@@ -248,6 +253,10 @@ struct BiplanarCommonData {
     vec3 orientedNormal;
     vec3 rotatedVectorToMatCenter;
     BiplanarAxes axes;
+    // Unrotated world-space position (relative to the orientation center) and normal, used by the
+    // temporary axis-locked sampling path below (see AxisLockedTexture/AxisLockedNormalMap).
+    vec3 worldPos;
+    vec3 worldNormal;
 };
 
 BiplanarData GenerateBiplanarData(in BiplanarCommonData btCommon, float scaler) {
@@ -329,15 +338,84 @@ BiplanarCommonData ComputeBiplanarCommonData(in FragmentData fragmentData) {
     }
 
     res.axes = ComputeBiplanarPlanes(res.normalWeights);
-    res.rotatedVectorToMatCenter = (fragmentData.pos - getMaterialOrientationCenter());
-    res.rotatedVectorToMatCenter *= orientMatrix;
+    res.worldPos = (fragmentData.pos - getMaterialOrientationCenter());
+    res.worldNormal = fragmentData.normal;
+    res.rotatedVectorToMatCenter = res.worldPos * orientMatrix;
     return res;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// TEMPORARY: axis-locked sampling used instead of the generic biplanar system when IsNotOriented()
+// is set. Bypasses axis ranking and tangent-frame reconstruction entirely: always blends the same
+// two fixed planes that both include the configured vertical axis (GetNotOrientedVerticalAxis()),
+// weighted by how much the surface faces the two horizontal axes. No dynamic vector indexing is
+// used here on purpose, to rule that out as a source of cross-backend inconsistency. Remove by
+// deleting this block and the two "if (IsNotOriented())" early-outs below it once the generic path
+// is fixed, or once this is confirmed good enough to keep.
+//
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct AxisLockedSample {
+    vec2 uvHoriz1; vec2 dpdxHoriz1; vec2 dpdyHoriz1; float weightHoriz1;
+    vec2 uvHoriz2; vec2 dpdxHoriz2; vec2 dpdyHoriz2; float weightHoriz2;
+};
+
+AxisLockedSample ComputeAxisLockedSample(in BiplanarCommonData btCommon, float scaler) {
+    vec3 pos = btCommon.worldPos * scaler;
+    vec3 dpdx = dFdx(pos);
+    vec3 dpdy = dFdy(pos);
+    vec3 n = btCommon.worldNormal;
+
+    AxisLockedSample result;
+    if (IsNotOrientedAxisY()) {
+        // Vertical = Y; horizontal axes are X and Z.
+        result.uvHoriz1   = vec2(pos.x, pos.y);
+        result.dpdxHoriz1 = vec2(dpdx.x, dpdx.y);
+        result.dpdyHoriz1 = vec2(dpdy.x, dpdy.y);
+
+        result.uvHoriz2   = vec2(pos.z, pos.y);
+        result.dpdxHoriz2 = vec2(dpdx.z, dpdx.y);
+        result.dpdyHoriz2 = vec2(dpdy.z, dpdy.y);
+
+        float w1 = abs(n.z);
+        float w2 = abs(n.x);
+        float sum = w1 + w2;
+        result.weightHoriz1 = sum > 0.0001 ? w1 / sum : 1.0;
+        result.weightHoriz2 = sum > 0.0001 ? w2 / sum : 0.0;
+    } else {
+        // Vertical = Z; horizontal axes are X and Y.
+        result.uvHoriz1   = vec2(pos.x, pos.z);
+        result.dpdxHoriz1 = vec2(dpdx.x, dpdx.z);
+        result.dpdyHoriz1 = vec2(dpdy.x, dpdy.z);
+
+        result.uvHoriz2   = vec2(pos.y, pos.z);
+        result.dpdxHoriz2 = vec2(dpdx.y, dpdx.z);
+        result.dpdyHoriz2 = vec2(dpdy.y, dpdy.z);
+
+        float w1 = abs(n.y);
+        float w2 = abs(n.x);
+        float sum = w1 + w2;
+        result.weightHoriz1 = sum > 0.0001 ? w1 / sum : 1.0;
+        result.weightHoriz2 = sum > 0.0001 ? w2 / sum : 0.0;
+    }
+    return result;
+}
+
+vec4 AxisLockedTexture(sampler2D tex, float scaler, in BiplanarCommonData btCommon) {
+    AxisLockedSample s = ComputeAxisLockedSample(btCommon, scaler);
+    vec4 sample1 = textureGrad(tex, s.uvHoriz1, s.dpdxHoriz1, s.dpdyHoriz1);
+    vec4 sample2 = textureGrad(tex, s.uvHoriz2, s.dpdxHoriz2, s.dpdyHoriz2);
+    return sample1 * s.weightHoriz1 + sample2 * s.weightHoriz2;
 }
 
 const float kSupportThreshold = 0.25;
 const float kSupportThresholdInv = 1.0 / (1.0 - kSupportThreshold);
 
 vec4 BiplanarTexture(sampler2D tex, float scaler, in BiplanarCommonData btCommon) {
+    if (IsNotOriented()) {
+        return AxisLockedTexture(tex, scaler, btCommon);
+    }
     // We sort triplanar plane relevance by the relative ordering of the weights and not by the normal
     BiplanarData queryData = GenerateBiplanarData(btCommon, scaler);
 
@@ -378,6 +456,29 @@ vec3 UnpackNormal(vec2 packedNormal, vec2 scale) {
     return vec3(x, y, sqrt(clamp(1.0 - x * x - y * y, 0.0, 1.0)));
 }
 
+vec3 AxisLockedNormalMap(sampler2D normalMap, float scaler, bool useSwizzledNormalMaps, float normalIntensity, in BiplanarCommonData btCommon) {
+    AxisLockedSample s = ComputeAxisLockedSample(btCommon, scaler);
+    vec3 n = btCommon.worldNormal;
+
+    vec2 packed1 = SampleNormalMap(normalMap, s.uvHoriz1, s.dpdxHoriz1, s.dpdyHoriz1, useSwizzledNormalMaps);
+    vec2 packed2 = SampleNormalMap(normalMap, s.uvHoriz2, s.dpdxHoriz2, s.dpdyHoriz2, useSwizzledNormalMaps);
+    vec3 t1 = UnpackNormal(packed1, vec2(normalIntensity, normalIntensity));
+    vec3 t2 = UnpackNormal(packed2, vec2(normalIntensity, normalIntensity));
+
+    vec3 fromPlane1;
+    vec3 fromPlane2;
+    if (IsNotOrientedAxisY()) {
+        // Plane 1 spans (X, Y), facing along Z. Plane 2 spans (Z, Y), facing along X.
+        fromPlane1 = vec3(t1.x, t1.y, t1.z * SIGN_NO_ZERO(n.z));
+        fromPlane2 = vec3(t2.z * SIGN_NO_ZERO(n.x), t2.y, t2.x);
+    } else {
+        // Plane 1 spans (X, Z), facing along Y. Plane 2 spans (Y, Z), facing along X.
+        fromPlane1 = vec3(t1.x, t1.z * SIGN_NO_ZERO(n.y), t1.y);
+        fromPlane2 = vec3(t2.z * SIGN_NO_ZERO(n.x), t2.x, t2.y);
+    }
+    return normalize(fromPlane1 * s.weightHoriz1 + fromPlane2 * s.weightHoriz2);
+}
+
 vec2 swizzleIvec(vec3 x, ivec2 i) {
     return vec2( x[i[0]], x[i[1]] );
 }
@@ -391,6 +492,9 @@ vec3 swizzleIvec(vec3 x, ivec3 i) {
 // Refer to https://iquilezles.org/articles/biplanar/
 // Refer to (basic triplanar mapping) https://bgolus.medium.com/normal-mapping-for-a-triplanar-shader-10bf39dca05a
 vec3 BiplanarNormalMap(sampler2D normalMap, float scaler, bool useSwizzledNormalMaps, float normalIntensity, in BiplanarCommonData btCommon) {
+    if (IsNotOriented()) {
+        return AxisLockedNormalMap(normalMap, scaler, useSwizzledNormalMaps, normalIntensity, btCommon);
+    }
     // We sort triplanar plane relevance by the relative ordering of the weights and not by the normal
     BiplanarAxes axes = btCommon.axes;
     BiplanarData queryData = GenerateBiplanarData(btCommon, scaler);
