@@ -1423,7 +1423,7 @@ void ViewerGui::updateUserInterface() {
                     setTextureIfPresent(tweaks.mClearCoatNormal.isFile, tweaks.mClearCoatNormal.filename, "clearCoatNormal");
                     setTextureIfPresent(tweaks.mClearCoatRoughness.isFile, tweaks.mClearCoatRoughness.filename, "clearCoatRoughness");
 
-                    matInstance->setParameter("textureScaler", math::float4(tweaks.mBaseTextureScale, tweaks.mNormalTextureScale, tweaks.mClearCoatTextureScale, tweaks.mRefractiveTextureScale));
+                    matInstance->setParameter("textureScaler", math::float4(tweaks.mBaseTextureScale * 0.1, tweaks.mNormalTextureScale * 0.1, tweaks.mClearCoatTextureScale * 0.1, tweaks.mRefractiveTextureScale * 0.1));
                     math::float4 gammaBaseColor{}; 
                     gammaBaseColor.r = std::pow(tweaks.mBaseColor.value.r, 2.22f); 
                     gammaBaseColor.g = std::pow(tweaks.mBaseColor.value.g, 2.22f);
