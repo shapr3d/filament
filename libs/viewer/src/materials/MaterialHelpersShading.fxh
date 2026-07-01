@@ -36,6 +36,7 @@
 // 12    doDeriveSheenColor             materialParams.usageFlags & 4096
 // 13    doDeriveSubsurfaceColor        materialParams.usageFlags & 8192
 // 14    maskedColorChange              materialParams.usageFlags & 16384
+// 15    ply                            materialParams.usageFlags & 32768
 //
 // Our ASTC compressor lays out the coordinates as XXXY but our BC5 compressor lays them out as XY.
 // The useSwizzledNormalMaps flag indicates if data is stored as XY or XXXY (so we can sample the 
@@ -101,6 +102,10 @@ bool DoDeriveSubsurfaceColor() {
 
 bool IsMaskedColorChange() {
     return ( materialParams.usageFlags & 16384u ) != 0u;
+}
+
+bool IsPLY() {
+    return ( materialParams.usageFlags & 32768u ) != 0u;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -289,6 +294,18 @@ BiplanarCommonData ComputeBiplanarCommonData(in FragmentData fragmentData) {
     BiplanarCommonData res;
     res.orientedNormal = fragmentData.normal * getMaterialOrientationMatrix();
     res.normalWeights = ComputeWeights(res.orientedNormal);
+    
+    // Globally enforce PLY stability for Albedo, Normals, and Roughness simultaneously
+    if (IsPLY()) {
+        res.normalWeights.z = 0.0;
+        float sum = res.normalWeights.x + res.normalWeights.y;
+        if (sum > 0.0001) {
+            res.normalWeights.xy /= sum;
+        } else {
+            res.normalWeights.x = 1.0;
+        }
+    }
+    
     res.axes = ComputeBiplanarPlanes(res.normalWeights);
     res.rotatedVectorToMatCenter = (fragmentData.pos - getMaterialOrientationCenter());
     res.rotatedVectorToMatCenter *= getMaterialOrientationMatrix();
@@ -354,7 +371,11 @@ vec3 swizzleIvec(vec3 x, ivec3 i) {
 vec3 BiplanarNormalMap(sampler2D normalMap, float scaler, bool useSwizzledNormalMaps, float normalIntensity, in BiplanarCommonData btCommon) {
     // We sort triplanar plane relevance by the relative ordering of the weights and not by the normal
     BiplanarAxes axes = btCommon.axes;
-    BiplanarData queryData = GenerateBiplanarData(btCommon, scaler);
+    float scaleMult = 1.0;
+    if (IsPLY()) {
+        scaleMult = 0.01;
+    }
+    BiplanarData queryData = GenerateBiplanarData(btCommon, scaler * scaleMult);
 
     // Tangent space normal maps in a quasi world space. 2-channel XY TS normal texture: this saves 33% on storage
     vec2 packedNormalMax = SampleNormalMap(normalMap, queryData.maxPos, queryData.maxDpDx, queryData.maxDpDy, useSwizzledNormalMaps);
@@ -437,18 +458,41 @@ void ApplyClearCoatNormalMap(inout MaterialInputs material, in BiplanarCommonDat
 
 void ApplyBaseColor(inout MaterialInputs material, in BiplanarCommonData btCommon) {
     float checkA = 1.0;
+    
+    // Create a modifiable local copy of the common biplanar data
+    BiplanarCommonData localBtCommon = btCommon;
+
 #if defined(MATERIAL_HAS_BASE_COLOR)
+    
+    // Check for PLY material and override projection planes
+    if (IsPLY()) {
+        // Force the Z normal weight to 0. This locks out the XY projection plane.
+        // As a result, the shader only blends X and Y planes, both of which 
+        // naturally map your texture's V-axis to the object's Z coordinate.
+        // (Note: If you actually meant to fix Y, set .y = 0.0 and normalize .xz instead).
+        localBtCommon.normalWeights.z = 0.0;
+        
+        // Re-normalize the remaining X and Y weights
+        float weightSum = localBtCommon.normalWeights.x + localBtCommon.normalWeights.y;
+        if (weightSum > 0.0001) {
+            localBtCommon.normalWeights.xy /= weightSum;
+        } else {
+            localBtCommon.normalWeights.x = 1.0; // Fallback to avoid division by zero
+        }
+        
+        // Recompute the dominant axes using our modified weights
+        localBtCommon.axes = ComputeBiplanarPlanes(localBtCommon.normalWeights);
+    }
+
     if (IsBaseColorTextured()) {
 #if defined(BLENDING_ENABLED) || defined(MATERIAL_HAS_REFRACTION) || defined(BLEND_MODE_MASKED)
         material.baseColor.rgba = BiplanarTexture(materialParams_baseColorTexture,
                                                 materialParams.textureScaler.x,
-                                                btCommon)
-                                    .rgba;
+                                                localBtCommon).rgba;
 #else
         vec4 colorT = BiplanarTexture(materialParams_baseColorTexture,
-                                                 materialParams.textureScaler.x,
-                                                 btCommon)
-                                    .rgba;
+                                      materialParams.textureScaler.x,
+                                      localBtCommon).rgba;
         material.baseColor.rgb = colorT.rgb;
         checkA = colorT.a;
 #endif
@@ -473,10 +517,9 @@ void ApplyBaseColor(inout MaterialInputs material, in BiplanarCommonData btCommo
 #if defined(DRAW_WEIGHTS)
     if((materialParams.debugUsageFlags & 1u ) != 0u) {
         vec3 vn = material.normal.xyz * getMaterialOrientationMatrix();
-        // If an axis has negative value, a complementer color is calculated using the following matrix
-        mat3 complementerMatrix = mat3(0.0, 1.0, 1.0,    // -X => cyan
-                                    1.0, 0.0, 1.0,    // -Y => magenta
-                                    1.0, 1.0, 0.0);   // -Z => yellow
+        mat3 complementerMatrix = mat3(0.0, 1.0, 1.0,    
+                                    1.0, 0.0, 1.0,    
+                                    1.0, 1.0, 0.0);   
         material.baseColor = vec4(clamp(vn, 0.0, 1.0) + clamp(-vn, 0.0, 1.0) * complementerMatrix, 1.0);
     }
 #endif
