@@ -1391,6 +1391,7 @@ void ViewerGui::updateUserInterface() {
                     usageFlags |= static_cast<std::uint32_t>(tweaks.mSubsurfaceColor.useDerivedQuantity) << 13u;
                     usageFlags |= static_cast<std::uint32_t>(tweaks.mMaskedColorChange) << 14u;
                     usageFlags |= static_cast<std::uint32_t>(tweaks.mNotOrientDefault) << 15u;
+                    usageFlags |= static_cast<std::uint32_t>(tweaks.mNotOrientedAxisIsY) << 16u;
                     matInstance->setParameter("usageFlags", usageFlags);
 
                     setTextureIfPresent(tweaks.mBaseColor.isFile, tweaks.mBaseColor.filename, "baseColor");

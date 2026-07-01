@@ -42,7 +42,8 @@ json TweakableMaterial::toJson() {
 
     result["useWard"] = mUseWard;
     result["maskedColorChange"] = mMaskedColorChange;       
-    result["notOrientDefault"] = mNotOrientDefault;    
+    result["notOrientDefault"] = mNotOrientDefault;
+    result["notOrientedAxisIsY"] = mNotOrientedAxisIsY;
 
     writeTexturedToJson(result, "baseColor", mBaseColor);
     result["tintColor"] = mTintColor.value;
@@ -119,6 +120,7 @@ void TweakableMaterial::fromJson(const json& source) {
     readValueFromJson(source, "useWard", mUseWard, false);
     readValueFromJson(source, "maskedColorChange", mMaskedColorChange, false);
     readValueFromJson(source, "notOrientDefault", mNotOrientDefault, false);
+    readValueFromJson(source, "notOrientedAxisIsY", mNotOrientedAxisIsY, false);
 
     bool isAlpha = mMaskedColorChange || (mShaderType == TweakableMaterial::MaterialType::Transparent) || (mShaderType == TweakableMaterial::MaterialType::Refractive) || (mShaderType == TweakableMaterial::MaterialType::Masked);
 
@@ -253,6 +255,7 @@ void TweakableMaterial::resetWithType(MaterialType newType) {
     mUseWard = false;
     mMaskedColorChange = false;
     mNotOrientDefault = false;
+    mNotOrientedAxisIsY = false;
     mDoRelease = false;
 
     mShaderType = newType;
@@ -429,6 +432,12 @@ void TweakableMaterial::drawUI(const std::string& header) {
         ImGui::Checkbox("Use Ward specular normal distribution", &mUseWard);
         ImGui::Checkbox("Apply tint only where alpha > 0.3", &mMaskedColorChange);
         ImGui::Checkbox("Lock orientation to one axis, biplanar-blend the other two", &mNotOrientDefault);
+        if (mNotOrientDefault) {
+            int axis = mNotOrientedAxisIsY ? 1 : 0;
+            ImGui::RadioButton("Keep Z fixed (blend X/Y)", &axis, 0); ImGui::SameLine();
+            ImGui::RadioButton("Keep Y fixed (blend X/Z)", &axis, 1);
+            mNotOrientedAxisIsY = axis != 0;
+        }
     }
 }
 

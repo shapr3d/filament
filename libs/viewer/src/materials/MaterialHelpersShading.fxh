@@ -37,6 +37,7 @@
 // 13    doDeriveSubsurfaceColor        materialParams.usageFlags & 8192
 // 14    maskedColorChange              materialParams.usageFlags & 16384
 // 15    notOrientDefault               materialParams.usageFlags & 32768
+// 16    notOrientedAxisIsY             materialParams.usageFlags & 65536
 //
 // Our ASTC compressor lays out the coordinates as XXXY but our BC5 compressor lays them out as XY.
 // The useSwizzledNormalMaps flag indicates if data is stored as XY or XXXY (so we can sample the 
@@ -106,6 +107,13 @@ bool IsMaskedColorChange() {
 
 bool IsNotOriented() {
     return ( materialParams.usageFlags & 32768u ) != 0u;
+}
+
+// Which world axis stays fixed (unblended) when IsNotOriented() is set: 1 = Y, 2 = Z.
+// Filament scenes can be authored either Y-up or Z-up (see Skybox::UpDirectionAxis), so this
+// has to be a per-material choice rather than a hardcoded axis.
+int GetNotOrientedVerticalAxis() {
+    return ( materialParams.usageFlags & 65536u ) != 0u ? 1 : 2;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -289,27 +297,40 @@ vec3 ComputeWeights(vec3 normal) {
     return blend;
 }
 
+// When IsNotOriented() is set, the per-object material orientation matrix must not be applied:
+// its whole purpose is to keep the projection tied to world space regardless of how the object
+// itself is rotated/oriented, so mixing in that rotation here would defeat the point.
+mat3 GetEffectiveOrientationMatrix() {
+    return IsNotOriented() ? mat3(1.0) : getMaterialOrientationMatrix();
+}
+
 //compute data shared between different functions
 BiplanarCommonData ComputeBiplanarCommonData(in FragmentData fragmentData) {
     BiplanarCommonData res;
-    res.orientedNormal = fragmentData.normal * getMaterialOrientationMatrix();
+    mat3 orientMatrix = GetEffectiveOrientationMatrix();
+    res.orientedNormal = fragmentData.normal * orientMatrix;
     res.normalWeights = ComputeWeights(res.orientedNormal);
-    
-    // Lock the biplanar projection to a single fixed axis (Z) and blend only X/Y, so
-    // texturing stays consistent across the model instead of orienting per-fragment.
+
+    // Lock the biplanar projection to a single fixed world axis (chosen via
+    // GetNotOrientedVerticalAxis()) and blend only the other two, so texturing stays
+    // consistent across the model/scene instead of re-orienting per-fragment.
     if (IsNotOriented()) {
-        res.normalWeights.z = 0.0;
-        float sum = res.normalWeights.x + res.normalWeights.y;
+        int vertical = GetNotOrientedVerticalAxis();
+        int a = (vertical + 1) % 3;
+        int b = (vertical + 2) % 3;
+        res.normalWeights[vertical] = 0.0;
+        float sum = res.normalWeights[a] + res.normalWeights[b];
         if (sum > 0.0001) {
-            res.normalWeights.xy /= sum;
+            res.normalWeights[a] /= sum;
+            res.normalWeights[b] /= sum;
         } else {
-            res.normalWeights.x = 1.0;
+            res.normalWeights[a] = 1.0;
         }
     }
-    
+
     res.axes = ComputeBiplanarPlanes(res.normalWeights);
     res.rotatedVectorToMatCenter = (fragmentData.pos - getMaterialOrientationCenter());
-    res.rotatedVectorToMatCenter *= getMaterialOrientationMatrix();
+    res.rotatedVectorToMatCenter *= orientMatrix;
     return res;
 }
 
@@ -398,7 +419,7 @@ vec3 BiplanarNormalMap(sampler2D normalMap, float scaler, bool useSwizzledNormal
     // Blend and normalize
     vec3 r = swizzleIvec(tNormalMax, worldSwizzles[maxAxis]) * queryData.mainWeight * worldMultipliers[maxAxis] +
              swizzleIvec(tNormalMed, worldSwizzles[medAxis]) * queryData.medianWeight * worldMultipliers[medAxis];
-    return getMaterialOrientationMatrix() * normalize(r);
+    return GetEffectiveOrientationMatrix() * normalize(r);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -493,7 +514,7 @@ void ApplyBaseColor(inout MaterialInputs material, in BiplanarCommonData btCommo
 
 #if defined(DRAW_WEIGHTS)
     if((materialParams.debugUsageFlags & 1u ) != 0u) {
-        vec3 vn = material.normal.xyz * getMaterialOrientationMatrix();
+        vec3 vn = material.normal.xyz * GetEffectiveOrientationMatrix();
         mat3 complementerMatrix = mat3(0.0, 1.0, 1.0,    
                                     1.0, 0.0, 1.0,    
                                     1.0, 1.0, 0.0);   

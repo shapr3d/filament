@@ -133,6 +133,7 @@ public:
     bool mUseWard{};
     bool mMaskedColorChange{};
     bool mNotOrientDefault{};
+    bool mNotOrientedAxisIsY{}; // when mNotOrientDefault is set, which world axis to keep fixed (false = Z, true = Y)
     bool mDoRelease{}; // this notifies the material integrator tool that this material needs to be checked into the codebase
 
     enum MaterialType { Opaque, Transparent, Refractive, Cloth, Subsurface, Masked };
