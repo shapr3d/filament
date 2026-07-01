@@ -38,6 +38,7 @@
 #include <math/mat4.h>
 #include <math/vec3.h>
 
+#include <array>
 #include <functional>
 #include <vector>
 
@@ -271,7 +272,27 @@ private:
     Scene* const mScene;
     View* const mView;
     const utils::Entity mSunlight;
-    const utils::Entity mSpotlight;
+
+    // Three debug spotlights, each independently positionable/colorable, pointing at the model.
+    struct DebugSpotlightState {
+        bool enabled = false;
+        float intensity = 32800.0f; // lumens
+        std::array<float, 3> color = {1.0f, 1.0f, 1.0f}; // sRGB
+        float outerConeDeg = 9.5f;
+        float innerConeDeg = 1.0f;
+
+        // Explicit 3D position (X, Y, Z) in meters from workspace origin
+        std::array<float, 3> position = {0.0f, 0.0f, 0.0f};
+
+        float falloffMultiplier = 4.010f;
+        std::array<float, 3> direction = {0.0f, 0.0f, 1.0f};
+
+        utils::Entity entity;
+        bool created = false;
+    };
+    static constexpr int kDebugSpotlightCount = 3;
+    std::array<DebugSpotlightState, kDebugSpotlightCount> mDebugSpotlights{};
+    void applyDebugSpotlightState(DebugSpotlightState& state);
 
     // Lazily instantiated fields.
     filagui::ImGuiHelper* mImGuiHelper = nullptr;

@@ -116,11 +116,11 @@ void TweakableMaterial::fromJson(const json& source) {
         readShaderType(source["materialType"]);
     }
 
-    bool isAlpha = mMaskedColorChange || (mShaderType == TweakableMaterial::MaterialType::Transparent) || (mShaderType == TweakableMaterial::MaterialType::Refractive) || (mShaderType == TweakableMaterial::MaterialType::Masked);
-
     readValueFromJson(source, "useWard", mUseWard, false);
     readValueFromJson(source, "maskedColorChange", mMaskedColorChange, false);
     readValueFromJson(source, "notOrientDefault", mNotOrientDefault, false);
+
+    bool isAlpha = mMaskedColorChange || (mShaderType == TweakableMaterial::MaterialType::Transparent) || (mShaderType == TweakableMaterial::MaterialType::Refractive) || (mShaderType == TweakableMaterial::MaterialType::Masked);
 
     readTexturedFromJson(source, "baseColor", mBaseColor, true, isAlpha, isAlpha ? 4 : 3);
     readValueFromJson(source, "tintColor", mTintColor, { 1.0f, 1.0f, 1.0f });
@@ -281,7 +281,6 @@ void TweakableMaterial::drawUI(const std::string& header) {
         if (mBaseColor.isFile) {
             bool isAlpha = (mMaskedColorChange || mShaderType == MaterialType::Transparent || mShaderType == MaterialType::Refractive || mShaderType == MaterialType::Masked);
             enqueueTextureRequest(mBaseColor, true, isAlpha, isAlpha ? 4 : 3);
-            //enqueueTextureRequest(mBaseColor, true, isAlpha, 4 );
         }
 
         mTintColor.addWidget("tintColor");
@@ -428,8 +427,8 @@ void TweakableMaterial::drawUI(const std::string& header) {
 
     if (ImGui::CollapsingHeader("Shader setup")) {
         ImGui::Checkbox("Use Ward specular normal distribution", &mUseWard);
-        ImGui::Checkbox("Apply tint only where alpha > 0.5", &mMaskedColorChange);
-        ImGui::Checkbox("Not orient default", &mNotOrientDefault);
+        ImGui::Checkbox("Apply tint only where alpha > 0.3", &mMaskedColorChange);
+        ImGui::Checkbox("Lock orientation to one axis, biplanar-blend the other two", &mNotOrientDefault);
     }
 }
 

@@ -664,7 +664,7 @@ void applySettings(Engine* engine, const MaterialSettings& settings, MaterialIns
     for (const auto& prop : settings.float4) { apply(prop, dest); }
 }
 
-void applySettings(Engine* engine, const LightSettings& settings, IndirectLight* ibl, utils::Entity sunlight, utils::Entity spotlight,
+void applySettings(Engine* engine, const LightSettings& settings, IndirectLight* ibl, utils::Entity sunlight,
         const utils::Entity* sceneLights, size_t sceneLightCount, LightManager* lm, Scene* scene, View* view) {
     auto light = lm->getInstance(sunlight);
     if (light) {
@@ -681,22 +681,6 @@ void applySettings(Engine* engine, const LightSettings& settings, IndirectLight*
         lm->setColor(light, settings.sunlightColor);
         lm->setShadowCaster(light, settings.enableShadows);
         lm->setShadowOptions(light, settings.shadowOptions);
-    }
-    auto spotL = lm->getInstance(spotlight);
-    if (spotL) {
-        if (settings.enableSunlight) {
-            scene->addEntity(spotlight);
-        } else {
-            scene->remove(spotlight);
-        }
-        // lm->setIntensity(light, settings.sunlightIntensity);
-        // lm->setSunHaloSize(light, settings.sunlightHaloSize);
-        // lm->setSunHaloFalloff(light, settings.sunlightHaloFalloff);
-        // lm->setSunAngularRadius(light, settings.sunlightAngularRadius);
-        // lm->setDirection(light, normalize(settings.sunlightDirection));
-        // lm->setColor(light, settings.sunlightColor);
-        // lm->setShadowCaster(light, settings.enableShadows);
-        // lm->setShadowOptions(light, settings.shadowOptions);
     }
 
     if (ibl) {

@@ -140,7 +140,6 @@ Java_com_google_android_filament_utils_AutomationEngine_nApplySettings(JNIEnv* e
         .scene = (Scene*) scene,
         .indirectLight = (IndirectLight*) nativeIbl,
         .sunlight = (Entity&) sunlightEntity,
-        .spotlight = (Entity&) spotlightEntity,
         .assetLights = (Entity*) intLights,
         .assetLightCount = (size_t) lightCount,
     };

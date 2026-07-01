@@ -55,60 +55,35 @@ std::string g_ArtRootPathStr {};
 namespace filament {
 namespace viewer {
 
-    namespace {
-
-struct DebugSpotlightState {
-    bool enabled = false;
-    float intensity = 32800.0f; // lumens
-    std::array<float, 3> color = {1.0f, 0.0f, 0.0f}; // sRGB
-    float outerConeDeg = 9.5f;
-    float innerConeDeg = 1.0f;
-    
-    // Explicit 3D position (X, Y, Z) in meters from workspace origin
-    std::array<float, 3> position = {0.0f, 0.0f, -1.664f}; 
-    
-    float falloffMultiplier = 4.010f;
-    std::array<float, 3> direction = {0.0f, 0.0f, 1.0f};
-
-    utils::Entity entity;
-    bool created = false;
-};
-
-constexpr int kDebugSpotlightCount = 3;
-static std::array<DebugSpotlightState, kDebugSpotlightCount> g_debugSpotlights{};
-
-void ApplySpotlightState(filament::Engine* engine, filament::Scene* scene, DebugSpotlightState& s) {
+void ViewerGui::applyDebugSpotlightState(DebugSpotlightState& s) {
     if (!s.enabled) {
         if (s.created) {
-            scene->remove(s.entity);
+            mScene->remove(s.entity);
         }
         return;
     }
 
-    // Read Cartesian coordinates directly
-    const filament::math::float3 position{s.position[0], s.position[1], s.position[2]};
+    const math::float3 position{s.position[0], s.position[1], s.position[2]};
+    const math::float3 rawDirection{s.direction[0], s.direction[1], s.direction[2]};
+    const math::float3 direction = length(rawDirection) > 1e-6f
+            ? normalize(rawDirection) : math::float3{0.0f, 0.0f, -1.0f};
 
-    filament::math::float3 direction{s.direction[0], s.direction[1], s.direction[2]};
-    const float dirLen = std::sqrt(direction.x * direction.x + direction.y * direction.y + direction.z * direction.z);
-    direction = (dirLen > 1e-6f) ? direction / dirLen : filament::math::float3{0.0f, 0.0f, -1.0f};
-
-    constexpr float kDegToRad = float(M_PI) / 180.0f;
-    const float innerRad = s.innerConeDeg * kDegToRad;
-    const float outerRad = std::max(s.outerConeDeg * kDegToRad, innerRad + 1e-3f);
+    const float innerRad = s.innerConeDeg * math::f::DEG_TO_RAD;
+    const float outerRad = std::max(s.outerConeDeg * math::f::DEG_TO_RAD, innerRad + 1e-3f);
     const float falloff = std::max(s.falloffMultiplier * 2.0f, 1.0f);
 
-    const auto linearColor = filament::Color::toLinear(filament::RgbType::sRGB,
-                                                       filament::math::float3{s.color[0], s.color[1], s.color[2]});
+    const auto linearColor = Color::toLinear(RgbType::sRGB,
+            math::float3{s.color[0], s.color[1], s.color[2]});
 
     if (!s.created) {
         s.entity = utils::EntityManager::get().create();
-        filament::LightManager::Builder(filament::LightManager::Type::FOCUSED_SPOT)
+        LightManager::Builder(LightManager::Type::FOCUSED_SPOT)
             .castShadows(true)
-            .build(*engine, s.entity);
+            .build(*mEngine, s.entity);
         s.created = true;
     }
 
-    auto& lm = engine->getLightManager();
+    auto& lm = mEngine->getLightManager();
     auto inst = lm.getInstance(s.entity);
     lm.setPosition(inst, position);
     lm.setDirection(inst, direction);
@@ -117,12 +92,10 @@ void ApplySpotlightState(filament::Engine* engine, filament::Scene* scene, Debug
     lm.setFalloff(inst, falloff);
     lm.setSpotLightCone(inst, innerRad, outerRad);
 
-    if (!scene->hasEntity(s.entity)) {
-        scene->addEntity(s.entity);
+    if (!mScene->hasEntity(s.entity)) {
+        mScene->addEntity(s.entity);
     }
 }
-
-} // anonymous namespace
 
 // Taken from MeshAssimp.cpp
 static int loadTexture(Engine* engine, const std::string& filePath, Texture** map,
@@ -530,7 +503,6 @@ ViewerGui::ViewerGui(filament::Engine* engine, filament::Scene* scene, filament:
         int sidebarWidth) :
         mEngine(engine), mScene(scene), mView(view),
         mSunlight(utils::EntityManager::get().create()),
-        mSpotlight(utils::EntityManager::get().create()),
         mSidebarWidth(sidebarWidth) {
 
     mSettings.view.shadowType = ShadowType::PCF;
@@ -554,18 +526,6 @@ ViewerGui::ViewerGui(filament::Engine* engine, filament::Scene* scene, filament:
     if (mSettings.lighting.enableSunlight) {
         mScene->addEntity(mSunlight);
     }
-    // LightManager::Builder(LightManager::Type::FOCUSED_SPOT)
-    //     .position({0.0f, 10.0f, 0.0f})
-    //     .direction({0.0f, -1.0f, 0.0f})
-    //     .color({0.0f, 255.0f, 0.0f})
-    //     .intensity(100000.0f)
-    //     .falloff(100.0f)
-    //     .spotLightCone(0.523599f, 0.785398f)
-    //     .castShadows(true)
-    //     .build(*engine, mSpotlight);
-    // if (mSettings.lighting.enableSunlight) {
-    //     mScene->addEntity(mSpotlight);
-    // }
 
     view->setAmbientOcclusionOptions({ .upsampling = View::QualityLevel::HIGH });
 
@@ -594,6 +554,22 @@ ViewerGui::ViewerGui(filament::Engine* engine, filament::Scene* scene, filament:
         Material::Builder()
         .package(SHAPR_MATERIALS_MASKED_DATA, SHAPR_MATERIALS_MASKED_SIZE)
         .build(*mEngine);
+
+    // Three debug spotlights, one along each axis, aimed back at the origin.
+    constexpr float kAxisDistance = 3.0f;
+    mDebugSpotlights[0].position = {kAxisDistance, 0.0f, 0.0f};
+    mDebugSpotlights[0].direction = {-1.0f, 0.0f, 0.0f};
+    mDebugSpotlights[0].color = {1.0f, 0.25f, 0.25f}; // X: red
+    mDebugSpotlights[1].position = {0.0f, kAxisDistance, 0.0f};
+    mDebugSpotlights[1].direction = {0.0f, -1.0f, 0.0f};
+    mDebugSpotlights[1].color = {0.25f, 1.0f, 0.25f}; // Y: green
+    mDebugSpotlights[2].position = {0.0f, 0.0f, kAxisDistance};
+    mDebugSpotlights[2].direction = {0.0f, 0.0f, -1.0f};
+    mDebugSpotlights[2].color = {0.25f, 0.25f, 1.0f}; // Z: blue
+    for (auto& state : mDebugSpotlights) {
+        state.enabled = true;
+        applyDebugSpotlightState(state);
+    }
 }
 
 ViewerGui::~ViewerGui() {
@@ -610,8 +586,7 @@ ViewerGui::~ViewerGui() {
         mEngine->destroy(textureEntry.second);
     }
     mEngine->destroy(mSunlight);
-    mEngine->destroy(mSpotlight);
-    for (auto& state : g_debugSpotlights) {
+    for (auto& state : mDebugSpotlights) {
         if (state.created) {
             mEngine->destroy(state.entity);
         }
@@ -1751,7 +1726,7 @@ void ViewerGui::updateUserInterface() {
 
     for (int i = 0; i < kDebugSpotlightCount; ++i) {
         ImGui::PushID(i);
-        auto& state = g_debugSpotlights[i];
+        auto& state = mDebugSpotlights[i];
         bool changed = false;
 
         const std::string header = "Spotlight " + std::to_string(i + 1) + (state.enabled ? " (on)" : " (off)");
@@ -1776,12 +1751,10 @@ void ViewerGui::updateUserInterface() {
 
             changed |= ImGui::DragFloat3("Forward vector", state.direction.data(), 0.05f, -1.0f, 1.0f);
             if (ImGui::Button("Aim at workspace center")) {
-                const float px = state.position[0];
-                const float py = state.position[1];
-                const float pz = state.position[2];
-                const float len = std::sqrt(px * px + py * py + pz * pz);
-                if (len > 1e-6f) {
-                    state.direction = {-px / len, -py / len, -pz / len};
+                const math::float3 toCenter = -math::float3{state.position[0], state.position[1], state.position[2]};
+                if (length(toCenter) > 1e-6f) {
+                    const auto dir = normalize(toCenter);
+                    state.direction = {dir.x, dir.y, dir.z};
                     changed = true;
                 }
             }
@@ -1789,7 +1762,7 @@ void ViewerGui::updateUserInterface() {
         }
 
         if (changed) {
-            ApplySpotlightState(mEngine, mScene, state);
+            applyDebugSpotlightState(state);
         }
         ImGui::PopID();
     }
@@ -2019,7 +1992,7 @@ void ViewerGui::updateUserInterface() {
         }
     });
 
-    applySettings(mEngine, mSettings.lighting, mIndirectLight, mSunlight, mSpotlight,
+    applySettings(mEngine, mSettings.lighting, mIndirectLight, mSunlight,
                 lights.data(), lights.size(), &lm, mScene, mView);
 
     // Set IBL options
