@@ -575,7 +575,7 @@ ViewerGui::ViewerGui(filament::Engine* engine, filament::Scene* scene, filament:
     mDebugSpotlights[2].direction = {0.0f, 0.0f, -1.0f};
     mDebugSpotlights[2].color = {0.25f, 0.25f, 1.0f};
     for (auto& state : mDebugSpotlights) {
-        state.enabled = true;
+        state.enabled = false;
         applyDebugSpotlightState(state);
     }
 }

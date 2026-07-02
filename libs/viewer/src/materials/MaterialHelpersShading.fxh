@@ -36,7 +36,7 @@
 // 12    doDeriveSheenColor             materialParams.usageFlags & 4096
 // 13    doDeriveSubsurfaceColor        materialParams.usageFlags & 8192
 // 14    maskedColorChange              materialParams.usageFlags & 16384
-// 15    fixedUvsUp                       materialParams.usageFlags & 32768
+// 15    fixedUvsUp                     materialParams.usageFlags & 32768
 //
 // Our ASTC compressor lays out the coordinates as XXXY but our BC5 compressor lays them out as XY.
 // The useSwizzledNormalMaps flag indicates if data is stored as XY or XXXY (so we can sample the 
@@ -492,7 +492,7 @@ void ApplyClearCoatNormalMap(inout MaterialInputs material, in BiplanarCommonDat
 }
 
 void ApplyBaseColor(inout MaterialInputs material, in BiplanarCommonData btCommon) {
-    //Parameter to check Alpha to apply tint for colored masked materials
+    // Parameter to check Alpha to apply tint for colored masked materials
     float checkA = 1.0;
 
 #if defined(MATERIAL_HAS_BASE_COLOR)
@@ -549,7 +549,7 @@ if (IsMaskedColorChange()) {
 #if defined(BLENDING_ENABLED)
     material.baseColor.rgb *= material.baseColor.a;
     material.baseColor.a = 0.0;
-#elif !defined(BLEND_MODE_MASKED)
+#elif defined(BLEND_MODE_OPAQUE)
     material.baseColor.a = 1.0;
 #endif
 #endif
