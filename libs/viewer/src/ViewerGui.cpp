@@ -596,6 +596,7 @@ ViewerGui::~ViewerGui() {
     mEngine->destroy(mSunlight);
     for (auto& state : mDebugSpotlights) {
         if (state.created) {
+            mScene->remove(state.entity);
             mEngine->destroy(state.entity);
         }
     }
@@ -1727,81 +1728,81 @@ void ViewerGui::updateUserInterface() {
             }
         }
 
-    if (ImGui::CollapsingHeader("Debug Spotlights")) {
-    ImGui::Indent();
-    ImGui::TextDisabled("Three debug spotlights, each pointing at the workspace origin.");
-    ImGui::Separator();
+        if (ImGui::CollapsingHeader("Debug Spotlights")) {
+            ImGui::Indent();
+            ImGui::TextDisabled("Three debug spotlights, each pointing at the workspace origin.");
+            ImGui::Separator();
 
-    for (int i = 0; i < kDebugSpotlightCount; ++i) {
-        ImGui::PushID(i);
-        auto& state = mDebugSpotlights[i];
-        bool changed = false;
+            for (int i = 0; i < kDebugSpotlightCount; ++i) {
+                ImGui::PushID(i);
+                auto& state = mDebugSpotlights[i];
+                bool changed = false;
 
-        const std::string header = "Spotlight " + std::to_string(i + 1) + (state.enabled ? " (on)" : " (off)");
-        if (ImGui::CollapsingHeader(header.c_str(), i == 0 ? ImGuiTreeNodeFlags_DefaultOpen : 0)) {
-            changed |= ImGui::Checkbox("Enabled", &state.enabled);
-            ImGui::BeginDisabled(!state.enabled);
+                const std::string header = "Spotlight " + std::to_string(i + 1) + (state.enabled ? " (on)" : " (off)");
+                if (ImGui::CollapsingHeader(header.c_str(), i == 0 ? ImGuiTreeNodeFlags_DefaultOpen : 0)) {
+                    changed |= ImGui::Checkbox("Enabled", &state.enabled);
+                    ImGui::BeginDisabled(!state.enabled);
 
-            changed |= ImGui::DragFloat("Intensity (lm)", &state.intensity, 100.0f, 0.0f, 1'000'000.0f);
-            changed |= ImGui::ColorEdit3("Color", state.color.data());
-            changed |= ImGui::DragFloat("Outer cone / umbra (°)", &state.outerConeDeg, 0.5f, 1.0f, 89.0f);
-            changed |= ImGui::DragFloat("Inner cone / penumbra (°)", &state.innerConeDeg, 0.5f, 0.0f, 89.0f);
-            
-            // Penumbra clamping logic (guarantees `changed` flag is ticked)
-            if (state.innerConeDeg > state.outerConeDeg) {
-                state.innerConeDeg = state.outerConeDeg;
-                changed = true;
-            }
+                    changed |= ImGui::DragFloat("Intensity (lm)", &state.intensity, 100.0f, 0.0f, 1'000'000.0f);
+                    changed |= ImGui::ColorEdit3("Color", state.color.data());
+                    changed |= ImGui::DragFloat("Outer cone / umbra (°)", &state.outerConeDeg, 0.5f, 1.0f, 89.0f);
+                    changed |= ImGui::DragFloat("Inner cone / penumbra (°)", &state.innerConeDeg, 0.5f, 0.0f, 89.0f);
 
-            // Modified Position Section
-            changed |= ImGui::DragFloat3("Position (XYZ)", state.position.data(), 0.1f);
-            changed |= ImGui::DragFloat("Falloff multiplier", &state.falloffMultiplier, 0.1f, 0.01f, 100.0f);
-
-            changed |= ImGui::DragFloat3("Forward vector", state.direction.data(), 0.05f, -1.0f, 1.0f);
-            if (ImGui::Button("Aim at workspace center")) {
-                const math::float3 toCenter = -math::float3{state.position[0], state.position[1], state.position[2]};
-                if (length(toCenter) > 1e-6f) {
-                    const auto dir = normalize(toCenter);
-                    state.direction = {dir.x, dir.y, dir.z};
-                    changed = true;
-                }
-            }
-
-            if (ImGui::CollapsingHeader("Shadow settings")) {
-                changed |= ImGui::Checkbox("Cast shadows", &state.castShadows);
-                ImGui::BeginDisabled(!state.castShadows);
-
-                static const char* kMapSizes[] = { "256", "512", "1024", "2048", "4096" };
-                static const int kMapSizeValues[] = { 256, 512, 1024, 2048, 4096 };
-                int mapSizeIndex = 2;
-                for (int j = 0; j < IM_ARRAYSIZE(kMapSizeValues); ++j) {
-                    if (kMapSizeValues[j] == state.shadowMapSize) {
-                        mapSizeIndex = j;
-                        break;
+                    // Penumbra clamping logic (guarantees `changed` flag is ticked)
+                    if (state.innerConeDeg > state.outerConeDeg) {
+                        state.innerConeDeg = state.outerConeDeg;
+                        changed = true;
                     }
-                }
-                if (ImGui::Combo("Shadow map size", &mapSizeIndex, kMapSizes, IM_ARRAYSIZE(kMapSizes))) {
-                    state.shadowMapSize = kMapSizeValues[mapSizeIndex];
-                    changed = true;
+
+                    // Modified Position Section
+                    changed |= ImGui::DragFloat3("Position (XYZ)", state.position.data(), 0.1f);
+                    changed |= ImGui::DragFloat("Falloff multiplier", &state.falloffMultiplier, 0.1f, 0.01f, 100.0f);
+
+                    changed |= ImGui::DragFloat3("Forward vector", state.direction.data(), 0.05f, -1.0f, 1.0f);
+                    if (ImGui::Button("Aim at workspace center")) {
+                        const math::float3 toCenter = -math::float3{state.position[0], state.position[1], state.position[2]};
+                        if (length(toCenter) > 1e-6f) {
+                            const auto dir = normalize(toCenter);
+                            state.direction = {dir.x, dir.y, dir.z};
+                            changed = true;
+                        }
+                    }
+
+                    if (ImGui::CollapsingHeader("Shadow settings")) {
+                        changed |= ImGui::Checkbox("Cast shadows", &state.castShadows);
+                        ImGui::BeginDisabled(!state.castShadows);
+
+                        static const char* kMapSizes[] = { "256", "512", "1024", "2048", "4096" };
+                        static const int kMapSizeValues[] = { 256, 512, 1024, 2048, 4096 };
+                        int mapSizeIndex = 2;
+                        for (int j = 0; j < IM_ARRAYSIZE(kMapSizeValues); ++j) {
+                            if (kMapSizeValues[j] == state.shadowMapSize) {
+                                mapSizeIndex = j;
+                                break;
+                            }
+                        }
+                        if (ImGui::Combo("Shadow map size", &mapSizeIndex, kMapSizes, IM_ARRAYSIZE(kMapSizes))) {
+                            state.shadowMapSize = kMapSizeValues[mapSizeIndex];
+                            changed = true;
+                        }
+
+                        changed |= ImGui::DragFloat("Constant bias", &state.shadowConstantBias, 0.0001f, 0.0f, 0.1f, "%.4f");
+                        changed |= ImGui::DragFloat("Normal bias", &state.shadowNormalBias, 0.05f, 0.0f, 10.0f);
+                        changed |= ImGui::DragFloat("Shadow bulb radius (soft shadows)", &state.shadowBulbRadius, 0.005f, 0.0f, 1.0f);
+                        changed |= ImGui::Checkbox("Screen-space contact shadows", &state.screenSpaceContactShadows);
+
+                        ImGui::EndDisabled();
+                    }
+                    ImGui::EndDisabled();
                 }
 
-                changed |= ImGui::DragFloat("Constant bias", &state.shadowConstantBias, 0.0001f, 0.0f, 0.1f, "%.4f");
-                changed |= ImGui::DragFloat("Normal bias", &state.shadowNormalBias, 0.05f, 0.0f, 10.0f);
-                changed |= ImGui::DragFloat("Shadow bulb radius (soft shadows)", &state.shadowBulbRadius, 0.005f, 0.0f, 1.0f);
-                changed |= ImGui::Checkbox("Screen-space contact shadows", &state.screenSpaceContactShadows);
-
-                ImGui::EndDisabled();
+                if (changed) {
+                    applyDebugSpotlightState(state);
+                }
+                ImGui::PopID();
             }
-            ImGui::EndDisabled();
+            ImGui::Unindent();
         }
-
-        if (changed) {
-            applyDebugSpotlightState(state);
-        }
-        ImGui::PopID();
-    }
-    ImGui::Unindent();
-}
 
         if (ImGui::CollapsingHeader("Shadows")) {
             ImGui::Checkbox("Enable shadows", &light.enableShadows);

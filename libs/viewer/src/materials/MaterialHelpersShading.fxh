@@ -253,7 +253,7 @@ BiplanarData GenerateBiplanarData(in BiplanarCommonData btCommon, float scaler) 
     vec3 dpdx = dFdx(queryPos);
     vec3 dpdy = dFdy(queryPos);
 
-if (IsFixedUVsUp()) {
+    if (IsFixedUVsUp()) {
         float signX = SIGN_NO_ZERO(btCommon.orientedNormal.x);
         float signY = SIGN_NO_ZERO(btCommon.orientedNormal.y);
         
@@ -326,8 +326,9 @@ vec3 ComputeWeights(vec3 normal) {
     }
 
     blend = max(blend - blendBias, vec3(0.0));
+    blend = blend * blend;
     float sum = blend.x + blend.y + blend.z;
-    
+
     if (sum > 0.0) {
         blend /= sum;
     } else if (IsFixedUVsUp()) {
