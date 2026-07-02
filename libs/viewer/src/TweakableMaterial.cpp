@@ -14,6 +14,16 @@ TweakableMaterial::TweakableMaterial() {
     mOcclusionIntensity.value = 1.0f;
 }
 
+void TweakableMaterial::drawAnisotropySettings() {
+    if (ImGui::CollapsingHeader("Metal (anisotropy, etc.) settings")) {
+        mAnisotropy.addWidget("anisotropy", -1.0f, 1.0f);
+
+        ImGui::Separator();
+        ImGui::LabelText("anisotropy direction", "anisotropy direction");
+        ImGuiExt::DirectionWidget("anisotropyDirection", mAnisotropyDirection.value.v);
+    }
+}
+
 json TweakableMaterial::toJson() {
     json result{};
 
@@ -313,13 +323,7 @@ void TweakableMaterial::drawUI(const std::string& header) {
             if (mSheenRoughness.isFile) enqueueTextureRequest(mSheenRoughness);
         }
 
-        if (ImGui::CollapsingHeader("Metal (anisotropy, etc.) settings")) {
-            mAnisotropy.addWidget("anisotropy", -1.0f, 1.0f);
-
-            ImGui::Separator();
-            ImGui::LabelText("anisotropy direction", "anisotropy direction");
-            ImGuiExt::DirectionWidget("anisotropyDirection", mAnisotropyDirection.value.v);
-        }
+        drawAnisotropySettings();
         break;
     }
     case MaterialType::Masked: {
@@ -332,13 +336,7 @@ void TweakableMaterial::drawUI(const std::string& header) {
             if (mSheenRoughness.isFile) enqueueTextureRequest(mSheenRoughness);
         }
 
-        if (ImGui::CollapsingHeader("Metal (anisotropy, etc.) settings")) {
-            mAnisotropy.addWidget("anisotropy", -1.0f, 1.0f);
-
-            ImGui::Separator();
-            ImGui::LabelText("anisotropy direction", "anisotropy direction");
-            ImGuiExt::DirectionWidget("anisotropyDirection", mAnisotropyDirection.value.v);
-        }
+        drawAnisotropySettings();
         break;
     }
     // For backward compatibility and warning supression (the enum value needs to be kept)
@@ -357,13 +355,7 @@ void TweakableMaterial::drawUI(const std::string& header) {
             mMaxThickness.addWidget("thickness scale", 1.0f, 32.0f);
             mThickness.addWidget("thickness");
         }
-        if (ImGui::CollapsingHeader("Metal (anisotropy, etc.) settings")) {
-            mAnisotropy.addWidget("anisotropy", -1.0f, 1.0f);
-
-            ImGui::Separator();
-            ImGui::LabelText("anisotropy direction", "anisotropy direction");
-            ImGuiExt::DirectionWidget("anisotropyDirection", mAnisotropyDirection.value.v);
-        }
+        drawAnisotropySettings();
         break;
     }
     case MaterialType::Cloth: {

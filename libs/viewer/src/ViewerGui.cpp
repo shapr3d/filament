@@ -1758,7 +1758,7 @@ void ViewerGui::updateUserInterface() {
                     changed |= ImGui::DragFloat3("Position (XYZ)", state.position.data(), 0.1f);
                     changed |= ImGui::DragFloat("Falloff multiplier", &state.falloffMultiplier, 0.1f, 0.01f, 100.0f);
 
-                    changed |= ImGui::DragFloat3("Forward vector", state.direction.data(), 0.05f, -1.0f, 1.0f);
+                    changed |= ImGuiExt::DirectionWidget("Forward vector", state.direction.data());
                     if (ImGui::Button("Aim at workspace center")) {
                         const math::float3 toCenter = -math::float3{state.position[0], state.position[1], state.position[2]};
                         if (length(toCenter) > 1e-6f) {
