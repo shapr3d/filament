@@ -281,13 +281,11 @@ private:
         float outerConeDeg = 9.5f;
         float innerConeDeg = 1.0f;
 
-        // Explicit 3D position (X, Y, Z) in meters from workspace origin
         std::array<float, 3> position = {0.0f, 0.0f, 0.0f};
 
         float falloffMultiplier = 4.010f;
         std::array<float, 3> direction = {0.0f, 0.0f, 1.0f};
 
-        // Shadow settings
         bool castShadows = true;
         int shadowMapSize = 1024;
         float shadowConstantBias = 0.001f;

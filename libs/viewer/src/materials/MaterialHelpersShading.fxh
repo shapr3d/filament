@@ -253,41 +253,29 @@ BiplanarData GenerateBiplanarData(in BiplanarCommonData btCommon, float scaler) 
     vec3 dpdx = dFdx(queryPos);
     vec3 dpdy = dFdy(queryPos);
 
-    if (IsFixedUVsUp()) {
+if (IsFixedUVsUp()) {
         float signX = SIGN_NO_ZERO(btCommon.orientedNormal.x);
         float signY = SIGN_NO_ZERO(btCommon.orientedNormal.y);
-        float signZ = SIGN_NO_ZERO(btCommon.orientedNormal.z);
-
-        // --- Analytic Polar Derivatives for Z-Plane (Top Cap) ---
-        // Prevents the nasty mipmap seam at the atan() wrap-around.
-        float r2 = queryPos.x * queryPos.x + queryPos.y * queryPos.y + 1e-6; // add epsilon to prevent division by zero
-        float r = sqrt(r2);
         
-        float dudx = -queryPos.y / (r2 * 6.2831853);
-        float dudy =  queryPos.x / (r2 * 6.2831853);
-        float dvdx =  queryPos.x / r;
-        float dvdy =  queryPos.y / r;
-
-        vec2 dpdx_polar = vec2(dudx * dpdx.x + dudy * dpdx.y, dvdx * dpdx.x + dvdy * dpdx.y);
-        vec2 dpdy_polar = vec2(dudx * dpdy.x + dudy * dpdy.y, dvdx * dpdy.x + dvdy * dpdy.y);
-
-        // --- UV Layout ---
+        // --- Continuous Side Wrap ---
+        // We project onto the X and Y planes (ZY and ZX in space)
+        // Multiplying the horizontal coordinate by the normal sign prevents mirroring on the backface.
         vec2 uvQueries[3] = vec2[3](
-            vec2(queryPos.y * signX, queryPos.z),               // X-Plane Wrap
-            vec2(-queryPos.x * signY, queryPos.z),              // Y-Plane Wrap
-            vec2(atan(queryPos.y, queryPos.x) / 6.2831853, r)   // Z-Plane Polar Wrap
+            vec2(queryPos.y * signX, queryPos.z), // X-Plane (Side 1)
+            vec2(-queryPos.x * signY, queryPos.z), // Y-Plane (Side 2)
+            vec2(queryPos.x, queryPos.y)           // Z-Plane (Top Cap fallback)
         );
 
         vec2 dpx_arr[3] = vec2[3](
             vec2(dpdx.y * signX, dpdx.z),
             vec2(-dpdx.x * signY, dpdx.z),
-            dpdx_polar
+            vec2(dpdx.x, dpdx.y)
         );
 
         vec2 dpy_arr[3] = vec2[3](
             vec2(dpdy.y * signX, dpdy.z),
             vec2(-dpdy.x * signY, dpdy.z),
-            dpdy_polar
+            vec2(dpdy.x, dpdy.y)
         );
 
         result.maxPos = uvQueries[axes.maximum.x];
@@ -329,9 +317,25 @@ vec3 ComputeWeights(vec3 normal) {
     // This one has a region where there is no blend, creating more defined interpolations
     const float blendBias = 0.2;
     vec3 blend = abs(normal.xyz);
+    
+    // --- Suppress the XY Plane (Top/Bottom Cap) ---
+    // Dropping the Z-normal component entirely forces the biplanar system 
+    // to choose only the X and Y side planes (ZX and ZY).
+    if (IsFixedUVsUp()) {
+        blend.z = 0.0;
+    }
+
     blend = max(blend - blendBias, vec3(0.0));
-    blend = blend * blend;
-    blend /= (blend.x + blend.y + blend.z);
+    float sum = blend.x + blend.y + blend.z;
+    
+    if (sum > 0.0) {
+        blend /= sum;
+    } else if (IsFixedUVsUp()) {
+        // Fallback: If a polygon is perfectly flat up/down, split the weight 
+        // evenly between the sides to keep rendering stable.
+        blend = vec3(0.5, 0.5, 0.0);
+    }
+    
     return blend;
 }
 
@@ -487,6 +491,7 @@ void ApplyClearCoatNormalMap(inout MaterialInputs material, in BiplanarCommonDat
 }
 
 void ApplyBaseColor(inout MaterialInputs material, in BiplanarCommonData btCommon) {
+    //Parameter to check Alpha to apply tint for colored masked materials
     float checkA = 1.0;
 
 #if defined(MATERIAL_HAS_BASE_COLOR)
@@ -516,10 +521,17 @@ void ApplyBaseColor(inout MaterialInputs material, in BiplanarCommonData btCommo
         material.baseColor.rgb *= materialParams.tintColor.rgb;
     }
 
-    if (IsMaskedColorChange()) {
-        if (checkA > 0.3) {
-            material.baseColor.rgb *= (materialParams.tintColor.rgb*checkA + (1.0-checkA)*vec3(1.0, 1.0, 1.0));
-        }
+if (IsMaskedColorChange()) {
+        // Calculate the rate of change of the alpha channel using derivatives
+        float alphaWidth = fwidth(checkA);
+        
+        // Create an anti-aliased mask around 0.3 threshold
+        // The smoothing window dynamically scales based on the pixel's derivatives
+        float mask = smoothstep(0.3 - alphaWidth, 0.3 + alphaWidth, checkA);
+
+        vec3 tintedColor = (materialParams.tintColor.rgb * checkA) + ((1.0 - checkA) * vec3(1.0, 1.0, 1.0));
+        
+        material.baseColor.rgb *= mix(vec3(1.0, 1.0, 1.0), tintedColor, mask);
     }
 
 #if defined(DRAW_WEIGHTS)

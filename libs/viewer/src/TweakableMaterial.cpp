@@ -316,7 +316,6 @@ void TweakableMaterial::drawUI(const std::string& header) {
         if (ImGui::CollapsingHeader("Metal (anisotropy, etc.) settings")) {
             mAnisotropy.addWidget("anisotropy", -1.0f, 1.0f);
 
-            // This is more intuitive to toggle like this
             ImGui::Separator();
             ImGui::LabelText("anisotropy direction", "anisotropy direction");
             ImGuiExt::DirectionWidget("anisotropyDirection", mAnisotropyDirection.value.v);
@@ -336,7 +335,6 @@ void TweakableMaterial::drawUI(const std::string& header) {
         if (ImGui::CollapsingHeader("Metal (anisotropy, etc.) settings")) {
             mAnisotropy.addWidget("anisotropy", -1.0f, 1.0f);
 
-            // This is more intuitive to toggle like this
             ImGui::Separator();
             ImGui::LabelText("anisotropy direction", "anisotropy direction");
             ImGuiExt::DirectionWidget("anisotropyDirection", mAnisotropyDirection.value.v);
@@ -362,7 +360,6 @@ void TweakableMaterial::drawUI(const std::string& header) {
         if (ImGui::CollapsingHeader("Metal (anisotropy, etc.) settings")) {
             mAnisotropy.addWidget("anisotropy", -1.0f, 1.0f);
 
-            // This is more intuitive to toggle like this
             ImGui::Separator();
             ImGui::LabelText("anisotropy direction", "anisotropy direction");
             ImGuiExt::DirectionWidget("anisotropyDirection", mAnisotropyDirection.value.v);
