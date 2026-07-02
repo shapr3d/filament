@@ -14,13 +14,24 @@ TweakableMaterial::TweakableMaterial() {
     mOcclusionIntensity.value = 1.0f;
 }
 
+void TweakableMaterial::drawAnisotropySettings() {
+    if (ImGui::CollapsingHeader("Metal (anisotropy, etc.) settings")) {
+        mAnisotropy.addWidget("anisotropy", -1.0f, 1.0f);
+
+        ImGui::Separator();
+        ImGui::LabelText("anisotropy direction", "anisotropy direction");
+        ImGuiExt::DirectionWidget("anisotropyDirection", mAnisotropyDirection.value.v);
+    }
+}
+
 json TweakableMaterial::toJson() {
     json result{};
 
-    //result["materialType"] = mMaterialType;
     result["shaderType"] = mShaderType;
 
     result["useWard"] = mUseWard;
+    result["maskedColorChange"] = mMaskedColorChange;       
+    result["fixedUvsUp"] = mFixedUvsUp;    
 
     writeTexturedToJson(result, "baseColor", mBaseColor);
     result["tintColor"] = mTintColor.value;
@@ -87,9 +98,11 @@ void TweakableMaterial::fromJson(const json& source) {
         mShaderType = source["materialType"];
     }
 
-    bool isAlpha = (mShaderType == TweakableMaterial::MaterialType::Transparent) || (mShaderType == TweakableMaterial::MaterialType::Refractive);
-
     readValueFromJson(source, "useWard", mUseWard, false);
+    readValueFromJson(source, "maskedColorChange", mMaskedColorChange, false);
+    readValueFromJson(source, "fixedUvsUp", mFixedUvsUp, false);
+
+    bool isAlpha = mMaskedColorChange || (mShaderType == TweakableMaterial::MaterialType::Transparent) || (mShaderType == TweakableMaterial::MaterialType::Refractive) || (mShaderType == TweakableMaterial::MaterialType::Masked);
 
     readTexturedFromJson(source, "baseColor", mBaseColor, true, isAlpha, isAlpha ? 4 : 3);
     readValueFromJson(source, "tintColor", mTintColor, { 1.0f, 1.0f, 1.0f });
@@ -220,6 +233,8 @@ void TweakableMaterial::resetWithType(MaterialType newType) {
     mAbsorption.useDerivedQuantity = false;
     mSheenColor.useDerivedQuantity = false;
     mUseWard = false;
+    mMaskedColorChange = false;
+    mFixedUvsUp = false;
     mDoRelease = false;
 
     mShaderType = newType;
@@ -246,7 +261,7 @@ void TweakableMaterial::drawUI(const std::string& header) {
 
         mBaseColor.addWidget("baseColor");
         if (mBaseColor.isFile) {
-            bool isAlpha = (mShaderType == MaterialType::Transparent || mShaderType == MaterialType::Refractive);
+            bool isAlpha = (mMaskedColorChange || mShaderType == MaterialType::Transparent || mShaderType == MaterialType::Refractive || mShaderType == MaterialType::Masked);
             enqueueTextureRequest(mBaseColor, true, isAlpha, isAlpha ? 4 : 3);
         }
 
@@ -308,14 +323,20 @@ void TweakableMaterial::drawUI(const std::string& header) {
             if (mSheenRoughness.isFile) enqueueTextureRequest(mSheenRoughness);
         }
 
-        if (ImGui::CollapsingHeader("Metal (anisotropy, etc.) settings")) {
-            mAnisotropy.addWidget("anisotropy", -1.0f, 1.0f);
-            
-            // This is more intuitive to toggle like this
-            ImGui::Separator();
-            ImGui::LabelText("anisotropy direction", "anisotropy direction");
-            ImGuiExt::DirectionWidget("anisotropyDirection", mAnisotropyDirection.value.v);
+        drawAnisotropySettings();
+        break;
+    }
+    case MaterialType::Masked: {
+        if (ImGui::CollapsingHeader("Sheen settings")) {
+            mSheenColor.addWidget("sheen color");
+            if (mSheenColor.useDerivedQuantity) {
+                mSheenIntensity.addWidget("auto-sheen intensity");
+            }
+            mSheenRoughness.addWidget("sheen roughness");
+            if (mSheenRoughness.isFile) enqueueTextureRequest(mSheenRoughness);
         }
+
+        drawAnisotropySettings();
         break;
     }
     // For backward compatibility and warning supression (the enum value needs to be kept)
@@ -334,14 +355,7 @@ void TweakableMaterial::drawUI(const std::string& header) {
             mMaxThickness.addWidget("thickness scale", 1.0f, 32.0f);
             mThickness.addWidget("thickness");
         }
-        if (ImGui::CollapsingHeader("Metal (anisotropy, etc.) settings")) {
-            mAnisotropy.addWidget("anisotropy", -1.0f, 1.0f);
-
-            // This is more intuitive to toggle like this
-            ImGui::Separator();
-            ImGui::LabelText("anisotropy direction", "anisotropy direction");
-            ImGuiExt::DirectionWidget("anisotropyDirection", mAnisotropyDirection.value.v);
-        }
+        drawAnisotropySettings();
         break;
     }
     case MaterialType::Cloth: {
@@ -374,6 +388,8 @@ void TweakableMaterial::drawUI(const std::string& header) {
 
     if (ImGui::CollapsingHeader("Shader setup")) {
         ImGui::Checkbox("Use Ward specular normal distribution", &mUseWard);
+        ImGui::Checkbox("Apply tint only where alpha > 0.3", &mMaskedColorChange);
+        ImGui::Checkbox("Lock orientation to one axis, biplanar-blend the other two", &mFixedUvsUp);
     }
 }
 

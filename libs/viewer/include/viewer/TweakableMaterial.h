@@ -131,9 +131,11 @@ public:
     TweakableProperty<float> mIor{}; // for refractive
 
     bool mUseWard{};
+    bool mMaskedColorChange{};
+    bool mFixedUvsUp{};
     bool mDoRelease{}; // this notifies the material integrator tool that this material needs to be checked into the codebase
 
-    enum MaterialType { Opaque, Transparent, Refractive, Cloth, Subsurface };
+    enum MaterialType { Opaque, Transparent, Refractive, Cloth, Subsurface, Masked };
     MaterialType mShaderType{};
 
     void resetWithType(MaterialType newType);
@@ -141,6 +143,8 @@ public:
     bool mDoesRequireValidation = false;
 
 private:
+    void drawAnisotropySettings();
+
     template< typename T, bool MayContainFile = false, bool IsColor = true, bool IsDerivable = false, typename = IsValidTweakableType<T> >
     void enqueueTextureRequest(TweakableProperty<T, MayContainFile, IsColor>& item, bool isSrgb = false, bool isAlpha = false, int channelCount = 1) {
         enqueueTextureRequest(item.filename, item.doRequestReload, isSrgb, isAlpha, channelCount);

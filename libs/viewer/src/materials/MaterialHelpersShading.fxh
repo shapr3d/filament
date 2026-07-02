@@ -35,6 +35,8 @@
 // 11    doDeriveAbsorption             materialParams.usageFlags & 2048
 // 12    doDeriveSheenColor             materialParams.usageFlags & 4096
 // 13    doDeriveSubsurfaceColor        materialParams.usageFlags & 8192
+// 14    maskedColorChange              materialParams.usageFlags & 16384
+// 15    fixedUvsUp                     materialParams.usageFlags & 32768
 //
 // Our ASTC compressor lays out the coordinates as XXXY but our BC5 compressor lays them out as XY.
 // The useSwizzledNormalMaps flag indicates if data is stored as XY or XXXY (so we can sample the 
@@ -96,6 +98,14 @@ bool DoDeriveSheenColor() {
 
 bool DoDeriveSubsurfaceColor() {
     return ( materialParams.usageFlags & 8192u ) != 0u;
+}
+
+bool IsMaskedColorChange() {
+    return ( materialParams.usageFlags & 16384u ) != 0u;
+}
+
+bool IsFixedUVsUp() {
+    return ( materialParams.usageFlags & 32768u ) != 0u;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -240,25 +250,59 @@ BiplanarData GenerateBiplanarData(in BiplanarCommonData btCommon, float scaler) 
     // Store the query data
     BiplanarData result = DEFAULT_BIPLANAR_DATA;
 
-    // Position requires fixed flipping operations for correct texture orientation, especially for wrapping around the Z-axis.
-    vec2 uvQueries[3] = vec2[3](
-        queryPos.yz * vec2(1.0, -1.0),
-        -queryPos.xz,
-        queryPos.xy
-    );
-
-    result.maxPos = uvQueries[axes.maximum.x];
-    result.medPos = uvQueries[axes.median.x];
-
-    // Derivatives are based on the scaled pos, without the flipping shenanigans going on above 
     vec3 dpdx = dFdx(queryPos);
     vec3 dpdy = dFdy(queryPos);
 
-    result.maxDpDx = vec2(dpdx[axes.maximum.y], dpdx[axes.maximum.z]);
-    result.maxDpDy = vec2(dpdy[axes.maximum.y], dpdy[axes.maximum.z]);
+    if (IsFixedUVsUp()) {
+        float signX = SIGN_NO_ZERO(btCommon.orientedNormal.x);
+        float signY = SIGN_NO_ZERO(btCommon.orientedNormal.y);
+        
+        // --- Continuous Side Wrap ---
+        // We project onto the X and Y planes (ZY and ZX in space)
+        // Multiplying the horizontal coordinate by the normal sign prevents mirroring on the backface.
+        vec2 uvQueries[3] = vec2[3](
+            vec2(queryPos.y * signX, queryPos.z), // X-Plane (Side 1)
+            vec2(-queryPos.x * signY, queryPos.z), // Y-Plane (Side 2)
+            vec2(queryPos.x, queryPos.y)           // Z-Plane (Top Cap fallback)
+        );
 
-    result.medDpDx = vec2(dpdx[axes.median.y], dpdx[axes.median.z]);
-    result.medDpDy = vec2(dpdy[axes.median.y], dpdy[axes.median.z]);
+        vec2 dpx_arr[3] = vec2[3](
+            vec2(dpdx.y * signX, dpdx.z),
+            vec2(-dpdx.x * signY, dpdx.z),
+            vec2(dpdx.x, dpdx.y)
+        );
+
+        vec2 dpy_arr[3] = vec2[3](
+            vec2(dpdy.y * signX, dpdy.z),
+            vec2(-dpdy.x * signY, dpdy.z),
+            vec2(dpdy.x, dpdy.y)
+        );
+
+        result.maxPos = uvQueries[axes.maximum.x];
+        result.medPos = uvQueries[axes.median.x];
+
+        result.maxDpDx = dpx_arr[axes.maximum.x];
+        result.maxDpDy = dpy_arr[axes.maximum.x];
+
+        result.medDpDx = dpx_arr[axes.median.x];
+        result.medDpDy = dpy_arr[axes.median.x];
+    } else {
+        // Original behavior
+        vec2 uvQueries[3] = vec2[3](
+            queryPos.yz * vec2(1.0, -1.0),
+            -queryPos.xz,
+            queryPos.xy
+        );
+
+        result.maxPos = uvQueries[axes.maximum.x];
+        result.medPos = uvQueries[axes.median.x];
+
+        result.maxDpDx = vec2(dpdx[axes.maximum.y], dpdx[axes.maximum.z]);
+        result.maxDpDy = vec2(dpdy[axes.maximum.y], dpdy[axes.maximum.z]);
+
+        result.medDpDx = vec2(dpdx[axes.median.y], dpdx[axes.median.z]);
+        result.medDpDy = vec2(dpdy[axes.median.y], dpdy[axes.median.z]);
+    }
 
     // Weights are selected by most relevant axes
     result.mainWeight = weights[axes.maximum.x];
@@ -273,9 +317,26 @@ vec3 ComputeWeights(vec3 normal) {
     // This one has a region where there is no blend, creating more defined interpolations
     const float blendBias = 0.2;
     vec3 blend = abs(normal.xyz);
+    
+    // --- Suppress the XY Plane (Top/Bottom Cap) ---
+    // Dropping the Z-normal component entirely forces the biplanar system 
+    // to choose only the X and Y side planes (ZX and ZY).
+    if (IsFixedUVsUp()) {
+        blend.z = 0.0;
+    }
+
     blend = max(blend - blendBias, vec3(0.0));
     blend = blend * blend;
-    blend /= (blend.x + blend.y + blend.z);
+    float sum = blend.x + blend.y + blend.z;
+
+    if (sum > 0.0) {
+        blend /= sum;
+    } else if (IsFixedUVsUp()) {
+        // Fallback: If a polygon is perfectly flat up/down, split the weight 
+        // evenly between the sides to keep rendering stable.
+        blend = vec3(0.5, 0.5, 0.0);
+    }
+    
     return blend;
 }
 
@@ -431,29 +492,48 @@ void ApplyClearCoatNormalMap(inout MaterialInputs material, in BiplanarCommonDat
 }
 
 void ApplyBaseColor(inout MaterialInputs material, in BiplanarCommonData btCommon) {
+    // Parameter to check Alpha to apply tint for colored masked materials
+    float checkA = 1.0;
+
 #if defined(MATERIAL_HAS_BASE_COLOR)
     if (IsBaseColorTextured()) {
-#if defined(BLENDING_ENABLED) || defined(MATERIAL_HAS_REFRACTION)
+#if defined(BLENDING_ENABLED) || defined(MATERIAL_HAS_REFRACTION) || defined(BLEND_MODE_MASKED)
         material.baseColor.rgba = BiplanarTexture(materialParams_baseColorTexture,
                                                 materialParams.textureScaler.x,
-                                                btCommon)
-                                    .rgba;
+                                                btCommon).rgba;
+        checkA = material.baseColor.a;
 #else
-        material.baseColor.rgb = BiplanarTexture(materialParams_baseColorTexture,
-                                                 materialParams.textureScaler.x,
-                                                 btCommon)
-                                    .rgb;
+        vec4 colorT = BiplanarTexture(materialParams_baseColorTexture,
+                                      materialParams.textureScaler.x,
+                                      btCommon).rgba;
+        material.baseColor.rgb = colorT.rgb;
+        checkA = colorT.a;
 #endif
     } else {
-#if defined(BLENDING_ENABLED) || defined(MATERIAL_HAS_REFRACTION)
+#if defined(BLENDING_ENABLED) || defined(MATERIAL_HAS_REFRACTION) || defined(BLEND_MODE_MASKED)
         material.baseColor.rgba = materialParams.baseColor.rgba;
+        checkA = material.baseColor.a;
 #else
         material.baseColor.rgb = materialParams.baseColor.rgb;
 #endif
     }
 
-    // Naive multiplicative tinting seems to be fine enough for now
-    material.baseColor.rgb *= materialParams.tintColor.rgb;
+    if (!IsMaskedColorChange()) {
+        material.baseColor.rgb *= materialParams.tintColor.rgb;
+    }
+
+if (IsMaskedColorChange()) {
+        // Calculate the rate of change of the alpha channel using derivatives
+        float alphaWidth = fwidth(checkA);
+        
+        // Create an anti-aliased mask around 0.3 threshold
+        // The smoothing window dynamically scales based on the pixel's derivatives
+        float mask = smoothstep(0.3 - alphaWidth, 0.3 + alphaWidth, checkA);
+
+        vec3 tintedColor = (materialParams.tintColor.rgb * checkA) + ((1.0 - checkA) * vec3(1.0, 1.0, 1.0));
+        
+        material.baseColor.rgb *= mix(vec3(1.0, 1.0, 1.0), tintedColor, mask);
+    }
 
 #if defined(DRAW_WEIGHTS)
     if((materialParams.debugUsageFlags & 1u ) != 0u) {
@@ -469,7 +549,7 @@ void ApplyBaseColor(inout MaterialInputs material, in BiplanarCommonData btCommo
 #if defined(BLENDING_ENABLED)
     material.baseColor.rgb *= material.baseColor.a;
     material.baseColor.a = 0.0;
-#else
+#elif defined(BLEND_MODE_OPAQUE)
     material.baseColor.a = 1.0;
 #endif
 #endif
