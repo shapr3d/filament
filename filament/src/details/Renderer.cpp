@@ -690,6 +690,9 @@ void FRenderer::renderJob(ArenaScope& arena, FView& view) {
         shadowVariant.setVsm(view.getShadowType() == ShadowType::VSM);
 
         RenderPass shadowPass(pass);
+        // The view's front-face inversion compensates for a mirrored main-camera projection; the shadow
+        // camera is not mirrored, so applying it here would render back faces into the shadow map.
+        shadowPass.setRenderFlags(renderFlags & ~RenderPass::HAS_INVERSE_FRONT_FACES);
         shadowPass.setVariant(shadowVariant);
         auto shadows = view.renderShadowMaps(engine, fg, cameraInfo, mShaderUserTime, shadowPass);
         blackboard["shadows"] = shadows;
