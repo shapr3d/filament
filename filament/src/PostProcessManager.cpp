@@ -817,9 +817,12 @@ FrameGraphId<FrameGraphTexture> PostProcessManager::screenSpaceAmbientOcclusion(
                 auto const& desc = resources.getDescriptor(data.depth);
 
                 // Estimate of the size in pixel units of a 1m tall/wide object viewed from 1m away (i.e. at z=-1)
+                // std::abs() because a mirrored projection (see FCamera::setScaling) makes one of the
+                // diagonal terms negative, which would otherwise make this scale — and the screen-space
+                // sample radius derived from it — negative, collapsing the AO radius to a single pixel.
                 const float projectionScale = std::min(
-                        0.5f * cameraInfo.projection[0].x * desc.width,
-                        0.5f * cameraInfo.projection[1].y * desc.height);
+                        0.5f * std::abs(cameraInfo.projection[0].x) * desc.width,
+                        0.5f * std::abs(cameraInfo.projection[1].y) * desc.height);
 
                 // Where the falloff function peaks
                 const float peak = 0.1f * options.radius;
