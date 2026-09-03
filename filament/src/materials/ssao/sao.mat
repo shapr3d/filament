@@ -107,6 +107,10 @@ material {
         {
             type : uint,
             name : ssctSampleCount
+        },
+        {
+            type : float,
+            name : normalHandedness
         }
     ],
     variables : [
@@ -143,9 +147,11 @@ fragment {
         highp float z = linearizeDepth(depth);
         highp vec3 origin = computeViewSpacePositionFromDepth(uv, z, materialParams.positionParams);
 
+        // The face normal is a cross product of screen-space derivatives, so it flips sign when the
+        // projection mirrors an axis (see FCamera::setScaling). normalHandedness is -1 in that case.
         vec3 normal = computeViewSpaceNormal(materialParams_depth, uv, depth, origin,
                 materialParams.resolution.zw,
-                materialParams.positionParams);
+                materialParams.positionParams) * materialParams.normalHandedness;
 
         float occlusion = 0.0;
         vec3 bentNormal; // will be discarded

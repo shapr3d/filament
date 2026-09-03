@@ -885,6 +885,11 @@ FrameGraphId<FrameGraphTexture> PostProcessManager::screenSpaceAmbientOcclusion(
                 mi->setParameter("ssctRayCount",
                         float2{ options.ssct.rayCount, 1.0f / float(options.ssct.rayCount) });
 
+                // A mirrored projection (see FCamera::setScaling) flips the handedness of the screen-space
+                // derivatives, and with it the sign of the reconstructed face normal.
+                const float normalHandedness = std::copysign(1.0f, invProjection[0][0] * invProjection[1][1]);
+                mi->setParameter("normalHandedness", normalHandedness);
+
                 mi->commit(driver);
                 mi->use(driver);
 
