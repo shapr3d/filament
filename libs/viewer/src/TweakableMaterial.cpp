@@ -31,7 +31,7 @@ json TweakableMaterial::toJson() {
 
     result["useWard"] = mUseWard;
     result["maskedColorChange"] = mMaskedColorChange;       
-    result["fixedUvsUp"] = mFixedUvsUp;    
+    result["fixedUVsUp"] = mFixedUVsUp;    
 
     writeTexturedToJson(result, "baseColor", mBaseColor);
     result["tintColor"] = mTintColor.value;
@@ -100,7 +100,7 @@ void TweakableMaterial::fromJson(const json& source) {
 
     readValueFromJson(source, "useWard", mUseWard, false);
     readValueFromJson(source, "maskedColorChange", mMaskedColorChange, false);
-    readValueFromJson(source, "fixedUvsUp", mFixedUvsUp, false);
+    readValueFromJson(source, "fixedUVsUp", mFixedUVsUp, false);
 
     bool isAlpha = mMaskedColorChange || (mShaderType == TweakableMaterial::MaterialType::Transparent) || (mShaderType == TweakableMaterial::MaterialType::Refractive) || (mShaderType == TweakableMaterial::MaterialType::Masked);
 
@@ -234,7 +234,7 @@ void TweakableMaterial::resetWithType(MaterialType newType) {
     mSheenColor.useDerivedQuantity = false;
     mUseWard = false;
     mMaskedColorChange = false;
-    mFixedUvsUp = false;
+    mFixedUVsUp = false;
     mDoRelease = false;
 
     mShaderType = newType;
@@ -389,7 +389,7 @@ void TweakableMaterial::drawUI(const std::string& header) {
     if (ImGui::CollapsingHeader("Shader setup")) {
         ImGui::Checkbox("Use Ward specular normal distribution", &mUseWard);
         ImGui::Checkbox("Apply tint only where alpha > 0.3", &mMaskedColorChange);
-        ImGui::Checkbox("Lock orientation to one axis, biplanar-blend the other two", &mFixedUvsUp);
+        ImGui::Checkbox("Lock orientation to one axis, biplanar-blend the other two", &mFixedUVsUp);
     }
 }
 

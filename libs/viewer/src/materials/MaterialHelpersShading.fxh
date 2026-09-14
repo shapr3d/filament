@@ -36,7 +36,7 @@
 // 12    doDeriveSheenColor             materialParams.usageFlags & 4096
 // 13    doDeriveSubsurfaceColor        materialParams.usageFlags & 8192
 // 14    maskedColorChange              materialParams.usageFlags & 16384
-// 15    fixedUvsUp                     materialParams.usageFlags & 32768
+// 15    fixedUVsUp                     materialParams.usageFlags & 32768
 //
 // Our ASTC compressor lays out the coordinates as XXXY but our BC5 compressor lays them out as XY.
 // The useSwizzledNormalMaps flag indicates if data is stored as XY or XXXY (so we can sample the 
