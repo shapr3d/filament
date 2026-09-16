@@ -48,7 +48,8 @@ TrianglePrimitive::TrianglePrimitive(filament::backend::DriverApi& driverApi,
 
     const size_t vertexBufferSize = sizeof(math::float2) * 3;
     mVertexBufferObject = mDriverApi.createBufferObject(vertexBufferSize, BufferObjectBinding::VERTEX, BufferUsage::STATIC);
-    mVertexBuffer = mDriverApi.createVertexBuffer(1, 1, mVertexCount, attributes);
+    mVertexBufferInfo = mDriverApi.createVertexBufferInfo(1, 1, attributes);
+    mVertexBuffer = mDriverApi.createVertexBuffer(mVertexCount, mVertexBufferInfo);
     mDriverApi.setVertexBufferObject(mVertexBuffer, 0, mVertexBufferObject);
     BufferDescriptor vertexBufferDesc(gVertices, vertexBufferSize);
     mDriverApi.updateBufferObject(mVertexBufferObject, std::move(vertexBufferDesc), 0);
@@ -63,7 +64,7 @@ TrianglePrimitive::TrianglePrimitive(filament::backend::DriverApi& driverApi,
     mDriverApi.updateBufferObject(mIndexBufferObject, std::move(indexBufferDesc), 0);
 
     mRenderPrimitive = mDriverApi.createRenderPrimitive(
-            mVertexBuffer, mIndexBuffer, PrimitiveType::TRIANGLES, 0, 0, 2, 3);
+            mVertexBuffer, mIndexBuffer, PrimitiveType::TRIANGLES);
 }
 
 void TrianglePrimitive::updateVertices(const filament::math::float2 vertices[3]) noexcept {
@@ -106,6 +107,7 @@ TrianglePrimitive::~TrianglePrimitive() {
     mDriverApi.destroyBufferObject(mVertexBufferObject);
     mDriverApi.destroyBufferObject(mIndexBufferObject);
     mDriverApi.destroyVertexBuffer(mVertexBuffer);
+    mDriverApi.destroyVertexBufferInfo(mVertexBufferInfo);
     mDriverApi.destroyIndexBuffer(mIndexBuffer);
     mDriverApi.destroyRenderPrimitive(mRenderPrimitive);
 }

@@ -685,7 +685,7 @@ void FRenderer::renderJob(RootArenaScope& rootArenaScope, FView& view) {
     RenderPass::RenderFlags renderFlags = 0;
     if (view.hasShadowing())                renderFlags |= RenderPass::HAS_SHADOWING;
     if (view.isFrontFaceWindingInverted())  renderFlags |= RenderPass::HAS_INVERSE_FRONT_FACES;
-    if (view.hasInstancedStereo())          renderFlags |= RenderPass::IS_STEREOSCOPIC;
+    if (view.hasStereo())                   renderFlags |= RenderPass::IS_STEREOSCOPIC;
 
     RenderPassBuilder passBuilder(commandArena);
     passBuilder.renderFlags(renderFlags);
@@ -695,7 +695,7 @@ void FRenderer::renderJob(RootArenaScope& rootArenaScope, FView& view) {
     variant.setDynamicLighting(view.hasDynamicLighting());
     variant.setFog(view.hasFog());
     variant.setVsm(view.hasShadowing() && view.getShadowType() != ShadowType::PCF);
-    variant.setStereo(view.hasInstancedStereo());
+    variant.setStereo(view.hasStereo());
 
     /*
      * Frame graph

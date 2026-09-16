@@ -152,6 +152,13 @@ protected:
         } egl;
     } ext;
 
+    struct SwapChainEGL : public Platform::SwapChain {
+        EGLSurface sur = EGL_NO_SURFACE;
+        Config attribs{};
+        EGLNativeWindowType nativeWindow{};
+        EGLConfig config{};
+    };
+
     void initializeGlExtensions() noexcept;
 
 protected:
