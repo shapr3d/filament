@@ -16,9 +16,22 @@
 
 #include "private/backend/HandleAllocator.h"
 
+#include <backend/Handle.h>
+
+#include <utils/Allocator.h>
+#include <utils/Log.h>
 #include <utils/Panic.h>
+#include <utils/compiler.h>
+#include <utils/debug.h>
+#include <utils/ostream.h>
+
+#include <algorithm>
+#include <exception>
+#include <limits>
+#include <mutex>
 
 #include <stdlib.h>
+#include <string.h>
 
 namespace filament::backend {
 
@@ -28,13 +41,37 @@ template <size_t P0, size_t P1, size_t P2>
 UTILS_NOINLINE
 HandleAllocator<P0, P1, P2>::Allocator::Allocator(AreaPolicy::HeapArea const& area, const PoolRatios& poolRatios)
         : mArea(area) {
-    const size_t unit = area.size() / (poolRatios.pool0 + poolRatios.pool1 + poolRatios.pool2);
-    const size_t offsetPool1 = poolRatios.pool0 * unit;
-    const size_t offsetPool2 = (poolRatios.pool0 + poolRatios.pool1) * unit;
-    char* const p = (char*)area.begin();
-    mPool0 = PoolAllocator< P0, 16>(p, p + offsetPool1);
-    mPool1 = PoolAllocator< P1, 16>(p + offsetPool1, p + offsetPool2);
-    mPool2 = PoolAllocator< P2, 16>(p + offsetPool2, area.end());
+
+    // The largest handle this allocator can generate currently depends on the architecture's
+    // min alignment, typically 8 or 16 bytes.
+    // e.g. On Android armv8, the alignment is 16 bytes, so for a 1 MiB heap, the largest handle
+    //      index will be 65536. Note that this is not the same as the number of handles (which
+    //      will always be less).
+    // Because our maximum representable handle currently is 0x07FFFFFF, the maximum no-nonsensical
+    // heap size is 2 GiB, which amounts to 7.6 millions handles per pool (in the GL case).
+    size_t const maxHeapSize = std::min(area.size(), HANDLE_INDEX_MASK * getAlignment());
+
+    if (UTILS_UNLIKELY(maxHeapSize != area.size())) {
+        slog.w << "HandleAllocator heap size reduced to "
+               << maxHeapSize << " from " << area.size() << io::endl;
+    }
+
+    // make sure we start with a clean arena. This is needed to ensure that all blocks start
+    // with an age of 0.
+    memset(area.data(), 0, maxHeapSize);
+
+    // size the different pools according to the requested ratios
+    size_t const unit = maxHeapSize / (poolRatios.pool0 + poolRatios.pool1 + poolRatios.pool2);
+    size_t const size0 = poolRatios.pool0 * unit;
+    size_t const size1 = poolRatios.pool1 * unit;
+    size_t const size2 = maxHeapSize - size0 - size1;
+    char* const p0 = static_cast<char*>(area.begin());
+    char* const p1 = p0 + size0;
+    char* const p2 = p1 + size1;
+
+    mPool0 = Pool<P0>(p0, size0);
+    mPool1 = Pool<P1>(p1, size1);
+    mPool2 = Pool<P2>(p2, size2);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -72,11 +109,17 @@ template <size_t P0, size_t P1, size_t P2>
 HandleBase::HandleId HandleAllocator<P0, P1, P2>::allocateHandleSlow(size_t size) noexcept {
     void* p = ::malloc(size);
     std::unique_lock lock(mLock);
-    HandleBase::HandleId id = (++mId) | HEAP_HANDLE_FLAG;
+
+    HandleBase::HandleId id = (++mId) | HANDLE_HEAP_FLAG;
+
+    ASSERT_POSTCONDITION(mId < HANDLE_HEAP_FLAG,
+            "No more Handle ids available! This can happen if HandleAllocator arena has been full"
+            " for a while. Please increase FILAMENT_OPENGL_HANDLE_ARENA_SIZE_IN_MB");
+
     mOverflowMap.emplace(id, p);
     lock.unlock();
 
-    if (UTILS_UNLIKELY(id == (HEAP_HANDLE_FLAG|1u))) { // meaning id was zero
+    if (UTILS_UNLIKELY(id == (HANDLE_HEAP_FLAG | 1u))) { // meaning id was zero
         PANIC_LOG("HandleAllocator arena is full, using slower system heap. Please increase "
                   "the appropriate constant (e.g. FILAMENT_OPENGL_HANDLE_ARENA_SIZE_IN_MB).");
     }
@@ -85,7 +128,7 @@ HandleBase::HandleId HandleAllocator<P0, P1, P2>::allocateHandleSlow(size_t size
 
 template <size_t P0, size_t P1, size_t P2>
 void HandleAllocator<P0, P1, P2>::deallocateHandleSlow(HandleBase::HandleId id, size_t) noexcept {
-    assert_invariant(id & HEAP_HANDLE_FLAG);
+    assert_invariant(id & HANDLE_HEAP_FLAG);
     void* p = nullptr;
     auto& overflowMap = mOverflowMap;
 

@@ -165,7 +165,7 @@ private:
     }
 
     void renderInternal(FView const* view);
-    void renderJob(ArenaScope& arena, FView& view);
+    void renderJob(RootArenaScope& rootArenaScope, FView& view);
 
     // keep a reference to our engine
     FEngine& mEngine;
@@ -189,9 +189,6 @@ private:
     backend::TargetBufferFlags mClearFlags{};
     tsl::robin_set<FRenderTarget*> mPreviousRenderTargets;
     std::function<void()> mBeginFrameInternal;
-
-    // per-frame arena for this Renderer
-    LinearAllocatorArena& mPerRenderPassArena;
 };
 
 FILAMENT_DOWNCAST(Renderer)
