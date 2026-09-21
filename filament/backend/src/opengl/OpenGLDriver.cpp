@@ -1847,17 +1847,13 @@ void OpenGLDriver::destroyTexture(Handle<HwTexture> th) {
                 assert_invariant(t->gl.target == GL_RENDERBUFFER);
                 glDeleteRenderbuffers(1, &t->gl.id);
             }
-            if (UTILS_UNLIKELY(t->target == SamplerType::SAMPLER_EXTERNAL)) {
-                mPlatform.destroyExternalImage(t->externalTexture);
-            } else {
-                glDeleteTextures(1, &t->gl.id);
+            if (t->gl.sidecarRenderBufferMS) {
+                glDeleteRenderbuffers(1, &t->gl.sidecarRenderBufferMS);
             }
         } else {
-            assert_invariant(t->gl.target == GL_RENDERBUFFER);
-            glDeleteRenderbuffers(1, &t->gl.id);
-        }
-        if (t->gl.sidecarRenderBufferMS) {
-            glDeleteRenderbuffers(1, &t->gl.sidecarRenderBufferMS);
+            // Shapr: never reached, imported textures transfer ownership to Filament and are
+            // deleted above (gl.imported is not set by importTextureR()).
+            gl.unbindTexture(t->gl.target, t->gl.id);
         }
         destruct(th, t);
     }

@@ -442,7 +442,11 @@ public:
                     GLsizeiptr size = 0;
                 } buffers[MAX_BUFFER_BINDINGS];
             } targets[3];   // there are only 3 indexed buffer targets
-            GLuint genericBinding[6] = {};
+            // Shapr: GL_ELEMENT_ARRAY_BUFFER (index 4) is not tracked, but the indices returned by
+            // getIndexForBufferTarget() go up to 6 (GL_PIXEL_UNPACK_BUFFER), so the array must keep
+            // upstream's size of 7 or the binding for index 6 is written past the end of the array
+            // (into state.textures.active).
+            GLuint genericBinding[7] = {};
         } buffers;
 
         struct {
