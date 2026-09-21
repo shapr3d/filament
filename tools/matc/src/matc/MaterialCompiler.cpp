@@ -24,6 +24,7 @@
 
 #include <filamat/Enums.h>
 
+#include <utils/Log.h>
 #include <utils/JobSystem.h>
 
 #include "DirIncluder.h"
@@ -408,11 +409,17 @@ bool MaterialCompiler::run(const Config& config) {
         .targetApi(config.getTargetApi())
         .optimization(config.getOptimizationLevel())
         .printShaders(config.printShaders())
+        .saveRawVariants(config.saveRawVariants())
         .generateDebugInfo(config.isDebug())
         .variantFilter(config.getVariantFilter() | builder.getVariantFilter());
 
     for (const auto& define : config.getDefines()) {
         builder.shaderDefine(define.first.c_str(), define.second.c_str());
+    }
+
+    if (!processMaterialParameters(builder, config)) {
+        std::cerr << "Error while processing material parameters." << std::endl;
+        return false;
     }
 
     JobSystem js;
@@ -618,6 +625,16 @@ bool MaterialCompiler::compileRawShader(const char* glsl, size_t size, bool isDe
     output->close();
 
     return true;
+}
+
+bool MaterialCompiler::processMaterialParameters(filamat::MaterialBuilder& builder,
+        const Config& config) const {
+    ParametersProcessor parametersProcessor;
+    bool ok = true;
+    for (const auto& param : config.getMaterialParameters()) {
+        ok &= parametersProcessor.process(builder, param.first, param.second);
+    }
+    return ok;
 }
 
 } // namespace matc

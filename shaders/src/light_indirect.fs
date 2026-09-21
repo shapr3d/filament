@@ -2,9 +2,6 @@
 // Image based lighting configuration
 //------------------------------------------------------------------------------
 
-// Number of spherical harmonics bands (1, 2 or 3)
-#define SPHERICAL_HARMONICS_BANDS           3
-
 // IBL integration algorithm
 #define IBL_INTEGRATION_PREFILTERED_CUBEMAP         0
 #define IBL_INTEGRATION_IMPORTANCE_SAMPLING         1
@@ -46,7 +43,7 @@ vec3 decodeDataForIBL(const vec4 data) {
 
 vec3 PrefilteredDFG_LUT(float lod, float NoV) {
     // coord = sqrt(linear_roughness), which is the mapping used by cmgen.
-    return textureLod(light_iblDFG, vec2(NoV, lod), 0.0).rgb;
+    return textureLod(sampler0_iblDFG, vec2(NoV, lod), 0.0).rgb;
 }
 
 //------------------------------------------------------------------------------
@@ -63,28 +60,30 @@ vec3 prefilteredDFG(float perceptualRoughness, float NoV) {
 //------------------------------------------------------------------------------
 
 vec3 Irradiance_SphericalHarmonics(const vec3 n) {
-    vec3 rawResult = max(
-          frameUniforms.iblSH[0]
-#if SPHERICAL_HARMONICS_BANDS >= 2
-        + frameUniforms.iblSH[1] * (n.y)
-        + frameUniforms.iblSH[2] * (n.z)
-        + frameUniforms.iblSH[3] * (n.x)
-#endif
-#if SPHERICAL_HARMONICS_BANDS >= 3
-        + frameUniforms.iblSH[4] * (n.y * n.x)
-        + frameUniforms.iblSH[5] * (n.y * n.z)
-        + frameUniforms.iblSH[6] * (3.0 * n.z * n.z - 1.0)
-        + frameUniforms.iblSH[7] * (n.z * n.x)
-        + frameUniforms.iblSH[8] * (n.x * n.x - n.y * n.y)
-#endif
-        , 0.0);
+    vec3 sphericalHarmonics = frameUniforms.iblSH[0];
 
-    return TintIbl(rawResult);
+    if (CONFIG_SH_BANDS_COUNT >= 2) {
+        sphericalHarmonics +=
+                  frameUniforms.iblSH[1] * (n.y)
+                + frameUniforms.iblSH[2] * (n.z)
+                + frameUniforms.iblSH[3] * (n.x);
+    }
+
+    if (CONFIG_SH_BANDS_COUNT >= 3) {
+        sphericalHarmonics +=
+                  frameUniforms.iblSH[4] * (n.y * n.x)
+                + frameUniforms.iblSH[5] * (n.y * n.z)
+                + frameUniforms.iblSH[6] * (3.0 * n.z * n.z - 1.0)
+                + frameUniforms.iblSH[7] * (n.z * n.x)
+                + frameUniforms.iblSH[8] * (n.x * n.x - n.y * n.y);
+    }
+
+    return TintIbl(max(sphericalHarmonics, 0.0));
 }
 
 vec3 Irradiance_RoughnessOne(const vec3 n) {
     // note: lod used is always integer, hopefully the hardware skips tri-linear filtering
-    return decodeDataForIBL(textureLod(light_iblSpecular, n, frameUniforms.iblRoughnessOneLevel));
+    return decodeDataForIBL(textureLod(sampler0_iblSpecular, n, frameUniforms.iblRoughnessOneLevel));
 }
 
 //------------------------------------------------------------------------------
@@ -92,7 +91,7 @@ vec3 Irradiance_RoughnessOne(const vec3 n) {
 //------------------------------------------------------------------------------
 
 vec3 diffuseIrradiance(const vec3 n) {
-    // On Metal devices with an A8X chipset, this light_iblSpecular texture sample must be pulled
+    // On Metal devices with certain chipsets, this light_iblSpecular texture sample must be pulled
     // outside the frameUniforms.iblSH check. This is to avoid a Metal pipeline compilation error
     // with the message: "Could not statically determine the target of a texture".
     // The reason for this is unknown, and is possibly a bug that exhibits only on these devices.
@@ -109,7 +108,7 @@ vec3 diffuseIrradiance(const vec3 n) {
             return Irradiance_RoughnessOne(n);
         }
 #else
-        ivec2 s = textureSize(light_iblSpecular, int(frameUniforms.iblRoughnessOneLevel));
+        ivec2 s = textureSize(sampler0_iblSpecular, int(frameUniforms.iblRoughnessOneLevel));
         float du = 1.0 / float(s.x);
         float dv = 1.0 / float(s.y);
         vec3 m0 = normalize(cross(n, vec3(0.0, 1.0, 0.0)));
@@ -153,12 +152,12 @@ float perceptualRoughnessToLod(float perceptualRoughness) {
 
 vec3 prefilteredRadiance(const vec3 r, float perceptualRoughness) {
     float lod = perceptualRoughnessToLod(perceptualRoughness);
-    return decodeDataForIBL(textureLod(light_iblSpecular, ZUpToIblDirection(r), lod));
+    return decodeDataForIBL(textureLod(sampler0_iblSpecular, ZUpToIblDirection(r), lod));
 }
 
 vec3 prefilteredRadiance(const vec3 r, float roughness, float offset) {
     float lod = frameUniforms.iblRoughnessOneLevel * roughness;
-    return decodeDataForIBL(textureLod(light_iblSpecular, ZUpToIblDirection(r), lod + offset));
+    return decodeDataForIBL(textureLod(sampler0_iblSpecular, ZUpToIblDirection(r), lod + offset));
 }
 
 vec3 getSpecularDominantDirection(const vec3 n, const vec3 r, float roughness) {
@@ -169,7 +168,11 @@ vec3 specularDFG(const PixelParams pixel) {
 #if defined(SHADING_MODEL_CLOTH)
     return pixel.f0 * pixel.dfg.z;
 #else
+#if defined(MATERIAL_HAS_SPECULAR_COLOR_FACTOR) || defined(MATERIAL_HAS_SPECULAR_FACTOR)
+    return mix(pixel.dfg.xxx, pixel.dfg.yyy, pixel.f0) * pixel.specular;
+#else
     return mix(pixel.dfg.xxx, pixel.dfg.yyy, pixel.f0);
+#endif
 #endif
 }
 
@@ -280,7 +283,7 @@ vec3 isEvaluateSpecularIBL(const MaterialInputs material, const PixelParams pixe
     T *= R;
 
     float roughness = pixel.roughness;
-    float dim = float(textureSize(light_iblSpecular, 0).x);
+    float dim = float(textureSize(sampler0_iblSpecular, 0).x);
     float omegaP = (4.0 * PI) / (6.0 * dim * dim);
 
     vec3 indirectSpecular = vec3(0.0);
@@ -301,7 +304,7 @@ vec3 isEvaluateSpecularIBL(const MaterialInputs material, const PixelParams pixe
             // PDF inverse (we must use D_GGX() here, which is used to generate samples)
             float ipdf = (4.0 * LoH) / (D_GGX(roughness, NoH, h) * NoH);
             float mipLevel = prefilteredImportanceSampling(ipdf, omegaP);
-            vec3 L = decodeDataForIBL(textureLod(light_iblSpecular, l, mipLevel));
+            vec3 L = decodeDataForIBL(textureLod(sampler0_iblSpecular, l, mipLevel));
 
             float D = distribution(roughness, NoH, h);
             float V = visibility(roughness, NoV, NoL);
@@ -338,7 +341,7 @@ vec3 isEvaluateDiffuseIBL(const MaterialInputs material, const PixelParams pixel
     R[2] = vec3( 0, 0, 1);
     T *= R;
 
-    float dim = float(textureSize(light_iblSpecular, 0).x);
+    float dim = float(textureSize(sampler0_iblSpecular, 0).x);
     float omegaP = (4.0 * PI) / (6.0 * dim * dim);
 
     vec3 indirectDiffuse = vec3(0.0);
@@ -357,7 +360,7 @@ vec3 isEvaluateDiffuseIBL(const MaterialInputs material, const PixelParams pixel
             float ipdf = PI / NoL;
             // we have to bias the mipLevel (+1) to help with very strong highlights
             float mipLevel = prefilteredImportanceSampling(ipdf, omegaP) + 1.0;
-            vec3 L = decodeDataForIBL(textureLod(light_iblSpecular, l, mipLevel));
+            vec3 L = decodeDataForIBL(textureLod(sampler0_iblSpecular, l, mipLevel));
             indirectDiffuse += L;
         }
     }
@@ -572,7 +575,7 @@ vec4 evaluateRefraction(
     // distance to camera plane
     const float invLog2sqrt5 = 0.8614;
     float lod = max(0.0, (2.0 * log2(perceptualRoughness) + frameUniforms.refractionLodOffset) * invLog2sqrt5);
-    Fat = textureLod(light_ssr, vec3(p.xy, 0.0), lod);
+    Fat = textureLod(sampler0_ssr, vec3(p.xy, 0.0), lod);
 
     // if it's a transparent background, shift color components towards white
     Fat.rgb = mix(vec3(1.0), Fat.rgb, Fat.a);
@@ -620,7 +623,7 @@ void evaluateIBL(const MaterialInputs material, const PixelParams pixel, inout v
             const float invLog2sqrt5 = 0.8614;
             float d = -mulMat4x4Float3(getViewFromWorldMatrix(), getWorldPosition()).z;
             float lod = max(0.0, (log2(pixel.roughness / d) + frameUniforms.refractionLodOffset) * invLog2sqrt5);
-            ssrFr = textureLod(light_ssr, vec3(interpolationCache.uv, 1.0), lod);
+            ssrFr = textureLod(sampler0_ssr, vec3(interpolationCache.uv, 1.0), lod);
         }
     }
 #else // BLEND_MODE_OPAQUE
@@ -706,7 +709,6 @@ void evaluateIBL(const MaterialInputs material, const PixelParams pixel, inout v
 
     // Combine all terms
     // Note: iblLuminance is already premultiplied by the exposure
-
     color.rgb += Fr + Fd;
 #if defined(MATERIAL_HAS_REFRACTION)
     color.rgb += Ft;

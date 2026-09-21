@@ -18,8 +18,6 @@
 
 #include "components/RenderableManager.h"
 
-#include "private/filament/SibStructs.h"
-
 #include "details/Engine.h"
 
 #include "FilamentAPI-impl.h"
@@ -27,7 +25,11 @@
 #include <math/half.h>
 #include <math/mat4.h>
 
-#include <cstring>
+#include <utils/CString.h>
+
+#include <string.h>
+#include <stddef.h>
+#include <stdint.h>
 
 namespace filament {
 
@@ -80,6 +82,11 @@ FSkinningBuffer::FSkinningBuffer(FEngine& engine, const Builder& builder)
             BufferObjectBinding::UNIFORM,
             BufferUsage::DYNAMIC);
 
+    if (auto name = builder.getName(); !name.empty()) {
+        // TODO: We should also tag the texture created inside createIndicesAndWeightsHandle.
+        driver.setDebugTag(mHandle.getId(), std::move(name));
+    }
+
     if (builder->mInitialize) {
         // initialize the bones to identity (before rounding up)
         auto* out = driver.allocatePod<PerRenderableBoneUib::BoneData>(mBoneCount);
@@ -96,24 +103,25 @@ void FSkinningBuffer::terminate(FEngine& engine) {
 
 void FSkinningBuffer::setBones(FEngine& engine,
         RenderableManager::Bone const* transforms, size_t count, size_t offset) {
-
-    ASSERT_PRECONDITION((offset + count) <= mBoneCount,
-            "SkinningBuffer (size=%lu) overflow (boneCount=%u, offset=%u)",
-            (unsigned)mBoneCount, (unsigned)count, (unsigned)offset);
+    FILAMENT_CHECK_PRECONDITION((offset + count) <= mBoneCount)
+            << "SkinningBuffer (size=" << (unsigned)mBoneCount
+            << ") overflow (boneCount=" << (unsigned)count << ", offset=" << (unsigned)offset
+            << ")";
 
     setBones(engine, mHandle, transforms, count, offset);
 }
 
 void FSkinningBuffer::setBones(FEngine& engine,
         math::mat4f const* transforms, size_t count, size_t offset) {
-
-    ASSERT_PRECONDITION((offset + count) <= mBoneCount,
-            "SkinningBuffer (size=%lu) overflow (boneCount=%u, offset=%u)",
-            (unsigned)mBoneCount, (unsigned)count, (unsigned)offset);
+    FILAMENT_CHECK_PRECONDITION((offset + count) <= mBoneCount)
+            << "SkinningBuffer (size=" << (unsigned)mBoneCount
+            << ") overflow (boneCount=" << (unsigned)count << ", offset=" << (unsigned)offset
+            << ")";
 
     setBones(engine, mHandle, transforms, count, offset);
 }
 
+UTILS_UNUSED
 static uint32_t packHalf2x16(half2 v) noexcept {
     uint32_t lo = getBits(v[0]);
     uint32_t hi = getBits(v[1]);
@@ -144,13 +152,8 @@ PerRenderableBoneUib::BoneData FSkinningBuffer::makeBone(mat4f transform) noexce
                     transform[1],
                     transform[2]
             },
-            .cof = {
-                    packHalf2x16({ cofactors[0].x, cofactors[0].y }),
-                    packHalf2x16({ cofactors[0].z, cofactors[1].x }),
-                    packHalf2x16({ cofactors[1].y, cofactors[1].z }),
-                    packHalf2x16({ cofactors[2].x, cofactors[2].y })
-                    // cofactor[2][2] is not stored because we don't have space for it
-            }
+            .cof0 = cofactors[0],
+            .cof1x = cofactors[1].x
     };
 }
 
@@ -197,7 +200,7 @@ void updateDataAt(backend::DriverApi& driver,
     size_t const elementSize = sizeof(float2);
     size_t const size = getSkinningBufferSize(count);
     auto* out = (float2*)malloc(size);
-    std::memcpy(out, pairs.begin(), size);
+    memcpy(out, pairs.begin(), size);
 
     size_t const textureWidth = getSkinningBufferWidth(count);
     size_t const lineCount = count / textureWidth;
@@ -230,29 +233,15 @@ void updateDataAt(backend::DriverApi& driver,
     }
 }
 
-FSkinningBuffer::HandleIndicesAndWeights FSkinningBuffer::createIndicesAndWeightsHandle(
+backend::TextureHandle FSkinningBuffer::createIndicesAndWeightsHandle(
         FEngine& engine, size_t count) {
-    backend::Handle<backend::HwSamplerGroup> samplerHandle;
-    backend::Handle<backend::HwTexture> textureHandle;
-
     FEngine::DriverApi& driver = engine.getDriverApi();
     // create a texture for skinning pairs data (bone index and weight)
-    textureHandle = driver.createTexture(SamplerType::SAMPLER_2D, 1,
+    return driver.createTexture(SamplerType::SAMPLER_2D, 1,
             TextureFormat::RG32F, 1,
             getSkinningBufferWidth(count),
             getSkinningBufferHeight(count), 1,
             TextureUsage::DEFAULT);
-    samplerHandle = driver.createSamplerGroup(PerRenderPrimitiveSkinningSib::SAMPLER_COUNT,
-            utils::FixedSizeString<32>("Skinning buffer samplers"));
-    SamplerGroup samplerGroup(PerRenderPrimitiveSkinningSib::SAMPLER_COUNT);
-    samplerGroup.setSampler(PerRenderPrimitiveSkinningSib::BONE_INDICES_AND_WEIGHTS,
-            { textureHandle, {}});
-    driver.updateSamplerGroup(samplerHandle,
-            samplerGroup.toBufferDescriptor(driver));
-    return {
-            .sampler = samplerHandle,
-            .texture = textureHandle
-    };
 }
 
 void FSkinningBuffer::setIndicesAndWeightsData(FEngine& engine,

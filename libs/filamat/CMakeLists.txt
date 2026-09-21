@@ -23,7 +23,8 @@ set(COMMON_PRIVATE_HDRS
         src/eiff/MaterialInterfaceBlockChunk.h
         src/eiff/ShaderEntry.h
         src/eiff/SimpleFieldChunk.h
-        src/Includes.h)
+        src/Includes.h
+        src/PushConstantDefinitions.h)
 
 set(COMMON_SRCS
         src/eiff/Chunk.cpp
@@ -41,7 +42,6 @@ set(COMMON_SRCS
         src/Includes.cpp
         src/MaterialBuilder.cpp
         src/MaterialVariants.cpp
-        src/SamplerBindingMap.cpp
 )
 
 # Sources and headers for filamat
@@ -50,7 +50,8 @@ set(PRIVATE_HDRS
         ${COMMON_PRIVATE_HDRS}
         src/eiff/BlobDictionary.h
         src/eiff/DictionarySpirvChunk.h
-        src/eiff/MaterialSpirvChunk.h
+        src/eiff/DictionaryMetalLibraryChunk.h
+        src/eiff/MaterialBinaryChunk.h
         src/GLSLPostProcessor.h
         src/MetalArgumentBuffer.h
         src/ShaderMinifier.h
@@ -63,7 +64,8 @@ set(SRCS
         ${COMMON_SRCS}
         src/eiff/BlobDictionary.cpp
         src/eiff/DictionarySpirvChunk.cpp
-        src/eiff/MaterialSpirvChunk.cpp
+        src/eiff/DictionaryMetalLibraryChunk.cpp
+        src/eiff/MaterialBinaryChunk.cpp
         src/MetalArgumentBuffer.cpp
         src/sca/ASTHelpers.cpp
         src/sca/GLSLTools.cpp
@@ -81,7 +83,7 @@ include_directories(${CMAKE_BINARY_DIR})
 add_library(${TARGET} STATIC ${HDRS} ${PRIVATE_HDRS} ${SRCS})
 target_include_directories(${TARGET} PUBLIC ${PUBLIC_HDR_DIR})
 set_target_properties(${TARGET} PROPERTIES FOLDER Libs)
-target_link_libraries(${TARGET} shaders filabridge utils smol-v)
+target_link_libraries(${TARGET} backend_headers shaders filabridge utils smol-v)
 
 # We are being naughty and accessing private headers here
 # For spirv-tools, we're just following glslang's example

@@ -23,12 +23,15 @@
 #include "DFG.h"
 #include "PostProcessManager.h"
 #include "ResourceList.h"
+#include "HwDescriptorSetLayoutFactory.h"
 #include "HwVertexBufferInfoFactory.h"
 
 #include "components/CameraManager.h"
 #include "components/LightManager.h"
 #include "components/TransformManager.h"
 #include "components/RenderableManager.h"
+
+#include "ds/DescriptorSetLayout.h"
 
 #include "details/BufferObject.h"
 #include "details/Camera.h"
@@ -59,10 +62,11 @@
 #include <filament/Texture.h>
 #include <filament/VertexBuffer.h>
 
-#include <utils/compiler.h>
 #include <utils/Allocator.h>
-#include <utils/JobSystem.h>
 #include <utils/CountDownLatch.h>
+#include <utils/FixedCapacityVector.h>
+#include <utils/JobSystem.h>
+#include <utils/compiler.h>
 
 #include <chrono>
 #include <memory>
@@ -85,6 +89,7 @@ namespace filament {
 
 class Renderer;
 class MaterialParser;
+class ResourceAllocatorDisposer;
 
 namespace backend {
 class Driver;
@@ -183,8 +188,8 @@ public:
         return CONFIG_MAX_INSTANCES;
     }
 
-    bool isStereoSupported(StereoscopicType stereoscopicType) const noexcept {
-        return getDriver().isStereoSupported(stereoscopicType);
+    bool isStereoSupported() const noexcept {
+        return getDriver().isStereoSupported();
     }
 
     static size_t getMaxStereoscopicEyes() noexcept {
@@ -231,25 +236,35 @@ public:
         return mPlatform;
     }
 
-    backend::ShaderLanguage getShaderLanguage() const noexcept {
+    // Return a vector of shader languages, in order of preference.
+    utils::FixedCapacityVector<backend::ShaderLanguage> getShaderLanguage() const noexcept {
         switch (mBackend) {
             case Backend::DEFAULT:
             case Backend::NOOP:
             default:
-                return backend::ShaderLanguage::ESSL3;
+                return { backend::ShaderLanguage::ESSL3 };
             case Backend::OPENGL:
-                return getDriver().getFeatureLevel() == FeatureLevel::FEATURE_LEVEL_0
-                        ? backend::ShaderLanguage::ESSL1 : backend::ShaderLanguage::ESSL3;
+                return { getDriver().getFeatureLevel() == FeatureLevel::FEATURE_LEVEL_0
+                                ? backend::ShaderLanguage::ESSL1
+                                : backend::ShaderLanguage::ESSL3 };
             case Backend::VULKAN:
-                return backend::ShaderLanguage::SPIRV;
+                return { backend::ShaderLanguage::SPIRV };
             case Backend::METAL:
-                return backend::ShaderLanguage::MSL;
+                const auto& lang = mConfig.preferredShaderLanguage;
+                if (lang == Config::ShaderLanguage::MSL) {
+                    return { backend::ShaderLanguage::MSL, backend::ShaderLanguage::METAL_LIBRARY };
+                }
+                return { backend::ShaderLanguage::METAL_LIBRARY, backend::ShaderLanguage::MSL };
         }
     }
 
-    ResourceAllocator& getResourceAllocator() noexcept {
-        assert_invariant(mResourceAllocator);
-        return *mResourceAllocator;
+    ResourceAllocatorDisposer& getResourceAllocatorDisposer() noexcept {
+        assert_invariant(mResourceAllocatorDisposer);
+        return *mResourceAllocatorDisposer;
+    }
+
+    std::shared_ptr<ResourceAllocatorDisposer> const& getSharedResourceAllocatorDisposer() noexcept {
+        return mResourceAllocatorDisposer;
     }
 
     void* streamAlloc(size_t size, size_t alignment) noexcept;
@@ -263,8 +278,8 @@ public:
         return mDefaultRenderTarget;
     }
 
-    template <typename T>
-    T* create(ResourceList<T>& list, typename T::Builder const& builder) noexcept;
+    template <typename T, typename ... ARGS>
+    T* create(ResourceList<T>& list, typename T::Builder const& builder, ARGS&& ... args) noexcept;
 
     FBufferObject* createBufferObject(const BufferObject::Builder& builder) noexcept;
     FVertexBuffer* createVertexBuffer(const VertexBuffer::Builder& builder) noexcept;
@@ -273,7 +288,7 @@ public:
     FMorphTargetBuffer* createMorphTargetBuffer(const MorphTargetBuffer::Builder& builder) noexcept;
     FInstanceBuffer* createInstanceBuffer(const InstanceBuffer::Builder& builder) noexcept;
     FIndirectLight* createIndirectLight(const IndirectLight::Builder& builder) noexcept;
-    FMaterial* createMaterial(const Material::Builder& builder) noexcept;
+    FMaterial* createMaterial(const Material::Builder& builder, std::unique_ptr<MaterialParser> materialParser) noexcept;
     FTexture* createTexture(const Texture::Builder& builder) noexcept;
     FSkybox* createSkybox(const Skybox::Builder& builder) noexcept;
     FColorGrading* createColorGrading(const ColorGrading::Builder& builder) noexcept;
@@ -284,8 +299,11 @@ public:
     void createLight(const LightManager::Builder& builder, utils::Entity entity);
 
     FRenderer* createRenderer() noexcept;
+
     FMaterialInstance* createMaterialInstance(const FMaterial* material,
             const FMaterialInstance* other, const char* name) noexcept;
+
+    FMaterialInstance* createMaterialInstance(const FMaterial* material) noexcept;
 
     FScene* createScene() noexcept;
     FView* createView() noexcept;
@@ -318,27 +336,48 @@ public:
     bool destroy(const FView* p);
     bool destroy(const FInstanceBuffer* p);
 
-    bool isValid(const FBufferObject* p);
-    bool isValid(const FVertexBuffer* p);
-    bool isValid(const FFence* p);
-    bool isValid(const FIndexBuffer* p);
-    bool isValid(const FSkinningBuffer* p);
-    bool isValid(const FMorphTargetBuffer* p);
-    bool isValid(const FIndirectLight* p);
-    bool isValid(const FMaterial* p);
-    bool isValid(const FMaterialInstance* p);
-    bool isValid(const FRenderer* p);
-    bool isValid(const FScene* p);
-    bool isValid(const FSkybox* p);
-    bool isValid(const FColorGrading* p);
-    bool isValid(const FSwapChain* p);
-    bool isValid(const FStream* p);
-    bool isValid(const FTexture* p);
-    bool isValid(const FRenderTarget* p);
-    bool isValid(const FView* p);
-    bool isValid(const FInstanceBuffer* p);
+    bool isValid(const FBufferObject* p) const;
+    bool isValid(const FVertexBuffer* p) const;
+    bool isValid(const FFence* p) const;
+    bool isValid(const FIndexBuffer* p) const;
+    bool isValid(const FSkinningBuffer* p) const;
+    bool isValid(const FMorphTargetBuffer* p) const;
+    bool isValid(const FIndirectLight* p) const;
+    bool isValid(const FMaterial* p) const;
+    bool isValid(const FMaterial* m, const FMaterialInstance* p) const;
+    bool isValidExpensive(const FMaterialInstance* p) const;
+    bool isValid(const FRenderer* p) const;
+    bool isValid(const FScene* p) const;
+    bool isValid(const FSkybox* p) const;
+    bool isValid(const FColorGrading* p) const;
+    bool isValid(const FSwapChain* p) const;
+    bool isValid(const FStream* p) const;
+    bool isValid(const FTexture* p) const;
+    bool isValid(const FRenderTarget* p) const;
+    bool isValid(const FView* p) const;
+    bool isValid(const FInstanceBuffer* p) const;
+
+    size_t getBufferObjectCount() const noexcept;
+    size_t getViewCount() const noexcept;
+    size_t getSceneCount() const noexcept;
+    size_t getSwapChainCount() const noexcept;
+    size_t getStreamCount() const noexcept;
+    size_t getIndexBufferCount() const noexcept;
+    size_t getSkinningBufferCount() const noexcept;
+    size_t getMorphTargetBufferCount() const noexcept;
+    size_t getInstanceBufferCount() const noexcept;
+    size_t getVertexBufferCount() const noexcept;
+    size_t getIndirectLightCount() const noexcept;
+    size_t getMaterialCount() const noexcept;
+    size_t getTextureCount() const noexcept;
+    size_t getSkyboxeCount() const noexcept;
+    size_t getColorGradingCount() const noexcept;
+    size_t getRenderTargetCount() const noexcept;
 
     void destroy(utils::Entity e);
+
+    bool isPaused() const noexcept;
+    void setPaused(bool paused);
 
     void flushAndWait();
 
@@ -395,6 +434,8 @@ public:
         getDriver().purge();
     }
 
+    void unprotected() noexcept;
+
     void setAutomaticInstancingEnabled(bool enable) noexcept {
         // instancing is not allowed at feature level 0
         if (hasFeatureLevel(FeatureLevel::FEATURE_LEVEL_1)) {
@@ -408,6 +449,22 @@ public:
 
     HwVertexBufferInfoFactory& getVertexBufferInfoFactory() noexcept {
         return mHwVertexBufferInfoFactory;
+    }
+
+    HwDescriptorSetLayoutFactory& getDescriptorSetLayoutFactory() noexcept {
+        return mHwDescriptorSetLayoutFactory;
+    }
+
+    DescriptorSetLayout const& getPerViewDescriptorSetLayoutDepthVariant() const noexcept {
+        return mPerViewDescriptorSetLayoutDepthVariant;
+    }
+
+    DescriptorSetLayout const& getPerViewDescriptorSetLayoutSsrVariant() const noexcept {
+        return mPerViewDescriptorSetLayoutSsrVariant;
+    }
+
+    DescriptorSetLayout const& getPerRenderableDescriptorSetLayout() const noexcept {
+        return mPerRenderableDescriptorSetLayout;
     }
 
     backend::Handle<backend::HwTexture> getOneTexture() const { return mDummyOneTexture; }
@@ -444,7 +501,7 @@ private:
     backend::Driver& getDriver() const noexcept { return *mDriver; }
 
     template<typename T>
-    bool isValid(const T* ptr, ResourceList<T>& list);
+    bool isValid(const T* ptr, ResourceList<T> const& list) const;
 
     template<typename T>
     bool terminateAndDestroy(const T* p, ResourceList<T>& list);
@@ -479,8 +536,12 @@ private:
     FTransformManager mTransformManager;
     FLightManager mLightManager;
     FCameraManager mCameraManager;
-    ResourceAllocator* mResourceAllocator = nullptr;
+    std::shared_ptr<ResourceAllocatorDisposer> mResourceAllocatorDisposer;
     HwVertexBufferInfoFactory mHwVertexBufferInfoFactory;
+    HwDescriptorSetLayoutFactory mHwDescriptorSetLayoutFactory;
+    DescriptorSetLayout mPerViewDescriptorSetLayoutDepthVariant;
+    DescriptorSetLayout mPerViewDescriptorSetLayoutSsrVariant;
+    DescriptorSetLayout mPerRenderableDescriptorSetLayout;
 
     ResourceList<FBufferObject> mBufferObjects{ "BufferObject" };
     ResourceList<FRenderer> mRenderers{ "Renderer" };
@@ -530,6 +591,7 @@ private:
 
     mutable FMaterial const* mDefaultMaterial = nullptr;
     mutable FMaterial const* mSkyboxMaterial = nullptr;
+    mutable FSwapChain* mUnprotectedDummySwapchain = nullptr;
 
     mutable FTexture* mDefaultIblTexture = nullptr;
     mutable FIndirectLight* mDefaultIbl = nullptr;
@@ -552,11 +614,14 @@ private:
 
     std::thread::id mMainThreadId{};
 
+    bool mInitialized = false;
+
     // Creation parameters
     Config mConfig;
 
 public:
-    // these are the debug properties used by FDebug. They're accessed directly by modules who need them.
+    // These are the debug properties used by FDebug.
+    // They're accessed directly by modules who need them.
     struct {
         struct {
             bool debug_directional_shadowmap = false;
@@ -564,7 +629,8 @@ public:
             bool far_uses_shadowcasters = true;
             bool focus_shadowcasters = true;
             bool visualize_cascades = false;
-            bool tightly_bound_scene = true;
+            bool disable_light_frustum_align = false;
+            bool depth_clamp = true;
             float dzn = -1.0f;
             float dzf =  1.0f;
             float display_shadow_texture_scale = 0.25f;
@@ -588,10 +654,14 @@ public:
             // capture to file. At the moment, only supported by the Metal backend.
             bool doFrameCapture = false;
             bool disable_buffer_padding = false;
+            bool disable_subpasses = false;
         } renderer;
         struct {
             bool debug_froxel_visualization = false;
         } lighting;
+        struct {
+            bool combine_multiview_images = false;
+        } stereo;
         matdbg::DebugServer* server = nullptr;
     } debug;
 };

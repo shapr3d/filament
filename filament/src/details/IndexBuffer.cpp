@@ -21,6 +21,8 @@
 
 #include "FilamentAPI-impl.h"
 
+#include <utils/CString.h>
+
 namespace filament {
 
 struct IndexBuffer::BuilderDetails {
@@ -72,6 +74,9 @@ FIndexBuffer::FIndexBuffer(FEngine& engine, const IndexBuffer::Builder& builder)
             filament::backend::BufferObjectBinding::INDEX,
              backend::BufferUsage::STATIC);
             engine.getDriverApi().setIndexBufferObject(mHandle, mObjectHandle);
+    }
+    if (auto name = builder.getName(); !name.empty()) {
+        driver.setDebugTag(mHandle.getId(), std::move(name));
     }
 }
 

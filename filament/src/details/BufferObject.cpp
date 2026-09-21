@@ -20,6 +20,8 @@
 
 #include "FilamentAPI-impl.h"
 
+#include <utils/CString.h>
+
 namespace filament {
 
 struct BufferObject::BuilderDetails {
@@ -68,6 +70,9 @@ FBufferObject::FBufferObject(FEngine& engine, const BufferObject::Builder& build
         driver.setupExternalResource(mImportedId);
         mHandle = driver.importBufferObject(mImportedId, builder->mBindingType,
                 backend::BufferUsage::STATIC, builder->mByteCount);
+    }
+    if (auto name = builder.getName(); !name.empty()) {
+        driver.setDebugTag(mHandle.getId(), std::move(name));
     }
 }
 

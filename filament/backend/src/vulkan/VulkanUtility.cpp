@@ -51,7 +51,7 @@ VkFormat getVkFormat(ElementType type, bool normalized, bool integer) {
             case ElementType::SHORT4: return VK_FORMAT_R16G16B16A16_SNORM;
             case ElementType::USHORT4: return VK_FORMAT_R16G16B16A16_UNORM;
             default:
-                ASSERT_POSTCONDITION(false, "Normalized format does not exist.");
+                FILAMENT_CHECK_POSTCONDITION(false) << "Normalized format does not exist.";
                 return VK_FORMAT_UNDEFINED;
         }
     }
@@ -577,7 +577,7 @@ uint32_t getComponentCount(VkFormat format) {
     return {};
 }
 
-VkComponentMapping getSwizzleMap(TextureSwizzle swizzle[4]) {
+VkComponentMapping getSwizzleMap(TextureSwizzle const swizzle[4]) {
     VkComponentMapping map;
     VkComponentSwizzle* dst = &map.r;
     for (int i = 0; i < 4; ++i, ++dst) {

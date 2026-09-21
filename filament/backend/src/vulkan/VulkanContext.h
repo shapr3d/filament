@@ -19,7 +19,6 @@
 
 #include "VulkanConstants.h"
 #include "VulkanImageUtility.h"
-#include "VulkanPipelineCache.h"
 #include "VulkanUtility.h"
 
 #include <utils/bitset.h>
@@ -42,16 +41,19 @@ struct VulkanTimerQuery;
 struct VulkanCommandBuffer;
 
 struct VulkanAttachment {
-    VulkanTexture* texture;
+    VulkanTexture* texture = nullptr;
     uint8_t level = 0;
+    uint8_t layerCount = 1;
     uint16_t layer = 0;
+
+    bool isDepth() const;
     VkImage getImage() const;
     VkFormat getFormat() const;
     VulkanLayout getLayout() const;
     VkExtent2D getExtent2D() const;
-    VkImageView getImageView(VkImageAspectFlags aspect);
+    VkImageView getImageView();
     // TODO: maybe embed aspect into the attachment or texture itself.
-    VkImageSubresourceRange getSubresourceRange(VkImageAspectFlags aspect) const;
+    VkImageSubresourceRange getSubresourceRange() const;
 };
 
 class VulkanTimestamps {
@@ -102,8 +104,12 @@ public:
         return (uint32_t) VK_MAX_MEMORY_TYPES;
     }
 
-    inline VkFormatList const& getAttachmentDepthFormats() const {
-        return mDepthFormats;
+    inline VkFormatList const& getAttachmentDepthStencilFormats() const {
+        return mDepthStencilFormats;
+    }
+
+    inline VkFormatList const& getBlittableDepthStencilFormats() const {
+        return mBlittableDepthStencilFormats;
     }
 
     inline VkPhysicalDeviceLimits const& getPhysicalDeviceLimits() const noexcept {
@@ -115,14 +121,31 @@ public:
     }
 
     inline bool isImageCubeArraySupported() const noexcept {
-        return mPhysicalDeviceFeatures.imageCubeArray;
+        return mPhysicalDeviceFeatures.imageCubeArray == VK_TRUE;
+    }
+
+    inline bool isDepthClampSupported() const noexcept {
+        return mPhysicalDeviceFeatures.depthClamp == VK_TRUE;
     }
 
     inline bool isDebugMarkersSupported() const noexcept {
         return mDebugMarkersSupported;
     }
+
     inline bool isDebugUtilsSupported() const noexcept {
         return mDebugUtilsSupported;
+    }
+
+    inline bool isMultiviewEnabled() const noexcept {
+        return mMultiviewEnabled;
+    }
+
+    inline bool isClipDistanceSupported() const noexcept {
+        return mPhysicalDeviceFeatures.shaderClipDistance == VK_TRUE;
+    }
+
+    inline bool isLazilyAllocatedMemorySupported() const noexcept {
+        return mLazilyAllocatedMemorySupported;
     }
 
 private:
@@ -131,8 +154,11 @@ private:
     VkPhysicalDeviceFeatures mPhysicalDeviceFeatures = {};
     bool mDebugMarkersSupported = false;
     bool mDebugUtilsSupported = false;
+    bool mMultiviewEnabled = false;
+    bool mLazilyAllocatedMemorySupported = false;
 
-    VkFormatList mDepthFormats;
+    VkFormatList mDepthStencilFormats;
+    VkFormatList mBlittableDepthStencilFormats;
 
     // For convenience so that VulkanPlatform can initialize the private fields.
     friend class VulkanPlatform;

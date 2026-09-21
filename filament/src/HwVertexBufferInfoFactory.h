@@ -48,7 +48,7 @@ public:
 
     void terminate(backend::DriverApi& driver) noexcept;
 
-    struct Parameters { // 136 bytes
+    struct Parameters { // 132 bytes
         uint8_t bufferCount;
         uint8_t attributeCount;
         uint8_t padding[2] = {};
@@ -66,7 +66,13 @@ public:
     void destroy(backend::DriverApi& driver, Handle handle) noexcept;
 
 private:
-    struct Key { // 140 bytes
+    struct Key { // 136 bytes
+        // The key should not be copyable, unfortunately due to how the Bimap works we have
+        // to copy-construct it once.
+        Key(Key const&) = default;
+        Key& operator=(Key const&) = delete;
+        Key& operator=(Key&&) noexcept = delete;
+        explicit Key(Parameters const& params) : params(params), refs(1) { }
         Parameters params;
         mutable uint32_t refs;  // 4 bytes
         bool operator==(Key const& rhs) const noexcept {
@@ -85,18 +91,18 @@ private:
     };
 
     struct ValueHasher {
-        size_t operator()(Value v) const noexcept {
-            std::hash<Handle::HandleId> const hasher;
-            return hasher(v.handle.getId());
+        size_t operator()(Value const v) const noexcept {
+            return std::hash<Handle::HandleId>()(v.handle.getId());
         }
     };
 
-    friend bool operator==(Value const& lhs, Value const& rhs) noexcept {
+    friend bool operator==(Value const lhs, Value const rhs) noexcept {
         return lhs.handle == rhs.handle;
     }
 
     // Size of the arena used for the "set" part of the bimap
-    static constexpr size_t SET_ARENA_SIZE = 4 * 1024 * 1024;
+    // about ~15K entry before fall back to heap
+    static constexpr size_t SET_ARENA_SIZE = 2 * 1024 * 1024;
 
     // Arena for the set<>, using a pool allocator inside a heap area.
     using PoolAllocatorArena = utils::Arena<

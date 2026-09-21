@@ -6,17 +6,19 @@ layout(location = 0) out vec4 fragColor;
 
 #if defined(MATERIAL_HAS_POST_LIGHTING_COLOR)
 void blendPostLightingColor(const MaterialInputs material, inout vec4 color) {
+    vec4 blend = color;
 #if defined(POST_LIGHTING_BLEND_MODE_OPAQUE)
-    color = material.postLightingColor;
+    blend = material.postLightingColor;
 #elif defined(POST_LIGHTING_BLEND_MODE_TRANSPARENT)
-    color = material.postLightingColor + color * (1.0 - material.postLightingColor.a);
+    blend = material.postLightingColor + color * (1.0 - material.postLightingColor.a);
 #elif defined(POST_LIGHTING_BLEND_MODE_ADD)
-    color += material.postLightingColor;
+    blend += material.postLightingColor;
 #elif defined(POST_LIGHTING_BLEND_MODE_MULTIPLY)
-    color *= material.postLightingColor;
+    blend *= material.postLightingColor;
 #elif defined(POST_LIGHTING_BLEND_MODE_SCREEN)
-    color += material.postLightingColor * (1.0 - color);
+    blend += material.postLightingColor * (1.0 - color);
 #endif
+    color = mix(color, blend, material.postLightingMixFactor);
 }
 #endif
 
@@ -75,7 +77,7 @@ void main() {
             vec4 c = vec4(1.0, 0, 1.0, 1.0) * a;
             fragColor = mix(fragColor, c, 0.2);
         } else {
-            highp vec2 size = vec2(textureSize(light_shadowMap, 0));
+            highp vec2 size = vec2(textureSize(sampler0_shadowMap, 0));
             highp int ix = int(floor(p.x * size.x));
             highp int iy = int(floor(p.y * size.y));
             float t = float((ix ^ iy) & 1) * 0.2;

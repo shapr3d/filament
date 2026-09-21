@@ -64,9 +64,6 @@ public:
 
     void setPriority(uint8_t priority) noexcept;
 
-    // commits UBOs
-    void commit(backend::DriverApi& driver) noexcept;
-
 private:
     // we don't own these
     FTexture const* mSkyboxTexture = nullptr;

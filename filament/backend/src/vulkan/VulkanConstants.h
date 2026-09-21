@@ -17,6 +17,8 @@
 #ifndef TNT_FILAMENT_BACKEND_VULKANCONSTANTS_H
 #define TNT_FILAMENT_BACKEND_VULKANCONSTANTS_H
 
+#include <utils/Log.h>
+
 #include <stdint.h>
 
 // In debug builds, we enable validation layers and set up a debug callback.
@@ -43,9 +45,12 @@
 // Enables Android systrace
 #define FVK_DEBUG_SYSTRACE                0x00000001
 
-// Group markers are used to denote collection of GPU commands.  It is typically at the granualarity
-// of a renderpass.
+// Group markers are used to denote collections of GPU commands.  It is typically at the
+// granualarity of a renderpass. You can enable this along with FVK_DEBUG_DEBUG_UTILS to take
+// advantage of vkCmdBegin/EndDebugUtilsLabelEXT. You can also just enable this with
+// FVK_DEBUG_PRINT_GROUP_MARKERS to print the current marker to stdout.
 #define FVK_DEBUG_GROUP_MARKERS           0x00000002
+
 #define FVK_DEBUG_TEXTURE                 0x00000004
 #define FVK_DEBUG_LAYOUT_TRANSITION       0x00000008
 #define FVK_DEBUG_COMMAND_BUFFER          0x00000010
@@ -63,31 +68,33 @@
 // Enable the debug utils extension if it is available.
 #define FVK_DEBUG_DEBUG_UTILS             0x00008000
 
-// Usefaul default combinations
+// Use this to debug potential Handle/Resource leakage. It will print out reference counts for all
+// the currently active resources.
+#define FVK_DEBUG_RESOURCE_LEAK           0x00010000
+
+// Set this to enable logging "only" to one output stream. This is useful in the case where we want
+// to debug with print statements and want ordered logging (e.g slog.i and slog.e will not appear in
+// order of calls).
+#define FVK_DEBUG_FORCE_LOG_TO_I          0x00020000
+
+// Useful default combinations
 #define FVK_DEBUG_EVERYTHING              0xFFFFFFFF
 #define FVK_DEBUG_PERFORMANCE     \
-    FVK_DEBUG_SYSTRACE |          \
-    FVK_DEBUG_GROUP_MARKERS
+    FVK_DEBUG_SYSTRACE
 
-#define FVK_DEBUG_CORRECTNESS     \
-    FVK_DEBUG_VALIDATION |        \
-    FVK_DEBUG_SHADER_MODULE |     \
-    FVK_DEBUG_TEXTURE |           \
-    FVK_DEBUG_LAYOUT_TRANSITION
-
-#define FVK_DEBUG_RENDER_PASSES   \
-    FVK_DEBUG_GROUP_MARKERS |     \
-    FVK_DEBUG_PRINT_GROUP_MARKERS
+#if defined(FILAMENT_BACKEND_DEBUG_FLAG)
+#define FVK_DEBUG_FORWARDED_FLAG (FILAMENT_BACKEND_DEBUG_FLAG & FVK_DEBUG_EVERYTHING)
+#else
+#define FVK_DEBUG_FORWARDED_FLAG 0
+#endif
 
 #ifndef NDEBUG
-#define FVK_DEBUG_FLAGS (FVK_DEBUG_PERFORMANCE | FVK_DEBUG_DEBUG_UTILS | FVK_DEBUG_VALIDATION)
+#define FVK_DEBUG_FLAGS (FVK_DEBUG_PERFORMANCE | FVK_DEBUG_FORWARDED_FLAG)
 #else
 #define FVK_DEBUG_FLAGS 0
 #endif
 
-#define FVK_ENABLED(flags) ((FVK_DEBUG_FLAGS) & (flags))
-#define FVK_ENABLED_BOOL(flags) ((bool) FVK_ENABLED(flags))
-
+#define FVK_ENABLED(flags) (((FVK_DEBUG_FLAGS) & (flags)) == (flags))
 
 // Group marker only works only if validation or debug utils is enabled since it uses
 // vkCmd(Begin/End)DebugUtilsLabelEXT or vkCmdDebugMarker(Begin/End)EXT
@@ -107,6 +114,15 @@ static_assert(FVK_ENABLED(FVK_DEBUG_VALIDATION));
 
 // end dependcy checks
 
+// Shorthand for combination of enabled debug flags
+#if FVK_ENABLED(FVK_DEBUG_DEBUG_UTILS) && FVK_ENABLED(FVK_DEBUG_TEXTURE)
+#define FVK_ENABLED_DEBUG_SAMPLER_NAME 1
+#else
+#define FVK_ENABLED_DEBUG_SAMPLER_NAME 0
+#endif
+
+// end shorthands
+
 #if FVK_ENABLED(FVK_DEBUG_SYSTRACE)
 
 #include <utils/Systrace.h>
@@ -122,6 +138,18 @@ static_assert(FVK_ENABLED(FVK_DEBUG_VALIDATION));
 
 #ifndef FVK_HANDLE_ARENA_SIZE_IN_MB
 #define FVK_HANDLE_ARENA_SIZE_IN_MB 8
+#endif
+
+#if FVK_ENABLED(FVK_DEBUG_FORCE_LOG_TO_I)
+    #define FVK_LOGI (utils::slog.i)
+    #define FVK_LOGD FVK_LOGI
+    #define FVK_LOGE FVK_LOGI
+    #define FVK_LOGW FVK_LOGI
+#else
+    #define FVK_LOGE (utils::slog.e)
+    #define FVK_LOGW (utils::slog.w)
+    #define FVK_LOGD (utils::slog.d)
+    #define FVK_LOGI (utils::slog.i)
 #endif
 
 // All vkCreate* functions take an optional allocator. For now we select the default allocator by

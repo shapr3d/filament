@@ -19,6 +19,7 @@
 
 
 #include "MaterialInfo.h"
+#include "UibGenerator.h"
 
 #include <filamat/MaterialBuilder.h>
 
@@ -41,6 +42,8 @@
 #include <iosfwd>
 #include <string>
 #include <variant>
+
+#include <stdint.h>
 
 namespace filamat {
 
@@ -103,11 +106,12 @@ public:
 
     // generate declarations for custom interpolants
     static utils::io::sstream& generateVariable(utils::io::sstream& out, ShaderStage stage,
-            const utils::CString& name, size_t index);
+            const MaterialBuilder::CustomVariable& variable, size_t index);
 
     // generate declarations for non-custom "in" variables
     utils::io::sstream& generateShaderInputs(utils::io::sstream& out, ShaderStage type,
-        const filament::AttributeBitset& attributes, filament::Interpolation interpolation) const;
+            const filament::AttributeBitset& attributes, filament::Interpolation interpolation,
+            MaterialBuilder::PushConstantList const& pushConstants) const;
     static utils::io::sstream& generatePostProcessInputs(utils::io::sstream& out, ShaderStage type);
 
     // generate declarations for custom output variables
@@ -122,8 +126,14 @@ public:
 
     // generate samplers
     utils::io::sstream& generateSamplers(utils::io::sstream& out,
-            filament::SamplerBindingPoints bindingPoint, uint8_t firstBinding,
-            const filament::SamplerInterfaceBlock& sib) const;
+            filament::DescriptorSetBindingPoints set,
+            filament::SamplerInterfaceBlock::SamplerInfoList const& list) const;
+
+    utils::io::sstream& generateSamplers(utils::io::sstream& out,
+            filament::DescriptorSetBindingPoints set,
+            const filament::SamplerInterfaceBlock& sib) const {
+        return generateSamplers(out, set, sib.getSamplerInfoList());
+    }
 
     // generate subpass
     static utils::io::sstream& generateSubpass(utils::io::sstream& out,
@@ -131,7 +141,9 @@ public:
 
     // generate uniforms
     utils::io::sstream& generateUniforms(utils::io::sstream& out, ShaderStage stage,
-            filament::UniformBindingPoints binding, const filament::BufferInterfaceBlock& uib) const;
+            filament::DescriptorSetBindingPoints set,
+            filament::backend::descriptor_binding_t binding,
+            const filament::BufferInterfaceBlock& uib) const;
 
     // generate buffers
     utils::io::sstream& generateBuffers(utils::io::sstream& out,
@@ -139,7 +151,9 @@ public:
 
     // generate an interface block
     utils::io::sstream& generateBufferInterfaceBlock(utils::io::sstream& out, ShaderStage stage,
-            uint32_t binding, const filament::BufferInterfaceBlock& uib) const;
+            filament::DescriptorSetBindingPoints set,
+            filament::backend::descriptor_binding_t binding,
+            const filament::BufferInterfaceBlock& uib) const;
 
     // generate material properties getters
     static utils::io::sstream& generateMaterialProperty(utils::io::sstream& out,
@@ -156,6 +170,10 @@ public:
     utils::io::sstream& generateSpecializationConstant(utils::io::sstream& out,
             const char* name, uint32_t id, std::variant<int, float, bool> value) const;
 
+    utils::io::sstream& generatePushConstants(utils::io::sstream& out,
+            MaterialBuilder::PushConstantList const& pushConstants,
+            size_t const layoutLocation) const;
+
     static utils::io::sstream& generatePostProcessGetters(utils::io::sstream& out, ShaderStage type);
     static utils::io::sstream& generateGetters(utils::io::sstream& out, ShaderStage stage);
     static utils::io::sstream& generateParameters(utils::io::sstream& out, ShaderStage type);
@@ -167,9 +185,21 @@ public:
     // These constants must match the equivalent in MetalState.h.
     // These values represent the starting index for uniform, ssbo, and sampler group [[buffer(n)]]
     // bindings. See the chart at the top of MetalState.h.
-    static constexpr uint32_t METAL_UNIFORM_BUFFER_BINDING_START = 17u;
-    static constexpr uint32_t METAL_SAMPLER_GROUP_BINDING_START = 27u;
-    static constexpr uint32_t METAL_SSBO_BINDING_START = 0;
+    static constexpr uint32_t METAL_PUSH_CONSTANT_BUFFER_INDEX = 20u;
+    static constexpr uint32_t METAL_DESCRIPTOR_SET_BINDING_START = 21u;
+    static constexpr uint32_t METAL_DYNAMIC_OFFSET_BINDING = 25u;
+
+    uint32_t getUniqueSamplerBindingPoint() const noexcept {
+        return mUniqueSamplerBindingPoint++;
+    }
+
+    uint32_t getUniqueUboBindingPoint() const noexcept {
+        return mUniqueUboBindingPoint++;
+    }
+
+    uint32_t getUniqueSsboBindingPoint() const noexcept {
+        return mUniqueSsboBindingPoint++;
+    }
 
 private:
     filament::backend::Precision getDefaultPrecision(ShaderStage stage) const;
@@ -214,6 +244,9 @@ private:
     TargetApi mTargetApi;
     TargetLanguage mTargetLanguage;
     FeatureLevel mFeatureLevel;
+    mutable uint32_t mUniqueSamplerBindingPoint = 0;
+    mutable uint32_t mUniqueUboBindingPoint = 0;
+    mutable uint32_t mUniqueSsboBindingPoint = 0;
 };
 
 } // namespace filamat

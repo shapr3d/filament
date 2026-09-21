@@ -61,7 +61,9 @@ FenceStatus FFence::waitAndDestroy(FFence* fence, Mode mode) noexcept {
 
 UTILS_NOINLINE
 FenceStatus FFence::wait(Mode mode, uint64_t timeout) noexcept {
-    ASSERT_PRECONDITION((FILAMENT_THREADING_MODE == FILAMENT_THREADING_MODE_ASYNCHRONOUS_DRIVER) || timeout == 0, "Non-zero timeout requires driver thread.");
+    FILAMENT_CHECK_PRECONDITION(
+            (FILAMENT_THREADING_MODE == FILAMENT_THREADING_MODE_ASYNCHRONOUS_DRIVER) || timeout == 0)
+            << "Non-zero timeout requires driver thread.";
 
     FEngine& engine = mEngine;
 

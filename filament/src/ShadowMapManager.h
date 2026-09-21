@@ -19,7 +19,7 @@
 
 #include "Culler.h"
 #include "ShadowMap.h"
-#include "TypedUniformBuffer.h"
+#include "ds/TypedBuffer.h"
 
 #include <filament/LightManager.h>
 #include <filament/Options.h>
@@ -40,6 +40,7 @@
 
 #include <utils/BitmaskEnum.h>
 #include <utils/compiler.h>
+#include <utils/FixedCapacityVector.h>
 #include <utils/debug.h>
 #include <utils/Range.h>
 #include <utils/Slice.h>
@@ -58,6 +59,7 @@
 
 namespace filament {
 
+class Camera;
 class FCamera;
 class FView;
 class FrameGraph;
@@ -138,15 +140,15 @@ public:
     bool hasSpotShadows() const { return !mSpotShadowMapCount; }
 
     // for debugging only
-    FCamera const* getDirectionalShadowCamera() const noexcept {
-        if (!mInitialized) return nullptr;
-        return getShadowMap(0).getDebugCamera();
-    }
+    utils::FixedCapacityVector<Camera const*> getDirectionalShadowCameras() const noexcept;
 
 private:
     explicit ShadowMapManager(FEngine& engine);
 
     void terminate(FEngine& engine);
+
+    static void updateNearFarPlanes(math::mat4f* projection,
+            float nearDistance, float farDistance) noexcept;
 
     ShadowMapManager::ShadowTechnique updateCascadeShadowMaps(FEngine& engine,
             FView& view, CameraInfo cameraInfo, FScene::RenderableSoa& renderableData,
@@ -160,14 +162,20 @@ private:
 
     void prepareSpotShadowMap(ShadowMap& shadowMap,
             FEngine& engine, FView& view, CameraInfo const& mainCameraInfo,
-            FScene::RenderableSoa& renderableData, utils::Range<uint32_t> range,
             FScene::LightSoa& lightData, ShadowMap::SceneInfo const& sceneInfo) noexcept;
+
+    static void cullSpotShadowMap(ShadowMap const& map,
+            FEngine& engine, FView& view,
+            FScene::RenderableSoa& renderableData, utils::Range<uint32_t> range,
+            FScene::LightSoa& lightData) noexcept;
 
     void preparePointShadowMap(ShadowMap& map,
             FEngine& engine, FView& view, CameraInfo const& mainCameraInfo,
+            FScene::LightSoa& lightData) noexcept;
+
+    static void cullPointShadowMap(ShadowMap const& shadowMap, FView& view,
             FScene::RenderableSoa& renderableData, utils::Range<uint32_t> range,
-            FScene::LightSoa& lightData,
-            ShadowMap::SceneInfo const& sceneInfo) noexcept;
+            FScene::LightSoa& lightData) noexcept;
 
     static void updateSpotVisibilityMasks(
             uint8_t visibleLayers,
@@ -180,30 +188,22 @@ private:
         constexpr static size_t SPLIT_COUNT = CONFIG_MAX_SHADOW_CASCADES + 1;
 
         struct Params {
-            math::mat4f proj;
             float near = 0.0f;
             float far = 0.0f;
-            size_t cascadeCount = 1;
+            uint32_t cascadeCount = 1;
             std::array<float, SPLIT_COUNT> splitPositions = { 0.0f };
         };
 
         explicit CascadeSplits(Params const& params) noexcept;
 
         // Split positions in world-space.
-        const float* beginWs() const { return mSplitsWs; }
-        const float* endWs() const { return mSplitsWs + mSplitCount; }
-
-        // Split positions in clip-space.
-        const float* beginCs() const { return mSplitsCs; }
-        const float* endCs() const { return mSplitsCs + mSplitCount; }
+        const float* begin() const { return mSplitsWs; }
+        const float* end() const { return mSplitsWs + mSplitCount; }
 
     private:
         float mSplitsWs[SPLIT_COUNT];
-        float mSplitsCs[SPLIT_COUNT];
-        size_t mSplitCount;
+        uint32_t mSplitCount;
     };
-
-    FEngine& mEngine;
 
     // Atlas requirements, updated in ShadowMapManager::update(),
     // consumed in ShadowMapManager::render()
@@ -217,7 +217,7 @@ private:
 
     SoftShadowOptions mSoftShadowOptions;
 
-    mutable TypedUniformBuffer<ShadowUib> mShadowUb;
+    mutable TypedBuffer<ShadowUib> mShadowUb;
     backend::Handle<backend::HwBufferObject> mShadowUbh;
 
     ShadowMappingUniforms mShadowMappingUniforms = {};
@@ -232,6 +232,7 @@ private:
     ShadowMapCacheContainer mShadowMapCache;
     uint32_t mDirectionalShadowMapCount = 0;
     uint32_t mSpotShadowMapCount = 0;
+    bool const mIsDepthClampSupported;
     bool mInitialized = false;
 
     ShadowMap& getShadowMap(size_t index) noexcept {
@@ -244,8 +245,12 @@ private:
     }
 
     utils::Slice<ShadowMap> getCascadedShadowMap() noexcept {
-        ShadowMap* const p = &getShadowMap(0);
+        ShadowMap const* const p = &getShadowMap(0);
         return { p, mDirectionalShadowMapCount };
+    }
+
+    utils::Slice<ShadowMap> getCascadedShadowMap() const noexcept {
+        return const_cast<ShadowMapManager*>(this)->getCascadedShadowMap();
     }
 
     utils::Slice<ShadowMap> getSpotShadowMaps() noexcept {

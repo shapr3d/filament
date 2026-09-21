@@ -15,29 +15,62 @@
  */
 
 #include "details/Material.h"
+#include "details/Engine.h"
 
 #include "Froxelizer.h"
 #include "MaterialParser.h"
 
-#include "details/Engine.h"
+#include "ds/ColorPassDescriptorSet.h"
 
 #include "FilamentAPI-impl.h"
 
-#include <private/filament/Variant.h>
-
 #include <private/filament/EngineEnums.h>
+#include <private/filament/DescriptorSets.h>
 #include <private/filament/SamplerInterfaceBlock.h>
 #include <private/filament/BufferInterfaceBlock.h>
+#include <private/filament/PushConstantInfo.h>
+#include <private/filament/Variant.h>
+
+#include <filament/Material.h>
+#include <filament/MaterialEnums.h>
+
+#if FILAMENT_ENABLE_MATDBG
+#include <matdbg/DebugServer.h>
+#endif
+
+#include <filaflat/ChunkContainer.h>
+#include <filaflat/MaterialChunk.h>
 
 #include <backend/DriverEnums.h>
+#include <backend/CallbackHandler.h>
 #include <backend/Program.h>
 
+#include <utils/BitmaskEnum.h>
 #include <utils/CString.h>
 #include <utils/FixedCapacityVector.h>
-#include <utils/Panic.h>
 #include <utils/Hash.h>
+#include <utils/Invocable.h>
+#include <utils/Log.h>
+#include <utils/Panic.h>
+#include <utils/bitset.h>
+#include <utils/compiler.h>
+#include <utils/debug.h>
+#include <utils/ostream.h>
 
+#include <algorithm>
+#include <array>
+#include <iterator>
+#include <memory>
+#include <new>
+#include <optional>
+#include <string>
+#include <string_view>
 #include <unordered_map>
+#include <utility>
+#include <variant>
+
+#include <stddef.h>
+#include <stdint.h>
 
 namespace filament {
 
@@ -45,40 +78,51 @@ using namespace backend;
 using namespace filaflat;
 using namespace utils;
 
-static MaterialParser* createParser(Backend backend, ShaderLanguage language,
-                                    const void* data, size_t size) {
+static std::unique_ptr<MaterialParser> createParser(Backend backend,
+        utils::FixedCapacityVector<ShaderLanguage> languages, const void* data, size_t size) {
     // unique_ptr so we don't leak MaterialParser on failures below
-    auto materialParser = std::make_unique<MaterialParser>(language, data, size);
+    auto materialParser = std::make_unique<MaterialParser>(languages, data, size);
 
     MaterialParser::ParseResult const materialResult = materialParser->parse();
 
-    if (backend == Backend::NOOP) {
-        return materialParser.release();
+    if (UTILS_UNLIKELY(materialResult == MaterialParser::ParseResult::ERROR_MISSING_BACKEND)) {
+        std::string languageNames;
+        for (auto it = languages.begin(); it != languages.end(); ++it) {
+            languageNames.append(shaderLanguageToString(*it));
+            if (std::next(it) != languages.end()) {
+                languageNames.append(", ");
+            }
+        }
+
+        FILAMENT_CHECK_PRECONDITION(
+                materialResult != MaterialParser::ParseResult::ERROR_MISSING_BACKEND)
+                << "the material was not built for any of the " << backendToString(backend)
+                << " backend's supported shader languages (" << languageNames.c_str() << ")\n";
     }
 
-    ASSERT_PRECONDITION(materialResult != MaterialParser::ParseResult::ERROR_MISSING_BACKEND,
-                "the material was not built for the %s backend and %s shader language\n",
-                backendToString(backend),
-                shaderLanguageToString(language));
+    if (backend == Backend::NOOP) {
+        return materialParser;
+    }
 
-    ASSERT_PRECONDITION(materialResult == MaterialParser::ParseResult::SUCCESS,
-                "could not parse the material package");
+    FILAMENT_CHECK_PRECONDITION(materialResult == MaterialParser::ParseResult::SUCCESS)
+            << "could not parse the material package";
 
     uint32_t version = 0;
     materialParser->getMaterialVersion(&version);
-    ASSERT_PRECONDITION(version == MATERIAL_VERSION,
-            "Material version mismatch. Expected %d but received %d.", MATERIAL_VERSION, version);
+    FILAMENT_CHECK_PRECONDITION(version == MATERIAL_VERSION)
+            << "Material version mismatch. Expected " << MATERIAL_VERSION << " but received "
+            << version << ".";
 
     assert_invariant(backend != Backend::DEFAULT && "Default backend has not been resolved.");
 
-    return materialParser.release();
+    return materialParser;
 }
 
 struct Material::BuilderDetails {
     const void* mPayload = nullptr;
     size_t mSize = 0;
-    MaterialParser* mMaterialParser = nullptr;
     bool mDefaultMaterial = false;
+    int32_t mShBandsCount = 3;
     std::unordered_map<
         utils::CString,
         std::variant<int32_t, float, bool>,
@@ -103,9 +147,14 @@ Material::Builder& Material::Builder::package(const void* payload, size_t size) 
     return *this;
 }
 
+Material::Builder& Material::Builder::sphericalHarmonicsBandCount(size_t shBandCount) noexcept {
+    mImpl->mShBandsCount = math::clamp(shBandCount, size_t(1), size_t(3));
+    return *this;
+}
+
 template<typename T, typename>
 Material::Builder& Material::Builder::constant(const char* name, size_t nameLength, T value) {
-    ASSERT_PRECONDITION(name != nullptr, "name cannot be null");
+    FILAMENT_CHECK_PRECONDITION(name != nullptr) << "name cannot be null";
     mImpl->mConstantSpecializations[{name, nameLength}] = value;
     return *this;
 }
@@ -115,11 +164,11 @@ template Material::Builder& Material::Builder::constant<float>(const char*, size
 template Material::Builder& Material::Builder::constant<bool>(const char*, size_t, bool);
 
 Material* Material::Builder::build(Engine& engine) {
-    std::unique_ptr<MaterialParser> materialParser{ createParser(
+    std::unique_ptr<MaterialParser> materialParser = createParser(
         downcast(engine).getBackend(), downcast(engine).getShaderLanguage(),
-        mImpl->mPayload, mImpl->mSize) };
+        mImpl->mPayload, mImpl->mSize);
 
-    if (materialParser == nullptr) {
+    if (!materialParser) {
         return nullptr;
     }
 
@@ -146,17 +195,40 @@ Material* Material::Builder::build(Engine& engine) {
         return nullptr;
     }
 
-    mImpl->mMaterialParser = materialParser.release();
+    // Print a warning if the material's stereo type doesn't align with the engine's setting.
+    MaterialDomain materialDomain;
+    UserVariantFilterMask variantFilterMask;
+    materialParser->getMaterialDomain(&materialDomain);
+    materialParser->getMaterialVariantFilterMask(&variantFilterMask);
+    bool const hasStereoVariants = !(variantFilterMask & UserVariantFilterMask(UserVariantFilterBit::STE));
+    if (materialDomain == MaterialDomain::SURFACE && hasStereoVariants) {
+        StereoscopicType const engineStereoscopicType = engine.getConfig().stereoscopicType;
+        // Default materials are always compiled with either 'instanced' or 'multiview'.
+        // So, we only verify compatibility if the engine is set up for stereo.
+        if (engineStereoscopicType != StereoscopicType::NONE) {
+            StereoscopicType materialStereoscopicType = StereoscopicType::NONE;
+            materialParser->getStereoscopicType(&materialStereoscopicType);
+            if (materialStereoscopicType != engineStereoscopicType) {
+                CString name;
+                materialParser->getName(&name);
+                slog.w << "The stereoscopic type in the compiled material '" << name.c_str_safe()
+                        << "' is " << (int)materialStereoscopicType
+                        << ", which is not compatiable with the engine's setting "
+                        << (int)engineStereoscopicType << "." << io::endl;
+            }
+        }
+    }
 
-    return downcast(engine).createMaterial(*this);
+    return downcast(engine).createMaterial(*this, std::move(materialParser));
 }
 
-FMaterial::FMaterial(FEngine& engine, const Material::Builder& builder)
-        : mEngine(engine),
-          mMaterialId(engine.getMaterialId())
-{
-    MaterialParser* parser = builder->mMaterialParser;
-    mMaterialParser = parser;
+FMaterial::FMaterial(FEngine& engine, const Material::Builder& builder,
+        std::unique_ptr<MaterialParser> materialParser)
+        : mIsDefaultMaterial(builder->mDefaultMaterial),
+          mEngine(engine),
+          mMaterialId(engine.getMaterialId()),
+          mMaterialParser(std::move(materialParser)) {
+    MaterialParser* const parser = mMaterialParser.get();
 
     UTILS_UNUSED_IN_RELEASE bool const nameOk = parser->getName(&mName);
     assert_invariant(nameOk);
@@ -189,21 +261,77 @@ FMaterial::FMaterial(FEngine& engine, const Material::Builder& builder)
     success = parser->getUIB(&mUniformInterfaceBlock);
     assert_invariant(success);
 
-    if (UTILS_UNLIKELY(engine.getShaderLanguage() == ShaderLanguage::ESSL1)) {
-        success = parser->getBindingUniformInfo(&mBindingUniformInfo);
-        assert_invariant(success);
-
+    if (UTILS_UNLIKELY(parser->getShaderLanguage() == ShaderLanguage::ESSL1)) {
         success = parser->getAttributeInfo(&mAttributeInfo);
         assert_invariant(success);
-    } else if (mFeatureLevel <= FeatureLevel::FEATURE_LEVEL_1) {
-        // this chunk is not needed for materials at feature level 2 and above
-        success = parser->getUniformBlockBindings(&mUniformBlockBindings);
+
+        success = parser->getBindingUniformInfo(&mBindingUniformInfo);
         assert_invariant(success);
     }
 
-    success = parser->getSamplerBlockBindings(
-            &mSamplerGroupBindingInfoList, &mSamplerBindingToNameMap);
-    assert_invariant(success);
+    // Older materials will not have a subpass chunk; this should not be an error.
+    if (!parser->getSubpasses(&mSubpassInfo)) {
+        mSubpassInfo.isValid = false;
+    }
+
+    parser->getShading(&mShading);
+    parser->getMaterialProperties(&mMaterialProperties);
+    parser->getInterpolation(&mInterpolation);
+    parser->getVertexDomain(&mVertexDomain);
+    parser->getMaterialDomain(&mMaterialDomain);
+    parser->getMaterialVariantFilterMask(&mVariantFilterMask);
+    parser->getRequiredAttributes(&mRequiredAttributes);
+    parser->getRefractionMode(&mRefractionMode);
+    parser->getRefractionType(&mRefractionType);
+    parser->getReflectionMode(&mReflectionMode);
+    parser->getTransparencyMode(&mTransparencyMode);
+    parser->getDoubleSided(&mDoubleSided);
+    parser->getCullingMode(&mCullingMode);
+
+    if (mShading == Shading::UNLIT) {
+        parser->hasShadowMultiplier(&mHasShadowMultiplier);
+    }
+
+    mIsVariantLit = mShading != Shading::UNLIT || mHasShadowMultiplier;
+
+    // color write
+    bool colorWrite = false;
+    parser->getColorWrite(&colorWrite);
+    mRasterState.colorWrite = colorWrite;
+
+    // depth test
+    bool depthTest = false;
+    parser->getDepthTest(&depthTest);
+    mRasterState.depthFunc = depthTest ? RasterState::DepthFunc::GE : RasterState::DepthFunc::A;
+
+    // if doubleSided() was called we override culling()
+    bool doubleSideSet = false;
+    parser->getDoubleSidedSet(&doubleSideSet);
+    if (doubleSideSet) {
+        mDoubleSidedCapability = true;
+        mRasterState.culling = mDoubleSided ? CullingMode::NONE : mCullingMode;
+    } else {
+        mRasterState.culling = mCullingMode;
+    }
+
+    // specular anti-aliasing
+    parser->hasSpecularAntiAliasing(&mSpecularAntiAliasing);
+    if (mSpecularAntiAliasing) {
+        parser->getSpecularAntiAliasingVariance(&mSpecularAntiAliasingVariance);
+        parser->getSpecularAntiAliasingThreshold(&mSpecularAntiAliasingThreshold);
+    }
+
+    processBlendingMode(parser);
+    processSpecializationConstants(engine, builder, parser);
+    processPushConstants(engine, parser);
+    processDepthVariants(engine, parser);
+    processDescriptorSets(engine, parser);
+
+    mPerViewLayoutIndex = ColorPassDescriptorSet::getIndex(
+            mIsVariantLit,
+            mReflectionMode == ReflectionMode::SCREEN_SPACE ||
+            mRefractionMode == RefractionMode::SCREEN_SPACE,
+            !(mVariantFilterMask & +UserVariantFilterBit::FOG));
 
 #if FILAMENT_ENABLE_MATDBG
     // Register the material with matdbg.
@@ -213,259 +341,9 @@ FMaterial::FMaterial(FEngine& engine, const Material::Builder& builder)
         mDebuggerId = server->addMaterial(mName, details->mPayload, details->mSize, this);
     }
 #endif
-
-    // Older materials will not have a subpass chunk; this should not be an error.
-    if (!parser->getSubpasses(&mSubpassInfo)) {
-        mSubpassInfo.isValid = false;
-    }
-
-    // Older materials won't have a constants chunk, but that's okay.
-    parser->getConstants(&mMaterialConstants);
-    for (size_t i = 0, c = mMaterialConstants.size(); i < c; i++) {
-        auto& item = mMaterialConstants[i];
-        // the key can be a string_view because mMaterialConstant owns the CString
-        std::string_view const key{ item.name.data(), item.name.size() };
-        mSpecializationConstantsNameToIndex[key] = i;
-    }
-
-    // Verify that all the constant specializations exist in the material and that their types match.
-    // The first specialization constants are defined internally by Filament.
-    // The subsequent constants are user-defined in the material.
-
-    // Feature level 0 doesn't support instancing
-    int const maxInstanceCount = (engine.getActiveFeatureLevel() == FeatureLevel::FEATURE_LEVEL_0)
-            ? 1 : CONFIG_MAX_INSTANCES;
-
-    int const maxFroxelBufferHeight = std::min(
-            FROXEL_BUFFER_MAX_ENTRY_COUNT / 4,
-            engine.getDriverApi().getMaxUniformBufferSize() / 16u);
-
-    bool const staticTextureWorkaround =
-            engine.getDriverApi().isWorkaroundNeeded(Workaround::A8X_STATIC_TEXTURE_TARGET_ERROR);
-
-    bool const powerVrShaderWorkarounds =
-            engine.getDriverApi().isWorkaroundNeeded(Workaround::POWER_VR_SHADER_WORKAROUNDS);
-
-    mSpecializationConstants.reserve(mMaterialConstants.size() + CONFIG_MAX_RESERVED_SPEC_CONSTANTS);
-    mSpecializationConstants.push_back({
-                    +ReservedSpecializationConstants::BACKEND_FEATURE_LEVEL,
-                    (int)engine.getSupportedFeatureLevel() });
-    mSpecializationConstants.push_back({
-                    +ReservedSpecializationConstants::CONFIG_MAX_INSTANCES,
-                    (int)maxInstanceCount });
-    mSpecializationConstants.push_back({
-                    +ReservedSpecializationConstants::CONFIG_FROXEL_BUFFER_HEIGHT,
-                    (int)maxFroxelBufferHeight });
-    mSpecializationConstants.push_back({
-                    +ReservedSpecializationConstants::CONFIG_DEBUG_DIRECTIONAL_SHADOWMAP,
-                    engine.debug.shadowmap.debug_directional_shadowmap });
-    mSpecializationConstants.push_back({
-                    +ReservedSpecializationConstants::CONFIG_DEBUG_FROXEL_VISUALIZATION,
-                    engine.debug.lighting.debug_froxel_visualization });
-    mSpecializationConstants.push_back({
-                    +ReservedSpecializationConstants::CONFIG_STATIC_TEXTURE_TARGET_WORKAROUND,
-                    staticTextureWorkaround });
-    mSpecializationConstants.push_back({
-                    +ReservedSpecializationConstants::CONFIG_POWER_VR_SHADER_WORKAROUNDS,
-                    powerVrShaderWorkarounds });
-    mSpecializationConstants.push_back({
-                    +ReservedSpecializationConstants::CONFIG_STEREO_EYE_COUNT,
-                    (int)engine.getConfig().stereoscopicEyeCount });
-    if (UTILS_UNLIKELY(engine.getShaderLanguage() == ShaderLanguage::ESSL1)) {
-        // The actual value of this spec-constant is set in the OpenGLDriver backend.
-        mSpecializationConstants.push_back({
-            +ReservedSpecializationConstants::CONFIG_SRGB_SWAPCHAIN_EMULATION,
-            false});
-    }
-
-    for (auto const& [name, value] : builder->mConstantSpecializations) {
-        std::string_view const key{ name.data(), name.size() };
-        auto pos = mSpecializationConstantsNameToIndex.find(key);
-        ASSERT_PRECONDITION(pos != mSpecializationConstantsNameToIndex.end(),
-                "The material %s does not have a constant parameter named %s.",
-                mName.c_str_safe(), name.c_str());
-        const char* const types[3] = {"an int", "a float", "a bool"};
-        const char* const errorMessage =
-                "The constant parameter %s on material %s is of type %s, but %s was "
-                "provided.";
-        auto& constant = mMaterialConstants[pos->second];
-        switch (constant.type) {
-            case ConstantType::INT:
-                ASSERT_PRECONDITION(std::holds_alternative<int32_t>(value), errorMessage,
-                        name.c_str(), mName.c_str_safe(), "int", types[value.index()]);
-                break;
-            case ConstantType::FLOAT:
-                ASSERT_PRECONDITION(std::holds_alternative<float>(value), errorMessage,
-                        name.c_str(), mName.c_str_safe(), "float", types[value.index()]);
-                break;
-            case ConstantType::BOOL:
-                ASSERT_PRECONDITION(std::holds_alternative<bool>(value), errorMessage,
-                        name.c_str(), mName.c_str_safe(), "bool", types[value.index()]);
-                break;
-        }
-        uint32_t const index = pos->second + CONFIG_MAX_RESERVED_SPEC_CONSTANTS;
-        mSpecializationConstants.push_back({ index, value });
-    }
-
-    parser->getShading(&mShading);
-    parser->getMaterialProperties(&mMaterialProperties);
-    parser->getBlendingMode(&mBlendingMode);
-    parser->getInterpolation(&mInterpolation);
-    parser->getVertexDomain(&mVertexDomain);
-    parser->getMaterialDomain(&mMaterialDomain);
-    parser->getMaterialVariantFilterMask(&mVariantFilterMask);
-    parser->getRequiredAttributes(&mRequiredAttributes);
-    parser->getRefractionMode(&mRefractionMode);
-    parser->getRefractionType(&mRefractionType);
-    parser->getReflectionMode(&mReflectionMode);
-
-    if (mBlendingMode == BlendingMode::MASKED) {
-        parser->getMaskThreshold(&mMaskThreshold);
-    }
-
-    // The fade blending mode only affects shading. For proper sorting we need to
-    // treat this blending mode as a regular transparent blending operation.
-    if (UTILS_UNLIKELY(mBlendingMode == BlendingMode::FADE)) {
-        mRenderBlendingMode = BlendingMode::TRANSPARENT;
-    } else {
-        mRenderBlendingMode = mBlendingMode;
-    }
-
-    if (mShading == Shading::UNLIT) {
-        parser->hasShadowMultiplier(&mHasShadowMultiplier);
-    }
-
-    mIsVariantLit = mShading != Shading::UNLIT || mHasShadowMultiplier;
-
-    // create raster state
-    using BlendFunction = RasterState::BlendFunction;
-    using DepthFunc = RasterState::DepthFunc;
-    switch (mBlendingMode) {
-        // Do not change the MASKED behavior without checking for regressions with
-        // AlphaBlendModeTest and TextureLinearInterpolationTest, with and without
-        // View::BlendMode::TRANSLUCENT.
-        case BlendingMode::MASKED:
-        case BlendingMode::OPAQUE:
-            mRasterState.blendFunctionSrcRGB   = BlendFunction::ONE;
-            mRasterState.blendFunctionSrcAlpha = BlendFunction::ONE;
-            mRasterState.blendFunctionDstRGB   = BlendFunction::ZERO;
-            mRasterState.blendFunctionDstAlpha = BlendFunction::ZERO;
-            mRasterState.depthWrite = true;
-            break;
-        case BlendingMode::TRANSPARENT:
-        case BlendingMode::FADE:
-            mRasterState.blendFunctionSrcRGB   = BlendFunction::ONE;
-            mRasterState.blendFunctionSrcAlpha = BlendFunction::ONE;
-            mRasterState.blendFunctionDstRGB   = BlendFunction::ONE_MINUS_SRC_ALPHA;
-            mRasterState.blendFunctionDstAlpha = BlendFunction::ONE_MINUS_SRC_ALPHA;
-            mRasterState.depthWrite = false;
-            break;
-        case BlendingMode::ADD:
-            mRasterState.blendFunctionSrcRGB   = BlendFunction::ONE;
-            mRasterState.blendFunctionSrcAlpha = BlendFunction::ONE;
-            mRasterState.blendFunctionDstRGB   = BlendFunction::ONE;
-            mRasterState.blendFunctionDstAlpha = BlendFunction::ONE;
-            mRasterState.depthWrite = false;
-            break;
-        case BlendingMode::MULTIPLY:
-            mRasterState.blendFunctionSrcRGB   = BlendFunction::ZERO;
-            mRasterState.blendFunctionSrcAlpha = BlendFunction::ZERO;
-            mRasterState.blendFunctionDstRGB   = BlendFunction::SRC_COLOR;
-            mRasterState.blendFunctionDstAlpha = BlendFunction::SRC_COLOR;
-            mRasterState.depthWrite = false;
-            break;
-        case BlendingMode::SCREEN:
-            mRasterState.blendFunctionSrcRGB   = BlendFunction::ONE;
-            mRasterState.blendFunctionSrcAlpha = BlendFunction::ONE;
-            mRasterState.blendFunctionDstRGB   = BlendFunction::ONE_MINUS_SRC_COLOR;
-            mRasterState.blendFunctionDstAlpha = BlendFunction::ONE_MINUS_SRC_COLOR;
-            mRasterState.depthWrite = false;
-            break;
-    }
-
-    bool depthWriteSet = false;
-    parser->getDepthWriteSet(&depthWriteSet);
-    if (depthWriteSet) {
-        bool depthWrite = false;
-        parser->getDepthWrite(&depthWrite);
-        mRasterState.depthWrite = depthWrite;
-    }
-
-    // if doubleSided() was called we override culling()
-    bool doubleSideSet = false;
-    parser->getDoubleSidedSet(&doubleSideSet);
-    parser->getDoubleSided(&mDoubleSided);
-    parser->getCullingMode(&mCullingMode);
-    bool depthTest = false;
-    parser->getDepthTest(&depthTest);
-
-    if (doubleSideSet) {
-        mDoubleSidedCapability = true;
-        mRasterState.culling = mDoubleSided ? CullingMode::NONE : mCullingMode;
-    } else {
-        mRasterState.culling = mCullingMode;
-    }
-
-    parser->getTransparencyMode(&mTransparencyMode);
-    parser->hasCustomDepthShader(&mHasCustomDepthShader);
-    mIsDefaultMaterial = builder->mDefaultMaterial;
-
-    if (UTILS_UNLIKELY(mIsDefaultMaterial)) {
-        assert_invariant(mMaterialDomain == MaterialDomain::SURFACE);
-        filaflat::MaterialChunk const& materialChunk{ mMaterialParser->getMaterialChunk() };
-        auto variants = FixedCapacityVector<Variant>::with_capacity(materialChunk.getShaderCount());
-        materialChunk.visitShaders([&variants](
-                ShaderModel, Variant variant, ShaderStage) {
-            if (Variant::isValidDepthVariant(variant)) {
-                variants.push_back(variant);
-            }
-        });
-        std::sort(variants.begin(), variants.end(),
-                [](Variant lhs, Variant rhs) { return lhs.key < rhs.key; });
-        auto pos = std::unique(variants.begin(), variants.end());
-        variants.resize(std::distance(variants.begin(), pos));
-        std::swap(mDepthVariants, variants);
-    }
-
-    if (mMaterialDomain == MaterialDomain::SURFACE) {
-        if (UTILS_UNLIKELY(!mIsDefaultMaterial && !mHasCustomDepthShader)) {
-            FMaterial const* const pDefaultMaterial = engine.getDefaultMaterial();
-            auto& cachedPrograms = mCachedPrograms;
-            for (Variant const variant: pDefaultMaterial->mDepthVariants) {
-                pDefaultMaterial->prepareProgram(variant);
-                cachedPrograms[variant.key] = pDefaultMaterial->getProgram(variant);
-            }
-        }
-    }
-
-    bool colorWrite = false;
-    parser->getColorWrite(&colorWrite);
-    mRasterState.colorWrite = colorWrite;
-    mRasterState.depthFunc = depthTest ? DepthFunc::GE : DepthFunc::A;
-
-    bool alphaToCoverageSet = false;
-    parser->getAlphaToCoverageSet(&alphaToCoverageSet);
-    if (alphaToCoverageSet) {
-        bool alphaToCoverage = false;
-        parser->getAlphaToCoverage(&alphaToCoverage);
-        mRasterState.alphaToCoverage = alphaToCoverage;
-    } else {
-        mRasterState.alphaToCoverage = mBlendingMode == BlendingMode::MASKED;
-    }
-
-    parser->hasSpecularAntiAliasing(&mSpecularAntiAliasing);
-    if (mSpecularAntiAliasing) {
-        parser->getSpecularAntiAliasingVariance(&mSpecularAntiAliasingVariance);
-        parser->getSpecularAntiAliasingThreshold(&mSpecularAntiAliasingThreshold);
-    }
-
-    // we can only initialize the default instance once we're initialized ourselves
-    mDefaultInstance.initDefaultInstance(engine, this);
 }
 
-FMaterial::~FMaterial() noexcept {
-    delete mMaterialParser;
-}
+FMaterial::~FMaterial() noexcept = default;
 
 void FMaterial::invalidate(Variant::type_t variantMask, Variant::type_t variantValue) noexcept {
     if (mMaterialDomain == MaterialDomain::SURFACE) {
@@ -523,7 +401,17 @@ void FMaterial::terminate(FEngine& engine) {
 #endif
 
     destroyPrograms(engine);
-    mDefaultInstance.terminate(engine);
+
+    if (mDefaultMaterialInstance) {
+        mDefaultMaterialInstance->setDefaultInstance(false);
+        engine.destroy(mDefaultMaterialInstance);
+        mDefaultMaterialInstance = nullptr;
+    }
+
+    mPerViewDescriptorSetLayout.terminate(
+            engine.getDescriptorSetLayoutFactory(), engine.getDriverApi());
+    mDescriptorSetLayout.terminate(
+            engine.getDescriptorSetLayoutFactory(), engine.getDriverApi());
 }
 
 void FMaterial::compile(CompilerPriorityQueue priority,
@@ -532,8 +420,7 @@ void FMaterial::compile(CompilerPriorityQueue priority,
         utils::Invocable<void(Material*)>&& callback) noexcept {
 
     // Turn off the STE variant if stereo is not supported.
-    const StereoscopicType stereoscopicType = mEngine.getConfig().stereoscopicType;
-    if (!mEngine.getDriverApi().isStereoSupported(stereoscopicType)) {
+    if (!mEngine.getDriverApi().isStereoSupported()) {
         variantSpec &= ~UserVariantFilterMask(UserVariantFilterBit::STE);
     }
 
@@ -570,7 +457,21 @@ void FMaterial::compile(CompilerPriorityQueue priority,
 }
 
 FMaterialInstance* FMaterial::createInstance(const char* name) const noexcept {
-    return FMaterialInstance::duplicate(&mDefaultInstance, name);
+    if (mDefaultMaterialInstance) {
+        // if we have a default instance, use it to create a new one
+        return FMaterialInstance::duplicate(mDefaultMaterialInstance, name);
+    } else {
+        // but if we don't, just create an instance with all the default parameters
+        return mEngine.createMaterialInstance(this);
+    }
+}
+
+FMaterialInstance* FMaterial::getDefaultInstance() noexcept {
+    if (UTILS_UNLIKELY(!mDefaultMaterialInstance)) {
+        mDefaultMaterialInstance = mEngine.createMaterialInstance(this);
+        mDefaultMaterialInstance->setDefaultInstance(true);
+    }
+    return mDefaultMaterialInstance;
 }
 
 bool FMaterial::hasParameter(const char* name) const noexcept {
@@ -641,6 +542,9 @@ void FMaterial::getSurfaceProgramSlow(Variant variant,
 
     Program pb{ getProgramWithVariants(variant, vertexVariant, fragmentVariant) };
     pb.priorityQueue(priorityQueue);
+    pb.multiview(
+            mEngine.getConfig().stereoscopicType == StereoscopicType::MULTIVIEW &&
+            Variant::isStereoVariant(variant));
     createAndCacheProgram(std::move(pb), variant);
 }
 
@@ -667,10 +571,11 @@ Program FMaterial::getProgramWithVariants(
     UTILS_UNUSED_IN_RELEASE bool const vsOK = mMaterialParser->getShader(vsBuilder, sm,
             vertexVariant, ShaderStage::VERTEX);
 
-    ASSERT_POSTCONDITION(isNoop || (vsOK && !vsBuilder.empty()),
-            "The material '%s' has not been compiled to include the required "
-            "GLSL or SPIR-V chunks for the vertex shader (variant=0x%x, filtered=0x%x).",
-            mName.c_str(), variant.key, vertexVariant.key);
+    FILAMENT_CHECK_POSTCONDITION(isNoop || (vsOK && !vsBuilder.empty()))
+            << "The material '" << mName.c_str()
+            << "' has not been compiled to include the required GLSL or SPIR-V chunks for the "
+               "vertex shader (variant="
+            << variant.key << ", filtered=" << vertexVariant.key << ").";
 
     /*
      * Fragment shader
@@ -681,45 +586,40 @@ Program FMaterial::getProgramWithVariants(
     UTILS_UNUSED_IN_RELEASE bool const fsOK = mMaterialParser->getShader(fsBuilder, sm,
             fragmentVariant, ShaderStage::FRAGMENT);
 
-    ASSERT_POSTCONDITION(isNoop || (fsOK && !fsBuilder.empty()),
-            "The material '%s' has not been compiled to include the required "
-            "GLSL or SPIR-V chunks for the fragment shader (variant=0x%x, filtered=0x%x).",
-            mName.c_str(), variant.key, fragmentVariant.key);
+    FILAMENT_CHECK_POSTCONDITION(isNoop || (fsOK && !fsBuilder.empty()))
+            << "The material '" << mName.c_str()
+            << "' has not been compiled to include the required GLSL or SPIR-V chunks for the "
+               "fragment shader (variant="
+            << variant.key << ", filtered=" << ").";
 
     Program program;
     program.shader(ShaderStage::VERTEX, vsBuilder.data(), vsBuilder.size())
-           .shader(ShaderStage::FRAGMENT, fsBuilder.data(), fsBuilder.size())
-           .uniformBlockBindings(mUniformBlockBindings)
-           .diagnostics(mName,
-                    [this, variant](io::ostream& out) -> io::ostream& {
-                        return out << mName.c_str_safe()
-                                   << ", variant=(" << io::hex << variant.key << io::dec << ")";
+            .shader(ShaderStage::FRAGMENT, fsBuilder.data(), fsBuilder.size())
+            .shaderLanguage(mMaterialParser->getShaderLanguage())
+            .diagnostics(mName,
+                    [this, variant, vertexVariant, fragmentVariant](
+                            io::ostream& out) -> io::ostream& {
+                        return out << mName.c_str_safe() << ", variant=(" << io::hex
+                                   << (int)variant.key << io::dec << "), vertexVariant=(" << io::hex
+                                   << (int)vertexVariant.key << io::dec << "), fragmentVariant=("
+                                   << io::hex << (int)fragmentVariant.key << io::dec << ")";
                     });
 
-    UTILS_NOUNROLL
-    for (size_t i = 0; i < Enum::count<SamplerBindingPoints>(); i++) {
-        SamplerBindingPoints const bindingPoint = (SamplerBindingPoints)i;
-        auto const& info = mSamplerGroupBindingInfoList[i];
-        if (info.count) {
-            std::array<Program::Sampler, backend::MAX_SAMPLER_COUNT> samplers{};
-            for (size_t j = 0, c = info.count; j < c; ++j) {
-                uint8_t const binding = info.bindingOffset + j;
-                samplers[j] = { mSamplerBindingToNameMap[binding], binding };
-            }
-            program.setSamplerGroup(+bindingPoint, info.shaderStageFlags,
-                    samplers.data(), info.count);
-        }
-    }
-
-    if (UTILS_UNLIKELY(mEngine.getShaderLanguage() == ShaderLanguage::ESSL1)) {
+    if (UTILS_UNLIKELY(mMaterialParser->getShaderLanguage() == ShaderLanguage::ESSL1)) {
         assert_invariant(!mBindingUniformInfo.empty());
-        for (auto const& [index, uniforms] : mBindingUniformInfo) {
-            program.uniforms(uint32_t(index), uniforms);
+        for (auto const& [index, name, uniforms] : mBindingUniformInfo) {
+            program.uniforms(uint32_t(index), name, uniforms);
         }
         program.attributes(mAttributeInfo);
     }
 
+    program.descriptorBindings(0, mProgramDescriptorBindings[0]);
+    program.descriptorBindings(1, mProgramDescriptorBindings[1]);
+    program.descriptorBindings(2, mProgramDescriptorBindings[2]);
     program.specializationConstants(mSpecializationConstants);
+
+    program.pushConstants(ShaderStage::VERTEX, mPushConstants[(uint8_t) ShaderStage::VERTEX]);
+    program.pushConstants(ShaderStage::FRAGMENT, mPushConstants[(uint8_t) ShaderStage::FRAGMENT]);
 
     program.cacheId(utils::hash::combine(size_t(mCacheId), variant.key));
 
@@ -728,6 +628,7 @@ Program FMaterial::getProgramWithVariants(
 
 void FMaterial::createAndCacheProgram(Program&& p, Variant variant) const noexcept {
     auto program = mEngine.getDriverApi().createProgram(std::move(p));
+    mEngine.getDriverApi().setDebugTag(program.getId(), mName);
     assert_invariant(program);
     mCachedPrograms[variant.key] = program;
 }
@@ -785,9 +686,22 @@ void FMaterial::applyPendingEdits() noexcept {
     const char* name = mName.c_str();
     slog.d << "Applying edits to " << (name ? name : "(untitled)") << io::endl;
     destroyPrograms(mEngine); // FIXME: this will not destroy the shared variants
-    delete mMaterialParser;
-    mMaterialParser = mPendingEdits;
-    mPendingEdits = nullptr;
+    latchPendingEdits();
+}
+
+void FMaterial::setPendingEdits(std::unique_ptr<MaterialParser> pendingEdits) noexcept {
+    std::lock_guard const lock(mPendingEditsLock);
+    std::swap(pendingEdits, mPendingEdits);
+}
+
+bool FMaterial::hasPendingEdits() noexcept {
+    std::lock_guard const lock(mPendingEditsLock);
+    return (bool)mPendingEdits;
+}
+
+void FMaterial::latchPendingEdits() noexcept {
+    std::lock_guard const lock(mPendingEditsLock);
+    mMaterialParser.reset(mPendingEdits.release());
 }
 
 /**
@@ -804,8 +718,9 @@ void FMaterial::onEditCallback(void* userdata, const utils::CString&, const void
 
     // This is called on a web server thread, so we defer clearing the program cache
     // and swapping out the MaterialParser until the next getProgram call.
-    material->mPendingEdits = createParser(engine.getBackend(), engine.getShaderLanguage(),
-            packageData, packageSize);
+    std::unique_ptr<MaterialParser> pending = createParser(
+            engine.getBackend(), engine.getShaderLanguage(), packageData, packageSize);
+    material->setPendingEdits(std::move(pending));
 }
 
 void FMaterial::onQueryCallback(void* userdata, VariantList* pVariants) {
@@ -815,9 +730,10 @@ void FMaterial::onQueryCallback(void* userdata, VariantList* pVariants) {
     material->mActivePrograms.reset();
 }
 
-#endif
-
 /** @}*/
+
+#endif // FILAMENT_ENABLE_MATDBG
+
 
 void FMaterial::destroyPrograms(FEngine& engine) {
     DriverApi& driverApi = engine.getDriverApi();
@@ -883,6 +799,276 @@ bool FMaterial::setConstant(uint32_t id, T value) noexcept {
         }
     }
     return false;
+}
+
+void FMaterial::processBlendingMode(MaterialParser const* const parser) {
+    parser->getBlendingMode(&mBlendingMode);
+
+    if (mBlendingMode == BlendingMode::MASKED) {
+        parser->getMaskThreshold(&mMaskThreshold);
+    }
+
+    if (mBlendingMode == BlendingMode::CUSTOM) {
+        parser->getCustomBlendFunction(&mCustomBlendFunctions);
+    }
+
+    // blending mode
+    switch (mBlendingMode) {
+        // Do not change the MASKED behavior without checking for regressions with
+        // AlphaBlendModeTest and TextureLinearInterpolationTest, with and without
+        // View::BlendMode::TRANSLUCENT.
+        case BlendingMode::MASKED:
+        case BlendingMode::OPAQUE:
+            mRasterState.blendFunctionSrcRGB   = BlendFunction::ONE;
+            mRasterState.blendFunctionSrcAlpha = BlendFunction::ONE;
+            mRasterState.blendFunctionDstRGB   = BlendFunction::ZERO;
+            mRasterState.blendFunctionDstAlpha = BlendFunction::ZERO;
+            mRasterState.depthWrite = true;
+            break;
+        case BlendingMode::TRANSPARENT:
+        case BlendingMode::FADE:
+            mRasterState.blendFunctionSrcRGB   = BlendFunction::ONE;
+            mRasterState.blendFunctionSrcAlpha = BlendFunction::ONE;
+            mRasterState.blendFunctionDstRGB   = BlendFunction::ONE_MINUS_SRC_ALPHA;
+            mRasterState.blendFunctionDstAlpha = BlendFunction::ONE_MINUS_SRC_ALPHA;
+            mRasterState.depthWrite = false;
+            break;
+        case BlendingMode::ADD:
+            mRasterState.blendFunctionSrcRGB   = BlendFunction::ONE;
+            mRasterState.blendFunctionSrcAlpha = BlendFunction::ONE;
+            mRasterState.blendFunctionDstRGB   = BlendFunction::ONE;
+            mRasterState.blendFunctionDstAlpha = BlendFunction::ONE;
+            mRasterState.depthWrite = false;
+            break;
+        case BlendingMode::MULTIPLY:
+            mRasterState.blendFunctionSrcRGB   = BlendFunction::ZERO;
+            mRasterState.blendFunctionSrcAlpha = BlendFunction::ZERO;
+            mRasterState.blendFunctionDstRGB   = BlendFunction::SRC_COLOR;
+            mRasterState.blendFunctionDstAlpha = BlendFunction::SRC_COLOR;
+            mRasterState.depthWrite = false;
+            break;
+        case BlendingMode::SCREEN:
+            mRasterState.blendFunctionSrcRGB   = BlendFunction::ONE;
+            mRasterState.blendFunctionSrcAlpha = BlendFunction::ONE;
+            mRasterState.blendFunctionDstRGB   = BlendFunction::ONE_MINUS_SRC_COLOR;
+            mRasterState.blendFunctionDstAlpha = BlendFunction::ONE_MINUS_SRC_COLOR;
+            mRasterState.depthWrite = false;
+            break;
+        case BlendingMode::CUSTOM:
+            mRasterState.blendFunctionSrcRGB   = mCustomBlendFunctions[0];
+            mRasterState.blendFunctionSrcAlpha = mCustomBlendFunctions[1];
+            mRasterState.blendFunctionDstRGB   = mCustomBlendFunctions[2];
+            mRasterState.blendFunctionDstAlpha = mCustomBlendFunctions[3];
+            mRasterState.depthWrite = false;
+    }
+
+    // depth write
+    bool depthWriteSet = false;
+    parser->getDepthWriteSet(&depthWriteSet);
+    if (depthWriteSet) {
+        bool depthWrite = false;
+        parser->getDepthWrite(&depthWrite);
+        mRasterState.depthWrite = depthWrite;
+    }
+
+    // alpha to coverage
+    bool alphaToCoverageSet = false;
+    parser->getAlphaToCoverageSet(&alphaToCoverageSet);
+    if (alphaToCoverageSet) {
+        bool alphaToCoverage = false;
+        parser->getAlphaToCoverage(&alphaToCoverage);
+        mRasterState.alphaToCoverage = alphaToCoverage;
+    } else {
+        mRasterState.alphaToCoverage = mBlendingMode == BlendingMode::MASKED;
+    }
+}
+
+void FMaterial::processSpecializationConstants(FEngine& engine, Material::Builder const& builder,
+        MaterialParser const* const parser) {
+    // Older materials won't have a constants chunk, but that's okay.
+    parser->getConstants(&mMaterialConstants);
+    for (size_t i = 0, c = mMaterialConstants.size(); i < c; i++) {
+        auto& item = mMaterialConstants[i];
+        // the key can be a string_view because mMaterialConstant owns the CString
+        std::string_view const key{ item.name.data(), item.name.size() };
+        mSpecializationConstantsNameToIndex[key] = i;
+    }
+
+    // Verify that all the constant specializations exist in the material and that their types match.
+    // The first specialization constants are defined internally by Filament.
+    // The subsequent constants are user-defined in the material.
+
+    // Feature level 0 doesn't support instancing
+    int const maxInstanceCount = (engine.getActiveFeatureLevel() == FeatureLevel::FEATURE_LEVEL_0)
+                                 ? 1 : CONFIG_MAX_INSTANCES;
+
+    int const maxFroxelBufferHeight = (int)std::min(
+            FROXEL_BUFFER_MAX_ENTRY_COUNT / 4,
+            engine.getDriverApi().getMaxUniformBufferSize() / 16u);
+
+    bool const staticTextureWorkaround =
+            engine.getDriverApi().isWorkaroundNeeded(Workaround::METAL_STATIC_TEXTURE_TARGET_ERROR);
+
+    bool const powerVrShaderWorkarounds =
+            engine.getDriverApi().isWorkaroundNeeded(Workaround::POWER_VR_SHADER_WORKAROUNDS);
+
+    mSpecializationConstants.reserve(mMaterialConstants.size() + CONFIG_MAX_RESERVED_SPEC_CONSTANTS);
+    mSpecializationConstants.push_back({
+            +ReservedSpecializationConstants::BACKEND_FEATURE_LEVEL,
+            (int)engine.getSupportedFeatureLevel() });
+    mSpecializationConstants.push_back({
+            +ReservedSpecializationConstants::CONFIG_MAX_INSTANCES,
+            (int)maxInstanceCount });
+    mSpecializationConstants.push_back({
+            +ReservedSpecializationConstants::CONFIG_FROXEL_BUFFER_HEIGHT,
+            (int)maxFroxelBufferHeight });
+    mSpecializationConstants.push_back({
+            +ReservedSpecializationConstants::CONFIG_DEBUG_DIRECTIONAL_SHADOWMAP,
+            engine.debug.shadowmap.debug_directional_shadowmap });
+    mSpecializationConstants.push_back({
+            +ReservedSpecializationConstants::CONFIG_DEBUG_FROXEL_VISUALIZATION,
+            engine.debug.lighting.debug_froxel_visualization });
+    mSpecializationConstants.push_back({
+            +ReservedSpecializationConstants::CONFIG_STATIC_TEXTURE_TARGET_WORKAROUND,
+            staticTextureWorkaround });
+    mSpecializationConstants.push_back({
+            +ReservedSpecializationConstants::CONFIG_POWER_VR_SHADER_WORKAROUNDS,
+            powerVrShaderWorkarounds });
+    mSpecializationConstants.push_back({
+            +ReservedSpecializationConstants::CONFIG_STEREO_EYE_COUNT,
+            (int)engine.getConfig().stereoscopicEyeCount });
+    mSpecializationConstants.push_back({
+            +ReservedSpecializationConstants::CONFIG_SH_BANDS_COUNT, builder->mShBandsCount });
+    if (UTILS_UNLIKELY(parser->getShaderLanguage() == ShaderLanguage::ESSL1)) {
+        // The actual value of this spec-constant is set in the OpenGLDriver backend.
+        mSpecializationConstants.push_back({
+                +ReservedSpecializationConstants::CONFIG_SRGB_SWAPCHAIN_EMULATION,
+                false});
+    }
+
+    for (auto const& [name, value] : builder->mConstantSpecializations) {
+        std::string_view const key{ name.data(), name.size() };
+        auto pos = mSpecializationConstantsNameToIndex.find(key);
+        FILAMENT_CHECK_PRECONDITION(pos != mSpecializationConstantsNameToIndex.end())
+                << "The material " << mName.c_str_safe()
+                << " does not have a constant parameter named " << name.c_str() << ".";
+        const char* const types[3] = {"an int", "a float", "a bool"};
+        auto& constant = mMaterialConstants[pos->second];
+        switch (constant.type) {
+            case ConstantType::INT:
+                FILAMENT_CHECK_PRECONDITION(std::holds_alternative<int32_t>(value))
+                        << "The constant parameter " << name.c_str() << " on material "
+                        << mName.c_str_safe() << " is of type int, but " << types[value.index()]
+                        << " was provided.";
+                break;
+            case ConstantType::FLOAT:
+                FILAMENT_CHECK_PRECONDITION(std::holds_alternative<float>(value))
+                        << "The constant parameter " << name.c_str() << " on material "
+                        << mName.c_str_safe() << " is of type float, but " << types[value.index()]
+                        << " was provided.";
+                break;
+            case ConstantType::BOOL:
+                FILAMENT_CHECK_PRECONDITION(std::holds_alternative<bool>(value))
+                        << "The constant parameter " << name.c_str() << " on material "
+                        << mName.c_str_safe() << " is of type bool, but " << types[value.index()]
+                        << " was provided.";
+                break;
+        }
+        uint32_t const index = pos->second + CONFIG_MAX_RESERVED_SPEC_CONSTANTS;
+        mSpecializationConstants.push_back({ index, value });
+    }
+}
+
+void FMaterial::processPushConstants(FEngine& engine, MaterialParser const* parser) {
+    utils::FixedCapacityVector<backend::Program::PushConstant>& vertexConstants =
+            mPushConstants[(uint8_t) ShaderStage::VERTEX];
+    utils::FixedCapacityVector<backend::Program::PushConstant>& fragmentConstants =
+            mPushConstants[(uint8_t) ShaderStage::FRAGMENT];
+
+    CString structVarName;
+    utils::FixedCapacityVector<MaterialPushConstant> pushConstants;
+    parser->getPushConstants(&structVarName, &pushConstants);
+
+    vertexConstants.reserve(pushConstants.size());
+    fragmentConstants.reserve(pushConstants.size());
+
+    constexpr size_t MAX_NAME_LEN = 60;
+    char buf[MAX_NAME_LEN];
+    uint8_t vertexCount = 0, fragmentCount = 0;
+
+    std::for_each(pushConstants.cbegin(), pushConstants.cend(),
+            [&](MaterialPushConstant const& constant) {
+                snprintf(buf, sizeof(buf), "%s.%s", structVarName.c_str(), constant.name.c_str());
+
+                switch (constant.stage) {
+                    case ShaderStage::VERTEX:
+                        vertexConstants.push_back({utils::CString(buf), constant.type});
+                        vertexCount++;
+                        break;
+                    case ShaderStage::FRAGMENT:
+                        fragmentConstants.push_back({utils::CString(buf), constant.type});
+                        fragmentCount++;
+                        break;
+                    case ShaderStage::COMPUTE:
+                        break;
+                }
+            });
+}
+
+void FMaterial::processDepthVariants(FEngine& engine, MaterialParser const* const parser) {
+    parser->hasCustomDepthShader(&mHasCustomDepthShader);
+
+    if (UTILS_UNLIKELY(mIsDefaultMaterial)) {
+        assert_invariant(mMaterialDomain == MaterialDomain::SURFACE);
+        filaflat::MaterialChunk const& materialChunk{ parser->getMaterialChunk() };
+        auto variants = FixedCapacityVector<Variant>::with_capacity(materialChunk.getShaderCount());
+        materialChunk.visitShaders([&variants](
+                ShaderModel, Variant variant, ShaderStage) {
+            if (Variant::isValidDepthVariant(variant)) {
+                variants.push_back(variant);
+            }
+        });
+        std::sort(variants.begin(), variants.end(),
+                [](Variant lhs, Variant rhs) { return lhs.key < rhs.key; });
+        auto pos = std::unique(variants.begin(), variants.end());
+        variants.resize(std::distance(variants.begin(), pos));
+        std::swap(mDepthVariants, variants);
+    }
+
+    if (mMaterialDomain == MaterialDomain::SURFACE) {
+        if (UTILS_UNLIKELY(!mIsDefaultMaterial && !mHasCustomDepthShader)) {
+            FMaterial const* const pDefaultMaterial = engine.getDefaultMaterial();
+            auto& cachedPrograms = mCachedPrograms;
+            for (Variant const variant: pDefaultMaterial->mDepthVariants) {
+                pDefaultMaterial->prepareProgram(variant);
+                cachedPrograms[variant.key] = pDefaultMaterial->getProgram(variant);
+            }
+        }
+    }
+}
+
+void FMaterial::processDescriptorSets(FEngine& engine, MaterialParser const* const parser) {
+    UTILS_UNUSED_IN_RELEASE bool success;
+
+    success = parser->getDescriptorBindings(&mProgramDescriptorBindings);
+    assert_invariant(success);
+
+    std::array<backend::DescriptorSetLayout, 2> descriptorSetLayout;
+    success = parser->getDescriptorSetLayout(&descriptorSetLayout);
+    assert_invariant(success);
+
+    mDescriptorSetLayout = {
+            engine.getDescriptorSetLayoutFactory(),
+            engine.getDriverApi(), std::move(descriptorSetLayout[0]) };
+
+    mPerViewDescriptorSetLayout = {
+            engine.getDescriptorSetLayoutFactory(),
+            engine.getDriverApi(), std::move(descriptorSetLayout[1]) };
+}
+
+backend::descriptor_binding_t FMaterial::getSamplerBinding(
+        std::string_view const& name) const {
+    return mSamplerInterfaceBlock.getSamplerInfo(name)->binding;
 }
 
 template bool FMaterial::setConstant<int32_t>(uint32_t id, int32_t value) noexcept;

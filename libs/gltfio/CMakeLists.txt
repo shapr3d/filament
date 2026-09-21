@@ -47,9 +47,19 @@ set(SRCS
         src/TangentsJob.cpp
         src/TangentsJob.h
         src/UbershaderProvider.cpp
+        src/Utility.cpp
+        src/Utility.h
         src/Wireframe.cpp
         src/Wireframe.h
         src/downcast.h
+        src/extended/AssetLoaderExtended.cpp
+        src/extended/AssetLoaderExtended.h
+        src/extended/ResourceLoaderExtended.cpp
+        src/extended/ResourceLoaderExtended.h
+        src/extended/TangentsJobExtended.cpp
+        src/extended/TangentsJobExtended.h
+        src/extended/TangentSpaceMeshWrapper.cpp
+        src/extended/TangentSpaceMeshWrapper.h
 )
 
 # ==================================================================================================
@@ -67,6 +77,13 @@ set(TRANSPARENCY default)
 
 set(UBERZ_OUTPUT_PATH "${RESOURCE_DIR}/default.uberz")
 
+set (MATC_FLAGS ${MATC_BASE_FLAGS})
+if (FILAMENT_SAMPLES_STEREO_TYPE STREQUAL "instanced")
+    set (MATC_FLAGS ${MATC_FLAGS} -PstereoscopicType=instanced)
+elseif (FILAMENT_SAMPLES_STEREO_TYPE STREQUAL "multiview")
+    set (MATC_FLAGS ${MATC_FLAGS} -PstereoscopicType=multiview)
+endif ()
+
 function(build_ubershader NAME SRC SHADINGMODEL BLENDING)
     set(DEST "${RESOURCE_DIR}/${NAME}")
     configure_file(materials/${SRC}.mat.in "${DEST}.mat" COPYONLY)
@@ -83,7 +100,7 @@ function(build_ubershader NAME SRC SHADINGMODEL BLENDING)
 
     add_custom_command(
         OUTPUT "${NAME}.filamat"
-        COMMAND matc ${MATC_BASE_FLAGS} ${TEMPLATE_ARGS} -o "${NAME}.filamat" "${NAME}.mat"
+        COMMAND matc ${MATC_FLAGS} ${TEMPLATE_ARGS} -o "${NAME}.filamat" "${NAME}.mat"
         DEPENDS matc "${DEST}.mat"
         WORKING_DIRECTORY ${RESOURCE_DIR}
         COMMENT "Compiling material ${NAME}")
@@ -130,6 +147,9 @@ build_ubershader(volume_opaque             volume          lit opaque)
 build_ubershader(volume_fade               volume          lit fade)
 build_ubershader(volume_masked             volume          lit masked)
 build_ubershader(sheen                     sheen           _ _)
+build_ubershader(specular_opaque           specular        lit opaque)
+build_ubershader(specular_fade             specular        lit fade)
+build_ubershader(specular_masked           specular        lit masked)
 
 add_custom_target(uberz_file DEPENDS ${UBERZ_OUTPUT_PATH})
 set_target_properties(uberz_file PROPERTIES FOLDER Libs)
@@ -162,7 +182,7 @@ set_target_properties(uberarchive PROPERTIES FOLDER Libs)
 # ==================================================================================================
 
 include_directories(${PUBLIC_HDR_DIR} ${RESOURCE_DIR})
-link_libraries(math utils filament cgltf stb ktxreader geometry tsl trie uberzlib)
+link_libraries(math utils filament cgltf stb ktxreader geometry tsl uberzlib)
 
 add_library(gltfio_core STATIC ${PUBLIC_HDRS} ${SRCS})
 

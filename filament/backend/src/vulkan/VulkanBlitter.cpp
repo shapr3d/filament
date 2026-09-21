@@ -15,6 +15,7 @@
  */
 
 #include "VulkanBlitter.h"
+#include "VulkanCommands.h"
 #include "VulkanContext.h"
 #include "VulkanFboCache.h"
 #include "VulkanHandles.h"
@@ -26,49 +27,32 @@
 
 #include <smolv.h>
 
-#include "generated/vkshaders/vkshaders.h"
-
 using namespace bluevk;
 using namespace utils;
 
 namespace filament::backend {
 
-using ImgUtil = VulkanImageUtility;
-
 namespace {
 
-inline void blitFast(const VkCommandBuffer cmdbuffer, VkImageAspectFlags aspect, VkFilter filter,
+inline void blitFast(VulkanCommandBuffer* commands, VkImageAspectFlags aspect, VkFilter filter,
         VulkanAttachment src, VulkanAttachment dst,
         const VkOffset3D srcRect[2], const VkOffset3D dstRect[2]) {
-
+    VkCommandBuffer const cmdbuf = commands->buffer();
     if constexpr (FVK_ENABLED(FVK_DEBUG_BLITTER)) {
-        utils::slog.d << "Fast blit from=" << src.texture->getVkImage() << ",level=" << (int) src.level
+        FVK_LOGD << "Fast blit from=" << src.texture->getVkImage() << ",level=" << (int) src.level
                       << " layout=" << src.getLayout()
                       << " to=" << dst.texture->getVkImage() << ",level=" << (int) dst.level
                       << " layout=" << dst.getLayout() << utils::io::endl;
     }
 
-    const VkImageSubresourceRange srcRange = {
-            .aspectMask = aspect,
-            .baseMipLevel = src.level,
-            .levelCount = 1,
-            .baseArrayLayer = src.layer,
-            .layerCount = 1,
-    };
-
-    const VkImageSubresourceRange dstRange = {
-            .aspectMask = aspect,
-            .baseMipLevel = dst.level,
-            .levelCount = 1,
-            .baseArrayLayer = dst.layer,
-            .layerCount = 1,
-    };
+    VkImageSubresourceRange const srcRange = src.getSubresourceRange();
+    VkImageSubresourceRange const dstRange = dst.getSubresourceRange();
 
     VulkanLayout oldSrcLayout = src.getLayout();
     VulkanLayout oldDstLayout = dst.getLayout();
 
-    src.texture->transitionLayout(cmdbuffer, srcRange, VulkanLayout::TRANSFER_SRC);
-    dst.texture->transitionLayout(cmdbuffer, dstRange, VulkanLayout::TRANSFER_DST);
+    src.texture->transitionLayout(commands, srcRange, VulkanLayout::TRANSFER_SRC);
+    dst.texture->transitionLayout(commands, dstRange, VulkanLayout::TRANSFER_DST);
 
     const VkImageBlit blitRegions[1] = {{
             .srcSubresource = { aspect, src.level, src.layer, 1 },
@@ -76,52 +60,39 @@ inline void blitFast(const VkCommandBuffer cmdbuffer, VkImageAspectFlags aspect,
             .dstSubresource = { aspect, dst.level, dst.layer, 1 },
             .dstOffsets = { dstRect[0], dstRect[1] },
     }};
-    vkCmdBlitImage(cmdbuffer,
-            src.getImage(), ImgUtil::getVkLayout(VulkanLayout::TRANSFER_SRC),
-            dst.getImage(), ImgUtil::getVkLayout(VulkanLayout::TRANSFER_DST),
+    vkCmdBlitImage(cmdbuf,
+            src.getImage(), imgutil::getVkLayout(VulkanLayout::TRANSFER_SRC),
+            dst.getImage(), imgutil::getVkLayout(VulkanLayout::TRANSFER_DST),
             1, blitRegions, filter);
 
     if (oldSrcLayout == VulkanLayout::UNDEFINED) {
-        oldSrcLayout = ImgUtil::getDefaultLayout(src.texture->usage);
+        oldSrcLayout = src.texture->getDefaultLayout();
     }
     if (oldDstLayout == VulkanLayout::UNDEFINED) {
-        oldDstLayout = ImgUtil::getDefaultLayout(dst.texture->usage);
+        oldDstLayout = dst.texture->getDefaultLayout();
     }
-    src.texture->transitionLayout(cmdbuffer, srcRange, oldSrcLayout);
-    dst.texture->transitionLayout(cmdbuffer, dstRange, oldDstLayout);
+    src.texture->transitionLayout(commands, srcRange, oldSrcLayout);
+    dst.texture->transitionLayout(commands, dstRange, oldDstLayout);
 }
 
-inline void resolveFast(const VkCommandBuffer cmdbuffer, VkImageAspectFlags aspect,
+inline void resolveFast(VulkanCommandBuffer* commands, VkImageAspectFlags aspect,
         VulkanAttachment src, VulkanAttachment dst) {
-
+    VkCommandBuffer const cmdbuffer = commands->buffer();
     if constexpr (FVK_ENABLED(FVK_DEBUG_BLITTER)) {
-        utils::slog.d << "Fast blit from=" << src.texture->getVkImage() << ",level=" << (int) src.level
+        FVK_LOGD << "Fast blit from=" << src.texture->getVkImage() << ",level=" << (int) src.level
                       << " layout=" << src.getLayout()
                       << " to=" << dst.texture->getVkImage() << ",level=" << (int) dst.level
                       << " layout=" << dst.getLayout() << utils::io::endl;
     }
 
-    const VkImageSubresourceRange srcRange = {
-            .aspectMask = aspect,
-            .baseMipLevel = src.level,
-            .levelCount = 1,
-            .baseArrayLayer = src.layer,
-            .layerCount = 1,
-    };
-
-    const VkImageSubresourceRange dstRange = {
-            .aspectMask = aspect,
-            .baseMipLevel = dst.level,
-            .levelCount = 1,
-            .baseArrayLayer = dst.layer,
-            .layerCount = 1,
-    };
+    VkImageSubresourceRange const srcRange = src.getSubresourceRange();
+    VkImageSubresourceRange const dstRange = dst.getSubresourceRange();
 
     VulkanLayout oldSrcLayout = src.getLayout();
     VulkanLayout oldDstLayout = dst.getLayout();
 
-    src.texture->transitionLayout(cmdbuffer, srcRange, VulkanLayout::TRANSFER_SRC);
-    dst.texture->transitionLayout(cmdbuffer, dstRange, VulkanLayout::TRANSFER_DST);
+    src.texture->transitionLayout(commands, srcRange, VulkanLayout::TRANSFER_SRC);
+    dst.texture->transitionLayout(commands, dstRange, VulkanLayout::TRANSFER_DST);
 
     assert_invariant(
             aspect != VK_IMAGE_ASPECT_DEPTH_BIT && "Resolve with depth is not yet supported.");
@@ -133,18 +104,18 @@ inline void resolveFast(const VkCommandBuffer cmdbuffer, VkImageAspectFlags aspe
             .extent = { src.getExtent2D().width, src.getExtent2D().height, 1 },
     }};
     vkCmdResolveImage(cmdbuffer,
-            src.getImage(), ImgUtil::getVkLayout(VulkanLayout::TRANSFER_SRC),
-            dst.getImage(), ImgUtil::getVkLayout(VulkanLayout::TRANSFER_DST),
+            src.getImage(), imgutil::getVkLayout(VulkanLayout::TRANSFER_SRC),
+            dst.getImage(), imgutil::getVkLayout(VulkanLayout::TRANSFER_DST),
             1, resolveRegions);
 
     if (oldSrcLayout == VulkanLayout::UNDEFINED) {
-        oldSrcLayout = ImgUtil::getDefaultLayout(src.texture->usage);
+        oldSrcLayout = src.texture->getDefaultLayout();
     }
     if (oldDstLayout == VulkanLayout::UNDEFINED) {
-        oldDstLayout = ImgUtil::getDefaultLayout(dst.texture->usage);
+        oldDstLayout = dst.texture->getDefaultLayout();
     }
-    src.texture->transitionLayout(cmdbuffer, srcRange, oldSrcLayout);
-    dst.texture->transitionLayout(cmdbuffer, dstRange, oldDstLayout);
+    src.texture->transitionLayout(commands, srcRange, oldSrcLayout);
+    dst.texture->transitionLayout(commands, dstRange, oldDstLayout);
 }
 
 struct BlitterUniforms {
@@ -154,15 +125,9 @@ struct BlitterUniforms {
 
 }// anonymous namespace
 
-VulkanBlitter::VulkanBlitter() noexcept = default;
-
-void VulkanBlitter::initialize(VkPhysicalDevice physicalDevice, VkDevice device,
-        VmaAllocator allocator, VulkanCommands* commands) noexcept {
-    mPhysicalDevice = physicalDevice;
-    mDevice = device;
-    mAllocator = allocator;
-    mCommands = commands;
-}
+VulkanBlitter::VulkanBlitter(VkPhysicalDevice physicalDevice, VulkanCommands* commands) noexcept
+    : mPhysicalDevice(physicalDevice),
+      mCommands(commands) {}
 
 void VulkanBlitter::resolve(VulkanAttachment dst, VulkanAttachment src) {
 
@@ -187,10 +152,9 @@ void VulkanBlitter::resolve(VulkanAttachment dst, VulkanAttachment src) {
 #endif
 
     VulkanCommandBuffer& commands = mCommands->get();
-    VkCommandBuffer const cmdbuffer = commands.buffer();
     commands.acquire(src.texture);
     commands.acquire(dst.texture);
-    resolveFast(cmdbuffer, aspect, src, dst);
+    resolveFast(&commands, aspect, src, dst);
 }
 
 void VulkanBlitter::blit(VkFilter filter,
@@ -213,10 +177,9 @@ void VulkanBlitter::blit(VkFilter filter,
     // src and dst should have the same aspect here
     VkImageAspectFlags const aspect = src.texture->getImageAspect();
     VulkanCommandBuffer& commands = mCommands->get();
-    VkCommandBuffer const cmdbuffer = commands.buffer();
     commands.acquire(src.texture);
     commands.acquire(dst.texture);
-    blitFast(cmdbuffer, aspect, filter, src, dst, srcRectPair, dstRectPair);
+    blitFast(&commands, aspect, filter, src, dst, srcRectPair, dstRectPair);
 }
 
 void VulkanBlitter::terminate() noexcept {

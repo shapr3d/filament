@@ -242,6 +242,15 @@ public class View {
     }
 
     /**
+     * Query whether a camera is set.
+     * @return true if a camera is set, false otherwise
+     * @see #setCamera
+     */
+    public boolean hasCamera() {
+        return nHasCamera(getNativeObject());
+    }
+
+    /**
      * Gets this View's associated Camera, or null if none has been assigned.
      *
      * @see #setCamera
@@ -1224,6 +1233,18 @@ public class View {
         return nGetFogEntity(getNativeObject());
     }
 
+    /**
+     * When certain temporal features are used (e.g.: TAA or Screen-space reflections), the view
+     * keeps a history of previous frame renders associated with the Renderer the view was last
+     * used with. When switching Renderer, it may be necessary to clear that history by calling
+     * this method. Similarly, if the whole content of the screen change, like when a cut-scene
+     * starts, clearing the history might be needed to avoid artifacts due to the previous frame
+     * being very different.
+     */
+    public void clearFrameHistory(Engine engine) {
+        nClearFrameHistory(getNativeObject(), engine.getNativeObject());
+    }
+
     public long getNativeObject() {
         if (mNativeObject == 0) {
             throw new IllegalStateException("Calling method on destroyed View");
@@ -1238,6 +1259,7 @@ public class View {
     private static native void nSetName(long nativeView, String name);
     private static native void nSetScene(long nativeView, long nativeScene);
     private static native void nSetCamera(long nativeView, long nativeCamera);
+    private static native boolean nHasCamera(long nativeView);
     private static native void nSetViewport(long nativeView, int left, int bottom, int width, int height);
     private static native void nSetVisibleLayers(long nativeView, int select, int value);
     private static native void nSetShadowingEnabled(long nativeView, boolean enabled);
@@ -1284,7 +1306,7 @@ public class View {
     private static native void nSetMaterialGlobal(long nativeView, int index, float x, float y, float z, float w);
     private static native void nGetMaterialGlobal(long nativeView, int index, float[] out);
     private static native int nGetFogEntity(long nativeView);
-
+    private static native void nClearFrameHistory(long nativeView, long nativeEngine);
 
     /**
      * List of available ambient occlusion techniques.

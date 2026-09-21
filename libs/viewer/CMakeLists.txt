@@ -143,6 +143,12 @@ target_include_directories(${TARGET} PUBLIC ${PUBLIC_HDR_DIR})
 target_include_directories(${TARGET} PRIVATE ${GENERATION_ROOT})
 set_target_properties(${TARGET} PROPERTIES FOLDER Libs)
 
+if (FILAMENT_SAMPLES_STEREO_TYPE STREQUAL "instanced")
+    add_definitions(-DFILAMENT_SAMPLES_STEREO_TYPE_INSTANCED)
+elseif (FILAMENT_SAMPLES_STEREO_TYPE STREQUAL "multiview")
+    add_definitions(-DFILAMENT_SAMPLES_STEREO_TYPE_MULTIVIEW)
+endif ()
+
 # ==================================================================================================
 # Compiler flags
 # ==================================================================================================

@@ -19,8 +19,6 @@
 
 #include <backend/DriverEnums.h>
 
-#include "../SamplerBindingMap.h"
-
 #include <filament/MaterialEnums.h>
 
 #include <private/filament/BufferInterfaceBlock.h>
@@ -54,6 +52,7 @@ struct UTILS_PUBLIC MaterialInfo {
     bool instanced;
     bool vertexDomainDeviceJittered;
     bool userMaterialHasCustomDepth;
+    int stereoscopicEyeCount;
     filament::SpecularAmbientOcclusion specularAO;
     filament::RefractionMode refractionMode;
     filament::RefractionType refractionType;
@@ -65,9 +64,9 @@ struct UTILS_PUBLIC MaterialInfo {
     filament::BufferInterfaceBlock uib;
     filament::SamplerInterfaceBlock sib;
     filament::SubpassInfo subpass;
-    filament::SamplerBindingMap samplerBindings;
     filament::ShaderQuality quality;
     filament::backend::FeatureLevel featureLevel;
+    filament::backend::StereoscopicType stereoscopicType;
     filament::math::uint3 groupSize;
 
     using BufferContainer = utils::FixedCapacityVector<filament::BufferInterfaceBlock const*>;

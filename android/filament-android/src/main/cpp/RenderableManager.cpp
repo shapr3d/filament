@@ -106,6 +106,14 @@ Java_com_google_android_filament_RenderableManager_nBuilderGeometry__JIIJJIIII(J
 
 extern "C"
 JNIEXPORT void JNICALL
+Java_com_google_android_filament_RenderableManager_nBuilderGeometryType(JNIEnv*, jclass,
+        jlong nativeBuilder, int type) {
+    RenderableManager::Builder *builder = (RenderableManager::Builder *) nativeBuilder;
+    builder->geometryType((RenderableManager::Builder::GeometryType)type);
+}
+
+extern "C"
+JNIEXPORT void JNICALL
 Java_com_google_android_filament_RenderableManager_nBuilderMaterial(JNIEnv*, jclass,
         jlong nativeBuilder, jint index, jlong nativeMaterialInstance) {
     RenderableManager::Builder *builder = (RenderableManager::Builder *) nativeBuilder;
@@ -237,12 +245,18 @@ Java_com_google_android_filament_RenderableManager_nBuilderMorphing(JNIEnv*, jcl
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_google_android_filament_RenderableManager_nBuilderSetMorphTargetBufferAt(JNIEnv*, jclass,
-        jlong nativeBuilder, int level, int primitiveIndex, jlong nativeMorphTargetBuffer,
-        int offset, int count) {
+Java_com_google_android_filament_RenderableManager_nBuilderMorphingStandard(JNIEnv*, jclass,
+        jlong nativeBuilder, jlong nativeMorphTargetBuffer) {
     RenderableManager::Builder *builder = (RenderableManager::Builder *) nativeBuilder;
     MorphTargetBuffer *morphTargetBuffer = (MorphTargetBuffer *) nativeMorphTargetBuffer;
-    builder->morphing(level, primitiveIndex, morphTargetBuffer, offset, count);
+    builder->morphing(morphTargetBuffer);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_google_android_filament_RenderableManager_nBuilderSetMorphTargetBufferOffsetAt(JNIEnv*, jclass,
+        jlong nativeBuilder, int level, int primitiveIndex, int offset) {
+    RenderableManager::Builder *builder = (RenderableManager::Builder *) nativeBuilder;
+    builder->morphing(level, primitiveIndex, offset);
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -314,13 +328,12 @@ Java_com_google_android_filament_RenderableManager_nSetMorphWeights(JNIEnv* env,
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_google_android_filament_RenderableManager_nSetMorphTargetBufferAt(JNIEnv*,
+Java_com_google_android_filament_RenderableManager_nSetMorphTargetBufferOffsetAt(JNIEnv*,
         jclass, jlong nativeRenderableManager, jint i, int level, jint primitiveIndex,
-        jlong nativeMorphTargetBuffer, jint offset, jint count) {
+        jlong, jint offset) {
     RenderableManager *rm = (RenderableManager *) nativeRenderableManager;
-    MorphTargetBuffer *morphTargetBuffer = (MorphTargetBuffer *) nativeMorphTargetBuffer;
-    rm->setMorphTargetBufferAt((RenderableManager::Instance) i, (uint8_t) level,
-            (size_t) primitiveIndex, morphTargetBuffer, (size_t) offset, (size_t) count);
+    rm->setMorphTargetBufferOffsetAt((RenderableManager::Instance) i, (uint8_t) level,
+            (size_t) primitiveIndex, (size_t) offset);
 }
 
 extern "C" JNIEXPORT jint JNICALL

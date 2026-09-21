@@ -17,6 +17,7 @@
 #include "details/View.h"
 
 #include "Culler.h"
+#include "FrameHistory.h"
 #include "Froxelizer.h"
 #include "RenderPrimitive.h"
 #include "ResourceAllocator.h"
@@ -30,15 +31,18 @@
 #include "details/Skybox.h"
 
 #include <filament/Exposure.h>
+#include <filament/DebugRegistry.h>
 #include <filament/TextureSampler.h>
 #include <filament/View.h>
 
 #include <private/filament/UibStructs.h>
+#include <private/filament/EngineEnums.h>
 
+#include <utils/compiler.h>
+#include <utils/debug.h>
 #include <utils/Profiler.h>
 #include <utils/Slice.h>
 #include <utils/Systrace.h>
-#include <utils/debug.h>
 #include <utils/Zip2Iterator.h>
 
 #include <math/scalar.h>
@@ -46,6 +50,7 @@
 
 #include <array>
 #include <memory>
+#include <tuple>
 
 using namespace utils;
 
@@ -58,10 +63,12 @@ static constexpr float PID_CONTROLLER_Ki = 0.002f;
 static constexpr float PID_CONTROLLER_Kd = 0.0f;
 
 FView::FView(FEngine& engine)
-        : mFroxelizer(engine),
+        : mCommonRenderableDescriptorSet(engine.getPerRenderableDescriptorSetLayout()),
+          mFroxelizer(engine),
           mFogEntity(engine.getEntityManager().create()),
-          mIsStereoSupported(engine.getDriverApi().isStereoSupported(engine.getConfig().stereoscopicType)),
-          mPerViewUniforms(engine) {
+          mIsStereoSupported(engine.getDriverApi().isStereoSupported()),
+          mUniforms(engine.getDriverApi()),
+          mColorPassDescriptorSet(engine, mUniforms) {
 
     DriverApi& driver = engine.getDriverApi();
 
@@ -77,21 +84,29 @@ FView::FView(FEngine& engine)
     mPidController.setOutputDeadBand(-0.01f, 0.05f);
 
 #ifndef NDEBUG
-    debugRegistry.registerDataSource("d.view.frame_info",
-            [this]() -> DebugRegistry::DataSource {
-                assert_invariant(!mDebugFrameHistory);
-                mDebugFrameHistory = std::make_unique<std::array<DebugRegistry::FrameHistory, 5*60>>();
-                return { mDebugFrameHistory->data(), mDebugFrameHistory->size() };
+    // This can fail if another view has already registered this data source
+    mDebugState->owner = debugRegistry.registerDataSource("d.view.frame_info",
+            [weak = std::weak_ptr<DebugState>(mDebugState)]() -> DebugRegistry::DataSource {
+                // the View could have been destroyed by the time we do this
+                auto const state = weak.lock();
+                if (!state) {
+                    return { nullptr, 0 };
+                }
+                // Lazily allocate the buffer for the debug data source, and mark this
+                // data source as active. It can never go back to inactive.
+                assert_invariant(!state->debugFrameHistory);
+                state->active = true;
+                state->debugFrameHistory =
+                        std::make_unique<std::array<DebugRegistry::FrameHistory, 5 * 60>>();
+                return { state->debugFrameHistory->data(), state->debugFrameHistory->size() };
             });
-    debugRegistry.registerProperty("d.view.pid.kp", &engine.debug.view.pid.kp);
-    debugRegistry.registerProperty("d.view.pid.ki", &engine.debug.view.pid.ki);
-    debugRegistry.registerProperty("d.view.pid.kd", &engine.debug.view.pid.kd);
-    // default parameters for debugging UI
-    engine.debug.view.pid.kp = 1.0f - std::exp(-1.0f / 8.0f);
-    engine.debug.view.pid.ki = PID_CONTROLLER_Ki;
-    engine.debug.view.pid.kd = PID_CONTROLLER_Kd;
-    mPidController.setParallelGains(
-            engine.debug.view.pid.kp, engine.debug.view.pid.ki, engine.debug.view.pid.kd);
+
+    if (UTILS_UNLIKELY(mDebugState->owner)) {
+        // publish the properties (they will be initialized in the main loop)
+        debugRegistry.registerProperty("d.view.pid.kp", &engine.debug.view.pid.kp);
+        debugRegistry.registerProperty("d.view.pid.ki", &engine.debug.view.pid.ki);
+        debugRegistry.registerProperty("d.view.pid.kd", &engine.debug.view.pid.kd);
+    }
 #endif
 
     // allocate UBOs
@@ -101,6 +116,11 @@ FView::FView(FEngine& engine)
     mIsDynamicResolutionSupported = driver.isFrameTimeSupported();
 
     mDefaultColorGrading = mColorGrading = engine.getDefaultColorGrading();
+
+    mColorPassDescriptorSet.init(
+            mLightUbh,
+            mFroxelizer.getRecordBuffer(),
+            mFroxelizer.getFroxelBuffer());
 }
 
 FView::~FView() noexcept = default;
@@ -118,13 +138,21 @@ void FView::terminate(FEngine& engine) {
     DriverApi& driver = engine.getDriverApi();
     driver.destroyBufferObject(mLightUbh);
     driver.destroyBufferObject(mRenderableUbh);
-    drainFrameHistory(engine);
+    clearFrameHistory(engine);
 
     ShadowMapManager::terminate(engine, mShadowMapManager);
-    mPerViewUniforms.terminate(driver);
+    mUniforms.terminate(driver);
+    mColorPassDescriptorSet.terminate(engine.getDescriptorSetLayoutFactory(), driver);
     mFroxelizer.terminate(driver);
+    mCommonRenderableDescriptorSet.terminate(driver);
 
     engine.getEntityManager().destroy(mFogEntity);
+
+#ifndef NDEBUG
+    if (UTILS_UNLIKELY(mDebugState->owner)) {
+        engine.getDebugRegistry().unregisterDataSource("d.view.frame_info");
+    }
+#endif
 }
 
 void FView::setViewport(filament::Viewport const& viewport) noexcept {
@@ -162,9 +190,19 @@ void FView::setDynamicLightingOptions(float zLightNear, float zLightFar) noexcep
 }
 
 float2 FView::updateScale(FEngine& engine,
-        FrameInfo const& info,
+        filament::details::FrameInfo const& info,
         Renderer::FrameRateOptions const& frameRateOptions,
         Renderer::DisplayInfo const& displayInfo) noexcept {
+
+#ifndef NDEBUG
+    if (UTILS_LIKELY(!mDebugState->active)) {
+        // if we're not active, update the debug properties with the normal values
+        // and use that for configuring the PID controller.
+        engine.debug.view.pid.kp = 1.0f - std::exp(-frameRateOptions.scaleRate);
+        engine.debug.view.pid.ki = PID_CONTROLLER_Ki;
+        engine.debug.view.pid.kd = PID_CONTROLLER_Kd;
+    }
+#endif
 
     DynamicResolutionOptions const& options = mDynamicResolution;
     if (options.enabled) {
@@ -249,14 +287,15 @@ float2 FView::updateScale(FEngine& engine,
 
 #ifndef NDEBUG
     // only for debugging...
-    if (mDebugFrameHistory) {
+    if (UTILS_UNLIKELY(mDebugState->active && mDebugState->debugFrameHistory)) {
+        auto* const debugFrameHistory = mDebugState->debugFrameHistory.get();
         using namespace std::chrono;
         using duration_ms = duration<float, std::milli>;
         const float target = (1000.0f * float(frameRateOptions.interval)) / displayInfo.refreshRate;
         const float targetWithHeadroom = target * (1.0f - frameRateOptions.headRoomRatio);
-        std::move(mDebugFrameHistory->begin() + 1,
-                mDebugFrameHistory->end(), mDebugFrameHistory->begin());
-        mDebugFrameHistory->back() = {
+        std::move(debugFrameHistory->begin() + 1,
+                debugFrameHistory->end(), debugFrameHistory->begin());
+        debugFrameHistory->back() = {
                 .target             = target,
                 .targetWithHeadroom = targetWithHeadroom,
                 .frameTime          = duration_cast<duration_ms>(info.frameTime).count(),
@@ -377,7 +416,7 @@ void FView::prepareLighting(FEngine& engine, CameraInfo const& cameraInfo) noexc
      */
 
     const float exposure = Exposure::exposure(cameraInfo.ev100);
-    mPerViewUniforms.prepareExposure(cameraInfo.ev100);
+    mColorPassDescriptorSet.prepareExposure(cameraInfo.ev100);
 
     /*
      * Indirect light (IBL)
@@ -394,8 +433,8 @@ void FView::prepareLighting(FEngine& engine, CameraInfo const& cameraInfo) noexc
         FSkybox const* const skybox = scene->getSkybox();
         intensity = skybox ? skybox->getIntensity() : FIndirectLight::DEFAULT_INTENSITY;
     }
-    mPerViewUniforms.prepareAmbientLight(engine, *ibl, intensity, exposure);
-    mPerViewUniforms.prepareIblLight(ibl->getIblOptions());
+    mColorPassDescriptorSet.prepareAmbientLight(engine, *ibl, intensity, exposure);
+    mColorPassDescriptorSet.prepareIblLight(ibl->getIblOptions());
 
     /*
      * Directional light (always at index 0)
@@ -403,7 +442,7 @@ void FView::prepareLighting(FEngine& engine, CameraInfo const& cameraInfo) noexc
 
     FLightManager::Instance const directionalLight = lightData.elementAt<FScene::LIGHT_INSTANCE>(0);
     const float3 sceneSpaceDirection = lightData.elementAt<FScene::DIRECTION>(0); // guaranteed normalized
-    mPerViewUniforms.prepareDirectionalLight(engine, exposure, sceneSpaceDirection, directionalLight);
+    mColorPassDescriptorSet.prepareDirectionalLight(engine, exposure, sceneSpaceDirection, directionalLight);
 }
 
 CameraInfo FView::computeCameraInfo(FEngine& engine) const noexcept {
@@ -535,7 +574,7 @@ void FView::prepare(FEngine& engine, DriverApi& driver, RootArenaScope& rootAren
         // we also know if we have a directional light
         FLightManager::Instance const directionalLight =
                 lightData.elementAt<FScene::LIGHT_INSTANCE>(0);
-        mHasDirectionalLight = directionalLight.isValid();
+        mHasDirectionalLighting = directionalLight.isValid();
 
         // As soon as prepareVisibleLight finishes, we can kick-off the froxelization
         if (hasDynamicLighting()) {
@@ -544,7 +583,7 @@ void FView::prepare(FEngine& engine, DriverApi& driver, RootArenaScope& rootAren
                     cameraInfo.projection, cameraInfo.zn, cameraInfo.zf)) {
                 // TODO: might be more consistent to do this in prepareLighting(), but it's not
                 //       strictly necessary
-                mPerViewUniforms.prepareDynamicLights(mFroxelizer);
+                mColorPassDescriptorSet.prepareDynamicLights(mFroxelizer);
             }
             // We need to pass viewMatrix by value here because it extends the scope of this
             // function.
@@ -639,13 +678,75 @@ void FView::prepare(FEngine& engine, DriverApi& driver, RootArenaScope& rootAren
                 const size_t count = std::max(size_t(16u), (4u * merged.size() + 2u) / 3u);
                 mRenderableUBOSize = uint32_t(count * sizeof(PerRenderableData));
                 driver.destroyBufferObject(mRenderableUbh);
-                mRenderableUbh = driver.createBufferObject(mRenderableUBOSize + sizeof(PerRenderableUib),
+                mRenderableUbh = driver.createBufferObject(
+                        mRenderableUBOSize + sizeof(PerRenderableUib),
                         BufferObjectBinding::UNIFORM, BufferUsage::DYNAMIC);
             } else {
                 // TODO: should we shrink the underlying UBO at some point?
             }
             assert_invariant(mRenderableUbh);
             scene->updateUBOs(merged, mRenderableUbh);
+
+            mCommonRenderableDescriptorSet.setBuffer(
+                    +PerRenderableBindingPoints::OBJECT_UNIFORMS, mRenderableUbh,
+                    0, sizeof(PerRenderableUib));
+
+            mCommonRenderableDescriptorSet.commit(
+                    engine.getPerRenderableDescriptorSetLayout(), driver);
+        }
+    }
+
+    { // this must happen after mRenderableUbh is created/updated
+        // prepare skinning, morphing and hybrid instancing
+        auto& sceneData = scene->getRenderableData();
+        for (uint32_t const i : merged) {
+            auto const& skinning = sceneData.elementAt<FScene::SKINNING_BUFFER>(i);
+            auto const& morphing = sceneData.elementAt<FScene::MORPHING_BUFFER>(i);
+            auto const& instance = sceneData.elementAt<FScene::INSTANCES>(i);
+
+            // FIXME: when only one is active the UBO handle of the other is null
+            //        (probably a problem on vulkan)
+            if (UTILS_UNLIKELY(skinning.handle || morphing.handle || instance.handle)) {
+                auto const ci = sceneData.elementAt<FScene::RENDERABLE_INSTANCE>(i);
+                FRenderableManager& rcm = engine.getRenderableManager();
+                auto& descriptorSet = rcm.getDescriptorSet(ci);
+
+                // initialize the descriptor set the first time it's needed
+                if (UTILS_UNLIKELY(!descriptorSet.getHandle())) {
+                    descriptorSet = DescriptorSet{ engine.getPerRenderableDescriptorSetLayout() };
+                }
+
+                descriptorSet.setBuffer(+PerRenderableBindingPoints::OBJECT_UNIFORMS,
+                        instance.handle ? instance.handle : mRenderableUbh,
+                        0, sizeof(PerRenderableUib));
+
+                if (UTILS_UNLIKELY(skinning.handle || morphing.handle)) {
+
+                    descriptorSet.setBuffer(+PerRenderableBindingPoints::BONES_UNIFORMS,
+                            skinning.handle, 0, sizeof(PerRenderableBoneUib));
+
+                    descriptorSet.setSampler(+PerRenderableBindingPoints::BONES_INDICES_AND_WEIGHTS,
+                            skinning.boneIndicesAndWeightHandle, {});
+
+                    descriptorSet.setBuffer(+PerRenderableBindingPoints::MORPHING_UNIFORMS,
+                            morphing.handle, 0, sizeof(PerRenderableMorphingUib));
+
+                    descriptorSet.setSampler(+PerRenderableBindingPoints::MORPH_TARGET_POSITIONS,
+                            morphing.morphTargetBuffer->getPositionsHandle(), {});
+
+                    descriptorSet.setSampler(+PerRenderableBindingPoints::MORPH_TARGET_TANGENTS,
+                            morphing.morphTargetBuffer->getTangentsHandle(), {});
+                }
+
+                descriptorSet.commit(engine.getPerRenderableDescriptorSetLayout(), driver);
+
+                // write the descriptor-set handle to the sceneData array for access later
+                sceneData.elementAt<FScene::DESCRIPTOR_SET_HANDLE>(i) = descriptorSet.getHandle();
+            } else {
+                // use the shared descriptor-set
+                sceneData.elementAt<FScene::DESCRIPTOR_SET_HANDLE>(i) =
+                        mCommonRenderableDescriptorSet.getHandle();
+            }
         }
     }
 
@@ -664,35 +765,12 @@ void FView::prepare(FEngine& engine, DriverApi& driver, RootArenaScope& rootAren
     auto const& tcm = engine.getTransformManager();
     auto const fogTransform = tcm.getWorldTransformAccurate(tcm.getInstance(mFogEntity));
 
-    mPerViewUniforms.prepareTime(engine, userTime);
-    mPerViewUniforms.prepareFog(engine, cameraInfo, fogTransform, mFogOptions,
+    mColorPassDescriptorSet.prepareTime(engine, userTime);
+    mColorPassDescriptorSet.prepareFog(engine, cameraInfo, fogTransform, mFogOptions,
             scene->getIndirectLight());
-    mPerViewUniforms.prepareTemporalNoise(engine, mTemporalAntiAliasingOptions);
-    mPerViewUniforms.prepareBlending(needsAlphaChannel);
-    mPerViewUniforms.prepareMaterialGlobals(mMaterialGlobals);
-}
-
-void FView::bindPerViewUniformsAndSamplers(FEngine::DriverApi& driver) const noexcept {
-    mPerViewUniforms.bind(driver);
-
-    if (UTILS_UNLIKELY(driver.getFeatureLevel() == backend::FeatureLevel::FEATURE_LEVEL_0)) {
-        return;
-    }
-
-    driver.bindUniformBuffer(+UniformBindingPoints::LIGHTS,
-            mLightUbh);
-
-    if (needsShadowMap()) {
-        assert_invariant(mShadowMapManager->getShadowUniformsHandle());
-        driver.bindUniformBuffer(+UniformBindingPoints::SHADOW,
-                mShadowMapManager->getShadowUniformsHandle());
-    }
-
-    driver.bindUniformBuffer(+UniformBindingPoints::FROXEL_RECORDS,
-            mFroxelizer.getRecordBuffer());
-
-    driver.bindUniformBuffer(+UniformBindingPoints::FROXELS,
-            mFroxelizer.getFroxelBuffer());
+    mColorPassDescriptorSet.prepareTemporalNoise(engine, mTemporalAntiAliasingOptions);
+    mColorPassDescriptorSet.prepareBlending(needsAlphaChannel);
+    mColorPassDescriptorSet.prepareMaterialGlobals(mMaterialGlobals);
 }
 
 void FView::computeVisibilityMasks(
@@ -753,12 +831,12 @@ void FView::prepareUpscaler(float2 scale,
             derivativesScale = 0.5f;
         }
     }
-    mPerViewUniforms.prepareLodBias(bias, derivativesScale);
+    mColorPassDescriptorSet.prepareLodBias(bias, derivativesScale);
 }
 
 void FView::prepareCamera(FEngine& engine, const CameraInfo& cameraInfo) const noexcept {
     SYSTRACE_CALL();
-    mPerViewUniforms.prepareCamera(engine, cameraInfo);
+    mColorPassDescriptorSet.prepareCamera(engine, cameraInfo);
 }
 
 void FView::prepareViewport(
@@ -767,23 +845,23 @@ void FView::prepareViewport(
     SYSTRACE_CALL();
     // TODO: we should pass viewport.{left|bottom} to the backend, so it can offset the
     //       scissor properly.
-    mPerViewUniforms.prepareViewport(physicalViewport, logicalViewport);
+    mColorPassDescriptorSet.prepareViewport(physicalViewport, logicalViewport);
 }
 
 void FView::prepareSSAO(Handle<HwTexture> ssao) const noexcept {
-    mPerViewUniforms.prepareSSAO(ssao, mAmbientOcclusionOptions);
+    mColorPassDescriptorSet.prepareSSAO(ssao, mAmbientOcclusionOptions);
 }
 
 void FView::prepareSSR(Handle<HwTexture> ssr,
         bool disableSSR,
         float refractionLodOffset,
         ScreenSpaceReflectionsOptions const& ssrOptions) const noexcept {
-    mPerViewUniforms.prepareSSR(ssr, disableSSR, refractionLodOffset, ssrOptions);
+    mColorPassDescriptorSet.prepareSSR(ssr, disableSSR, refractionLodOffset, ssrOptions);
 }
 
 void FView::prepareStructure(Handle<HwTexture> structure) const noexcept {
     // sampler must be NEAREST
-    mPerViewUniforms.prepareStructure(structure);
+    mColorPassDescriptorSet.prepareStructure(structure);
 }
 
 void FView::prepareShadow(Handle<HwTexture> texture) const noexcept {
@@ -795,33 +873,33 @@ void FView::prepareShadow(Handle<HwTexture> texture) const noexcept {
     }
     switch (mShadowType) {
         case filament::ShadowType::PCF:
-            mPerViewUniforms.prepareShadowPCF(texture, uniforms);
+            mColorPassDescriptorSet.prepareShadowPCF(texture, uniforms);
             break;
         case filament::ShadowType::VSM:
-            mPerViewUniforms.prepareShadowVSM(texture, uniforms, mVsmShadowOptions);
+            mColorPassDescriptorSet.prepareShadowVSM(texture, uniforms, mVsmShadowOptions);
             break;
         case filament::ShadowType::DPCF:
-            mPerViewUniforms.prepareShadowDPCF(texture, uniforms, mSoftShadowOptions);
+            mColorPassDescriptorSet.prepareShadowDPCF(texture, uniforms, mSoftShadowOptions);
             break;
         case filament::ShadowType::PCSS:
-            mPerViewUniforms.prepareShadowPCSS(texture, uniforms, mSoftShadowOptions);
+            mColorPassDescriptorSet.prepareShadowPCSS(texture, uniforms, mSoftShadowOptions);
             break;
         case filament::ShadowType::PCFd:
-            mPerViewUniforms.prepareShadowPCFDebug(texture, uniforms);
+            mColorPassDescriptorSet.prepareShadowPCFDebug(texture, uniforms);
             break;
     }
 }
 
 void FView::prepareShadowMapping(bool highPrecision) const noexcept {
-    mPerViewUniforms.prepareShadowMapping(highPrecision);
+    if (mHasShadowing) {
+        assert_invariant(mShadowMapManager);
+        mColorPassDescriptorSet.prepareShadowMapping(
+                mShadowMapManager->getShadowUniformsHandle(), highPrecision);
+    }
 }
 
-void FView::cleanupRenderPasses() const noexcept {
-    mPerViewUniforms.unbindSamplers();
-}
-
-void FView::commitUniforms(DriverApi& driver) const noexcept {
-    mPerViewUniforms.commit(driver);
+void FView::commitUniformsAndSamplers(DriverApi& driver) const noexcept {
+    mColorPassDescriptorSet.commit(driver);
 }
 
 void FView::commitFroxels(DriverApi& driverApi) const noexcept {
@@ -996,20 +1074,25 @@ FrameGraphId<FrameGraphTexture> FView::renderShadowMaps(FEngine& engine, FrameGr
 
 void FView::commitFrameHistory(FEngine& engine) noexcept {
     // Here we need to destroy resources in mFrameHistory.back()
+    auto& disposer = engine.getResourceAllocatorDisposer();
     auto& frameHistory = mFrameHistory;
 
     FrameHistoryEntry& last = frameHistory.back();
-    last.taa.color.destroy(engine.getResourceAllocator());
-    last.ssr.color.destroy(engine.getResourceAllocator());
+    disposer.destroy(std::move(last.taa.color.handle));
+    disposer.destroy(std::move(last.ssr.color.handle));
 
     // and then push the new history entry to the history stack
     frameHistory.commit();
 }
 
-void FView::drainFrameHistory(FEngine& engine) noexcept {
+void FView::clearFrameHistory(FEngine& engine) noexcept {
     // make sure we free all resources in the history
-    for (size_t i = 0; i < mFrameHistory.size(); ++i) {
-        commitFrameHistory(engine);
+    auto& disposer = engine.getResourceAllocatorDisposer();
+    auto& frameHistory = mFrameHistory;
+    for (size_t i = 0; i < frameHistory.size(); ++i) {
+        FrameHistoryEntry& last = frameHistory[i];
+        disposer.destroy(std::move(last.taa.color.handle));
+        disposer.destroy(std::move(last.ssr.color.handle));
     }
 }
 
@@ -1164,12 +1247,14 @@ void FView::setStereoscopicOptions(const StereoscopicOptions& options) noexcept 
 }
 
 void FView::setMaterialGlobal(uint32_t index, float4 const& value) {
-    ASSERT_PRECONDITION(index < 4, "material global variable index (%u) out of range", +index);
+    FILAMENT_CHECK_PRECONDITION(index < 4)
+            << "material global variable index (" << +index << ") out of range";
     mMaterialGlobals[index] = value;
 }
 
 math::float4 FView::getMaterialGlobal(uint32_t index) const {
-    ASSERT_PRECONDITION(index < 4, "material global variable index (%u) out of range", +index);
+    FILAMENT_CHECK_PRECONDITION(index < 4)
+            << "material global variable index (" << +index << ") out of range";
     return mMaterialGlobals[index];
 }
 

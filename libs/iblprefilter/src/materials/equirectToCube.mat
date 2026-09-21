@@ -10,6 +10,11 @@ material {
             type : float,
             name : side,
             precision: medium
+        },
+        {
+            type : float,
+            name : mirror,
+            precision: medium
         }
     ],
     outputs : [
@@ -67,13 +72,13 @@ void postProcess(inout PostProcessInputs postProcess) {
         1.0 - uv.y * 2.0);
 
     float side = materialParams.side;
+    float mirror = materialParams.mirror;
     highp float l = inversesqrt(p.x * p.x + p.y * p.y + 1.0);
 
     // compute the view (and normal, since v = n) direction for each face
-    highp vec3 rx = vec3(      side,  p.y,  side * -p.x);
-    highp vec3 ry = vec3(       p.x,  side, side * -p.y);
-    highp vec3 rz = vec3(side * p.x,  p.y,  side);
-
+    highp vec3 rx = vec3(      side * mirror,  p.y,  side * -p.x);
+    highp vec3 ry = vec3(       p.x * mirror,  side, side * -p.y);
+    highp vec3 rz = vec3(side * p.x * mirror,  p.y,  side);
 
     postProcess.outx = sampleEquirect(materialParams_equirect, rx * l);
     postProcess.outy = sampleEquirect(materialParams_equirect, ry * l);

@@ -27,15 +27,18 @@
 
 #include "private/backend/DriverApi.h"
 
+#include <utils/algorithm.h>
+#include <utils/bitset.h>
 #include <utils/compiler.h>
 #include <utils/debug.h>
-#include <utils/FixedCapacityVector.h>
 #include <utils/Log.h>
 #include <utils/ostream.h>
 
 #include <array>
 #include <algorithm>
 #include <iterator>
+#include <memory>
+#include <optional>
 #include <utility>
 
 #include <stddef.h>
@@ -89,7 +92,14 @@ void ResourceAllocator::AssociativeContainer<K, V, H>::emplace(ARGS&& ... args) 
 }
 
 // ------------------------------------------------------------------------------------------------
+
 ResourceAllocatorInterface::~ResourceAllocatorInterface() = default;
+
+// ------------------------------------------------------------------------------------------------
+
+ResourceAllocatorDisposerInterface::~ResourceAllocatorDisposerInterface() = default;
+
+// ------------------------------------------------------------------------------------------------
 
 size_t ResourceAllocator::TextureKey::getSize() const noexcept {
     size_t const pixelCount = width * height * depth;
@@ -109,18 +119,23 @@ size_t ResourceAllocator::TextureKey::getSize() const noexcept {
 }
 
 ResourceAllocator::ResourceAllocator(Engine::Config const& config, DriverApi& driverApi) noexcept
-        : mCacheCapacity(config.resourceAllocatorCacheSizeMB << 20),
-          mCacheMaxAge(config.resourceAllocatorCacheMaxAge),
-          mBackend(driverApi) {
+        : mCacheMaxAge(config.resourceAllocatorCacheMaxAge),
+          mBackend(driverApi),
+          mDisposer(std::make_shared<ResourceAllocatorDisposer>(driverApi)) {
+}
+
+ResourceAllocator::ResourceAllocator(std::shared_ptr<ResourceAllocatorDisposer> disposer,
+        Engine::Config const& config, DriverApi& driverApi) noexcept
+        : mCacheMaxAge(config.resourceAllocatorCacheMaxAge),
+          mBackend(driverApi),
+          mDisposer(std::move(disposer)) {
 }
 
 ResourceAllocator::~ResourceAllocator() noexcept {
-    assert_invariant(!mTextureCache.size());
-    assert_invariant(!mInUseTextures.size());
+    assert_invariant(mTextureCache.empty());
 }
 
 void ResourceAllocator::terminate() noexcept {
-    assert_invariant(!mInUseTextures.size());
     auto& textureCache = mTextureCache;
     for (auto it = textureCache.begin(); it != textureCache.end();) {
         mBackend.destroyTexture(it->second.handle);
@@ -128,12 +143,14 @@ void ResourceAllocator::terminate() noexcept {
     }
 }
 
-RenderTargetHandle ResourceAllocator::createRenderTarget(const char*,
+RenderTargetHandle ResourceAllocator::createRenderTarget(const char* name,
         TargetBufferFlags targetBufferFlags, uint32_t width, uint32_t height,
-        uint8_t samples, MRT color, TargetBufferInfo depth,
+        uint8_t samples, uint8_t layerCount, MRT color, TargetBufferInfo depth,
         TargetBufferInfo stencil) noexcept {
-    return mBackend.createRenderTarget(targetBufferFlags,
-            width, height, samples ? samples : 1u, color, depth, stencil);
+    auto handle = mBackend.createRenderTarget(targetBufferFlags,
+            width, height, samples ? samples : 1u, layerCount, color, depth, stencil);
+    mBackend.setDebugTag(handle.getId(), CString{ name });
+    return handle;
 }
 
 void ResourceAllocator::destroyRenderTarget(RenderTargetHandle h) noexcept {
@@ -155,9 +172,9 @@ backend::TextureHandle ResourceAllocator::createTexture(const char* name,
 
     // do we have a suitable texture in the cache?
     TextureHandle handle;
+    TextureKey const key{ name, target, levels, format, samples, width, height, depth, usage, swizzle };
     if constexpr (mEnabled) {
         auto& textureCache = mTextureCache;
-        const TextureKey key{ name, target, levels, format, samples, width, height, depth, usage, swizzle };
         auto it = textureCache.find(key);
         if (UTILS_LIKELY(it != textureCache.end())) {
             // we do, move the entry to the in-use list, and remove from the cache
@@ -166,127 +183,177 @@ backend::TextureHandle ResourceAllocator::createTexture(const char* name,
             textureCache.erase(it);
         } else {
             // we don't, allocate a new texture and populate the in-use list
-            if (swizzle == defaultSwizzle) {
-                handle = mBackend.createTexture(
-                        target, levels, format, samples, width, height, depth, usage);
-            } else {
-                handle = mBackend.createTextureSwizzled(
-                        target, levels, format, samples, width, height, depth, usage,
-                        swizzle[0], swizzle[1], swizzle[2], swizzle[3]);
-            }
-        }
-        mInUseTextures.emplace(handle, key);
-    } else {
-        if (swizzle == defaultSwizzle) {
             handle = mBackend.createTexture(
                     target, levels, format, samples, width, height, depth, usage);
-        } else {
-            handle = mBackend.createTextureSwizzled(
-                    target, levels, format, samples, width, height, depth, usage,
-                    swizzle[0], swizzle[1], swizzle[2], swizzle[3]);
+            if (swizzle != defaultSwizzle) {
+                TextureHandle swizzledHandle = mBackend.createTextureViewSwizzle(
+                        handle, swizzle[0], swizzle[1], swizzle[2], swizzle[3]);
+                mBackend.destroyTexture(handle);
+                handle = swizzledHandle;
+            }
+        }
+    } else {
+        handle = mBackend.createTexture(
+                target, levels, format, samples, width, height, depth, usage);
+        if (swizzle != defaultSwizzle) {
+            TextureHandle swizzledHandle = mBackend.createTextureViewSwizzle(
+                    handle, swizzle[0], swizzle[1], swizzle[2], swizzle[3]);
+            mBackend.destroyTexture(handle);
+            handle = swizzledHandle;
         }
     }
+    mDisposer->checkout(handle, key);
+    mBackend.setDebugTag(handle.getId(), CString{ name });
     return handle;
 }
 
 void ResourceAllocator::destroyTexture(TextureHandle h) noexcept {
+    auto const key = mDisposer->checkin(h);
     if constexpr (mEnabled) {
-        // find the texture in the in-use list (it must be there!)
-        auto it = mInUseTextures.find(h);
-        assert_invariant(it != mInUseTextures.end());
-
-        // move it to the cache
-        const TextureKey key = it->second;
-        uint32_t const size = key.getSize();
-
-        mTextureCache.emplace(key, TextureCachePayload{ h, mAge, size });
-        mCacheSize += size;
-
-        // remove it from the in-use list
-        mInUseTextures.erase(it);
+        if (UTILS_LIKELY(key.has_value())) {
+            uint32_t const size = key.value().getSize();
+            mTextureCache.emplace(key.value(), TextureCachePayload{ h, mAge, size });
+            mCacheSize += size;
+            mCacheSizeHiWaterMark = std::max(mCacheSizeHiWaterMark, mCacheSize);
+        }
     } else {
         mBackend.destroyTexture(h);
     }
 }
 
-void ResourceAllocator::gc() noexcept {
-    // this is called regularly -- usually once per frame of each Renderer
+ResourceAllocatorDisposerInterface& ResourceAllocator::getDisposer() noexcept {
+    return *mDisposer;
+}
 
-    // increase our age
-    const size_t age = mAge++;
+void ResourceAllocator::gc(bool skippedFrame) noexcept {
+    // this is called regularly -- usually once per frame
+
+    // increase our age at each (non-skipped) frame
+    const size_t age = mAge;
+    if (!skippedFrame) {
+        mAge++;
+    }
 
     // Purging strategy:
-    //  - remove entries that are older than a certain age
-    //      - remove only one entry per gc(),
-    //      - unless we're at capacity
-    // - remove LRU entries until we're below capacity (except most recent)
+    //  - remove all entries older than MAX_AGE_SKIPPED_FRAME when skipping a frame
+    //  - remove entries older than mCacheMaxAgeSoft
+    //      - remove only MAX_EVICTION_COUNT entry per gc(),
+    //  - look for the number of unique resource ages present in the cache (this basically gives
+    //    us how many buckets of resources we have corresponding to previous frames.
+    //      - remove all resources that have an age older than the MAX_UNIQUE_AGE_COUNT'th bucket
 
     auto& textureCache = mTextureCache;
+
+    // when skipping a frame, the maximum age to keep in the cache
+    constexpr size_t MAX_AGE_SKIPPED_FRAME = 1;
+
+    // maximum entry count to evict per GC, under the mCacheMaxAgeSoft limit
+    constexpr size_t MAX_EVICTION_COUNT = 1;
+
+    // maximum number of unique ages in the cache
+    constexpr size_t MAX_UNIQUE_AGE_COUNT = 3;
+
+    utils::bitset32 ages;
+    uint32_t evictedCount = 0;
     for (auto it = textureCache.begin(); it != textureCache.end();) {
-        const size_t ageDiff = age - it->second.age;
-        if (ageDiff >= mCacheMaxAge) {
-            it = purge(it);
-            if (mCacheSize < mCacheCapacity) {
-                // if we're not at capacity, only purge a single entry per gc, trying to
-                // avoid a burst of work.
-                break;
-            }
+        size_t const ageDiff = age - it->second.age;
+        if ((ageDiff >= MAX_AGE_SKIPPED_FRAME && skippedFrame) ||
+            (ageDiff >= mCacheMaxAge && evictedCount < MAX_EVICTION_COUNT)) {
+            evictedCount++;
+            purge(it);
         } else {
+            // build the set of ages present in the cache after eviction
+            ages.set(std::min(size_t(31), ageDiff));
             ++it;
         }
     }
 
-    if (UTILS_UNLIKELY(mCacheSize >= mCacheCapacity)) {
-        // make a copy of our CacheContainer to a vector
-        using Vector = FixedCapacityVector<std::pair<TextureKey, TextureCachePayload>>;
-        auto cache = Vector::with_capacity(textureCache.size());
-        std::copy(textureCache.begin(), textureCache.end(), std::back_insert_iterator<Vector>(cache));
-
-        // sort by least recently used
-        std::sort(cache.begin(), cache.end(), [](auto const& lhs, auto const& rhs) {
-            return lhs.second.age < rhs.second.age;
-        });
-
-        // now remove entries until we're at capacity
-        // unless the entry was used in this frame
-        auto curr = cache.begin();
-        while (mCacheSize >= mCacheCapacity && curr->second.age < age) {
-            // by construction this entry must exist
-            purge(textureCache.find(curr->first));
-            ++curr;
+    // if we have MAX_UNIQUE_AGE_COUNT ages or more, we evict all the resources that
+    // are older than the MAX_UNIQUE_AGE_COUNT'th age.
+    if (!skippedFrame && ages.count() >= MAX_UNIQUE_AGE_COUNT) {
+        uint32_t bits = ages.getValue();
+        // remove from the set the ages we keep
+        for (size_t i = 0; i < MAX_UNIQUE_AGE_COUNT - 1; i++) {
+            bits &= ~(1 << utils::ctz(bits));
         }
-
-        // Since we're sorted already, reset the oldestAge of the whole system
-        size_t const oldestAge = cache.front().second.age;
-        for (auto& it : textureCache) {
-            it.second.age -= oldestAge;
+        size_t const maxAge = utils::ctz(bits);
+        for (auto it = textureCache.begin(); it != textureCache.end();) {
+            const size_t ageDiff = age - it->second.age;
+            if (ageDiff >= maxAge) {
+                purge(it);
+            } else {
+                ++it;
+            }
         }
-        mAge -= oldestAge;
     }
-    //if (mAge % 60 == 0) dump();
 }
 
 UTILS_NOINLINE
 void ResourceAllocator::dump(bool brief) const noexcept {
-    slog.d << "# entries=" << mTextureCache.size() << ", sz=" << mCacheSize / float(1u << 20u)
-           << " MiB" << io::endl;
+    constexpr float MiB = 1.0f / float(1u << 20u);
+    slog.d  << "# entries=" << mTextureCache.size()
+            << ", sz=" << (float)mCacheSize * MiB << " MiB"
+            << ", max=" << (float)mCacheSizeHiWaterMark * MiB << " MiB"
+            << io::endl;
     if (!brief) {
         for (auto const& it : mTextureCache) {
             auto w = it.first.width;
             auto h = it.first.height;
             auto f = FTexture::getFormatSize(it.first.format);
             slog.d << it.first.name << ": w=" << w << ", h=" << h << ", f=" << f << ", sz="
-                   << it.second.size / float(1u << 20u) << io::endl;
+                   << (float)it.second.size * MiB << io::endl;
         }
     }
 }
 
-ResourceAllocator::CacheContainer::iterator ResourceAllocator::purge(
+void ResourceAllocator::purge(
         ResourceAllocator::CacheContainer::iterator const& pos) {
     //slog.d << "purging " << pos->second.handle.getId() << ", age=" << pos->second.age << io::endl;
     mBackend.destroyTexture(pos->second.handle);
     mCacheSize -= pos->second.size;
-    return mTextureCache.erase(pos);
+    mTextureCache.erase(pos);
+}
+
+// ------------------------------------------------------------------------------------------------
+
+ResourceAllocatorDisposer::ResourceAllocatorDisposer(DriverApi& driverApi) noexcept
+        : mBackend(driverApi) {
+}
+
+ResourceAllocatorDisposer::~ResourceAllocatorDisposer() noexcept {
+     assert_invariant(mInUseTextures.empty());
+}
+
+void ResourceAllocatorDisposer::terminate() noexcept {
+    assert_invariant(mInUseTextures.empty());
+}
+
+void ResourceAllocatorDisposer::destroy(backend::TextureHandle handle) noexcept {
+    if (handle) {
+        auto r = checkin(handle);
+        if (r.has_value()) {
+            mBackend.destroyTexture(handle);
+        }
+    }
+}
+
+void ResourceAllocatorDisposer::checkout(backend::TextureHandle handle,
+        ResourceAllocator::TextureKey key) {
+    mInUseTextures.emplace(handle, key);
+}
+
+std::optional<ResourceAllocator::TextureKey> ResourceAllocatorDisposer::checkin(
+        backend::TextureHandle handle) {
+    // find the texture in the in-use list (it must be there!)
+    auto it = mInUseTextures.find(handle);
+    assert_invariant(it != mInUseTextures.end());
+    if (it == mInUseTextures.end()) {
+        return std::nullopt;
+    }
+    TextureKey const key = it->second;
+    // remove it from the in-use list
+    mInUseTextures.erase(it);
+    return key;
 }
 
 } // namespace filament

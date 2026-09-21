@@ -190,10 +190,10 @@ void RenderPassNode::resolve() noexcept {
                 minHeight = std::min(minHeight, h);
                 maxHeight = std::max(maxHeight, h);
             }
-            // additionally, clear implies discardStart
-            rt.backend.params.flags.discardStart |= (
-                    rt.descriptor.clearFlags & rt.targetBufferFlags);
         }
+        // additionally, clear implies discardStart
+        rt.backend.params.flags.discardStart |= (
+                rt.descriptor.clearFlags & rt.targetBufferFlags);
 
         assert_invariant(minWidth == maxWidth);
         assert_invariant(minHeight == maxHeight);
@@ -276,8 +276,8 @@ void RenderPassNode::RenderPassData::devirtualize(FrameGraph& fg,
                 name, targetBufferFlags,
                 backend.params.viewport.width,
                 backend.params.viewport.height,
-                descriptor.samples,
-                colorInfo,info[0], info[1]);
+                descriptor.samples, descriptor.layerCount,
+                colorInfo, info[0], info[1]);
     }
 }
 

@@ -21,8 +21,18 @@
 
 #include "FilamentAPI-impl.h"
 
-#include <utils/Panic.h>
 #include <filament/RenderTarget.h>
+
+#include <utils/compiler.h>
+#include <utils/BitmaskEnum.h>
+#include <utils/Panic.h>
+
+#include <algorithm>
+#include <iterator>
+#include <limits>
+
+#include <stdint.h>
+#include <stddef.h>
 
 
 namespace filament {
@@ -34,6 +44,10 @@ struct RenderTarget::BuilderDetails {
     uint32_t mWidth{};
     uint32_t mHeight{};
     uint8_t mSamples = 1;   // currently not settable in the public facing API
+    // The number of layers for the render target. The value should be 1 except for multiview.
+    // If multiview is enabled, this value is appropriately updated based on the layerCount value
+    // from each attachment. Hence, #>1 means using multiview
+    uint8_t mLayerCount = 1;
 };
 
 using BuilderType = RenderTarget;
@@ -64,63 +78,94 @@ RenderTarget::Builder& RenderTarget::Builder::layer(AttachmentPoint pt, uint32_t
     return *this;
 }
 
+RenderTarget::Builder& RenderTarget::Builder::multiview(AttachmentPoint pt, uint8_t layerCount,
+        uint8_t baseLayer/*= 0*/) noexcept {
+    mImpl->mAttachments[(size_t)pt].layer = baseLayer;
+    mImpl->mAttachments[(size_t)pt].layerCount = layerCount;
+    return *this;
+}
+
+
 RenderTarget* RenderTarget::Builder::build(Engine& engine) {
     using backend::TextureUsage;
     const FRenderTarget::Attachment& color = mImpl->mAttachments[(size_t)AttachmentPoint::COLOR0];
     const FRenderTarget::Attachment& depth = mImpl->mAttachments[(size_t)AttachmentPoint::DEPTH];
 
     if (color.texture) {
-        ASSERT_PRECONDITION(color.texture->getUsage() & TextureUsage::COLOR_ATTACHMENT,
-                "Texture usage must contain COLOR_ATTACHMENT");
+        FILAMENT_CHECK_PRECONDITION(color.texture->getUsage() & TextureUsage::COLOR_ATTACHMENT)
+                << "Texture usage must contain COLOR_ATTACHMENT";
+        FILAMENT_CHECK_PRECONDITION(color.texture->getTarget() != Texture::Sampler::SAMPLER_EXTERNAL)
+                << "Color attachment can't be an external texture";
     }
 
     if (depth.texture) {
-        ASSERT_PRECONDITION(depth.texture->getUsage() & TextureUsage::DEPTH_ATTACHMENT,
-                "Texture usage must contain DEPTH_ATTACHMENT");
+        FILAMENT_CHECK_PRECONDITION(depth.texture->getUsage() & TextureUsage::DEPTH_ATTACHMENT)
+                << "Texture usage must contain DEPTH_ATTACHMENT";
+        FILAMENT_CHECK_PRECONDITION(depth.texture->getTarget() != Texture::Sampler::SAMPLER_EXTERNAL)
+                        << "Depth attachment can't be an external texture";
     }
 
     const size_t maxDrawBuffers = downcast(engine).getDriverApi().getMaxDrawBuffers();
     for (size_t i = maxDrawBuffers; i < MAX_SUPPORTED_COLOR_ATTACHMENTS_COUNT; i++) {
-        ASSERT_PRECONDITION(!mImpl->mAttachments[i].texture,
-                "Only %u color attachments are supported, but COLOR%u attachment is set",
-                maxDrawBuffers, i);
+        FILAMENT_CHECK_PRECONDITION(!mImpl->mAttachments[i].texture)
+                << "Only " << maxDrawBuffers << " color attachments are supported, but COLOR" << i
+                << " attachment is set";
     }
     
     uint32_t minWidth = std::numeric_limits<uint32_t>::max();
     uint32_t maxWidth = 0;
     uint32_t minHeight = std::numeric_limits<uint32_t>::max();
     uint32_t maxHeight = 0;
+    uint32_t minLayerCount = std::numeric_limits<uint32_t>::max();
+    uint32_t maxLayerCount = 0;
     for (auto const& attachment : mImpl->mAttachments) {
         if (attachment.texture) {
             const uint32_t w = attachment.texture->getWidth(attachment.mipLevel);
             const uint32_t h = attachment.texture->getHeight(attachment.mipLevel);
+            const uint32_t d = attachment.texture->getDepth(attachment.mipLevel);
+            const uint32_t l = attachment.layerCount;
+            if (l > 0) {
+                FILAMENT_CHECK_PRECONDITION(
+                        attachment.texture->getTarget() == Texture::Sampler::SAMPLER_2D_ARRAY)
+                        << "Texture sampler must be of 2d array for multiview";
+            }
+            FILAMENT_CHECK_PRECONDITION(attachment.layer + l <= d)
+                    << "layer + layerCount cannot exceed the number of depth";
             minWidth  = std::min(minWidth, w);
             minHeight = std::min(minHeight, h);
+            minLayerCount = std::min(minLayerCount, l);
             maxWidth  = std::max(maxWidth, w);
             maxHeight = std::max(maxHeight, h);
+            maxLayerCount = std::max(maxLayerCount, l);
         }
     }
 
-    ASSERT_PRECONDITION(minWidth == maxWidth && minHeight == maxHeight,
-            "All attachments dimensions must match");
+    FILAMENT_CHECK_PRECONDITION(minWidth == maxWidth && minHeight == maxHeight
+            && minLayerCount == maxLayerCount) << "All attachments dimensions must match";
 
     mImpl->mWidth  = minWidth;
     mImpl->mHeight = minHeight;
+    if (minLayerCount > 0) {
+        // mLayerCount should be 1 except for multiview use where we update this variable
+        // to the number of layerCount for multiview.
+        mImpl->mLayerCount = minLayerCount;
+    }
     return downcast(engine).createRenderTarget(*this);
 }
 
 // ------------------------------------------------------------------------------------------------
 
 FRenderTarget::FRenderTarget(FEngine& engine, const RenderTarget::Builder& builder)
-    : mSupportedColorAttachmentsCount(engine.getDriverApi().getMaxDrawBuffers()) {
-
+    : mSupportedColorAttachmentsCount(engine.getDriverApi().getMaxDrawBuffers()),
+      mSupportsReadPixels(false) {
     std::copy(std::begin(builder.mImpl->mAttachments), std::end(builder.mImpl->mAttachments),
             std::begin(mAttachments));
 
     backend::MRT mrt{};
     TargetBufferInfo dinfo{};
 
-    auto setAttachment = [this](TargetBufferInfo& info, AttachmentPoint attachmentPoint) {
+    auto setAttachment = [this, &driver = engine.getDriverApi()]
+            (TargetBufferInfo& info, AttachmentPoint attachmentPoint) {
         Attachment const& attachment = mAttachments[(size_t)attachmentPoint];
         auto t = downcast(attachment.texture);
         info.handle = t->getHwHandle();
@@ -130,6 +175,7 @@ FRenderTarget::FRenderTarget(FEngine& engine, const RenderTarget::Builder& build
         } else {
             info.layer = attachment.layer;
         }
+        t->updateLodRange(info.level);
     };
 
     UTILS_NOUNROLL
@@ -142,6 +188,16 @@ FRenderTarget::FRenderTarget(FEngine& engine, const RenderTarget::Builder& build
             if (any(attachment.texture->getUsage() &
                     (TextureUsage::SAMPLEABLE | Texture::Usage::SUBPASS_INPUT))) {
                 mSampleableAttachmentsMask |= targetBufferBit;
+            }
+
+            // readPixels() only applies to the color attachment that binds at index 0.
+            if (i == 0 && any(attachment.texture->getUsage() & TextureUsage::COLOR_ATTACHMENT)) {
+
+                // TODO: the following will be changed to
+                //    mSupportsReadPixels =
+                //            any(attachment.texture->getUsage() & TextureUsage::BLIT_SRC);
+                //    in a later filament version when clients have properly added the right usage.
+                mSupportsReadPixels = attachment.texture->hasBlitSrcUsage();
             }
         }
     }
@@ -160,7 +216,8 @@ FRenderTarget::FRenderTarget(FEngine& engine, const RenderTarget::Builder& build
 
     FEngine::DriverApi& driver = engine.getDriverApi();
     mHandle = driver.createRenderTarget(mAttachmentMask,
-            builder.mImpl->mWidth, builder.mImpl->mHeight, builder.mImpl->mSamples, mrt, dinfo, {});
+            builder.mImpl->mWidth, builder.mImpl->mHeight, builder.mImpl->mSamples,
+            builder.mImpl->mLayerCount, mrt, dinfo, {});
 }
 
 void FRenderTarget::terminate(FEngine& engine) {

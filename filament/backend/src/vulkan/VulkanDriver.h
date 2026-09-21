@@ -28,6 +28,9 @@
 #include "VulkanSamplerCache.h"
 #include "VulkanStagePool.h"
 #include "VulkanUtility.h"
+#include "backend/DriverEnums.h"
+#include "caching/VulkanDescriptorSetManager.h"
+#include "caching/VulkanPipelineLayoutCache.h"
 
 #include "DriverBase.h"
 #include "private/backend/Driver.h"
@@ -39,6 +42,10 @@ namespace filament::backend {
 
 class VulkanPlatform;
 struct VulkanSamplerGroup;
+
+// The maximum number of attachments for any renderpass (color + resolve + depth)
+constexpr uint8_t MAX_RENDERTARGET_ATTACHMENT_TEXTURES =
+        MRT::MAX_SUPPORTED_RENDER_TARGET_COUNT * 2 + 1;
 
 class VulkanDriver final : public DriverBase {
 public:
@@ -70,6 +77,8 @@ public:
 #endif // FVK_ENABLED(FVK_DEBUG_DEBUG_UTILS)
 
 private:
+    static constexpr uint8_t MAX_SAMPLER_BINDING_COUNT = Program::SAMPLER_BINDING_COUNT;
+
     void debugCommandBegin(CommandStream* cmds, bool synchronous,
             const char* methodName) noexcept override;
 
@@ -101,16 +110,10 @@ private:
     VulkanDriver& operator=(VulkanDriver const&) = delete;
 
 private:
-    inline void setRenderPrimitiveBuffer(Handle<HwRenderPrimitive> rph, PrimitiveType pt,
-            Handle<HwVertexBuffer> vbh,
-            Handle<HwIndexBuffer> ibh);
-
     void collectGarbage();
 
     VulkanPlatform* mPlatform = nullptr;
-    std::unique_ptr<VulkanCommands> mCommands;
     std::unique_ptr<VulkanTimestamps> mTimestamps;
-    std::unique_ptr<VulkanTexture> mEmptyTexture;
 
     VulkanSwapChain* mCurrentSwapChain = nullptr;
     VulkanRenderTarget* mDefaultRenderTarget = nullptr;
@@ -126,15 +129,33 @@ private:
     // thread.
     VulkanThreadSafeResourceManager mThreadSafeResourceManager;
 
+    VulkanCommands mCommands;
+    VulkanPipelineLayoutCache mPipelineLayoutCache;
     VulkanPipelineCache mPipelineCache;
     VulkanStagePool mStagePool;
     VulkanFboCache mFramebufferCache;
     VulkanSamplerCache mSamplerCache;
     VulkanBlitter mBlitter;
-    VulkanSamplerGroup* mSamplerBindings[VulkanPipelineCache::SAMPLER_BINDING_COUNT] = {};
+    VulkanSamplerGroup* mSamplerBindings[MAX_SAMPLER_BINDING_COUNT] = {};
     VulkanReadPixels mReadPixels;
+    VulkanDescriptorSetManager mDescriptorSetManager;
+
+    // This is necessary for us to write to push constants after binding a pipeline.
+    struct {
+        VulkanProgram* program;
+        VkPipelineLayout pipelineLayout;
+        DescriptorSetMask descriptorSetMask;
+    } mBoundPipeline = {};
+
+    // We need to store information about a render pass to enable better barriers at the end of a
+    // renderpass.
+    struct {
+        using AttachmentArray = CappedArray<VulkanAttachment, MAX_RENDERTARGET_ATTACHMENT_TEXTURES>;
+        AttachmentArray attachments;
+    } mRenderPassFboInfo = {};
 
     bool const mIsSRGBSwapChainSupported;
+    backend::StereoscopicType const mStereoscopicType;
 };
 
 } // namespace filament::backend

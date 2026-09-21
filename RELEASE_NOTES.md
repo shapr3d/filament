@@ -7,6 +7,114 @@ A new header is inserted each time a *tag* is created.
 Instead, if you are authoring a PR for the main branch, add your release note to
 [NEW_RELEASE_NOTES.md](./NEW_RELEASE_NOTES.md).
 
+## v1.55.1
+
+
+## v1.55.0
+- Add descriptor sets to describe shader resources. [⚠️ **New Material Version**]
+
+## v1.54.5
+
+
+## v1.54.4
+
+- Add support for multi-layered render target with array textures.
+
+## v1.54.3
+
+
+## v1.54.2
+
+- Add a `name` API to Filament objects for debugging handle use-after-free assertions
+
+## v1.54.1
+
+
+## v1.54.0
+
+- materials: add a new `stereoscopicType` material parameter. [⚠️ **New Material Version**]
+- Fix a crash when compiling shaders on IMG devices
+
+## v1.53.5
+
+- engine: Fix bug causing certain sampler parameters to not be applied correctly in GLES 2.0 and on
+  certain GLES 3.0 drivers.
+
+## v1.53.4
+
+
+## v1.53.3
+
+- Add drag and drop support for IBL files for desktop gltf_viewer.
+
+## v1.53.2
+
+
+## v1.53.1
+
+
+## v1.53.0
+
+- engine: fix skinning normals with large transforms (b/342459864) [⚠️ **New Material Version**]
+
+## v1.52.3
+
+
+## v1.52.2
+
+
+## v1.52.1
+
+- Add instructions for using Mesa for software rasterization
+
+## v1.51.9
+
+
+## v1.51.8
+
+- filagui: Fix regression which broke WebGL
+- Add a new Engine::Config setting to control preferred shader language
+- Add `getEyeIndex` vertex API
+- ios: Remove bitcode from iOS builds
+
+## v1.51.7
+
+- Add new matedit tool
+- filagui: Support rendering `GL_TEXTURE_EXTERNAL_OES` textures.
+- `setFrameScheduledCallback` now takes a `utils::Invocable`.
+- engine: Add `isPaused()`
+
+## v1.51.6
+
+- Add new matedit tool
+- filagui: Support rendering `GL_TEXTURE_EXTERNAL_OES` textures.
+
+## v1.51.5
+
+
+## v1.51.4
+
+
+## v1.51.3
+
+
+## v1.51.2
+
+- engine: Add experimental APIs `Engine::builder::paused()` and `Engine::setPaused()`
+
+## v1.51.1
+
+
+## v1.51.0
+
+- materials: add support for post-lighting mix factor (b/328498606) [⚠️ **New Material Version**]
+
+## v1.50.6
+
+- Add new API `SwapChain::getFrameScheduledCallback`
+- vulkan: fixed validation error VUID-vkAcquireNextImageKHR-semaphore-01779
+- opengl: Add support for protected content swapchains and contexts
+
 ## v1.50.5
 
 - android: NDK 26.1.10909125 is used by default

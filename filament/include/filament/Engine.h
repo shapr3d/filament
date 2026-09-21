@@ -288,19 +288,27 @@ public:
          */
         uint32_t jobSystemThreadCount = 0;
 
-        /*
-         * Number of most-recently destroyed textures to track for use-after-free.
+        /**
+         * When uploading vertex or index data, the Filament Metal backend copies data
+         * into a shared staging area before transferring it to the GPU. This setting controls
+         * the total size of the buffer used to perform these allocations.
          *
-         * This will cause the backend to throw an exception when a texture is freed but still bound
-         * to a SamplerGroup and used in a draw call. 0 disables completely.
+         * Higher values can improve performance when performing many uploads across a small
+         * number of frames.
          *
-         * Currently only respected by the Metal backend.
+         * This buffer remains alive throughout the lifetime of the Engine, so this size adds to the
+         * memory footprint of the app and should be set as conservative as possible.
+         *
+         * A value of 0 disables the shared staging buffer entirely; uploads will acquire an
+         * individual buffer from a pool of shared buffers.
+         *
+         * Only respected by the Metal backend.
          */
-        size_t textureUseAfterFreePoolSize = 0;
+        size_t metalUploadBufferSizeBytes = 512 * 1024;
 
         /**
          * Set to `true` to forcibly disable parallel shader compilation in the backend.
-         * Currently only honored by the GL backend.
+         * Currently only honored by the GL and Metal backends.
          */
         bool disableParallelShaderCompile = false;
 
@@ -315,7 +323,7 @@ public:
          *
          * @see View::setStereoscopicOptions
          */
-        StereoscopicType stereoscopicType = StereoscopicType::INSTANCED;
+        StereoscopicType stereoscopicType = StereoscopicType::NONE;
 
         /*
          * The number of eyes to render when stereoscopic rendering is enabled. Supported values are
@@ -327,18 +335,59 @@ public:
         uint8_t stereoscopicEyeCount = 2;
 
         /*
-         * Size in MiB of the frame graph texture cache. This should be adjusted based on the
-         * size of used render targets (typically the screen).
+         * @deprecated This value is no longer used.
          */
         uint32_t resourceAllocatorCacheSizeMB = 150;
 
         /*
-         * This value determines for how many frames are texture entries kept in the cache.
-         * The default value of 30 corresponds to about half a second at 60 fps.
+         * This value determines how many frames texture entries are kept for in the cache. This
+         * is a soft limit, meaning some texture older than this are allowed to stay in the cache.
+         * Typically only one texture is evicted per frame.
+         * The default is 1.
          */
-        uint32_t resourceAllocatorCacheMaxAge = 30;
-    };
+        uint32_t resourceAllocatorCacheMaxAge = 1;
 
+        /*
+         * Disable backend handles use-after-free checks.
+         */
+        bool disableHandleUseAfterFreeCheck = false;
+
+        /*
+         * Sets a preferred shader language for Filament to use.
+         *
+         * The Metal backend supports two shader languages: MSL (Metal Shading Language) and
+         * METAL_LIBRARY (precompiled .metallib). This option controls which shader language is
+         * used when materials contain both.
+         *
+         * By default, when preferredShaderLanguage is unset, Filament will prefer METAL_LIBRARY
+         * shaders if present within a material, falling back to MSL. Setting
+         * preferredShaderLanguage to ShaderLanguage::MSL will instead instruct Filament to check
+         * for the presence of MSL in a material first, falling back to METAL_LIBRARY if MSL is not
+         * present.
+         *
+         * When using a non-Metal backend, setting this has no effect.
+         */
+        enum class ShaderLanguage {
+            DEFAULT = 0,
+            MSL = 1,
+            METAL_LIBRARY = 2,
+        };
+        ShaderLanguage preferredShaderLanguage = ShaderLanguage::DEFAULT;
+
+        /*
+         * When the OpenGL ES backend is used, setting this value to true will force a GLES2.0
+         * context if supported by the Platform, or if not, will have the backend pretend
+         * it's a GLES2 context. Ignored on other backends.
+         */
+        bool forceGLES2Context = false;
+
+        /**
+         * Assert the native window associated to a SwapChain is valid when calling makeCurrent().
+         * This is only supported for:
+         *      - PlatformEGLAndroid
+         */
+        bool assertNativeWindowIsValid = false;
+    };
 
 #if FILAMENT_THREADING_MODE == FILAMENT_THREADING_MODE_ASYNCHRONOUS_DRIVER
     using CreateCallback = void(void* UTILS_NULLABLE user, void* UTILS_NONNULL token);
@@ -403,6 +452,14 @@ public:
          * @return A reference to this Builder for chaining calls.
          */
         Builder& featureLevel(FeatureLevel featureLevel) noexcept;
+
+        /**
+         * Warning: This is an experimental API. See Engine::setPaused(bool) for caveats.
+         *
+         * @param paused Whether to start the rendering thread paused.
+         * @return A reference to this Builder for chaining calls.
+         */
+        Builder& paused(bool paused) noexcept;
 
 #if FILAMENT_THREADING_MODE == FILAMENT_THREADING_MODE_ASYNCHRONOUS_DRIVER
         /**
@@ -789,24 +846,74 @@ public:
     bool destroy(const InstanceBuffer* UTILS_NULLABLE p);   //!< Destroys an InstanceBuffer object.
     void destroy(utils::Entity e);    //!< Destroys all filament-known components from this entity
 
-    bool isValid(const BufferObject* UTILS_NULLABLE p);        //!< Tells whether a BufferObject object is valid
-    bool isValid(const VertexBuffer* UTILS_NULLABLE p);        //!< Tells whether an VertexBuffer object is valid
-    bool isValid(const Fence* UTILS_NULLABLE p);               //!< Tells whether a Fence object is valid
-    bool isValid(const IndexBuffer* UTILS_NULLABLE p);         //!< Tells whether an IndexBuffer object is valid
-    bool isValid(const SkinningBuffer* UTILS_NULLABLE p);      //!< Tells whether a SkinningBuffer object is valid
-    bool isValid(const MorphTargetBuffer* UTILS_NULLABLE p);   //!< Tells whether a MorphTargetBuffer object is valid
-    bool isValid(const IndirectLight* UTILS_NULLABLE p);       //!< Tells whether an IndirectLight object is valid
-    bool isValid(const Material* UTILS_NULLABLE p);            //!< Tells whether an IndirectLight object is valid
-    bool isValid(const Renderer* UTILS_NULLABLE p);            //!< Tells whether a Renderer object is valid
-    bool isValid(const Scene* UTILS_NULLABLE p);               //!< Tells whether a Scene object is valid
-    bool isValid(const Skybox* UTILS_NULLABLE p);              //!< Tells whether a SkyBox object is valid
-    bool isValid(const ColorGrading* UTILS_NULLABLE p);        //!< Tells whether a ColorGrading object is valid
-    bool isValid(const SwapChain* UTILS_NULLABLE p);           //!< Tells whether a SwapChain object is valid
-    bool isValid(const Stream* UTILS_NULLABLE p);              //!< Tells whether a Stream object is valid
-    bool isValid(const Texture* UTILS_NULLABLE p);             //!< Tells whether a Texture object is valid
-    bool isValid(const RenderTarget* UTILS_NULLABLE p);        //!< Tells whether a RenderTarget object is valid
-    bool isValid(const View* UTILS_NULLABLE p);                //!< Tells whether a View object is valid
-    bool isValid(const InstanceBuffer* UTILS_NULLABLE p);      //!< Tells whether an InstanceBuffer object is valid
+    /** Tells whether a BufferObject object is valid */
+    bool isValid(const BufferObject* UTILS_NULLABLE p) const;
+    /** Tells whether an VertexBuffer object is valid */
+    bool isValid(const VertexBuffer* UTILS_NULLABLE p) const;
+    /** Tells whether a Fence object is valid */
+    bool isValid(const Fence* UTILS_NULLABLE p) const;
+    /** Tells whether an IndexBuffer object is valid */
+    bool isValid(const IndexBuffer* UTILS_NULLABLE p) const;
+    /** Tells whether a SkinningBuffer object is valid */
+    bool isValid(const SkinningBuffer* UTILS_NULLABLE p) const;
+    /** Tells whether a MorphTargetBuffer object is valid */
+    bool isValid(const MorphTargetBuffer* UTILS_NULLABLE p) const;
+    /** Tells whether an IndirectLight object is valid */
+    bool isValid(const IndirectLight* UTILS_NULLABLE p) const;
+    /** Tells whether an Material object is valid */
+    bool isValid(const Material* UTILS_NULLABLE p) const;
+    /** Tells whether an MaterialInstance object is valid. Use this if you already know
+     * which Material this MaterialInstance belongs to. DO NOT USE getMaterial(), this would
+     * defeat the purpose of validating the MaterialInstance.
+     */
+    bool isValid(const Material* UTILS_NONNULL m, const MaterialInstance* UTILS_NULLABLE p) const;
+    /** Tells whether an MaterialInstance object is valid. Use this if the Material the
+     * MaterialInstance belongs to is not known. This method can be expensive.
+     */
+    bool isValidExpensive(const MaterialInstance* UTILS_NULLABLE p) const;
+    /** Tells whether a Renderer object is valid */
+    bool isValid(const Renderer* UTILS_NULLABLE p) const;
+    /** Tells whether a Scene object is valid */
+    bool isValid(const Scene* UTILS_NULLABLE p) const;
+    /** Tells whether a SkyBox object is valid */
+    bool isValid(const Skybox* UTILS_NULLABLE p) const;
+    /** Tells whether a ColorGrading object is valid */
+    bool isValid(const ColorGrading* UTILS_NULLABLE p) const;
+    /** Tells whether a SwapChain object is valid */
+    bool isValid(const SwapChain* UTILS_NULLABLE p) const;
+    /** Tells whether a Stream object is valid */
+    bool isValid(const Stream* UTILS_NULLABLE p) const;
+    /** Tells whether a Texture object is valid */
+    bool isValid(const Texture* UTILS_NULLABLE p) const;
+    /** Tells whether a RenderTarget object is valid */
+    bool isValid(const RenderTarget* UTILS_NULLABLE p) const;
+    /** Tells whether a View object is valid */
+    bool isValid(const View* UTILS_NULLABLE p) const;
+    /** Tells whether an InstanceBuffer object is valid */
+    bool isValid(const InstanceBuffer* UTILS_NULLABLE p) const;
+
+    /**
+     * Retrieve the count of each resource tracked by Engine.
+     * This is intended for debugging.
+     * @{
+     */
+    size_t getBufferObjectCount() const noexcept;
+    size_t getViewCount() const noexcept;
+    size_t getSceneCount() const noexcept;
+    size_t getSwapChainCount() const noexcept;
+    size_t getStreamCount() const noexcept;
+    size_t getIndexBufferCount() const noexcept;
+    size_t getSkinningBufferCount() const noexcept;
+    size_t getMorphTargetBufferCount() const noexcept;
+    size_t getInstanceBufferCount() const noexcept;
+    size_t getVertexBufferCount() const noexcept;
+    size_t getIndirectLightCount() const noexcept;
+    size_t getMaterialCount() const noexcept;
+    size_t getTextureCount() const noexcept;
+    size_t getSkyboxeCount() const noexcept;
+    size_t getColorGradingCount() const noexcept;
+    size_t getRenderTargetCount() const noexcept;
+    /**  @} */
 
     /**
      * Kicks the hardware thread (e.g. the OpenGL, Vulkan or Metal thread) and blocks until
@@ -830,6 +937,30 @@ public:
     void flush();
 
     /**
+     * Get paused state of rendering thread.
+     *
+     * <p>Warning: This is an experimental API.
+     *
+     * @see setPaused
+     */
+    bool isPaused() const noexcept;
+
+    /**
+     * Pause or resume rendering thread.
+     *
+     * <p>Warning: This is an experimental API. In particular, note the following caveats.
+     *
+     * <ul><li>
+     * Buffer callbacks will never be called as long as the rendering thread is paused.
+     * Do not rely on a buffer callback to unpause the thread.
+     * </li><li>
+     * While the rendering thread is paused, rendering commands will continue to be queued until the
+     * buffer limit is reached. When the limit is reached, the program will abort.
+     * </li></ul>
+     */
+    void setPaused(bool paused);
+
+    /**
      * Drains the user callback message queue and immediately execute all pending callbacks.
      *
      * <p> Typically this should be called once per frame right after the application's vsync tick,
@@ -838,6 +969,14 @@ public:
      * which may increase latency in certain applications.</p>
      */
     void pumpMessageQueues();
+
+    /**
+     * Switch the command queue to unprotected mode. Protected mode can be activated via
+     * Renderer::beginFrame() using a protected SwapChain.
+     * @see Renderer
+     * @see SwapChain
+     */
+    void unprotected() noexcept;
 
     /**
      * Returns the default Material.
@@ -921,6 +1060,21 @@ public:
       */
     void resetBackendState() noexcept;
 #endif
+
+    /**
+     * Get the current time. This is a convenience function that simply returns the
+     * time in nanosecond since epoch of std::chrono::steady_clock.
+     * A possible implementation is:
+     *
+     * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     *     return std::chrono::steady_clock::now().time_since_epoch().count();
+     * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     *
+     * @return current time in nanosecond since epoch of std::chrono::steady_clock.
+     * @see Renderer::beginFrame()
+     */
+    static uint64_t getSteadyClockTimeNano() noexcept;
+
 
     DebugRegistry& getDebugRegistry() noexcept;
 

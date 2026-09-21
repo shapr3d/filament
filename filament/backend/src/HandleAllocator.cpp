@@ -39,8 +39,10 @@ using namespace utils;
 
 template <size_t P0, size_t P1, size_t P2>
 UTILS_NOINLINE
-HandleAllocator<P0, P1, P2>::Allocator::Allocator(AreaPolicy::HeapArea const& area, const PoolRatios& poolRatios)
-        : mArea(area) {
+HandleAllocator<P0, P1, P2>::Allocator::Allocator(AreaPolicy::HeapArea const& area,
+        const PoolRatios& poolRatios, bool disableUseAfterFreeCheck)
+        : mArea(area),
+          mUseAfterFreeCheckDisabled(disableUseAfterFreeCheck) {
 
     // The largest handle this allocator can generate currently depends on the architecture's
     // min alignment, typically 8 or 16 bytes.
@@ -77,8 +79,13 @@ HandleAllocator<P0, P1, P2>::Allocator::Allocator(AreaPolicy::HeapArea const& ar
 // ------------------------------------------------------------------------------------------------
 
 template <size_t P0, size_t P1, size_t P2>
-HandleAllocator<P0, P1, P2>::HandleAllocator(const char* name, size_t size, const PoolRatios& poolRatios) noexcept
-    : mHandleArena(name, size, poolRatios) {
+HandleAllocator<P0, P1, P2>::HandleAllocator(const char* name, size_t size,
+        const PoolRatios& poolRatios, bool disableUseAfterFreeCheck) noexcept
+    : mHandleArena(name, size, poolRatios, disableUseAfterFreeCheck),
+      mUseAfterFreeCheckDisabled(disableUseAfterFreeCheck) {
+    // Reserve initial space for debug tags. This prevents excessive calls to malloc when the first
+    // few tags are set.
+    mDebugTags.reserve(512);
 }
 
 template <size_t P0, size_t P1, size_t P2>
@@ -106,15 +113,15 @@ void* HandleAllocator<P0, P1, P2>::handleToPointerSlow(HandleBase::HandleId id) 
 }
 
 template <size_t P0, size_t P1, size_t P2>
-HandleBase::HandleId HandleAllocator<P0, P1, P2>::allocateHandleSlow(size_t size) noexcept {
+HandleBase::HandleId HandleAllocator<P0, P1, P2>::allocateHandleSlow(size_t size) {
     void* p = ::malloc(size);
     std::unique_lock lock(mLock);
 
     HandleBase::HandleId id = (++mId) | HANDLE_HEAP_FLAG;
 
-    ASSERT_POSTCONDITION(mId < HANDLE_HEAP_FLAG,
+    FILAMENT_CHECK_POSTCONDITION(mId < HANDLE_HEAP_FLAG) <<
             "No more Handle ids available! This can happen if HandleAllocator arena has been full"
-            " for a while. Please increase FILAMENT_OPENGL_HANDLE_ARENA_SIZE_IN_MB");
+            " for a while. Please increase FILAMENT_OPENGL_HANDLE_ARENA_SIZE_IN_MB";
 
     mOverflowMap.emplace(id, p);
     lock.unlock();

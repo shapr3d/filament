@@ -150,9 +150,9 @@ IndirectLight::Builder& IndirectLight::Builder::rotation(mat3f const& rotation) 
 
 IndirectLight* IndirectLight::Builder::build(Engine& engine) {
     if (mImpl->mReflectionsMap) {
-        ASSERT_PRECONDITION(
-                mImpl->mReflectionsMap->getTarget() == Texture::Sampler::SAMPLER_CUBEMAP,
-                "reflection map must a cubemap");
+        FILAMENT_CHECK_PRECONDITION(
+                mImpl->mReflectionsMap->getTarget() == Texture::Sampler::SAMPLER_CUBEMAP)
+                << "reflection map must a cubemap";
 
         if constexpr (IBL_INTEGRATION == IBL_INTEGRATION_IMPORTANCE_SAMPLING) {
             mImpl->mReflectionsMap->generateMipmaps(engine);
@@ -160,9 +160,9 @@ IndirectLight* IndirectLight::Builder::build(Engine& engine) {
     }
 
     if (mImpl->mIrradianceMap) {
-        ASSERT_PRECONDITION(
-                mImpl->mIrradianceMap->getTarget() == Texture::Sampler::SAMPLER_CUBEMAP,
-                "irradiance map must a cubemap");
+        FILAMENT_CHECK_PRECONDITION(
+                mImpl->mIrradianceMap->getTarget() == Texture::Sampler::SAMPLER_CUBEMAP)
+                << "irradiance map must a cubemap";
     }
 
     return downcast(engine).createIndirectLight(*this);
@@ -200,11 +200,13 @@ void FIndirectLight::terminate(FEngine& engine) {
 }
 
 backend::Handle<backend::HwTexture> FIndirectLight::getReflectionHwHandle() const noexcept {
-    return mReflectionsTexture ? mReflectionsTexture->getHwHandle() : backend::Handle<backend::HwTexture> {};
+    return mReflectionsTexture ? mReflectionsTexture->getHwHandleForSampling()
+                               : backend::Handle<backend::HwTexture>{};
 }
 
 backend::Handle<backend::HwTexture> FIndirectLight::getIrradianceHwHandle() const noexcept {
-    return mIrradianceTexture ? mIrradianceTexture->getHwHandle() : backend::Handle<backend::HwTexture> {};
+    return mIrradianceTexture ? mIrradianceTexture->getHwHandleForSampling()
+                              : backend::Handle<backend::HwTexture>{};
 }
 
 math::float3 FIndirectLight::getDirectionEstimate(math::float3 const* f) noexcept {

@@ -47,8 +47,6 @@ function print_help {
     echo "        Exclude OpenGL support from the iOS/Catalyst build."
     echo "    -s"
     echo "        Add iOS simulator support to the iOS build."
-    echo "    -t"
-    echo "        Enable SwiftShader support for Vulkan in desktop builds."
     echo "    -e"
     echo "        Enable EGL on Linux support for desktop builds."
     echo "    -l"
@@ -64,6 +62,17 @@ function print_help {
     echo "    -b"
     echo "        Enable Address and Undefined Behavior Sanitizers (asan/ubsan) for debugging."
     echo "        This is only for the desktop build."
+    echo "    -x value"
+    echo "        Define a preprocessor flag FILAMENT_BACKEND_DEBUG_FLAG with [value]. This is useful for"
+    echo "        enabling debug paths in the backend from the build script. For example, make a"
+    echo "        systrace-enabled build without directly changing #defines. Remember to add -f when"
+    echo "        changing this option."
+    echo "    -X osmesa_path"
+    echo "        Indicates a path to a completed OSMesa build. OSMesa is used to create an offscreen GL"
+    echo "        context for software rasterization"
+    echo "    -S type"
+    echo "        Enable stereoscopic rendering where type is one of [instanced|multiview]. This is only"
+    echo "        meant for building the samples."
     echo ""
     echo "Build types:"
     echo "    release"
@@ -167,8 +176,6 @@ VULKAN_ANDROID_GRADLE_OPTION=""
 
 OPENGL_IOS_OPTION="-DFILAMENT_SUPPORTS_OPENGL=ON"
 
-SWIFTSHADER_OPTION="-DFILAMENT_USE_SWIFTSHADER=OFF"
-
 EGL_ON_LINUX_OPTION="-DFILAMENT_SUPPORTS_EGL_ON_LINUX=OFF"
 
 MATDBG_OPTION="-DFILAMENT_ENABLE_MATDBG=OFF"
@@ -178,6 +185,12 @@ MATOPT_OPTION=""
 MATOPT_GRADLE_OPTION=""
 
 ASAN_UBSAN_OPTION=""
+
+BACKEND_DEBUG_FLAG_OPTION=""
+
+STEREOSCOPIC_OPTION=""
+
+OSMESA_OPTION=""
 
 IOS_BUILD_SIMULATOR=false
 VISIONOS_BUILD_SIMULATOR=false
@@ -235,11 +248,13 @@ function build_desktop_target {
             -DCMAKE_BUILD_TYPE="$1" \
             -DCMAKE_INSTALL_PREFIX="../${lc_target}/filament" \
             -DFILAMENT_ENABLE_FEATURE_LEVEL_0=OFF \
-            ${SWIFTSHADER_OPTION} \
             ${EGL_ON_LINUX_OPTION} \
             ${MATDBG_OPTION} \
             ${MATOPT_OPTION} \
             ${ASAN_UBSAN_OPTION} \
+            ${BACKEND_DEBUG_FLAG_OPTION} \
+            ${STEREOSCOPIC_OPTION} \
+            ${OSMESA_OPTION} \
             ${architectures} \
             ../..
         ln -sf "out/cmake-${lc_target}/compile_commands.json" \
@@ -311,6 +326,7 @@ function build_webgl_with_target {
             -DCMAKE_BUILD_TYPE="$1" \
             -DCMAKE_INSTALL_PREFIX="../webgl-${lc_target}/filament" \
             -DWEBGL=1 \
+            ${BACKEND_DEBUG_FLAG_OPTION} \
             ../..
         ln -sf "out/cmake-webgl-${lc_target}/compile_commands.json" \
            ../../compile_commands.json
@@ -385,6 +401,8 @@ function build_android_target {
             ${MATDBG_OPTION} \
             ${MATOPT_OPTION} \
             ${VULKAN_ANDROID_OPTION} \
+            ${BACKEND_DEBUG_FLAG_OPTION} \
+            ${STEREOSCOPIC_OPTION} \
             ../..
         ln -sf "out/cmake-android-${lc_target}-${arch}/compile_commands.json" \
            ../../compile_commands.json
@@ -538,7 +556,7 @@ function build_android {
             if [[ "${BUILD_ANDROID_SAMPLES}" == "true" ]]; then
                 for sample in ${ANDROID_SAMPLES}; do
                     echo "Installing out/${sample}-debug.apk"
-                    cp samples/${sample}/build/outputs/apk/debug/${sample}-debug-unsigned.apk \
+                    cp samples/${sample}/build/outputs/apk/debug/${sample}-debug.apk \
                         ../out/${sample}-debug.apk
                 done
             fi
@@ -627,6 +645,7 @@ function build_ios_target {
             ${MATDBG_OPTION} \
             ${MATOPT_OPTION} \
             ${OPENGL_IOS_OPTION} \
+            ${STEREOSCOPIC_OPTION} \
             ../..
         ln -sf "out/cmake-ios-${lc_target}-${arch}/compile_commands.json" \
            ../../compile_commands.json
@@ -845,6 +864,13 @@ function validate_build_command {
             exit 1
         fi
     fi
+
+    # Make sure FILAMENT_BACKEND_DEBUG_FLAG is only meant for debug builds
+    if [[ "${ISSUE_DEBUG_BUILD}" != "true" ]] && [[ ! -z "${BACKEND_DEBUG_FLAG_OPTION}" ]]; then
+        echo "Error: cannot specify FILAMENT_BACKEND_DEBUG_FLAG in non-debug build"
+        exit 1
+    fi
+
     set -e
 }
 
@@ -891,7 +917,7 @@ function check_debug_release_build {
 
 pushd "$(dirname "$0")" > /dev/null
 
-while getopts ":hacCfgijmp:q:uvGslwtedk:b" opt; do
+while getopts ":hacCfgijmp:q:uvGslwedk:bx:S:X:" opt; do
     case ${opt} in
         h)
             print_help
@@ -963,7 +989,7 @@ while getopts ":hacCfgijmp:q:uvGslwtedk:b" opt; do
                         echo "Platform must be one of [desktop|android|ios|visionos|webgl|all]"
                         echo ""
                         exit 1
-                    ;;    
+                    ;;
                 esac
             done
             ;;
@@ -1023,10 +1049,6 @@ while getopts ":hacCfgijmp:q:uvGslwtedk:b" opt; do
             VISIONOS_BUILD_SIMULATOR=true
             echo "visionOS/iOS simulator support enabled."
             ;;
-        t)
-            SWIFTSHADER_OPTION="-DFILAMENT_USE_SWIFTSHADER=ON"
-            echo "SwiftShader support enabled."
-            ;;
         e)
             EGL_ON_LINUX_OPTION="-DFILAMENT_SUPPORTS_EGL_ON_LINUX=ON -DFILAMENT_SKIP_SDL2=ON -DFILAMENT_SKIP_SAMPLES=ON"
             echo "EGL on Linux support enabled; skipping SDL2."
@@ -1044,6 +1066,24 @@ while getopts ":hacCfgijmp:q:uvGslwtedk:b" opt; do
             ;;
         b)  ASAN_UBSAN_OPTION="-DFILAMENT_ENABLE_ASAN_UBSAN=ON"
             echo "Enabled ASAN/UBSAN"
+            ;;
+        x)  BACKEND_DEBUG_FLAG_OPTION="-DFILAMENT_BACKEND_DEBUG_FLAG=${OPTARG}"
+            ;;
+        S)  case $(echo "${OPTARG}" | tr '[:upper:]' '[:lower:]') in
+                instanced)
+                    STEREOSCOPIC_OPTION="-DFILAMENT_SAMPLES_STEREO_TYPE=instanced"
+                    ;;
+                multiview)
+                    STEREOSCOPIC_OPTION="-DFILAMENT_SAMPLES_STEREO_TYPE=multiview"
+                    ;;
+                *)
+                    echo "Unknown stereoscopic type ${OPTARG}"
+                    echo "Type must be one of [instanced|multiview]"
+                    echo ""
+                    exit 1
+            esac
+            ;;
+        X)  OSMESA_OPTION="-DFILAMENT_OSMESA_PATH=${OPTARG}"
             ;;
         \?)
             echo "Invalid option: -${OPTARG}" >&2

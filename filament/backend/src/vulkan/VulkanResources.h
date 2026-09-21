@@ -17,6 +17,8 @@
 #ifndef TNT_FILAMENT_BACKEND_VULKANRESOURCES_H
 #define TNT_FILAMENT_BACKEND_VULKANRESOURCES_H
 
+#include "VulkanUtility.h"
+
 #include <backend/Handle.h>
 
 #include <tsl/robin_set.h>
@@ -33,21 +35,25 @@ struct VulkanThreadSafeResource;
 
 // Subclasses of VulkanResource must provide this enum in their construction.
 enum class VulkanResourceType : uint8_t {
-    BUFFER_OBJECT,
-    INDEX_BUFFER,
-    PROGRAM,
-    RENDER_TARGET,
-    SAMPLER_GROUP,
-    SWAP_CHAIN,
-    RENDER_PRIMITIVE,
-    TEXTURE,
-    TIMER_QUERY,
-    VERTEX_BUFFER,
-    VERTEX_BUFFER_INFO,
+    BUFFER_OBJECT = 0,
+    INDEX_BUFFER = 1,
+    PROGRAM = 2,
+    RENDER_TARGET = 3,
+    SAMPLER_GROUP = 4,
+    SWAP_CHAIN = 5,
+    RENDER_PRIMITIVE = 6,
+    TEXTURE = 7,
+    TIMER_QUERY = 8,
+    VERTEX_BUFFER = 9,
+    VERTEX_BUFFER_INFO = 10,
+    DESCRIPTOR_SET_LAYOUT = 11,
+    DESCRIPTOR_SET = 12,
 
     // Below are resources that are managed manually (i.e. not ref counted).
-    FENCE,
-    HEAP_ALLOCATED,
+    FENCE = 13,
+    HEAP_ALLOCATED = 14,
+
+    END_TYPE = 15,  // A placeholder
 };
 
 #define IS_HEAP_ALLOC_TYPE(f)                                                                      \
@@ -162,62 +168,7 @@ namespace {
 // When the size of the resource set is known to be small, (for example for VulkanRenderPrimitive),
 // we just use a std::array to back the set.
 template<std::size_t SIZE>
-class FixedCapacityResourceSet {
-private:
-    using FixedSizeArray = std::array<VulkanResource*, SIZE>;
-
-public:
-    using const_iterator = typename FixedSizeArray::const_iterator;
-
-    inline ~FixedCapacityResourceSet() {
-        clear();
-    }
-
-    inline const_iterator begin() {
-        if (mInd == 0) {
-            return mArray.cend();
-        }
-        return mArray.cbegin();
-    }
-
-    inline const_iterator end() {
-        if (mInd == 0) {
-            return mArray.cend();
-        }
-        if (mInd < SIZE) {
-            return mArray.begin() + mInd;
-        }
-        return mArray.cend();
-    }
-
-    inline const_iterator find(VulkanResource* resource) {
-        return std::find(begin(), end(), resource);
-    }
-
-    inline void insert(VulkanResource* resource) {
-        assert_invariant(mInd < SIZE);
-        mArray[mInd++] = resource;
-    }
-
-    inline void erase(VulkanResource* resource) {
-        assert_invariant(false && "FixedCapacityResourceSet::erase should not be called");
-    }
-
-    inline void clear() {
-        if (mInd == 0) {
-            return;
-        }
-        mInd = 0;
-    }
-
-    inline size_t size() {
-        return mInd;
-    }
-
-private:
-    FixedSizeArray mArray{nullptr};
-    size_t mInd = 0;
-};
+using FixedCapacityResourceSet = CappedArray<VulkanResource*, SIZE>;
 
 // robin_set/map are useful for sets that are acquire only and the set will be iterated when the set
 // is cleared.

@@ -14,20 +14,44 @@
  * limitations under the License.
  */
 
+#include <backend/AcquiredImage.h>
+#include <backend/Platform.h>
+#include <backend/platforms/PlatformEGL.h>
 #include <backend/platforms/PlatformEGLAndroid.h>
+
+#include <private/backend/VirtualMachineEnv.h>
 
 #include "opengl/GLUtils.h"
 #include "ExternalStreamManagerAndroid.h"
 
 #include <android/api-level.h>
+#include <android/native_window.h>
+#include <android/hardware_buffer.h>
+
+#include <utils/android/PerformanceHintManager.h>
+
+#include <utils/compiler.h>
+#include <utils/ostream.h>
+#include <utils/Panic.h>
+#include <utils/Log.h>
 
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 
-#include <utils/compiler.h>
-#include <utils/Log.h>
-
 #include <sys/system_properties.h>
+
+#include <jni.h>
+
+#include <chrono>
+#include <new>
+#include <string_view>
+
+#include <dlfcn.h>
+#include <unistd.h>
+
+#include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
 
 // We require filament to be built with an API 19 toolchain, before that, OpenGLES 3.0 didn't exist
 // Actually, OpenGL ES 3.0 was added to API 18, but API 19 is the better target and
@@ -60,47 +84,124 @@ UTILS_PRIVATE PFNEGLGETFRAMETIMESTAMPSANDROIDPROC eglGetFrameTimestampsANDROID =
 }
 using namespace glext;
 
-using EGLStream = Platform::Stream;
+// ---------------------------------------------------------------------------------------------
+
+PlatformEGLAndroid::InitializeJvmForPerformanceManagerIfNeeded::InitializeJvmForPerformanceManagerIfNeeded() {
+    // PerformanceHintManager() needs the calling thread to be a Java thread; so we need
+    // to attach this thread to the JVM before we initialize PerformanceHintManager.
+    // This should be done in PerformanceHintManager(), but libutils doesn't have access to
+    // VirtualMachineEnv.
+    if (PerformanceHintManager::isSupported()) {
+        (void)VirtualMachineEnv::get().getEnvironment();
+    }
+}
 
 // ---------------------------------------------------------------------------------------------
 
 PlatformEGLAndroid::PlatformEGLAndroid() noexcept
         : PlatformEGL(),
-          mExternalStreamManager(ExternalStreamManagerAndroid::create()) {
-
-    char scratch[PROP_VALUE_MAX + 1];
-    int length = __system_property_get("ro.build.version.release", scratch);
-    int const androidVersion = length >= 0 ? atoi(scratch) : 1;
-    if (!androidVersion) {
-        mOSVersion = 1000; // if androidVersion is 0, it means "future"
-    } else {
-        length = __system_property_get("ro.build.version.sdk", scratch);
-        mOSVersion = length >= 0 ? atoi(scratch) : 1;
+          mExternalStreamManager(ExternalStreamManagerAndroid::create()),
+          mInitializeJvmForPerformanceManagerIfNeeded(),
+          mPerformanceHintManager() {
+    mOSVersion = android_get_device_api_level();
+    if (mOSVersion < 0) {
+        mOSVersion = __ANDROID_API_FUTURE__;
     }
 
-    // This disables an ANGLE optimization on ARM, which turns out to be more costly for us
-    // see b/229017581
-    // We need to do this before we create the GL context.
-    // An alternative solution is use a system property:
-    //            __system_property_set(
-    //                    "debug.angle.feature_overrides_disabled",
-    //                    "preferSubmitAtFBOBoundary");
-    // but that would outlive this process, so the environment variable is better.
-    // We also make sure to not update the variable if it already exists.
-    // There is no harm setting this if we're not on ANGLE or ARM.
-    setenv("ANGLE_FEATURE_OVERRIDES_DISABLED", "preferSubmitAtFBOBoundary", false);
+    mNativeWindowLib = dlopen("libnativewindow.so", RTLD_LOCAL | RTLD_NOW);
+    if (mNativeWindowLib) {
+        ANativeWindow_getBuffersDefaultDataSpace =
+                (int32_t(*)(ANativeWindow*))dlsym(mNativeWindowLib,
+                        "ANativeWindow_getBuffersDefaultDataSpace");
+    }
 }
 
-PlatformEGLAndroid::~PlatformEGLAndroid() noexcept = default;
-
+PlatformEGLAndroid::~PlatformEGLAndroid() noexcept {
+    if (mNativeWindowLib) {
+        dlclose(mNativeWindowLib);
+    }
+}
 
 void PlatformEGLAndroid::terminate() noexcept {
     ExternalStreamManagerAndroid::destroy(&mExternalStreamManager);
     PlatformEGL::terminate();
 }
 
+static constexpr const std::string_view kNativeWindowInvalidMsg =
+        "ANativeWindow is invalid. It probably has been destroyed. EGL surface = ";
+
+bool PlatformEGLAndroid::makeCurrent(ContextType type,
+        SwapChain* drawSwapChain,
+        SwapChain* readSwapChain) noexcept {
+
+    // fast & safe path
+    if (UTILS_LIKELY(!mAssertNativeWindowIsValid)) {
+        return PlatformEGL::makeCurrent(type, drawSwapChain, readSwapChain);
+    }
+
+    SwapChainEGL const* const dsc = static_cast<SwapChainEGL const*>(drawSwapChain);
+    if (ANativeWindow_getBuffersDefaultDataSpace) {
+        // anw can be nullptr if we're using a pbuffer surface
+        if (UTILS_LIKELY(dsc->nativeWindow)) {
+            // this a proxy of is_valid()
+            auto result = ANativeWindow_getBuffersDefaultDataSpace(dsc->nativeWindow);
+            FILAMENT_CHECK_POSTCONDITION(result >= 0) << kNativeWindowInvalidMsg << dsc->sur;
+        }
+    } else {
+        // If we don't have ANativeWindow_getBuffersDefaultDataSpace, we revert to using the
+        // private query() call.
+        // Shadow version if the real ANativeWindow, so we can access the query() hook. Query
+        // has existed since forever, probably Android 1.0.
+        struct NativeWindow {
+            // is valid query enum value
+            enum { IS_VALID = 17 };
+            uint64_t pad[18];
+            int (* query)(ANativeWindow const*, int, int*);
+        } const* pWindow = reinterpret_cast<NativeWindow const*>(dsc->nativeWindow);
+        int isValid = 0;
+        if (UTILS_LIKELY(pWindow->query)) { // just in case it's nullptr
+            int const err = pWindow->query(dsc->nativeWindow, NativeWindow::IS_VALID, &isValid);
+            if (UTILS_LIKELY(err >= 0)) { // in case the IS_VALID enum is not recognized
+                // query call succeeded
+                FILAMENT_CHECK_POSTCONDITION(isValid) << kNativeWindowInvalidMsg << dsc->sur;
+            }
+        }
+    }
+    return PlatformEGL::makeCurrent(type, drawSwapChain, readSwapChain);
+}
+
+void PlatformEGLAndroid::beginFrame(
+        int64_t monotonic_clock_ns,
+        int64_t refreshIntervalNs,
+        uint32_t frameId) noexcept {
+    if (mPerformanceHintSession.isValid()) {
+        if (refreshIntervalNs <= 0) {
+            // we're not provided with a target time, assume 16.67ms
+            refreshIntervalNs = 16'666'667;
+        }
+        mStartTimeOfActualWork = clock::time_point(std::chrono::nanoseconds(monotonic_clock_ns));
+        mPerformanceHintSession.updateTargetWorkDuration(refreshIntervalNs);
+    }
+    PlatformEGL::beginFrame(monotonic_clock_ns, refreshIntervalNs, frameId);
+}
+
+void backend::PlatformEGLAndroid::preCommit() noexcept {
+    if (mPerformanceHintSession.isValid()) {
+        auto const actualWorkDuration = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                clock::now() - mStartTimeOfActualWork);
+        mPerformanceHintSession.reportActualWorkDuration(actualWorkDuration.count());
+    }
+    PlatformEGL::preCommit();
+}
+
 Driver* PlatformEGLAndroid::createDriver(void* sharedContext,
         const Platform::DriverConfig& driverConfig) noexcept {
+
+    // the refresh rate default value doesn't matter, we change it later
+    int32_t const tid = gettid();
+    mPerformanceHintSession = PerformanceHintManager::Session{
+            mPerformanceHintManager, &tid, 1, 16'666'667 };
+
     Driver* driver = PlatformEGL::createDriver(sharedContext, driverConfig);
     auto extensions = GLUtils::split(eglQueryString(mEGLDisplay, EGL_EXTENSIONS));
 
@@ -125,15 +226,18 @@ Driver* PlatformEGLAndroid::createDriver(void* sharedContext,
                 "eglGetFrameTimestampsANDROID");
     }
 
+    mAssertNativeWindowIsValid = driverConfig.assertNativeWindowIsValid;
+
     return driver;
 }
 
 void PlatformEGLAndroid::setPresentationTime(int64_t presentationTimeInNanosecond) noexcept {
-    if (mCurrentDrawSurface != EGL_NO_SURFACE) {
+    EGLSurface currentDrawSurface = eglGetCurrentSurface(EGL_DRAW);
+    if (currentDrawSurface != EGL_NO_SURFACE) {
         if (eglPresentationTimeANDROID) {
             eglPresentationTimeANDROID(
                     mEGLDisplay,
-                    mCurrentDrawSurface,
+                    currentDrawSurface,
                     presentationTimeInNanosecond);
         }
     }
@@ -165,14 +269,28 @@ int PlatformEGLAndroid::getOSVersion() const noexcept {
 
 AcquiredImage PlatformEGLAndroid::transformAcquiredImage(AcquiredImage source) noexcept {
     // Convert the AHardwareBuffer to EGLImage.
-    EGLClientBuffer clientBuffer = eglGetNativeClientBufferANDROID((const AHardwareBuffer*)source.image);
+    AHardwareBuffer const* const pHardwareBuffer = (const AHardwareBuffer*)source.image;
+
+    EGLClientBuffer clientBuffer = eglGetNativeClientBufferANDROID(pHardwareBuffer);
     if (!clientBuffer) {
         slog.e << "Unable to get EGLClientBuffer from AHardwareBuffer." << io::endl;
         return {};
     }
-    // Note that this cannot be used to stream protected video (for now) because we do not set EGL_PROTECTED_CONTENT_EXT.
-    EGLint attrs[] = { EGL_NONE, EGL_NONE };
-    EGLImageKHR eglImage = eglCreateImageKHR(mEGLDisplay, EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_ANDROID, clientBuffer, attrs);
+
+    PlatformEGL::Config attributes;
+
+    if (__builtin_available(android 26, *)) {
+        AHardwareBuffer_Desc desc;
+        AHardwareBuffer_describe(pHardwareBuffer, &desc);
+        bool const isProtectedContent =
+                desc.usage & AHardwareBuffer_UsageFlags::AHARDWAREBUFFER_USAGE_PROTECTED_CONTENT;
+        if (isProtectedContent) {
+            attributes[EGL_PROTECTED_CONTENT_EXT] = EGL_TRUE;
+        }
+    }
+
+    EGLImageKHR eglImage = eglCreateImageKHR(mEGLDisplay,
+            EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_ANDROID, clientBuffer, attributes.data());
     if (eglImage == EGL_NO_IMAGE_KHR) {
         slog.e << "eglCreateImageKHR returned no image." << io::endl;
         return {};

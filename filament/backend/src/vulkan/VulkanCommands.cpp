@@ -47,7 +47,8 @@ VulkanCmdFence::VulkanCmdFence(VkFence ifence)
 
 VulkanCommandBuffer::VulkanCommandBuffer(VulkanResourceAllocator* allocator, VkDevice device,
         VkCommandPool pool)
-    : mResourceManager(allocator) {
+    : mResourceManager(allocator),
+      mPipeline(VK_NULL_HANDLE) {
     // Create the low-level command buffer.
     const VkCommandBufferAllocateInfo allocateInfo{
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -155,7 +156,7 @@ VulkanCommands::VulkanCommands(VkDevice device, VkQueue queue, uint32_t queueFam
 #endif
 }
 
-VulkanCommands::~VulkanCommands() {
+void VulkanCommands::terminate() {
     wait();
     gc();
     vkDestroyCommandPool(mDevice, mPool, VKALLOC);
@@ -177,7 +178,7 @@ VulkanCommandBuffer& VulkanCommands::get() {
     // presenting the swap chain or waiting on a fence.
     while (mAvailableBufferCount == 0) {
 #if FVK_ENABLED(FVK_DEBUG_COMMAND_BUFFER)
-        slog.i << "VulkanCommands has stalled. "
+        FVK_LOGI << "VulkanCommands has stalled. "
                << "If this occurs frequently, consider increasing VK_MAX_COMMAND_BUFFERS."
                << io::endl;
 #endif
@@ -288,7 +289,7 @@ bool VulkanCommands::flush() {
     };
 
 #if FVK_ENABLED(FVK_DEBUG_COMMAND_BUFFER)
-    slog.i << "Submitting cmdbuffer=" << cmdbuffer
+    FVK_LOGI << "Submitting cmdbuffer=" << cmdbuffer
            << " wait=(" << signals[0] << ", " << signals[1] << ") "
            << " signal=" << renderingFinished
            << " fence=" << currentbuf->fence->fence
@@ -296,15 +297,15 @@ bool VulkanCommands::flush() {
 #endif
 
     auto& cmdfence = currentbuf->fence;
-    std::unique_lock<utils::Mutex> lock(cmdfence->mutex);
-    cmdfence->status.store(VK_NOT_READY);
-    UTILS_UNUSED_IN_RELEASE VkResult result = vkQueueSubmit(mQueue, 1, &submitInfo, cmdfence->fence);
-    cmdfence->condition.notify_all();
-    lock.unlock();
+    UTILS_UNUSED_IN_RELEASE VkResult result = VK_SUCCESS;
+    {
+        auto scope = cmdfence->setValue(VK_NOT_READY);
+        result = vkQueueSubmit(mQueue, 1, &submitInfo, cmdfence->getFence());
+    }
 
 #if FVK_ENABLED(FVK_DEBUG_COMMAND_BUFFER)
     if (result != VK_SUCCESS) {
-        utils::slog.d << "Failed command buffer submission result: " << result << utils::io::endl;
+        FVK_LOGD << "Failed command buffer submission result: " << result << utils::io::endl;
     }
 #endif
     assert_invariant(result == VK_SUCCESS);
@@ -319,7 +320,7 @@ VkSemaphore VulkanCommands::acquireFinishedSignal() {
     VkSemaphore semaphore = mSubmissionSignal;
     mSubmissionSignal = VK_NULL_HANDLE;
 #if FVK_ENABLED(FVK_DEBUG_COMMAND_BUFFER)
-    slog.i << "Acquiring " << semaphore << " (e.g. for vkQueuePresentKHR)" << io::endl;
+    FVK_LOGI << "Acquiring " << semaphore << " (e.g. for vkQueuePresentKHR)" << io::endl;
 #endif
     return semaphore;
 }
@@ -328,7 +329,7 @@ void VulkanCommands::injectDependency(VkSemaphore next) {
     assert_invariant(mInjectedSignal == VK_NULL_HANDLE);
     mInjectedSignal = next;
 #if FVK_ENABLED(FVK_DEBUG_COMMAND_BUFFER)
-    slog.i << "Injecting " << next << " (e.g. due to vkAcquireNextImageKHR)" << io::endl;
+    FVK_LOGI << "Injecting " << next << " (e.g. due to vkAcquireNextImageKHR)" << io::endl;
 #endif
 }
 
@@ -339,7 +340,7 @@ void VulkanCommands::wait() {
         auto wrapper = mStorage[i].get();
         if (wrapper->buffer() != VK_NULL_HANDLE
                 && mCurrentCommandBufferIndex != static_cast<int8_t>(i)) {
-            fences[count++] = wrapper->fence->fence;
+            fences[count++] = wrapper->fence->getFence();
         }
     }
     if (count > 0) {
@@ -360,12 +361,13 @@ void VulkanCommands::gc() {
         if (wrapper->buffer() == VK_NULL_HANDLE) {
             continue;
         }
-        VkResult const result = vkGetFenceStatus(mDevice, wrapper->fence->fence);
+        auto const vkfence = wrapper->fence->getFence();
+        VkResult const result = vkGetFenceStatus(mDevice, vkfence);
         if (result != VK_SUCCESS) {
             continue;
         }
-        fences[count++] = wrapper->fence->fence;
-        wrapper->fence->status.store(VK_SUCCESS);
+        fences[count++] = vkfence;
+        wrapper->fence->setValue(VK_SUCCESS);
         wrapper->reset();
         mAvailableBufferCount++;
     }
@@ -382,9 +384,9 @@ void VulkanCommands::updateFences() {
         if (wrapper->buffer() != VK_NULL_HANDLE) {
             VulkanCmdFence* fence = wrapper->fence.get();
             if (fence) {
-                VkResult status = vkGetFenceStatus(mDevice, fence->fence);
+                VkResult status = vkGetFenceStatus(mDevice, fence->getFence());
                 // This is either VK_SUCCESS, VK_NOT_READY, or VK_ERROR_DEVICE_LOST.
-                fence->status.store(status, std::memory_order_relaxed);
+                fence->setValue(status);
             }
         }
     }
@@ -397,7 +399,7 @@ void VulkanCommands::pushGroupMarker(char const* str, VulkanGroupMarkers::Timest
     // If the timestamp is not 0, then we are carrying over a marker across buffer submits.
     // If it is 0, then this is a normal marker push and we should just print debug line as usual.
     if (timestamp.time_since_epoch().count() == 0.0) {
-        utils::slog.d << "----> " << str << utils::io::endl;
+        FVK_LOGD << "----> " << str << utils::io::endl;
     }
 #endif
 
@@ -435,8 +437,8 @@ void VulkanCommands::popGroupMarker() {
         auto const [marker, startTime] = mGroupMarkers->pop();
         auto const endTime = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> diff = endTime - startTime;
-        utils::slog.d << "<---- " << marker << " elapsed: " << (diff.count() * 1000) << " ms\n"
-                      << utils::io::flush;
+        FVK_LOGD << "<---- " << marker << " elapsed: " << (diff.count() * 1000) << " ms"
+                      << utils::io::endl;
 #else
         mGroupMarkers->pop();
 #endif

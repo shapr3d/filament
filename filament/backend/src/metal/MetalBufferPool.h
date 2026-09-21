@@ -19,6 +19,8 @@
 
 #include <Metal/Metal.h>
 
+#include "MetalBuffer.h"
+
 #include <map>
 #include <mutex>
 #include <unordered_set>
@@ -30,10 +32,32 @@ struct MetalContext;
 
 // Immutable POD representing a shared CPU-GPU buffer.
 struct MetalBufferPoolEntry {
-    id<MTLBuffer> buffer;
+    TrackedMetalBuffer buffer;
     size_t capacity;
     mutable uint64_t lastAccessed;
     mutable uint32_t referenceCount;
+};
+
+class MetalBumpAllocator {
+public:
+    MetalBumpAllocator(id<MTLDevice> device, size_t capacity);
+
+    /**
+     * Allocates a staging area of the given size. Returns a pair of the buffer and the offset
+     * within the buffer. The buffer is guaranteed to be at least the given size, but may be larger.
+     * Clients must not write to the buffer beyond the returned offset + size.
+     * Clients are responsible for holding a reference to the returned buffer.
+     * Allocations are guaranteed to be aligned to 4 bytes.
+     */
+    std::pair<id<MTLBuffer>, size_t> allocateStagingArea(size_t size);
+
+    size_t getCapacity() const noexcept { return mCapacity; }
+
+private:
+    id<MTLDevice> mDevice;
+    TrackedMetalBuffer mCurrentUploadBuffer = nil;
+    size_t mHead = 0;
+    size_t mCapacity;
 };
 
 // Manages a pool of Metal buffers, periodically releasing ones that have been unused for awhile.

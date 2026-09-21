@@ -22,6 +22,8 @@
 #include "Allocators.h"
 #include "Culler.h"
 
+#include "ds/DescriptorSet.h"
+
 #include "components/LightManager.h"
 #include "components/RenderableManager.h"
 #include "components/TransformManager.h"
@@ -80,10 +82,6 @@ public:
     void prepareDynamicLights(const CameraInfo& camera,
             backend::Handle<backend::HwBufferObject> lightUbh) noexcept;
 
-    backend::Handle<backend::HwBufferObject> getRenderableUBO() const noexcept {
-        return mRenderableViewUbh;
-    }
-
     /*
      * Storage for per-frame renderable data
      */
@@ -111,6 +109,7 @@ public:
         PRIMITIVES,             //   8 | level-of-detail'ed primitives
         SUMMED_PRIMITIVE_COUNT, //   4 | summed visible primitive counts
         UBO,                    // 128 |
+        DESCRIPTOR_SET_HANDLE,
 
         // FIXME: We need a better way to handle this
         USER_DATA,              //   4 | user data currently used to store the scale
@@ -133,6 +132,7 @@ public:
             utils::Slice<FRenderPrimitive>,             // PRIMITIVES
             uint32_t,                                   // SUMMED_PRIMITIVE_COUNT
             PerRenderableData,                          // UBO
+            backend::DescriptorSetHandle,               // DESCRIPTOR_SET_HANDLE
             // FIXME: We need a better way to handle this
             float                                       // USER_DATA
     >;
@@ -232,7 +232,6 @@ private:
      */
     RenderableSoa mRenderableData;
     LightSoa mLightData;
-    backend::Handle<backend::HwBufferObject> mRenderableViewUbh; // This is actually owned by the view.
     bool mHasContactShadows = false;
 
     // State shared between Scene and driver callbacks.

@@ -39,6 +39,9 @@ public:
         uint8_t mipLevel = 0;
         CubemapFace face = RenderTarget::CubemapFace::POSITIVE_X;
         uint32_t layer = 0;
+        // Indicates the number of layers used for multiview, starting from the `layer` (baseIndex).
+        // This means `layer` + `layerCount` cannot exceed the number of depth for the attachment.
+        uint16_t layerCount = 0;
     };
 
     FRenderTarget(FEngine& engine, const Builder& builder);
@@ -65,6 +68,10 @@ public:
 
     bool hasSampleableDepth() const noexcept;
 
+    bool supportsReadPixels() const noexcept {
+        return mSupportsReadPixels;
+    }
+
 private:
     friend class RenderTarget;
     static constexpr size_t ATTACHMENT_COUNT = MAX_SUPPORTED_COLOR_ATTACHMENTS_COUNT + 1u;
@@ -73,6 +80,7 @@ private:
     backend::TargetBufferFlags mAttachmentMask = {};
     backend::TargetBufferFlags mSampleableAttachmentsMask = {};
     const uint8_t mSupportedColorAttachmentsCount;
+    bool mSupportsReadPixels = false;
 };
 
 FILAMENT_DOWNCAST(RenderTarget)

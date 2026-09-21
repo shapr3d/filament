@@ -70,20 +70,29 @@ struct MetalShaderCompiler::MetalProgramToken : ProgramToken {
 
 MetalShaderCompiler::MetalProgramToken::~MetalProgramToken() = default;
 
-MetalShaderCompiler::MetalShaderCompiler(id<MTLDevice> device, MetalDriver& driver)
+MetalShaderCompiler::MetalShaderCompiler(id<MTLDevice> device, MetalDriver& driver, Mode mode)
         : mDevice(device),
-          mCallbackManager(driver) {
+          mCallbackManager(driver),
+          mMode(mode) {
 
 }
 
 void MetalShaderCompiler::init() noexcept {
-    const uint32_t poolSize = 2;
-    mCompilerThreadPool.init(poolSize, []() {}, []() {});
+    const uint32_t poolSize = 1;
+    if (mMode == Mode::ASYNCHRONOUS) {
+        mCompilerThreadPool.init(poolSize, []() {}, []() {});
+    }
 }
 
 void MetalShaderCompiler::terminate() noexcept {
-    mCompilerThreadPool.terminate();
+    if (mMode == Mode::ASYNCHRONOUS) {
+        mCompilerThreadPool.terminate();
+    }
     mCallbackManager.terminate();
+}
+
+bool MetalShaderCompiler::isParallelShaderCompileSupported() const noexcept {
+    return mMode == Mode::ASYNCHRONOUS;
 }
 
 /* static */ MetalShaderCompiler::MetalFunctionBundle MetalShaderCompiler::compileProgram(
@@ -97,26 +106,38 @@ void MetalShaderCompiler::terminate() noexcept {
             continue;
         }
 
-        assert_invariant(source[source.size() - 1] == '\0');
-
-        // the shader string is null terminated and the length includes the null character
-        NSString* objcSource = [[NSString alloc] initWithBytes:source.data()
-                                                        length:source.size() - 1
-                                                      encoding:NSUTF8StringEncoding];
-
-        // By default, Metal uses the most recent language version.
-        MTLCompileOptions* options = [MTLCompileOptions new];
-
-        // Disable Fast Math optimizations.
-        // This ensures that operations adhere to IEEE standards for floating-point arithmetic,
-        // which is crucial for half precision floats in scenarios where fast math optimizations
-        // lead to inaccuracies, such as in handling special values like NaN or Infinity.
-        options.fastMathEnabled = YES;
-
         NSError* error = nil;
-        id<MTLLibrary> library = [device newLibraryWithSource:objcSource
-                                                      options:options
-                                                        error:&error];
+        id<MTLLibrary> library = nil;
+        switch (program.getShaderLanguage()) {
+            case ShaderLanguage::MSL: {
+                // By default, Metal uses the most recent language version.
+                MTLCompileOptions* options = [MTLCompileOptions new];
+
+                // Shapr: fast math is re-enabled (upstream disables it for IEEE compliance of
+                // half precision floats, see "Re-enable fast-math" in the fork history).
+                options.fastMathEnabled = YES;
+
+                assert_invariant(source[source.size() - 1] == '\0');
+                // the shader string is null terminated and the length includes the null character
+                NSString* objcSource = [[NSString alloc] initWithBytes:source.data()
+                                                                length:source.size() - 1
+                                                              encoding:NSUTF8StringEncoding];
+                library = [device newLibraryWithSource:objcSource options:options error:&error];
+                break;
+            }
+            case ShaderLanguage::METAL_LIBRARY: {
+                dispatch_data_t data = dispatch_data_create(source.data(), source.size(),
+                        dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0),
+                        DISPATCH_DATA_DESTRUCTOR_DEFAULT);
+                library = [device newLibraryWithData:data error:&error];
+                break;
+            }
+            case ShaderLanguage::ESSL1:
+            case ShaderLanguage::ESSL3:
+            case ShaderLanguage::SPIRV:
+                break;
+        }
+
         if (library == nil) {
             NSString* errorMessage = @"unknown error";
             if (error) {
@@ -145,6 +166,23 @@ void MetalShaderCompiler::terminate() noexcept {
         id<MTLFunction> function = [library newFunctionWithName:@"main0"
                                                  constantValues:constants
                                                           error:&error];
+        if (function == nil) {
+            // If the library loads but functions within it fail to load, it usually means the
+            // GPU backend crashed. (This can happen if it's a Metallib shader that was compiled
+            // with a minimum iOS version that's newer than this device.)
+            NSString* errorMessage = @"unknown error";
+            if (error) {
+                auto description =
+                        [error.localizedDescription cStringUsingEncoding:NSUTF8StringEncoding];
+                utils::slog.w << description << utils::io::endl;
+                errorMessage = error.localizedDescription;
+            }
+            PANIC_LOG("Failed to load main0 in Metal program.");
+            NSString* programName =
+                [NSString stringWithFormat:@"%s::main0", program.getName().c_str_safe()];
+            return MetalFunctionBundle::error(errorMessage, programName);
+        }
+
         if (!program.getName().empty()) {
             function.label = @(program.getName().c_str());
         }
@@ -180,14 +218,26 @@ MetalShaderCompiler::program_token_t MetalShaderCompiler::createProgram(
 
     token->handle = mCallbackManager.get();
 
-    CompilerPriorityQueue const priorityQueue = program.getPriorityQueue();
-    mCompilerThreadPool.queue(priorityQueue, token,
-            [this, name, device = mDevice, program = std::move(program), token]() {
-                MetalFunctionBundle compiledProgram = compileProgram(program, device);
+    switch (mMode) {
+        case Mode::ASYNCHRONOUS: {
+            CompilerPriorityQueue const priorityQueue = program.getPriorityQueue();
+            mCompilerThreadPool.queue(priorityQueue, token,
+                    [this, name, device = mDevice, program = std::move(program), token]() {
+                        MetalFunctionBundle compiledProgram = compileProgram(program, device);
+                        token->set(compiledProgram);
+                        mCallbackManager.put(token->handle);
+                    });
 
-                token->set(compiledProgram);
-                mCallbackManager.put(token->handle);
-            });
+            break;
+        }
+
+        case Mode::SYNCHRONOUS: {
+            MetalFunctionBundle compiledProgram = compileProgram(program, mDevice);
+            token->set(compiledProgram);
+            mCallbackManager.put(token->handle);
+            break;
+        }
+    }
 
     return token;
 }
@@ -195,33 +245,21 @@ MetalShaderCompiler::program_token_t MetalShaderCompiler::createProgram(
 MetalShaderCompiler::MetalFunctionBundle MetalShaderCompiler::getProgram(program_token_t& token) {
     assert_invariant(token);
 
-    if (!token->isReady()) {
-        auto job = mCompilerThreadPool.dequeue(token);
-        if (job) {
-            job();
+    if (mMode == Mode::ASYNCHRONOUS) {
+        if (!token->isReady()) {
+            auto job = mCompilerThreadPool.dequeue(token);
+            if (job) {
+                job();
+            }
         }
     }
 
+    // The job isn't guaranteed to have finished yet. We may have failed to dequeue it above,
+    // which means it's currently running. In that case get() will block until it finishes.
+
     MetalShaderCompiler::MetalFunctionBundle program = token->get();
-
     token = nullptr;
-
     return program;
-}
-
-/* static */ void MetalShaderCompiler::terminate(program_token_t& token) {
-    assert_invariant(token);
-
-    auto job = token->compiler.mCompilerThreadPool.dequeue(token);
-    if (!job) {
-        // The job is being executed right now (or has already executed).
-        token->wait();
-    } else {
-        // The job has not executed yet.
-        token->compiler.mCallbackManager.put(token->handle);
-    }
-
-    token.reset();
 }
 
 void MetalShaderCompiler::notifyWhenAllProgramsAreReady(

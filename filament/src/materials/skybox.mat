@@ -153,7 +153,11 @@ fragment {
             float3 shaprSkyColor = shaprSkyGradient();
             sky = float4(shaprSkyColor, 1.0);
         } else if (materialParams.skyboxType == SHAPR_SKYBOX_TYPE_ENVIRONMENT) {
+#if MATERIAL_FEATURE_LEVEL == 0
+            sky = float4(textureCube(materialParams_skybox, variable_eyeDirection.xyz).rgb, 1.0);
+#else
             sky = float4(textureLod(materialParams_skybox, variable_eyeDirection.xyz, 0.0).rgb, 1.0);
+#endif
             sky.rgb *= frameUniforms.iblLuminance;
         } else if (materialParams.skyboxType == SHAPR_SKYBOX_TYPE_CHECKERBOARD) {
             float3 checkerboardColor = shaprCheckerboardPattern(getNormalizedViewportCoord().xy);
@@ -162,7 +166,7 @@ fragment {
             sky = float4(1.0, 0.0, 1.0, 1.0);
         }
 
-        if (materialParams.skyboxType == SHAPR_SKYBOX_TYPE_ENVIRONMENT && materialParams.showSun != 0 && frameUniforms.sun.w >= 0.0f) {
+        if (materialParams.skyboxType == SHAPR_SKYBOX_TYPE_ENVIRONMENT && materialParams.showSun != 0 && frameUniforms.sun.w >= 0.0) {
             float3 direction = normalize(variable_eyeDirection.xyz);
             // Assume the sun is a sphere
             float3 sun = frameUniforms.lightColorIntensity.rgb *
@@ -184,6 +188,15 @@ fragment {
 
 vertex {
     void materialVertex(inout MaterialVertexInputs material) {
-        material.eyeDirection.xyz = material.worldPosition.xyz;
+        // This code is taken from computeWorldPosition and assumes the vertex domain is 'device'.
+        vec4 p = getPosition();
+        // GL convention to inverted DX convention
+        p.z = p.z * -0.5 + 0.5;
+        vec4 worldPosition = getWorldFromClipMatrix() * p;
+        // Getting the true world position would require dividing by w, but since this is a skybox
+        // at inifinity, this results in very large numbers for material.eyeDirection.
+        // Since the eyeDirection is only used as a direction vector in the fragment shader, we can
+        // skip that step to improve precision.
+        material.eyeDirection.xyz = worldPosition.xyz;
     }
 }

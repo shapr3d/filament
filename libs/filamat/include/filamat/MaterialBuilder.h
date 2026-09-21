@@ -134,6 +134,7 @@ protected:
     TargetApi mTargetApi = (TargetApi) 0;
     Optimization mOptimization = Optimization::PERFORMANCE;
     bool mPrintShaders = false;
+    bool mSaveRawVariants = false;
     bool mGenerateDebugInfo = false;
     bool mIncludeEssl1 = true;
     utils::bitset32 mShaderModels;
@@ -227,6 +228,7 @@ public:
 
     using ShaderQuality = filament::ShaderQuality;
     using BlendingMode = filament::BlendingMode;
+    using BlendFunction = filament::backend::BlendFunction;
     using Shading = filament::Shading;
     using Interpolation = filament::Interpolation;
     using VertexDomain = filament::VertexDomain;
@@ -243,6 +245,8 @@ public:
     using Precision = filament::backend::Precision;
     using CullingMode = filament::backend::CullingMode;
     using FeatureLevel = filament::backend::FeatureLevel;
+    using StereoscopicType = filament::backend::StereoscopicType;
+    using ShaderStage = filament::backend::ShaderStage;
 
     enum class VariableQualifier : uint8_t {
         OUT
@@ -318,6 +322,9 @@ public:
 
     //! Custom variables (all float4).
     MaterialBuilder& variable(Variable v, const char* name) noexcept;
+
+    MaterialBuilder& variable(Variable v, const char* name,
+            ParameterPrecision precision) noexcept;
 
     /**
      * Require a specified attribute.
@@ -407,9 +414,19 @@ public:
     MaterialBuilder& blending(BlendingMode blending) noexcept;
 
     /**
+     * Set the blend function  for this material. blending must be et to CUSTOM.
+     */
+    MaterialBuilder& customBlendFunctions(
+            BlendFunction srcRGB,
+            BlendFunction srcA,
+            BlendFunction dstRGB,
+            BlendFunction dstA) noexcept;
+
+    /**
      * Set the blending mode of the post-lighting color for this material.
      * Only OPAQUE, TRANSPARENT and ADD are supported, the default is TRANSPARENT.
-     * This setting requires the material property "postLightingColor" to be set.
+     * This setting requires the material properties "postLightingColor" and
+     * "postLightingMixFactor" to be set.
      */
     MaterialBuilder& postLightingBlending(BlendingMode blending) noexcept;
 
@@ -521,6 +538,12 @@ public:
     //! Specifies how transparent objects should be rendered (default is DEFAULT).
     MaterialBuilder& transparencyMode(TransparencyMode mode) noexcept;
 
+    //! Specify the stereoscopic type (default is INSTANCED)
+    MaterialBuilder& stereoscopicType(StereoscopicType stereoscopicType) noexcept;
+
+    //! Specify the number of eyes for stereoscopic rendering
+    MaterialBuilder& stereoscopicEyeCount(uint8_t eyeCount) noexcept;
+
     /**
      * Enable / disable custom surface shading. Custom surface shading requires the LIT
      * shading model. In addition, the following function must be defined in the fragment
@@ -566,6 +589,14 @@ public:
     // MaterialBuilder.
     //! If true, will output the generated GLSL shader code to stdout.
     MaterialBuilder& printShaders(bool printShaders) noexcept;
+
+    /**
+     * If true, this will write the raw generated GLSL for each variant to a text file in the
+     * current directory. The file will be named after the material name and the variant name. Its
+     * extension will be derived from the shader stage. For example, mymaterial_0x0e.frag,
+     * mymaterial_0x18.vert, etc.
+     */
+    MaterialBuilder& saveRawVariants(bool saveVariants) noexcept;
 
     //! If true, will include debugging information in generated SPIRV.
     MaterialBuilder& generateDebugInfo(bool generateDebugInfo) noexcept;
@@ -674,11 +705,23 @@ public:
         } defaultValue;
     };
 
+    struct PushConstant {
+        utils::CString name;
+        ConstantType type;
+        ShaderStage stage;
+    };
+
+    struct CustomVariable {
+        utils::CString name;
+        Precision precision = Precision::DEFAULT;
+        bool hasPrecision = false;
+    };
+
     static constexpr size_t MATERIAL_PROPERTIES_COUNT = filament::MATERIAL_PROPERTIES_COUNT;
     using Property = filament::Property;
 
     using PropertyList = bool[MATERIAL_PROPERTIES_COUNT];
-    using VariableList = utils::CString[MATERIAL_VARIABLES_COUNT];
+    using VariableList = CustomVariable[MATERIAL_VARIABLES_COUNT];
     using OutputList = std::vector<Output>;
 
     static constexpr size_t MAX_COLOR_OUTPUT = filament::backend::MRT::MAX_SUPPORTED_RENDER_TARGET_COUNT;
@@ -702,6 +745,7 @@ public:
     using SubpassList = Parameter[MAX_SUBPASS_COUNT];
     using BufferList = std::vector<std::unique_ptr<filament::BufferInterfaceBlock>>;
     using ConstantList = std::vector<Constant>;
+    using PushConstantList = std::vector<PushConstant>;
 
     // returns the number of parameters declared in this material
     uint8_t getParameterCount() const noexcept { return mParameterCount; }
@@ -744,6 +788,10 @@ private:
     static const AttributeDatabase sAttributeDatabase;
 
     void prepareToBuild(MaterialInfo& info) noexcept;
+
+    // Initialize internal push constants that will both be written to the shaders and material
+    // chunks (like user-defined spec constants).
+    void initPushConstants() noexcept;
 
     // Return true if the shader is syntactically and semantically valid.
     // This method finds all the properties defined in the fragment and
@@ -811,6 +859,7 @@ private:
     PropertyList mProperties;
     ParameterList mParameters;
     ConstantList mConstants;
+    PushConstantList mPushConstants;
     SubpassList mSubpasses;
     VariableList mVariables;
     OutputList mOutputs;
@@ -820,6 +869,7 @@ private:
     FeatureLevel mFeatureLevel = FeatureLevel::FEATURE_LEVEL_1;
     BlendingMode mBlendingMode = BlendingMode::OPAQUE;
     BlendingMode mPostLightingBlendingMode = BlendingMode::TRANSPARENT;
+    std::array<BlendFunction, 4> mCustomBlendFunctions = {};
     CullingMode mCullingMode = CullingMode::BACK;
     Shading mShading = Shading::LIT;
     MaterialDomain mMaterialDomain = MaterialDomain::SURFACE;
@@ -829,6 +879,8 @@ private:
     Interpolation mInterpolation = Interpolation::SMOOTH;
     VertexDomain mVertexDomain = VertexDomain::OBJECT;
     TransparencyMode mTransparencyMode = TransparencyMode::DEFAULT;
+    StereoscopicType mStereoscopicType = StereoscopicType::INSTANCED;
+    uint8_t mStereoscopicEyeCount = 2;
 
     filament::AttributeBitset mRequiredAttributes;
 

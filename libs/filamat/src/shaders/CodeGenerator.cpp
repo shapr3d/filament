@@ -17,8 +17,11 @@
 #include "CodeGenerator.h"
 
 #include "MaterialInfo.h"
+#include "../PushConstantDefinitions.h"
 
 #include "generated/shaders.h"
+
+#include <backend/DriverEnums.h>
 
 #include <utils/sstream.h>
 
@@ -64,13 +67,22 @@ utils::io::sstream& CodeGenerator::generateProlog(utils::io::sstream& out, Shade
                 }
             }
             if (v.hasStereo() && stage == ShaderStage::VERTEX) {
-                // If we're not processing the shader through glslang (in the case of unoptimized
-                // OpenGL shaders), then we need to add the #extension string ourselves.
-                // If we ARE running the shader through glslang, then we must not include it,
-                // otherwise glslang will complain.
-                out << "#ifndef FILAMENT_GLSLANG\n";
-                out << "#extension GL_EXT_clip_cull_distance : require\n";
-                out << "#endif\n\n";
+                switch (material.stereoscopicType) {
+                case StereoscopicType::INSTANCED:
+                    // If we're not processing the shader through glslang (in the case of unoptimized
+                    // OpenGL shaders), then we need to add the #extension string ourselves.
+                    // If we ARE running the shader through glslang, then we must not include it,
+                    // otherwise glslang will complain.
+                    out << "#ifndef FILAMENT_GLSLANG\n";
+                    out << "#extension GL_EXT_clip_cull_distance : require\n";
+                    out << "#endif\n\n";
+                    break;
+                case StereoscopicType::MULTIVIEW:
+                    out << "#extension GL_OVR_multiview2 : require\n";
+                    break;
+                case StereoscopicType::NONE:
+                    break;
+                }
             }
             break;
         case ShaderModel::DESKTOP:
@@ -83,6 +95,18 @@ utils::io::sstream& CodeGenerator::generateProlog(utils::io::sstream& out, Shade
                 out << "#version 410 core\n\n";
                 out << "#extension GL_ARB_shading_language_packing : enable\n\n";
             }
+            if (v.hasStereo() && stage == ShaderStage::VERTEX) {
+                switch (material.stereoscopicType) {
+                case StereoscopicType::INSTANCED:
+                    // Nothing to generate
+                    break;
+                case StereoscopicType::MULTIVIEW:
+                    out << "#extension GL_OVR_multiview2 : require\n";
+                    break;
+                case StereoscopicType::NONE:
+                    break;
+                }
+            }
             break;
     }
 
@@ -93,6 +117,19 @@ utils::io::sstream& CodeGenerator::generateProlog(utils::io::sstream& out, Shade
     // This allows our includer system to use the #line directive to denote the source file for
     // #included code. This way, glslang reports errors more accurately.
     out << "#extension GL_GOOGLE_cpp_style_line_directive : enable\n\n";
+
+    if (v.hasStereo() && stage == ShaderStage::VERTEX) {
+        switch (material.stereoscopicType) {
+        case StereoscopicType::INSTANCED:
+            // Nothing to generate
+            break;
+        case StereoscopicType::MULTIVIEW:
+            out << "layout(num_views = " << material.stereoscopicEyeCount << ") in;\n";
+            break;
+        case StereoscopicType::NONE:
+            break;
+        }
+    }
 
     if (stage == ShaderStage::COMPUTE) {
         out << "layout(local_size_x = " << material.groupSize.x
@@ -180,6 +217,17 @@ utils::io::sstream& CodeGenerator::generateProlog(utils::io::sstream& out, Shade
         }
     }
     generateDefine(out, "FILAMENT_EFFECTIVE_VERSION", effective_version);
+
+    switch (material.stereoscopicType) {
+    case StereoscopicType::INSTANCED:
+        generateDefine(out, "FILAMENT_STEREO_INSTANCED", true);
+        break;
+    case StereoscopicType::MULTIVIEW:
+        generateDefine(out, "FILAMENT_STEREO_MULTIVIEW", true);
+        break;
+    case StereoscopicType::NONE:
+        break;
+    }
 
     if (stage == ShaderStage::VERTEX) {
         CodeGenerator::generateDefine(out, "FLIP_UV_ATTRIBUTE", material.flipUV);
@@ -284,7 +332,10 @@ utils::io::sstream& CodeGenerator::generateProlog(utils::io::sstream& out, Shade
             +ReservedSpecializationConstants::CONFIG_POWER_VR_SHADER_WORKAROUNDS, false);
 
     generateSpecializationConstant(out, "CONFIG_STEREO_EYE_COUNT",
-            +ReservedSpecializationConstants::CONFIG_STEREO_EYE_COUNT, 2);
+            +ReservedSpecializationConstants::CONFIG_STEREO_EYE_COUNT, material.stereoscopicEyeCount);
+
+    generateSpecializationConstant(out, "CONFIG_SH_BANDS_COUNT",
+            +ReservedSpecializationConstants::CONFIG_SH_BANDS_COUNT, 3);
 
     // CONFIG_MAX_STEREOSCOPIC_EYES is used to size arrays and on Adreno GPUs + vulkan, this has to
     // be explicitly, statically defined (as in #define). Otherwise (using const int for
@@ -404,23 +455,28 @@ io::sstream& CodeGenerator::generatePostProcessMain(io::sstream& out, ShaderStag
 }
 
 io::sstream& CodeGenerator::generateVariable(io::sstream& out, ShaderStage stage,
-        const CString& name, size_t index) {
-
+        const MaterialBuilder::CustomVariable& variable, size_t index) {
+    auto const& name = variable.name;
+    const char* precisionString = getPrecisionQualifier(variable.precision);
     if (!name.empty()) {
         if (stage == ShaderStage::VERTEX) {
             out << "\n#define VARIABLE_CUSTOM" << index << " " << name.c_str() << "\n";
             out << "\n#define VARIABLE_CUSTOM_AT" << index << " variable_" << name.c_str() << "\n";
-            out << "LAYOUT_LOCATION(" << index << ") VARYING vec4 variable_" << name.c_str() << ";\n";
+            out << "LAYOUT_LOCATION(" << index << ") VARYING " << precisionString << " vec4 variable_" << name.c_str() << ";\n";
         } else if (stage == ShaderStage::FRAGMENT) {
-            out << "\nLAYOUT_LOCATION(" << index << ") VARYING highp vec4 variable_" << name.c_str() << ";\n";
+            if (!variable.hasPrecision && variable.precision == Precision::DEFAULT) {
+                // for backward compatibility
+                precisionString = "highp";
+            }
+            out << "\nLAYOUT_LOCATION(" << index << ") VARYING " << precisionString << " vec4 variable_" << name.c_str() << ";\n";
         }
     }
     return out;
 }
 
 io::sstream& CodeGenerator::generateShaderInputs(io::sstream& out, ShaderStage type,
-        const AttributeBitset& attributes, Interpolation interpolation) const {
-
+        const AttributeBitset& attributes, Interpolation interpolation,
+        MaterialBuilder::PushConstantList const& pushConstants) const {
     auto const& attributeDatabase = MaterialBuilder::getAttributeDatabase();
 
     const char* shading = getInterpolationQualifier(interpolation);
@@ -444,6 +500,9 @@ io::sstream& CodeGenerator::generateShaderInputs(io::sstream& out, ShaderStage t
             }
             out << getTypeName(attribute.type) << " " << attribute.getAttributeName() << ";\n";
         });
+
+        out << "\n";
+        generatePushConstants(out, pushConstants, attributes.size());
     }
 
     out << "\n";
@@ -547,17 +606,33 @@ const char* CodeGenerator::getUniformPrecisionQualifier(UniformType type, Precis
 
 utils::io::sstream& CodeGenerator::generateBuffers(utils::io::sstream& out,
         MaterialInfo::BufferContainer const& buffers) const {
-    uint32_t binding = 0;
+
     for (auto const* buffer : buffers) {
-        generateBufferInterfaceBlock(out, ShaderStage::COMPUTE, binding, *buffer);
-        binding++;
+
+        // FIXME: we need to get the bindings for the SSBOs and that will depend on the samplers
+        backend::descriptor_binding_t binding = 0;
+
+        if (mTargetApi == TargetApi::OPENGL) {
+            // For OpenGL, the set is not used bug the binding must be unique.
+            binding = getUniqueSsboBindingPoint();
+        }
+        generateBufferInterfaceBlock(out, ShaderStage::COMPUTE,
+                DescriptorSetBindingPoints::PER_MATERIAL, binding, *buffer);
     }
     return out;
 }
 
 io::sstream& CodeGenerator::generateUniforms(io::sstream& out, ShaderStage stage,
-        UniformBindingPoints binding, const BufferInterfaceBlock& uib) const {
-    return generateBufferInterfaceBlock(out, stage, +binding, uib);
+        filament::DescriptorSetBindingPoints set,
+        filament::backend::descriptor_binding_t binding,
+        const BufferInterfaceBlock& uib) const {
+
+    if (mTargetApi == TargetApi::OPENGL) {
+        // For OpenGL, the set is not used bug the binding must be unique.
+        binding = getUniqueUboBindingPoint();
+    }
+
+    return generateBufferInterfaceBlock(out, stage, set, binding, uib);
 }
 
 io::sstream& CodeGenerator::generateInterfaceFields(io::sstream& out,
@@ -612,7 +687,9 @@ io::sstream& CodeGenerator::generateUboAsPlainUniforms(io::sstream& out, ShaderS
 }
 
 io::sstream& CodeGenerator::generateBufferInterfaceBlock(io::sstream& out, ShaderStage stage,
-        uint32_t binding, const BufferInterfaceBlock& uib) const {
+        filament::DescriptorSetBindingPoints set,
+        filament::backend::descriptor_binding_t binding,
+        const BufferInterfaceBlock& uib) const {
     if (uib.isEmptyForFeatureLevel(mFeatureLevel)) {
         return out;
     }
@@ -632,28 +709,19 @@ io::sstream& CodeGenerator::generateBufferInterfaceBlock(io::sstream& out, Shade
     blockName.front() = char(std::toupper((unsigned char)blockName.front()));
     instanceName.front() = char(std::tolower((unsigned char)instanceName.front()));
 
-    auto metalBufferBindingOffset = 0;
-    switch (uib.getTarget()) {
-        case BufferInterfaceBlock::Target::UNIFORM:
-            metalBufferBindingOffset = METAL_UNIFORM_BUFFER_BINDING_START;
-            break;
-        case BufferInterfaceBlock::Target::SSBO:
-            metalBufferBindingOffset = METAL_SSBO_BINDING_START;
-            break;
-    }
-
     out << "\nlayout(";
     if (mTargetLanguage == TargetLanguage::SPIRV ||
         mFeatureLevel >= FeatureLevel::FEATURE_LEVEL_2) {
         switch (mTargetApi) {
             case TargetApi::METAL:
-                out << "binding = " << metalBufferBindingOffset + binding << ", ";
+            case TargetApi::VULKAN:
+                out << "set = " << +set << ", binding = " << +binding << ", ";
                 break;
 
             case TargetApi::OPENGL:
                 // GLSL 4.5 / ESSL 3.1 require the 'binding' layout qualifier
-            case TargetApi::VULKAN:
-                out << "binding = " << binding << ", ";
+                // in the GLSL 4.5 / ESSL 3.1 case, the set is not used and binding is unique
+                out << "binding = " << +binding << ", ";
                 break;
 
             case TargetApi::ALL:
@@ -707,15 +775,14 @@ io::sstream& CodeGenerator::generateBufferInterfaceBlock(io::sstream& out, Shade
     return out;
 }
 
-io::sstream& CodeGenerator::generateSamplers(
-        io::sstream& out, SamplerBindingPoints bindingPoint, uint8_t firstBinding,
-        const SamplerInterfaceBlock& sib) const {
-    auto const& infos = sib.getSamplerInfoList();
-    if (infos.empty()) {
+io::sstream& CodeGenerator::generateSamplers(utils::io::sstream& out,
+        filament::DescriptorSetBindingPoints set,
+        filament::SamplerInterfaceBlock::SamplerInfoList const& list) const {
+    if (list.empty()) {
         return out;
     }
 
-    for (auto const& info : infos) {
+    for (auto const& info : list) {
         auto type = info.type;
         if (type == SamplerType::SAMPLER_EXTERNAL && mShaderModel != ShaderModel::MOBILE) {
             // we're generating the shader for the desktop, where we assume external textures
@@ -725,27 +792,27 @@ io::sstream& CodeGenerator::generateSamplers(
         char const* const typeName = getSamplerTypeName(type, info.format, info.multisample);
         char const* const precision = getPrecisionQualifier(info.precision);
         if (mTargetLanguage == TargetLanguage::SPIRV) {
-            const uint32_t bindingIndex = (uint32_t) firstBinding + info.offset;
             switch (mTargetApi) {
-                // For Vulkan, we place uniforms in set 0 (the default set) and samplers in set 1. This
-                // allows the sampler bindings to live in a separate "namespace" that starts at zero.
                 // Note that the set specifier is not covered by the desktop GLSL spec, including
                 // recent versions. It is only documented in the GL_KHR_vulkan_glsl extension.
                 case TargetApi::VULKAN:
-                    out << "layout(binding = " << bindingIndex << ", set = 1) ";
+                    out << "layout(binding = " << +info.binding << ", set = " << +set << ") ";
                     break;
 
                 // For Metal, each sampler group gets its own descriptor set, each of which will
                 // become an argument buffer. The first descriptor set is reserved for uniforms,
                 // hence the +1 here.
                 case TargetApi::METAL:
-                    out << "layout(binding = " << (uint32_t) info.offset
-                        << ", set = " << (uint32_t) bindingPoint + 1 << ") ";
+                    out << "layout(binding = " << +info.binding << ", set = " << +set << ") ";
                     break;
 
-                default:
                 case TargetApi::OPENGL:
-                    out << "layout(binding = " << bindingIndex << ") ";
+                    // GLSL 4.5 / ESSL 3.1 require the 'binding' layout qualifier
+                    out << "layout(binding = " << getUniqueSamplerBindingPoint() << ") ";
+                    break;
+
+                case TargetApi::ALL:
+                    // should not happen
                     break;
             }
         }
@@ -871,6 +938,41 @@ utils::io::sstream& CodeGenerator::generateSpecializationConstant(utils::io::sst
     return out;
 }
 
+utils::io::sstream& CodeGenerator::generatePushConstants(utils::io::sstream& out,
+        MaterialBuilder::PushConstantList const& pushConstants, size_t const layoutLocation) const {
+    static constexpr char const* STRUCT_NAME = "Constants";
+
+    bool const outputSpirv =
+            mTargetLanguage == TargetLanguage::SPIRV && mTargetApi != TargetApi::OPENGL;
+    auto const getType = [](ConstantType const& type) {
+        switch (type) {
+            case ConstantType::BOOL:
+                return "bool";
+            case ConstantType::INT:
+                return "int";
+            case ConstantType::FLOAT:
+                return "float";
+        }
+    };
+    if (outputSpirv) {
+        out << "layout(push_constant) uniform " << STRUCT_NAME << " {\n ";
+    } else {
+        out << "struct " << STRUCT_NAME << " {\n";
+    }
+
+    for (auto const& constant: pushConstants) {
+        out << getType(constant.type) << " " << constant.name.c_str() << ";\n";
+    }
+
+    if (outputSpirv) {
+        out << "} " << PUSH_CONSTANT_STRUCT_VAR_NAME << ";\n";
+    } else {
+        out << "};\n";
+        out << "LAYOUT_LOCATION(" << static_cast<int>(layoutLocation) << ") uniform " << STRUCT_NAME
+            << " " << PUSH_CONSTANT_STRUCT_VAR_NAME << ";\n";
+    }
+    return out;
+}
 
 io::sstream& CodeGenerator::generateMaterialProperty(io::sstream& out,
         MaterialBuilder::Property property, bool isSet) {
@@ -1080,32 +1182,35 @@ io::sstream& CodeGenerator::generateShaderReflections(utils::io::sstream& out, S
 char const* CodeGenerator::getConstantName(MaterialBuilder::Property property) noexcept {
     using Property = MaterialBuilder::Property;
     switch (property) {
-        case Property::BASE_COLOR:           return "BASE_COLOR";
-        case Property::ROUGHNESS:            return "ROUGHNESS";
-        case Property::METALLIC:             return "METALLIC";
-        case Property::REFLECTANCE:          return "REFLECTANCE";
-        case Property::AMBIENT_OCCLUSION:    return "AMBIENT_OCCLUSION";
-        case Property::CLEAR_COAT:           return "CLEAR_COAT";
-        case Property::CLEAR_COAT_ROUGHNESS: return "CLEAR_COAT_ROUGHNESS";
-        case Property::CLEAR_COAT_NORMAL:    return "CLEAR_COAT_NORMAL";
-        case Property::ANISOTROPY:           return "ANISOTROPY";
-        case Property::ANISOTROPY_DIRECTION: return "ANISOTROPY_DIRECTION";
-        case Property::THICKNESS:            return "THICKNESS";
-        case Property::SUBSURFACE_POWER:     return "SUBSURFACE_POWER";
-        case Property::SUBSURFACE_COLOR:     return "SUBSURFACE_COLOR";
-        case Property::SHEEN_COLOR:          return "SHEEN_COLOR";
-        case Property::SHEEN_ROUGHNESS:      return "SHEEN_ROUGHNESS";
-        case Property::GLOSSINESS:           return "GLOSSINESS";
-        case Property::SPECULAR_COLOR:       return "SPECULAR_COLOR";
-        case Property::EMISSIVE:             return "EMISSIVE";
-        case Property::NORMAL:               return "NORMAL";
-        case Property::POST_LIGHTING_COLOR:  return "POST_LIGHTING_COLOR";
-        case Property::CLIP_SPACE_TRANSFORM: return "CLIP_SPACE_TRANSFORM";
-        case Property::ABSORPTION:           return "ABSORPTION";
-        case Property::TRANSMISSION:         return "TRANSMISSION";
-        case Property::IOR:                  return "IOR";
-        case Property::MICRO_THICKNESS:      return "MICRO_THICKNESS";
-        case Property::BENT_NORMAL:          return "BENT_NORMAL";
+        case Property::BASE_COLOR:                  return "BASE_COLOR";
+        case Property::ROUGHNESS:                   return "ROUGHNESS";
+        case Property::METALLIC:                    return "METALLIC";
+        case Property::REFLECTANCE:                 return "REFLECTANCE";
+        case Property::AMBIENT_OCCLUSION:           return "AMBIENT_OCCLUSION";
+        case Property::CLEAR_COAT:                  return "CLEAR_COAT";
+        case Property::CLEAR_COAT_ROUGHNESS:        return "CLEAR_COAT_ROUGHNESS";
+        case Property::CLEAR_COAT_NORMAL:           return "CLEAR_COAT_NORMAL";
+        case Property::ANISOTROPY:                  return "ANISOTROPY";
+        case Property::ANISOTROPY_DIRECTION:        return "ANISOTROPY_DIRECTION";
+        case Property::THICKNESS:                   return "THICKNESS";
+        case Property::SUBSURFACE_POWER:            return "SUBSURFACE_POWER";
+        case Property::SUBSURFACE_COLOR:            return "SUBSURFACE_COLOR";
+        case Property::SHEEN_COLOR:                 return "SHEEN_COLOR";
+        case Property::SHEEN_ROUGHNESS:             return "SHEEN_ROUGHNESS";
+        case Property::GLOSSINESS:                  return "GLOSSINESS";
+        case Property::SPECULAR_COLOR:              return "SPECULAR_COLOR";
+        case Property::EMISSIVE:                    return "EMISSIVE";
+        case Property::NORMAL:                      return "NORMAL";
+        case Property::POST_LIGHTING_COLOR:         return "POST_LIGHTING_COLOR";
+        case Property::POST_LIGHTING_MIX_FACTOR:    return "POST_LIGHTING_MIX_FACTOR";
+        case Property::CLIP_SPACE_TRANSFORM:        return "CLIP_SPACE_TRANSFORM";
+        case Property::ABSORPTION:                  return "ABSORPTION";
+        case Property::TRANSMISSION:                return "TRANSMISSION";
+        case Property::IOR:                         return "IOR";
+        case Property::MICRO_THICKNESS:             return "MICRO_THICKNESS";
+        case Property::BENT_NORMAL:                 return "BENT_NORMAL";
+        case Property::SPECULAR_FACTOR:             return "SPECULAR_FACTOR";
+        case Property::SPECULAR_COLOR_FACTOR:       return "SPECULAR_COLOR_FACTOR";
     }
 }
 

@@ -17,6 +17,7 @@
 #ifndef TNT_FILAMENT_DRIVER_METALDRIVER_H
 #define TNT_FILAMENT_DRIVER_METALDRIVER_H
 
+#include <backend/DriverEnums.h>
 #include "private/backend/Driver.h"
 #include "DriverBase.h"
 
@@ -31,6 +32,7 @@
 #include <functional>
 #include <mutex>
 #include <vector>
+#include <deque>
 
 namespace filament {
 namespace backend {
@@ -56,11 +58,11 @@ class MetalDriver final : public DriverBase {
 
 public:
     static Driver* create(MetalPlatform* platform, const Platform::DriverConfig& driverConfig);
-    void runAtNextTick(const std::function<void()>& fn) noexcept;
 
 private:
 
     friend class MetalSwapChain;
+    friend struct MetalDescriptorSet;
 
     MetalPlatform& mPlatform;
     MetalContext* mContext;
@@ -72,10 +74,23 @@ private:
 
     /*
      * Tasks run regularly on the driver thread.
+     * Not thread-safe; tasks are run from the driver thead and must be enqueued from the driver
+     * thread.
      */
+    void runAtNextTick(const std::function<void()>& fn) noexcept;
     void executeTickOps() noexcept;
     std::vector<std::function<void()>> mTickOps;
-    std::mutex mTickOpsLock;
+
+    // Tasks regularly executed on the driver thread after a command buffer has completed
+    struct DeferredTask {
+        DeferredTask(uint64_t commandBufferId, utils::Invocable<void()>&& fn) noexcept
+            : commandBufferId(commandBufferId), fn(std::move(fn)) {}
+        uint64_t commandBufferId;     // after this command buffer completes
+        utils::Invocable<void()> fn;  // execute this task
+    };
+    void executeAfterCurrentCommandBufferCompletes(utils::Invocable<void()>&& fn) noexcept;
+    void executeDeferredOps() noexcept;
+    std::deque<DeferredTask> mDeferredTasks;
 
     /*
      * Driver interface
@@ -136,10 +151,10 @@ private:
     inline void setRenderPrimitiveBuffer(Handle<HwRenderPrimitive> rph, PrimitiveType pt,
             Handle<HwVertexBuffer> vbh, Handle<HwIndexBuffer> ibh);
 
-    void finalizeSamplerGroup(MetalSamplerGroup* sg);
     void enumerateBoundBuffers(BufferObjectBinding bindingType,
             const std::function<void(const BufferState&, MetalBuffer*, uint32_t)>& f);
 
+    backend::StereoscopicType const mStereoscopicType;
 };
 
 } // namespace backend
