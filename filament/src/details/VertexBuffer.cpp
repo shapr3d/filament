@@ -272,10 +272,16 @@ FVertexBuffer::FVertexBuffer(FEngine& engine, const VertexBuffer::Builder& build
             const uint32_t offset = mAttributes[i].offset;
             const uint8_t stride = mAttributes[i].stride;
             const uint8_t slot = mAttributes[i].buffer;
-            const size_t end = offset + mVertexCount * stride;
+            // Ported from upstream b09b99bf9 ("Fix interleaved buffer size calculation", v1.72):
+            // the last vertex only needs `elementSize` bytes, not a full stride, so interleaved
+            // attributes with an offset no longer over-allocate the internal buffer objects.
+            const size_t elementSize = Driver::getElementTypeSize(mAttributes[i].type);
+            // mVertexCount is always > 0, checked by precondition, so this should not underflow.
+            const size_t end = offset + (mVertexCount - 1) * stride + elementSize;
+            const size_t rounded = ((end + stride - 1) / stride) * stride;
             if (slot != Attribute::BUFFER_UNUSED) {
                 assert_invariant(slot < MAX_VERTEX_BUFFER_COUNT);
-                bufferSizes[slot] = std::max(bufferSizes[slot], end);
+                bufferSizes[slot] = std::max(bufferSizes[slot], rounded);
             }
         }
     }
