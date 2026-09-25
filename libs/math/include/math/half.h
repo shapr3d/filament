@@ -190,8 +190,8 @@ public:
     static constexpr const bool has_infinity = true;
     static constexpr const bool has_quiet_NaN = true;
     static constexpr const bool has_signaling_NaN = false;
-    static constexpr const float_denorm_style has_denorm = denorm_absent;
-    static constexpr const bool has_denorm_loss = true;
+    // NB: has_denorm and has_denorm_loss are intentionally not defined here: they are deprecated
+    // by C++23 (referencing float_denorm_style/denorm_absent warns) and unused by filament.
     static constexpr const bool is_iec559 = false;
     static constexpr const bool is_bounded = true;
     static constexpr const bool is_modulo = false;
