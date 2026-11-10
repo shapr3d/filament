@@ -56,7 +56,7 @@ float shadowMultiplier_getDistanceAttenuation(const highp vec3 posToLight, float
 }
 
 /**
- * Adds to illuminance the luminance of the light that the point and spot lights would deliver to
+ * Adds to illuminance the luminance of the light that the shadow-casting point and spot lights would deliver to
  * the fragment without shadows, and to shadowedIlluminance the part of it their shadows block.
  */
 void accumulatePunctualLightShadows(const highp vec3 n,
@@ -76,7 +76,10 @@ void accumulatePunctualLightShadows(const highp vec3 n,
         highp mat4 data = lightsUniforms.lights[shadowMultiplier_getLightIndex(index)];
         highp uint typeShadow = floatBitsToUint(data[3][2]);
         highp uint lightChannels = floatBitsToUint(data[3][3]);
-        if ((int(lightChannels) & channels) == 0) {
+        // A light that casts no shadows would only weaken the shadows of the other lights, since a
+        // shadow-only surface can't show the light it adds
+        bool castsShadows = bool(lightChannels & 0x10000u);
+        if ((int(lightChannels) & channels) == 0 || !castsShadows) {
             continue;
         }
 
@@ -98,17 +101,14 @@ void accumulatePunctualLightShadows(const highp vec3 n,
             continue;
         }
 
-        float visibility = 1.0;
-        if (bool(lightChannels & 0x10000u)) {
-            int shadowIndex = int((typeShadow >> 8u) & 0xFFu);
-            if (!isSpot) {
-                shadowIndex += getPointLightFace(worldPosition - data[0].xyz);
-            }
-            highp float zLight = dot(shadowUniforms.shadows[shadowIndex].lightFromWorldZ,
-                    vec4(worldPosition, 1.0));
-            highp vec4 shadowPosition = getShadowPosition(shadowIndex, data[1].xyz, zLight);
-            visibility = shadow(false, light_shadowMap, shadowIndex, shadowPosition, zLight);
+        int shadowIndex = int((typeShadow >> 8u) & 0xFFu);
+        if (!isSpot) {
+            shadowIndex += getPointLightFace(worldPosition - data[0].xyz);
         }
+        highp float zLight = dot(shadowUniforms.shadows[shadowIndex].lightFromWorldZ,
+                vec4(worldPosition, 1.0));
+        highp vec4 shadowPosition = getShadowPosition(shadowIndex, data[1].xyz, zLight);
+        float visibility = shadow(false, light_shadowMap, shadowIndex, shadowPosition, zLight);
 
         illuminance += lightIlluminance;
         shadowedIlluminance += lightIlluminance * (1.0 - visibility);
