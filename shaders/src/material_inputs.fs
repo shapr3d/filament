@@ -9,8 +9,9 @@
     #define MATERIAL_CAN_SKIP_LIGHTING
 #endif
 
-// Lets materials check for MaterialInputs::directionalLightVisibility
+// Lets materials check for MaterialInputs::directionalLightVisibility and MaterialInputs::reflectedRadiance
 #define SHAPR_HAS_DIRECTIONAL_LIGHT_VISIBILITY
+#define SHAPR_HAS_REFLECTED_RADIANCE
 
 struct MaterialInputs {
     vec4  baseColor;
@@ -26,6 +27,9 @@ struct MaterialInputs {
     float ambientOcclusion;
     // Multiplies the directional light's own shadowing, e.g. with shadows computed outside of Filament
     float directionalLightVisibility;
+    // Reflections computed outside of Filament, combined with the IBL like screen-space reflections: pre-exposed
+    // radiance in rgb, and the fraction of the IBL reflection it replaces in a
+    vec4 reflectedRadiance;
 #endif
     vec4  emissive;
     float specularIntensity;
@@ -110,6 +114,7 @@ void initMaterial(out MaterialInputs material) {
 #endif
     material.ambientOcclusion = 1.0;
     material.directionalLightVisibility = 1.0;
+    material.reflectedRadiance = vec4(0.0);
 #endif
     material.emissive = vec4(vec3(0.0), 1.0);
     material.specularIntensity = 1.0;

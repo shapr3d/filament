@@ -657,6 +657,8 @@ void evaluateIBL(const MaterialInputs material, const PixelParams pixel, inout v
 #if defined(MATERIAL_HAS_REFLECTIONS)
     ssrFr.rgb *= specularSingleBounceAO;
 #endif
+    vec4 externalFr = material.reflectedRadiance;
+    externalFr.rgb *= specularSingleBounceAO;
 
     // diffuse layer
     float diffuseBRDF = singleBounceAO(diffuseAO); // Fd_Lambert() is baked in the SH below
@@ -702,6 +704,7 @@ void evaluateIBL(const MaterialInputs material, const PixelParams pixel, inout v
 #if defined(MATERIAL_HAS_REFLECTIONS)
     Fr = Fr * (1.0 - ssrFr.a) + (E * ssrFr.rgb);
 #endif
+    Fr = Fr * (1.0 - externalFr.a) + (E * externalFr.rgb);
     Fr *= material.specularIntensity;
 
     // Combine all terms
