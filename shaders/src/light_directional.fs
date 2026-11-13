@@ -84,6 +84,9 @@ void evaluateDirectionalLight(const MaterialInputs material,
     }
 #endif
 
+    // Applied even without shadow maps, which are turned off when the shadows come from elsewhere
+    visibility *= material.directionalLightVisibility;
+
 #if defined(MATERIAL_HAS_CUSTOM_SURFACE_SHADING)
     color.rgb += customSurfaceShading(material, pixel, light, visibility);
 #else

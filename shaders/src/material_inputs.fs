@@ -9,6 +9,9 @@
     #define MATERIAL_CAN_SKIP_LIGHTING
 #endif
 
+// Lets materials check for MaterialInputs::directionalLightVisibility
+#define SHAPR_HAS_DIRECTIONAL_LIGHT_VISIBILITY
+
 struct MaterialInputs {
     vec4  baseColor;
     bool  useWard;
@@ -21,6 +24,8 @@ struct MaterialInputs {
     float reflectance;
 #endif
     float ambientOcclusion;
+    // Multiplies the directional light's own shadowing, e.g. with shadows computed outside of Filament
+    float directionalLightVisibility;
 #endif
     vec4  emissive;
     float specularIntensity;
@@ -104,6 +109,7 @@ void initMaterial(out MaterialInputs material) {
     material.reflectance = 0.0;
 #endif
     material.ambientOcclusion = 1.0;
+    material.directionalLightVisibility = 1.0;
 #endif
     material.emissive = vec4(vec3(0.0), 1.0);
     material.specularIntensity = 1.0;
