@@ -9,9 +9,12 @@
     #define MATERIAL_CAN_SKIP_LIGHTING
 #endif
 
-// Lets materials check for MaterialInputs::directionalLightVisibility and MaterialInputs::reflectedRadiance
+// Lets materials check for MaterialInputs::directionalLightVisibility and MaterialInputs::reflectedRadiance, which
+// only lit materials have
+#if !defined(SHADING_MODEL_UNLIT)
 #define SHAPR_HAS_DIRECTIONAL_LIGHT_VISIBILITY
 #define SHAPR_HAS_REFLECTED_RADIANCE
+#endif
 
 struct MaterialInputs {
     vec4  baseColor;
