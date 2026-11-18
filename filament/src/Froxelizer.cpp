@@ -44,6 +44,15 @@ namespace filament {
 
 using namespace backend;
 
+// TEMPORARY, do not commit. Isolates which stage of the spot light froxelization drops the light:
+//   0: normal
+//   1: the cone test always passes
+//   2: the light covers the whole screen range of froxels, instead of its projected bounding box
+//   3: every froxel in the projected bounding box gets the light (no sphere or cone test)
+#ifndef SHAPR_FROXEL_EXPERIMENT
+#define SHAPR_FROXEL_EXPERIMENT 0
+#endif
+
 // TODO: these should come from a configuration object on View or Camera
 static constexpr size_t FROXEL_SLICE_COUNT = 16;
 static constexpr float FROXEL_FIRST_SLICE_DEPTH = 5;
@@ -760,7 +769,7 @@ void Froxelizer::froxelizePointAndSpotLight(
     // the code below works with radius^2
     const float4 s = { light.position, light.radius * light.radius };
 
-#ifdef DEBUG_FROXEL
+#if defined(DEBUG_FROXEL) || SHAPR_FROXEL_EXPERIMENT == 2
     const size_t x0 = 0;
     const size_t x1 = mFroxelCountX - 1;
     const size_t y0 = 0;
@@ -804,6 +813,17 @@ void Froxelizer::froxelizePointAndSpotLight(
     assert_invariant(x0 <= x1);
     assert_invariant(y0 <= y1);
     assert_invariant(z0 <= z1);
+#endif
+
+#if SHAPR_FROXEL_EXPERIMENT == 3
+    for (size_t iz = z0; iz <= z1; ++iz) {
+        for (size_t iy = y0; iy <= y1; ++iy) {
+            for (size_t ix = x0; ix <= x1; ++ix) {
+                froxelThread[getFroxelIndex(ix, iy, iz)] |= LightGroupType(1) << bit;
+            }
+        }
+    }
+    return;
 #endif
 
     const size_t zcenter = findSliceZ(s.z);
@@ -875,8 +895,12 @@ void Froxelizer::froxelizePointAndSpotLight(
                         // this loops gets vectorized (on arm64) w/ clang
                         while (bx++ != ex) {
                             // see if this froxel intersects the cone
+#if SHAPR_FROXEL_EXPERIMENT == 1
+                            bool const intersect = true;
+#else
                             bool const intersect = sphereConeIntersectionFast(boundingSpheres[fi],
                                     light.position, light.axis, light.invSin, light.cosSqr);
+#endif
                             froxelThread[fi++] |= LightGroupType(intersect) << bit;
                         }
                     } else {
