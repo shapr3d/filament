@@ -28,12 +28,14 @@
 #include <utils/BinaryTreeArray.h>
 #include <utils/Systrace.h>
 #include <utils/debug.h>
+#include <utils/Log.h>
 
 #include <math/mat4.h>
 #include <math/fast.h>
 #include <math/scalar.h>
 
 #include <algorithm>
+#include <atomic>
 
 #include <stddef.h>
 
@@ -49,6 +51,7 @@ using namespace backend;
 //   1: the cone test always passes
 //   2: the light covers the whole screen range of froxels, instead of its projected bounding box
 //   3: every froxel in the projected bounding box gets the light (no sphere or cone test)
+//   4: normal, and logs the cone test's inputs and the first froxels it rejects (slog warnings)
 #ifndef SHAPR_FROXEL_EXPERIMENT
 #define SHAPR_FROXEL_EXPERIMENT 0
 #endif
@@ -769,6 +772,20 @@ void Froxelizer::froxelizePointAndSpotLight(
     // the code below works with radius^2
     const float4 s = { light.position, light.radius * light.radius };
 
+#if SHAPR_FROXEL_EXPERIMENT == 4
+    // Logs the cone test's inputs, and the first froxels it rejects, once every 10 lights froxelized
+    static std::atomic<uint32_t> callCounter{ 0 };
+    const bool logThisCall = (callCounter++ % 10) == 0;
+    size_t conePassed = 0, coneRejected = 0, rejectLogs = 0;
+    if (logThisCall) {
+        slog.w << "FroxelExp light: pos " << light.position.x << " " << light.position.y << " " << light.position.z
+               << " axis " << light.axis.x << " " << light.axis.y << " " << light.axis.z
+               << " radius " << light.radius << " invSin " << light.invSin << " cosSqr " << light.cosSqr
+               << " | froxels " << mFroxelCountX << "x" << mFroxelCountY << "x" << mFroxelCountZ
+               << " near " << mNear << " zLightFar " << mZLightFar << io::endl;
+    }
+#endif
+
 #if defined(DEBUG_FROXEL) || SHAPR_FROXEL_EXPERIMENT == 2
     const size_t x0 = 0;
     const size_t x1 = mFroxelCountX - 1;
@@ -901,6 +918,22 @@ void Froxelizer::froxelizePointAndSpotLight(
                             bool const intersect = sphereConeIntersectionFast(boundingSpheres[fi],
                                     light.position, light.axis, light.invSin, light.cosSqr);
 #endif
+#if SHAPR_FROXEL_EXPERIMENT == 4
+                            if (intersect) {
+                                conePassed++;
+                            } else {
+                                coneRejected++;
+                                if (logThisCall && rejectLogs < 6) {
+                                    rejectLogs++;
+                                    float4 const& sp = boundingSpheres[fi];
+                                    float3 const u = light.position - (sp.w * light.invSin) * light.axis;
+                                    float3 const d = sp.xyz - u;
+                                    slog.w << "FroxelExp rejected: froxel " << (bx - 1) << "," << iy << "," << iz
+                                           << " sphere " << sp.x << " " << sp.y << " " << sp.z << " r " << sp.w
+                                           << " e " << dot(light.axis, d) << " dd " << dot(d, d) << io::endl;
+                                }
+                            }
+#endif
                             froxelThread[fi++] |= LightGroupType(intersect) << bit;
                         }
                     } else {
@@ -913,11 +946,16 @@ void Froxelizer::froxelizePointAndSpotLight(
             }
         }
     }
+#if SHAPR_FROXEL_EXPERIMENT == 4
+    if (logThisCall) {
+        slog.w << "FroxelExp cone test: passed " << conePassed << ", rejected " << coneRejected << io::endl;
+    }
+#endif
 }
 
 /*
  *
- * lightTree            output the light tree structure there (must be large enough to hold a complete tree)
+ * lightTree           output the light tree structure there (must be large enough to hold a complete tree)
  * lightList            list if lights
  * lightData            scene's light data SoA
  * lightRecordsOffset   offset in the record buffer where to find the light list
