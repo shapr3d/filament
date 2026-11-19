@@ -405,6 +405,10 @@ void FEngine::init() {
                 });
             });
 
+    // TEMPORARY, do not commit
+    mDebugRegistry.registerProperty("d.lighting.froxel_experiment", &debug.lighting.froxel_experiment);
+    mDebugRegistry.registerProperty("d.lighting.froxel_log", &debug.lighting.froxel_log);
+
     mDebugRegistry.registerProperty("d.lighting.debug_froxel_visualization",
             &debug.lighting.debug_froxel_visualization, [this]() {
                 mMaterials.forEach([this](FMaterial* material) {

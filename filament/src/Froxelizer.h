@@ -191,6 +191,9 @@ private:
 
     struct FroxelThreadData;
 
+    // TEMPORARY, do not commit: runtime experiment selector, see Froxelizer.cpp
+    int experiment() const noexcept;
+
     inline void setViewport(Viewport const& viewport) noexcept;
     inline void setProjection(const math::mat4f& projection, float near, float far) noexcept;
     bool update() noexcept;
@@ -230,6 +233,8 @@ private:
     static void computeFroxelLayout(
             math::uint2* dim, uint16_t* countX, uint16_t* countY, uint16_t* countZ,
             size_t froxelBufferEntryCount, Viewport const& viewport) noexcept;
+
+    FEngine const& mEngine;
 
     // internal state dependent on the viewport and needed for froxelizing
     LinearAllocatorArena mArena;                        // ~256 KiB
@@ -272,6 +277,7 @@ private:
     float mFar = 0.0f;         // camera far
     float mZLightNear;
     float mZLightFar;
+    int mAppliedExperiment = 0;
 
     // track if we need to update our internal state before froxelizing
     uint8_t mDirtyFlags = 0;

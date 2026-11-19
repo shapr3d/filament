@@ -36,6 +36,8 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cmath>
+#include <vector>
 
 #include <stddef.h>
 
@@ -46,16 +48,17 @@ namespace filament {
 
 using namespace backend;
 
-// TEMPORARY, do not commit. Isolates which stage of the spot light froxelization drops the light:
+// TEMPORARY, do not commit. Runtime experiments, selected with the debug registry property
+// "d.lighting.froxel_experiment" (and "d.lighting.froxel_log" for slog warnings about the inputs):
 //   0: normal
 //   1: the cone test always passes
 //   2: the light covers the whole screen range of froxels, instead of its projected bounding box
 //   3: every froxel in the projected bounding box gets the light (no sphere or cone test)
-//   4: normal, and logs the cone test's inputs and the first froxels it rejects (slog warnings)
-//   5: the shader's depth slice lookup accounts for the camera's finite far plane
-#ifndef SHAPR_FROXEL_EXPERIMENT
-#define SHAPR_FROXEL_EXPERIMENT 0
-#endif
+//   5: the shader's depth slice lookup accounts for the finite far plane of the projection matrix
+//   6: normal, then the light is also added to the froxels one depth slice before and after
+//   7: normal, then the light is also added to the froxels one tile left/right/up/down
+//   8: both 6 and 7
+//   9: normal, but the depth slice of a view-space z uses an exact log2 instead of fast::log2
 
 // TODO: these should come from a configuration object on View or Camera
 static constexpr size_t FROXEL_SLICE_COUNT = 16;
@@ -109,8 +112,13 @@ static bool fuzzyEqual(mat4f const& UTILS_RESTRICT l, mat4f const& UTILS_RESTRIC
 }
 
 
+int Froxelizer::experiment() const noexcept {
+    return mEngine.debug.lighting.froxel_experiment;
+}
+
 Froxelizer::Froxelizer(FEngine& engine)
-        : mArena("froxel", PER_FROXELDATA_ARENA_SIZE),
+        : mEngine(engine),
+          mArena("froxel", PER_FROXELDATA_ARENA_SIZE),
           mZLightNear(FROXEL_FIRST_SLICE_DEPTH),
           mZLightFar(FROXEL_LAST_SLICE_DISTANCE)
 {
@@ -186,6 +194,11 @@ bool Froxelizer::prepare(
         const mat4f& projection, float projectionNear, float projectionFar) noexcept {
     setViewport(viewport);
     setProjection(projection, projectionNear, projectionFar);
+
+    if (UTILS_UNLIKELY(experiment() != mAppliedExperiment)) {
+        mAppliedExperiment = experiment();
+        mDirtyFlags |= PROJECTION_CHANGED;
+    }
 
     bool uniformsNeedUpdating = false;
     if (UTILS_UNLIKELY(mDirtyFlags)) {
@@ -450,13 +463,9 @@ bool Froxelizer::update() noexcept {
             // ==> i = -log2(z_screen * (far/near)) * (1/linearizer) + zcount
             // ==> i = log2(z_screen * (far/near)) * (-1/linearizer) + zcount
             mParamsZ[0] = mZLightFar / Pw;
-#if SHAPR_FROXEL_EXPERIMENT == 5
-            // The relation above only holds for an infinite far plane. With a finite far,
-            // z_screen * (zLightFar / Pw) = zLightFar * (1 / z_view - 1 / far), so add the missing term.
-            mParamsZ[1] = mZLightFar / mFar;
-#else
-            mParamsZ[1] = 0.0f;
-#endif
+            // The relation above only holds for an infinite far plane. In general
+            // z_screen = Pw / -z_view - Pz, so add the missing Pz term.
+            mParamsZ[1] = (mAppliedExperiment == 5) ? (mZLightFar * Pz / Pw) : 0.0f;
             mParamsZ[2] = -mLinearizer;
         } else {
             // orthographic projection
@@ -470,6 +479,19 @@ bool Froxelizer::update() noexcept {
             mParamsZ[2] = mLinearizer;
         }
         uniformsNeedUpdating = true;
+
+        if (mEngine.debug.lighting.froxel_log) {
+            slog.w << "FroxelExp update: experiment " << mAppliedExperiment
+                   << " viewport " << mViewport.width << "x" << mViewport.height
+                   << " froxelDim " << mFroxelDimension.x << "x" << mFroxelDimension.y
+                   << " froxels " << mFroxelCountX << "x" << mFroxelCountY << "x" << mFroxelCountZ
+                   << " near " << mNear << " far " << mFar
+                   << " P22 " << Pz << " P32 " << Pw << " P23 " << mProjection[2][3]
+                   << " P00 " << mProjection[0][0] << " P11 " << mProjection[1][1]
+                   << " P20 " << mProjection[2][0] << " P21 " << mProjection[2][1]
+                   << " zParams " << mParamsZ.x << " " << mParamsZ.y << " " << mParamsZ.z << " " << mParamsZ.w
+                   << io::endl;
+        }
     }
     assert_invariant(mZLightNear >= mNear);
     mDirtyFlags = 0;
@@ -498,7 +520,9 @@ size_t Froxelizer::findSliceZ(float z) const noexcept {
 
     // This whole function is now branch-less.
 
-    int s = int( fast::log2(-z / mZLightFar) * mLinearizer + float(mFroxelCountZ) );
+    float const l2 = (experiment() == 9) ?
+            std::log2(std::max(-z, 1e-30f) / mZLightFar) : fast::log2(-z / mZLightFar);
+    int s = int( l2 * mLinearizer + float(mFroxelCountZ) );
 
     // there are cases where z can be negative here, e.g.:
     // - the light is visible, but its center is behind the camera
@@ -780,28 +804,22 @@ void Froxelizer::froxelizePointAndSpotLight(
     // the code below works with radius^2
     const float4 s = { light.position, light.radius * light.radius };
 
-#if SHAPR_FROXEL_EXPERIMENT == 4
-    // Logs the cone test's inputs, and the first froxels it rejects, once every 10 lights froxelized
+    int const exp = experiment();
+
+    // Logs the cone test's inputs, and the first froxels it rejects, once every 60 lights froxelized
     static std::atomic<uint32_t> callCounter{ 0 };
-    const bool logThisCall = (callCounter++ % 10) == 0;
+    const bool logThisCall = mEngine.debug.lighting.froxel_log && (callCounter++ % 60) == 0;
     size_t conePassed = 0, coneRejected = 0, rejectLogs = 0;
     if (logThisCall) {
-        slog.w << "FroxelExp light: pos " << light.position.x << " " << light.position.y << " " << light.position.z
+        slog.w << "FroxelExp light: experiment " << exp
+               << " pos " << light.position.x << " " << light.position.y << " " << light.position.z
                << " axis " << light.axis.x << " " << light.axis.y << " " << light.axis.z
                << " radius " << light.radius << " invSin " << light.invSin << " cosSqr " << light.cosSqr
                << " | froxels " << mFroxelCountX << "x" << mFroxelCountY << "x" << mFroxelCountZ
-               << " near " << mNear << " far " << mFar << " zLightFar " << mZLightFar << io::endl;
+               << " near " << mNear << " far " << mFar << " zLightFar " << mZLightFar
+               << " zcenter " << findSliceZ(light.position.z) << io::endl;
     }
-#endif
 
-#if defined(DEBUG_FROXEL) || SHAPR_FROXEL_EXPERIMENT == 2
-    const size_t x0 = 0;
-    const size_t x1 = mFroxelCountX - 1;
-    const size_t y0 = 0;
-    const size_t y1 = mFroxelCountY - 1;
-    const size_t z0 = 0;
-    const size_t z1 = mFroxelCountZ - 1;
-#else
     // find a reasonable bounding-box in froxel space for the sphere by projecting
     // its (clipped) bounding-box to clip-space and converting to froxel indices.
     Box const aabb = { light.position, light.radius };
@@ -829,27 +847,35 @@ void Froxelizer::froxelizePointAndSpotLight(
         pmax = max(pmax, pt);
     }
 
-    const auto [x0, y0] = clipToIndices(pmin);
-    const size_t z0 = findSliceZ(znear);
+    auto [x0, y0] = clipToIndices(pmin);
+    size_t z0 = findSliceZ(znear);
 
-    const auto [x1, y1] = clipToIndices(pmax);
-    const size_t z1 = findSliceZ(zfar);
+    auto [x1, y1] = clipToIndices(pmax);
+    size_t z1 = findSliceZ(zfar);
 
     assert_invariant(x0 <= x1);
     assert_invariant(y0 <= y1);
     assert_invariant(z0 <= z1);
-#endif
 
-#if SHAPR_FROXEL_EXPERIMENT == 3
-    for (size_t iz = z0; iz <= z1; ++iz) {
-        for (size_t iy = y0; iy <= y1; ++iy) {
-            for (size_t ix = x0; ix <= x1; ++ix) {
-                froxelThread[getFroxelIndex(ix, iy, iz)] |= LightGroupType(1) << bit;
+    if (exp == 2) {
+        x0 = 0;
+        x1 = mFroxelCountX - 1;
+        y0 = 0;
+        y1 = mFroxelCountY - 1;
+        z0 = 0;
+        z1 = mFroxelCountZ - 1;
+    }
+
+    if (exp == 3) {
+        for (size_t iz = z0; iz <= z1; ++iz) {
+            for (size_t iy = y0; iy <= y1; ++iy) {
+                for (size_t ix = x0; ix <= x1; ++ix) {
+                    froxelThread[getFroxelIndex(ix, iy, iz)] |= LightGroupType(1) << bit;
+                }
             }
         }
+        return;
     }
-    return;
-#endif
 
     const size_t zcenter = findSliceZ(s.z);
     float4 const * const UTILS_RESTRICT planesX = mPlanesX;
@@ -920,28 +946,25 @@ void Froxelizer::froxelizePointAndSpotLight(
                         // this loops gets vectorized (on arm64) w/ clang
                         while (bx++ != ex) {
                             // see if this froxel intersects the cone
-#if SHAPR_FROXEL_EXPERIMENT == 1
-                            bool const intersect = true;
-#else
-                            bool const intersect = sphereConeIntersectionFast(boundingSpheres[fi],
+                            bool const intersect = (exp == 1) || sphereConeIntersectionFast(
+                                    boundingSpheres[fi],
                                     light.position, light.axis, light.invSin, light.cosSqr);
-#endif
-#if SHAPR_FROXEL_EXPERIMENT == 4
-                            if (intersect) {
-                                conePassed++;
-                            } else {
-                                coneRejected++;
-                                if (logThisCall && rejectLogs < 6) {
-                                    rejectLogs++;
-                                    float4 const& sp = boundingSpheres[fi];
-                                    float3 const u = light.position - (sp.w * light.invSin) * light.axis;
-                                    float3 const d = sp.xyz - u;
-                                    slog.w << "FroxelExp rejected: froxel " << (bx - 1) << "," << iy << "," << iz
-                                           << " sphere " << sp.x << " " << sp.y << " " << sp.z << " r " << sp.w
-                                           << " e " << dot(light.axis, d) << " dd " << dot(d, d) << io::endl;
+                            if (logThisCall) {
+                                if (intersect) {
+                                    conePassed++;
+                                } else {
+                                    coneRejected++;
+                                    if (rejectLogs < 6) {
+                                        rejectLogs++;
+                                        float4 const& sp = boundingSpheres[fi];
+                                        float3 const u = light.position - (sp.w * light.invSin) * light.axis;
+                                        float3 const d = sp.xyz - u;
+                                        slog.w << "FroxelExp rejected: froxel " << (bx - 1) << "," << iy << "," << iz
+                                               << " sphere " << sp.x << " " << sp.y << " " << sp.z << " r " << sp.w
+                                               << " e " << dot(light.axis, d) << " dd " << dot(d, d) << io::endl;
+                                    }
                                 }
                             }
-#endif
                             froxelThread[fi++] |= LightGroupType(intersect) << bit;
                         }
                     } else {
@@ -954,11 +977,36 @@ void Froxelizer::froxelizePointAndSpotLight(
             }
         }
     }
-#if SHAPR_FROXEL_EXPERIMENT == 4
     if (logThisCall) {
         slog.w << "FroxelExp cone test: passed " << conePassed << ", rejected " << coneRejected << io::endl;
     }
-#endif
+
+    if (exp == 6 || exp == 7 || exp == 8) {
+        // also give the light to the neighbors of every froxel that has it
+        bool const dilateZ = (exp == 6 || exp == 8);
+        bool const dilateXY = (exp == 7 || exp == 8);
+        LightGroupType const mask = LightGroupType(1) << bit;
+        ssize_t const nx = mFroxelCountX, ny = mFroxelCountY, nz = mFroxelCountZ;
+        std::vector<uint32_t> hits;
+        for (size_t i = 0, c = mFroxelCount; i < c; i++) {
+            if (froxelThread[i] & mask) {
+                hits.push_back(uint32_t(i));
+            }
+        }
+        for (uint32_t const i : hits) {
+            ssize_t const ix = i % nx, iy = (i / nx) % ny, iz = i / (nx * ny);
+            for (ssize_t dz = dilateZ ? -1 : 0; dz <= (dilateZ ? 1 : 0); dz++) {
+                for (ssize_t dy = dilateXY ? -1 : 0; dy <= (dilateXY ? 1 : 0); dy++) {
+                    for (ssize_t dx = dilateXY ? -1 : 0; dx <= (dilateXY ? 1 : 0); dx++) {
+                        ssize_t const jx = ix + dx, jy = iy + dy, jz = iz + dz;
+                        if (jx >= 0 && jx < nx && jy >= 0 && jy < ny && jz >= 0 && jz < nz) {
+                            froxelThread[getFroxelIndex(jx, jy, jz)] |= mask;
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 /*

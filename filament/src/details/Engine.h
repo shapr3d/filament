@@ -583,6 +583,9 @@ public:
         } renderer;
         struct {
             bool debug_froxel_visualization = false;
+            // TEMPORARY, do not commit: see Froxelizer.cpp
+            int froxel_experiment = 0;
+            bool froxel_log = false;
         } lighting;
         matdbg::DebugServer* server = nullptr;
     } debug;
