@@ -66,6 +66,7 @@ using namespace backend;
 //   17: normal, but zLightFar = 70, so zParams.x overflows a half float
 //   20: normal here; the app removes the polygon offset of the ground shadow plane
 //   21..36: only the froxels of depth slice (experiment - 21) get the light, across the whole screen
+//   37, 38: normal, but zParams.x is divided by 2 or 1.5 (compensates a too large fragment depth)
 
 // TODO: these should come from a configuration object on View or Camera
 static constexpr size_t FROXEL_SLICE_COUNT = 16;
@@ -217,6 +218,10 @@ bool Froxelizer::prepare(
 
     bool uniformsNeedUpdating = false;
     if (UTILS_UNLIKELY(mDirtyFlags)) {
+        if (mEngine.debug.lighting.froxel_log) {
+            math::float2 const clipControl = driverApi.getClipSpaceParams();
+            slog.w << "FroxelExp clipControl " << clipControl.x << " " << clipControl.y << io::endl;
+        }
         uniformsNeedUpdating = update();
     }
 
@@ -478,6 +483,9 @@ bool Froxelizer::update() noexcept {
             // ==> i = -log2(z_screen * (far/near)) * (1/linearizer) + zcount
             // ==> i = log2(z_screen * (far/near)) * (-1/linearizer) + zcount
             mParamsZ[0] = mZLightFar / Pw;
+            // experiments 37 and 38 compensate a fragment depth that is 2x or 1.5x too large
+            if (mAppliedExperiment == 37) mParamsZ[0] *= 0.5f;
+            if (mAppliedExperiment == 38) mParamsZ[0] /= 1.5f;
             // The relation above only holds for an infinite far plane. In general
             // z_screen = Pw / -z_view - Pz, so add the missing Pz term.
             mParamsZ[1] = (mAppliedExperiment == 5) ? (mZLightFar * Pz / Pw) : 0.0f;
