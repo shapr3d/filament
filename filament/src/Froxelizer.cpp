@@ -67,6 +67,8 @@ using namespace backend;
 //   20: normal here; the app removes the polygon offset of the ground shadow plane
 //   21..36: only the froxels of depth slice (experiment - 21) get the light, across the whole screen
 //   37, 38: normal, but zParams.x is divided by 2 or 1.5 (compensates a too large fragment depth)
+//   39: normal, but zParams.x is tiny: the shader puts every fragment in the last slice (no spot/point light)
+//   40, 41: normal, but the shader's froxelCountXY is divided or multiplied by 1.5
 
 // TODO: these should come from a configuration object on View or Camera
 static constexpr size_t FROXEL_SLICE_COUNT = 16;
@@ -486,6 +488,8 @@ bool Froxelizer::update() noexcept {
             // experiments 37 and 38 compensate a fragment depth that is 2x or 1.5x too large
             if (mAppliedExperiment == 37) mParamsZ[0] *= 0.5f;
             if (mAppliedExperiment == 38) mParamsZ[0] /= 1.5f;
+            // experiment 39 puts every fragment in the last slice, so no froxel light shows anywhere
+            if (mAppliedExperiment == 39) mParamsZ[0] *= 1e-6f;
             // The relation above only holds for an infinite far plane. In general
             // z_screen = Pw / -z_view - Pz, so add the missing Pz term.
             mParamsZ[1] = (mAppliedExperiment == 5) ? (mZLightFar * Pz / Pw) : 0.0f;

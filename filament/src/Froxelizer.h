@@ -129,6 +129,9 @@ public:
         s.zParams = mParamsZ;
         s.fParams = mParamsF;
         s.froxelCountXY = math::float2{ mViewport.width, mViewport.height } / mFroxelDimension;
+        // TEMPORARY, do not commit: experiments 40 and 41 scale the shader's froxel x/y lookup
+        if (mAppliedExperiment == 40) s.froxelCountXY /= 1.5f;
+        if (mAppliedExperiment == 41) s.froxelCountXY *= 1.5f;
     }
 
     // send froxel data to GPU
