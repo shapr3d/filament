@@ -69,6 +69,8 @@ using namespace backend;
 //   37, 38: normal, but zParams.x is divided by 2 or 1.5 (compensates a too large fragment depth)
 //   39: normal, but zParams.x is tiny: the shader puts every fragment in the last slice (no spot/point light)
 //   40, 41: normal, but the shader's froxelCountXY is divided or multiplied by 1.5
+//   42: zParams for a fragment depth of (1 + near/z) / 2 (no effective clip control)
+//   43: zParams for a fragment depth of 1 - near/z (no reversed z)
 
 // TODO: these should come from a configuration object on View or Camera
 static constexpr size_t FROXEL_SLICE_COUNT = 16;
@@ -490,6 +492,17 @@ bool Froxelizer::update() noexcept {
             if (mAppliedExperiment == 38) mParamsZ[0] /= 1.5f;
             // experiment 39 puts every fragment in the last slice, so no froxel light shows anywhere
             if (mAppliedExperiment == 39) mParamsZ[0] *= 1e-6f;
+            // experiment 42: the fragment depth is (1 + near/z) / 2, i.e. clip z in [0, w] was
+            // treated as [-w, w]: near/z = 2 * depth - 1
+            if (mAppliedExperiment == 42) {
+                mParamsZ[0] = 2.0f * mZLightFar / Pw;
+                mParamsZ[1] = -mZLightFar / Pw;
+            }
+            // experiment 43: the fragment depth is not reversed, 1 - near/z
+            if (mAppliedExperiment == 43) {
+                mParamsZ[0] = -mZLightFar / Pw;
+                mParamsZ[1] = mZLightFar / Pw;
+            }
             // The relation above only holds for an infinite far plane. In general
             // z_screen = Pw / -z_view - Pz, so add the missing Pz term.
             mParamsZ[1] = (mAppliedExperiment == 5) ? (mZLightFar * Pz / Pw) : 0.0f;
