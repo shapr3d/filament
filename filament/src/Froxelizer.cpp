@@ -37,6 +37,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <cstdio>
 #include <vector>
 
 #include <stddef.h>
@@ -59,9 +60,11 @@ using namespace backend;
 //      (radius in tiles x, y and depth slices z):
 //        6: (0,0,1)   7: (1,1,0)   8: (1,1,1)   10: (2,2,0)   11: (0,0,2)
 //        12: (1,0,0)  13: (0,1,0)  14: (1,0,1)  15: (0,1,1)
+//        18: only the 2 slices toward the camera    19: only the 2 slices away from the camera
 //   9: normal, but the depth slice of a view-space z uses an exact log2 instead of fast::log2
 //   16: normal, but zLightFar = 60, so zParams.x = zLightFar / near fits in a half float (near = 1/1024)
 //   17: normal, but zLightFar = 70, so zParams.x overflows a half float
+//   20: normal here; the app removes the polygon offset of the ground shadow plane
 
 // TODO: these should come from a configuration object on View or Camera
 static constexpr size_t FROXEL_SLICE_COUNT = 16;
@@ -992,21 +995,24 @@ void Froxelizer::froxelizePointAndSpotLight(
         slog.w << "FroxelExp cone test: passed " << conePassed << ", rejected " << coneRejected << io::endl;
     }
 
-    // also give the light to the neighbors (within radius rx, ry, rz) of every froxel that has it
-    ssize_t rx = 0, ry = 0, rz = 0;
+    // also give the light to the neighbors of every froxel that has it: within rx tiles in x,
+    // ry tiles in y, and depth slices dzMin..dzMax (negative is toward the camera)
+    ssize_t rx = 0, ry = 0, dzMin = 0, dzMax = 0;
     switch (exp) {
-        case 6:  rz = 1; break;
+        case 6:  dzMin = -1; dzMax = 1; break;
         case 7:  rx = ry = 1; break;
-        case 8:  rx = ry = rz = 1; break;
+        case 8:  rx = ry = 1; dzMin = -1; dzMax = 1; break;
         case 10: rx = ry = 2; break;
-        case 11: rz = 2; break;
+        case 11: dzMin = -2; dzMax = 2; break;
         case 12: rx = 1; break;
         case 13: ry = 1; break;
-        case 14: rx = rz = 1; break;
-        case 15: ry = rz = 1; break;
+        case 14: rx = 1; dzMin = -1; dzMax = 1; break;
+        case 15: ry = 1; dzMin = -1; dzMax = 1; break;
+        case 18: dzMin = -2; break;
+        case 19: dzMax = 2; break;
         default: break;
     }
-    if (rx || ry || rz) {
+    if (rx || ry || dzMin || dzMax) {
         LightGroupType const mask = LightGroupType(1) << bit;
         ssize_t const nx = mFroxelCountX, ny = mFroxelCountY, nz = mFroxelCountZ;
         std::vector<uint32_t> hits;
@@ -1017,7 +1023,7 @@ void Froxelizer::froxelizePointAndSpotLight(
         }
         for (uint32_t const i : hits) {
             ssize_t const ix = i % nx, iy = (i / nx) % ny, iz = i / (nx * ny);
-            for (ssize_t dz = -rz; dz <= rz; dz++) {
+            for (ssize_t dz = dzMin; dz <= dzMax; dz++) {
                 for (ssize_t dy = -ry; dy <= ry; dy++) {
                     for (ssize_t dx = -rx; dx <= rx; dx++) {
                         ssize_t const jx = ix + dx, jy = iy + dy, jz = iz + dz;
@@ -1027,6 +1033,25 @@ void Froxelizer::froxelizePointAndSpotLight(
                     }
                 }
             }
+        }
+    }
+
+    // Logs which froxels have this light: per depth slice, one hex bit mask of x per row y
+    if (logThisCall) {
+        LightGroupType const mask = LightGroupType(1) << bit;
+        for (size_t iz = 0; iz < mFroxelCountZ; iz++) {
+            char line[16 * 64];
+            int n = snprintf(line, sizeof(line), "FroxelExp slice %2zu:", iz);
+            for (size_t iy = 0; iy < mFroxelCountY && n < int(sizeof(line)) - 16; iy++) {
+                uint64_t bits = 0;
+                for (size_t ix = 0; ix < mFroxelCountX && ix < 64; ix++) {
+                    if (froxelThread[getFroxelIndex(ix, iy, iz)] & mask) {
+                        bits |= uint64_t(1) << ix;
+                    }
+                }
+                n += snprintf(line + n, sizeof(line) - n, " %06llx", (unsigned long long)bits);
+            }
+            slog.w << line << io::endl;
         }
     }
 }
