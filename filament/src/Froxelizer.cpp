@@ -71,6 +71,7 @@ using namespace backend;
 //   40, 41: normal, but the shader's froxelCountXY is divided or multiplied by 1.5
 //   42: zParams for a fragment depth of (1 + near/z) / 2 (no effective clip control)
 //   43: zParams for a fragment depth of 1 - near/z (no reversed z)
+//   44..53: zParams.x scaled by 2^-2, 2^-4, ..., 2^-20 (2^(-2 * (experiment - 43)))
 
 // TODO: these should come from a configuration object on View or Camera
 static constexpr size_t FROXEL_SLICE_COUNT = 16;
@@ -497,6 +498,11 @@ bool Froxelizer::update() noexcept {
             if (mAppliedExperiment == 42) {
                 mParamsZ[0] = 2.0f * mZLightFar / Pw;
                 mParamsZ[1] = -mZLightFar / Pw;
+            }
+            // experiments 44..53 scale zParams.x by 2^-2, 2^-4, ..., 2^-20, to find the scale of the
+            // fragment depth the shader sees
+            if (mAppliedExperiment >= 44 && mAppliedExperiment <= 53) {
+                mParamsZ[0] *= std::exp2(-2.0f * float(mAppliedExperiment - 43));
             }
             // experiment 43: the fragment depth is not reversed, 1 - near/z
             if (mAppliedExperiment == 43) {
