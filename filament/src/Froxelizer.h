@@ -269,6 +269,7 @@ private:
     math::float4 mParamsZ = {};
     math::uint3 mParamsF = {};
     float mNear = 0.0f;        // camera near
+    float mFar = 0.0f;         // camera far
     float mZLightNear;
     float mZLightFar;
 

@@ -52,6 +52,7 @@ using namespace backend;
 //   2: the light covers the whole screen range of froxels, instead of its projected bounding box
 //   3: every froxel in the projected bounding box gets the light (no sphere or cone test)
 //   4: normal, and logs the cone test's inputs and the first froxels it rejects (slog warnings)
+//   5: the shader's depth slice lookup accounts for the camera's finite far plane
 #ifndef SHAPR_FROXEL_EXPERIMENT
 #define SHAPR_FROXEL_EXPERIMENT 0
 #endif
@@ -171,10 +172,11 @@ void Froxelizer::setViewport(filament::Viewport const& viewport) noexcept {
 }
 
 void Froxelizer::setProjection(const mat4f& projection,
-        float near, UTILS_UNUSED float far) noexcept {
+        float near, float far) noexcept {
     if (UTILS_UNLIKELY(!fuzzyEqual(mProjection, projection))) {
         mProjection = projection;
         mNear = near;
+        mFar = far;
         mDirtyFlags |= PROJECTION_CHANGED;
     }
 }
@@ -448,7 +450,13 @@ bool Froxelizer::update() noexcept {
             // ==> i = -log2(z_screen * (far/near)) * (1/linearizer) + zcount
             // ==> i = log2(z_screen * (far/near)) * (-1/linearizer) + zcount
             mParamsZ[0] = mZLightFar / Pw;
+#if SHAPR_FROXEL_EXPERIMENT == 5
+            // The relation above only holds for an infinite far plane. With a finite far,
+            // z_screen * (zLightFar / Pw) = zLightFar * (1 / z_view - 1 / far), so add the missing term.
+            mParamsZ[1] = mZLightFar / mFar;
+#else
             mParamsZ[1] = 0.0f;
+#endif
             mParamsZ[2] = -mLinearizer;
         } else {
             // orthographic projection
@@ -782,7 +790,7 @@ void Froxelizer::froxelizePointAndSpotLight(
                << " axis " << light.axis.x << " " << light.axis.y << " " << light.axis.z
                << " radius " << light.radius << " invSin " << light.invSin << " cosSqr " << light.cosSqr
                << " | froxels " << mFroxelCountX << "x" << mFroxelCountY << "x" << mFroxelCountZ
-               << " near " << mNear << " zLightFar " << mZLightFar << io::endl;
+               << " near " << mNear << " far " << mFar << " zLightFar " << mZLightFar << io::endl;
     }
 #endif
 
