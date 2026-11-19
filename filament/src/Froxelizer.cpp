@@ -65,6 +65,7 @@ using namespace backend;
 //   16: normal, but zLightFar = 60, so zParams.x = zLightFar / near fits in a half float (near = 1/1024)
 //   17: normal, but zLightFar = 70, so zParams.x overflows a half float
 //   20: normal here; the app removes the polygon offset of the ground shadow plane
+//   21..36: only the froxels of depth slice (experiment - 21) get the light, across the whole screen
 
 // TODO: these should come from a configuration object on View or Camera
 static constexpr size_t FROXEL_SLICE_COUNT = 16;
@@ -878,6 +879,17 @@ void Froxelizer::froxelizePointAndSpotLight(
         y1 = mFroxelCountY - 1;
         z0 = 0;
         z1 = mFroxelCountZ - 1;
+    }
+
+    if (exp >= 21 && exp < 21 + int(mFroxelCountZ)) {
+        // only the froxels of depth slice (exp - 21) get the light, across the whole screen
+        size_t const iz = size_t(exp - 21);
+        for (size_t iy = 0; iy < mFroxelCountY; ++iy) {
+            for (size_t ix = 0; ix < mFroxelCountX; ++ix) {
+                froxelThread[getFroxelIndex(ix, iy, iz)] |= LightGroupType(1) << bit;
+            }
+        }
+        return;
     }
 
     if (exp == 3) {
