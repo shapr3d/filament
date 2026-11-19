@@ -54,10 +54,11 @@ using namespace backend;
 //   1: the cone test always passes
 //   2: the light covers the whole screen range of froxels, instead of its projected bounding box
 //   3: every froxel in the projected bounding box gets the light (no sphere or cone test)
-//   5: the shader's depth slice lookup accounts for the finite far plane of the projection matrix
-//   6: normal, then the light is also added to the froxels one depth slice before and after
-//   7: normal, then the light is also added to the froxels one tile left/right/up/down
-//   8: both 6 and 7
+//   5: (no effect: the drawing projection has an infinite far plane)
+//   6..8, 10..15: normal, then the light is also added to the neighbors of every froxel that has it
+//      (radius in tiles x, y and depth slices z):
+//        6: (0,0,1)   7: (1,1,0)   8: (1,1,1)   10: (2,2,0)   11: (0,0,2)
+//        12: (1,0,0)  13: (0,1,0)  14: (1,0,1)  15: (0,1,1)
 //   9: normal, but the depth slice of a view-space z uses an exact log2 instead of fast::log2
 
 // TODO: these should come from a configuration object on View or Camera
@@ -981,10 +982,21 @@ void Froxelizer::froxelizePointAndSpotLight(
         slog.w << "FroxelExp cone test: passed " << conePassed << ", rejected " << coneRejected << io::endl;
     }
 
-    if (exp == 6 || exp == 7 || exp == 8) {
-        // also give the light to the neighbors of every froxel that has it
-        bool const dilateZ = (exp == 6 || exp == 8);
-        bool const dilateXY = (exp == 7 || exp == 8);
+    // also give the light to the neighbors (within radius rx, ry, rz) of every froxel that has it
+    ssize_t rx = 0, ry = 0, rz = 0;
+    switch (exp) {
+        case 6:  rz = 1; break;
+        case 7:  rx = ry = 1; break;
+        case 8:  rx = ry = rz = 1; break;
+        case 10: rx = ry = 2; break;
+        case 11: rz = 2; break;
+        case 12: rx = 1; break;
+        case 13: ry = 1; break;
+        case 14: rx = rz = 1; break;
+        case 15: ry = rz = 1; break;
+        default: break;
+    }
+    if (rx || ry || rz) {
         LightGroupType const mask = LightGroupType(1) << bit;
         ssize_t const nx = mFroxelCountX, ny = mFroxelCountY, nz = mFroxelCountZ;
         std::vector<uint32_t> hits;
@@ -995,9 +1007,9 @@ void Froxelizer::froxelizePointAndSpotLight(
         }
         for (uint32_t const i : hits) {
             ssize_t const ix = i % nx, iy = (i / nx) % ny, iz = i / (nx * ny);
-            for (ssize_t dz = dilateZ ? -1 : 0; dz <= (dilateZ ? 1 : 0); dz++) {
-                for (ssize_t dy = dilateXY ? -1 : 0; dy <= (dilateXY ? 1 : 0); dy++) {
-                    for (ssize_t dx = dilateXY ? -1 : 0; dx <= (dilateXY ? 1 : 0); dx++) {
+            for (ssize_t dz = -rz; dz <= rz; dz++) {
+                for (ssize_t dy = -ry; dy <= ry; dy++) {
+                    for (ssize_t dx = -rx; dx <= rx; dx++) {
                         ssize_t const jx = ix + dx, jy = iy + dy, jz = iz + dz;
                         if (jx >= 0 && jx < nx && jy >= 0 && jy < ny && jz >= 0 && jz < nz) {
                             froxelThread[getFroxelIndex(jx, jy, jz)] |= mask;
