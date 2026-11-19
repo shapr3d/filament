@@ -481,6 +481,9 @@ void OpenGLContext::initBugs(Bugs* bugs, Extensions const& exts,
             // (that should be regardless of ANGLE, but we should double-check)
             bugs->split_easu = true;
         }
+        if (exts.EXT_clip_control && (strstr(renderer, "Direct3D11") || strstr(renderer, "D3D11"))) {
+            bugs->frag_coord_z_ignores_clip_control = true;
+        }
     }
 
 #ifdef BACKEND_OPENGL_VERSION_GLES

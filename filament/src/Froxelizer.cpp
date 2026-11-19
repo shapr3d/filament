@@ -106,6 +106,9 @@ Froxelizer::Froxelizer(FEngine& engine)
 
     DriverApi& driverApi = engine.getDriverApi();
 
+    mFragCoordZIgnoresClipControl =
+            driverApi.isWorkaroundNeeded(Workaround::FRAG_COORD_Z_IGNORES_CLIP_CONTROL);
+
     if (UTILS_UNLIKELY(driverApi.getFeatureLevel() == FeatureLevel::FEATURE_LEVEL_0)) {
         return;
     }
@@ -448,6 +451,12 @@ bool Froxelizer::update() noexcept {
             mParamsZ[0] = -1.0f / (Pz * mZLightFar);  // -(far-near) / mZLightFar
             mParamsZ[1] =    Pw / (Pz * mZLightFar);  //         far / mZLightFar
             mParamsZ[2] = mLinearizer;
+        }
+        if (UTILS_UNLIKELY(mFragCoordZIgnoresClipControl)) {
+            // the shader sees (1 + z_screen) / 2 instead of z_screen, so substitute
+            // z_screen = 2 * fragCoordZ - 1 into zParams.x * z_screen + zParams.y
+            mParamsZ[1] -= mParamsZ[0];
+            mParamsZ[0] *= 2.0f;
         }
         uniformsNeedUpdating = true;
     }

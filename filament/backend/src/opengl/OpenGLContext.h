@@ -281,6 +281,10 @@ public:
         // bugs or performance issues.
         bool force_feature_level0;
 
+        // ANGLE's D3D11 backend computes gl_FragCoord.z as if the clip-space depth was in [-w, w],
+        // even when glClipControlEXT() set it to [0, w].
+        bool frag_coord_z_ignores_clip_control;
+
     } bugs = {};
 
     // state getters -- as needed.
@@ -472,6 +476,9 @@ private:
                     ""},
             {   bugs.force_feature_level0,
                     "force_feature_level0",
+                    ""},
+            {   bugs.frag_coord_z_ignores_clip_control,
+                    "frag_coord_z_ignores_clip_control",
                     ""},
     }};
 

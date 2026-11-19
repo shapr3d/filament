@@ -271,6 +271,7 @@ private:
     float mNear = 0.0f;        // camera near
     float mZLightNear;
     float mZLightFar;
+    bool mFragCoordZIgnoresClipControl = false;
 
     // track if we need to update our internal state before froxelizing
     uint8_t mDirtyFlags = 0;

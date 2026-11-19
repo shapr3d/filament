@@ -1210,7 +1210,10 @@ enum class Workaround : uint16_t {
     POWER_VR_SHADER_WORKAROUNDS,
     // The driver has some threads pinned, and we can't easily know on which core, it can hurt
     // performance more if we end-up pinned on the same one.
-    DISABLE_THREAD_AFFINITY
+    DISABLE_THREAD_AFFINITY,
+    // The fragment depth (gl_FragCoord.z) is computed as if the clip-space depth was in [-w, w],
+    // even though the clip control sets it to [0, w]: it is (1 + depth) / 2.
+    FRAG_COORD_Z_IGNORES_CLIP_CONTROL
 };
 
 } // namespace filament::backend

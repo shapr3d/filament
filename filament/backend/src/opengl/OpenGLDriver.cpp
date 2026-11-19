@@ -1947,6 +1947,8 @@ bool OpenGLDriver::isWorkaroundNeeded(Workaround workaround) {
             return mContext.bugs.powervr_shader_workarounds;
         case Workaround::DISABLE_THREAD_AFFINITY:
             return mContext.bugs.disable_thread_affinity;
+        case Workaround::FRAG_COORD_Z_IGNORES_CLIP_CONTROL:
+            return mContext.bugs.frag_coord_z_ignores_clip_control;
         default:
             return false;
     }
