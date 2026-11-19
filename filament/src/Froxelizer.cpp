@@ -108,6 +108,7 @@ Froxelizer::Froxelizer(FEngine& engine)
 
     mFragCoordZIgnoresClipControl =
             driverApi.isWorkaroundNeeded(Workaround::FRAG_COORD_Z_IGNORES_CLIP_CONTROL);
+    slog.w << "FroxelFix froxelizer workaround " << mFragCoordZIgnoresClipControl << io::endl; // TEMPORARY, do not commit
 
     if (UTILS_UNLIKELY(driverApi.getFeatureLevel() == FeatureLevel::FEATURE_LEVEL_0)) {
         return;

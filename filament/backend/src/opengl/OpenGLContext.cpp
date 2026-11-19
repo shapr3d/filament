@@ -485,6 +485,10 @@ void OpenGLContext::initBugs(Bugs* bugs, Extensions const& exts,
             bugs->frag_coord_z_ignores_clip_control = true;
         }
     }
+    // TEMPORARY, do not commit
+    slog.w << "FroxelFix renderer [" << renderer << "] angle " << isAngle
+           << " EXT_clip_control " << exts.EXT_clip_control
+           << " frag_coord_z_ignores_clip_control " << bugs->frag_coord_z_ignores_clip_control << io::endl;
 
 #ifdef BACKEND_OPENGL_VERSION_GLES
 #   ifndef IOS // IOS is guaranteed to have ES3.x
