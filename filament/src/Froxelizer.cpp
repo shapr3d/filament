@@ -60,6 +60,8 @@ using namespace backend;
 //        6: (0,0,1)   7: (1,1,0)   8: (1,1,1)   10: (2,2,0)   11: (0,0,2)
 //        12: (1,0,0)  13: (0,1,0)  14: (1,0,1)  15: (0,1,1)
 //   9: normal, but the depth slice of a view-space z uses an exact log2 instead of fast::log2
+//   16: normal, but zLightFar = 60, so zParams.x = zLightFar / near fits in a half float (near = 1/1024)
+//   17: normal, but zLightFar = 70, so zParams.x overflows a half float
 
 // TODO: these should come from a configuration object on View or Camera
 static constexpr size_t FROXEL_SLICE_COUNT = 16;
@@ -121,7 +123,9 @@ Froxelizer::Froxelizer(FEngine& engine)
         : mEngine(engine),
           mArena("froxel", PER_FROXELDATA_ARENA_SIZE),
           mZLightNear(FROXEL_FIRST_SLICE_DEPTH),
-          mZLightFar(FROXEL_LAST_SLICE_DISTANCE)
+          mZLightFar(FROXEL_LAST_SLICE_DISTANCE),
+          mUserZLightNear(FROXEL_FIRST_SLICE_DEPTH),
+          mUserZLightFar(FROXEL_LAST_SLICE_DISTANCE)
 {
     static_assert(std::is_same_v<RecordBufferType, uint8_t>,
             "Record Buffer must use bytes");
@@ -165,11 +169,8 @@ void Froxelizer::terminate(DriverApi& driverApi) noexcept {
 }
 
 void Froxelizer::setOptions(float zLightNear, float zLightFar) noexcept {
-    if (UTILS_UNLIKELY(mZLightNear != zLightNear || mZLightFar != zLightFar)) {
-        mZLightNear = zLightNear;
-        mZLightFar = zLightFar;
-        mDirtyFlags |= VIEWPORT_CHANGED;
-    }
+    mUserZLightNear = zLightNear;
+    mUserZLightFar = zLightFar;
 }
 
 
@@ -199,6 +200,15 @@ bool Froxelizer::prepare(
     if (UTILS_UNLIKELY(experiment() != mAppliedExperiment)) {
         mAppliedExperiment = experiment();
         mDirtyFlags |= PROJECTION_CHANGED;
+    }
+
+    // experiments 16 and 17 put zParams.x = zLightFar / near on either side of the half float maximum
+    float const zLightFar = (mAppliedExperiment == 16) ? 60.0f :
+                            (mAppliedExperiment == 17) ? 70.0f : mUserZLightFar;
+    if (UTILS_UNLIKELY(mZLightNear != mUserZLightNear || mZLightFar != zLightFar)) {
+        mZLightNear = mUserZLightNear;
+        mZLightFar = zLightFar;
+        mDirtyFlags |= VIEWPORT_CHANGED;
     }
 
     bool uniformsNeedUpdating = false;

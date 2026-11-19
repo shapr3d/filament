@@ -277,6 +277,8 @@ private:
     float mFar = 0.0f;         // camera far
     float mZLightNear;
     float mZLightFar;
+    float mUserZLightNear;
+    float mUserZLightFar;
     int mAppliedExperiment = 0;
 
     // track if we need to update our internal state before froxelizing
