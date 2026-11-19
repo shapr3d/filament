@@ -278,9 +278,15 @@ void OpenGLContext::setDefaultState() noexcept {
     if (ext.EXT_clip_control) {
 #if defined(BACKEND_OPENGL_VERSION_GL)
         glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
+        slog.w << "FroxelExp init: glClipControl called" << io::endl; // TEMPORARY, do not commit
 #elif defined(GL_EXT_clip_control)
         glClipControlEXT(GL_LOWER_LEFT_EXT, GL_ZERO_TO_ONE_EXT);
+        slog.w << "FroxelExp init: glClipControlEXT called, error 0x" << io::hex << glGetError() << io::dec << io::endl; // TEMPORARY, do not commit
+#else
+        slog.w << "FroxelExp init: clip control advertised but compiled out" << io::endl; // TEMPORARY, do not commit
 #endif
+    } else {
+        slog.w << "FroxelExp init: no clip control" << io::endl; // TEMPORARY, do not commit
     }
 #endif
 

@@ -2740,6 +2740,25 @@ void OpenGLDriver::beginRenderPass(Handle<HwRenderTarget> rth,
 
     gl.depthRange(params.depthRange.near, params.depthRange.far);
 
+    // TEMPORARY, do not commit: logs the GL clip depth mode actually in effect, every 300 render passes
+    {
+        static uint32_t passCounter = 0;
+        if ((passCounter++ % 300) == 0) {
+            GLint depthMode = 0;
+#if defined(GL_CLIP_DEPTH_MODE_EXT)
+            if (gl.ext.EXT_clip_control) glGetIntegerv(GL_CLIP_DEPTH_MODE_EXT, &depthMode);
+#elif defined(GL_CLIP_DEPTH_MODE)
+            if (gl.ext.EXT_clip_control) glGetIntegerv(GL_CLIP_DEPTH_MODE, &depthMode);
+#endif
+            GLfloat depthRange[2] = {};
+            glGetFloatv(GL_DEPTH_RANGE, depthRange);
+            slog.w << "FroxelExp render pass: EXT_clip_control " << gl.ext.EXT_clip_control
+                   << " depth mode 0x" << io::hex << depthMode << io::dec
+                   << " (0x935F = zero to one, 0x935E = negative one to one)"
+                   << " depth range " << depthRange[0] << " " << depthRange[1] << io::endl;
+        }
+    }
+
 #ifndef NDEBUG
     // clear the discarded (but not the cleared ones) buffers in debug builds
     gl.disable(GL_SCISSOR_TEST);

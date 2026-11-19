@@ -493,16 +493,18 @@ bool Froxelizer::update() noexcept {
             if (mAppliedExperiment == 38) mParamsZ[0] /= 1.5f;
             // experiment 39 puts every fragment in the last slice, so no froxel light shows anywhere
             if (mAppliedExperiment == 39) mParamsZ[0] *= 1e-6f;
+            // experiments 44..53 scale zParams.x by 2^-2, 2^-4, ..., 2^-20, to find the scale of the
+            // fragment depth the shader sees
+            if (mAppliedExperiment >= 44 && mAppliedExperiment <= 53) {
+                mParamsZ[0] *= std::exp2(-2.0f * float(mAppliedExperiment - 43));
+            }
+            mParamsZ[1] = (mAppliedExperiment == 5) ? (mZLightFar * Pz / Pw) : 0.0f;
+            mParamsZ[2] = -mLinearizer;
             // experiment 42: the fragment depth is (1 + near/z) / 2, i.e. clip z in [0, w] was
             // treated as [-w, w]: near/z = 2 * depth - 1
             if (mAppliedExperiment == 42) {
                 mParamsZ[0] = 2.0f * mZLightFar / Pw;
                 mParamsZ[1] = -mZLightFar / Pw;
-            }
-            // experiments 44..53 scale zParams.x by 2^-2, 2^-4, ..., 2^-20, to find the scale of the
-            // fragment depth the shader sees
-            if (mAppliedExperiment >= 44 && mAppliedExperiment <= 53) {
-                mParamsZ[0] *= std::exp2(-2.0f * float(mAppliedExperiment - 43));
             }
             // experiment 43: the fragment depth is not reversed, 1 - near/z
             if (mAppliedExperiment == 43) {
@@ -511,8 +513,6 @@ bool Froxelizer::update() noexcept {
             }
             // The relation above only holds for an infinite far plane. In general
             // z_screen = Pw / -z_view - Pz, so add the missing Pz term.
-            mParamsZ[1] = (mAppliedExperiment == 5) ? (mZLightFar * Pz / Pw) : 0.0f;
-            mParamsZ[2] = -mLinearizer;
         } else {
             // orthographic projection
             // z_view = (1 - z_screen) * (near - far) - near
